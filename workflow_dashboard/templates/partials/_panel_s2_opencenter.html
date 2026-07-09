@@ -168,6 +168,183 @@
               <tr><td><strong>Docker / Kind</strong></td><td>local test cluster</td><td><span class="ocqs-badge-opt">Optional</span></td></tr>
             </tbody>
           </table>
+          <div style="margin-top:14px;border:2px solid #bae6fd;border-radius:10px;padding:14px;background:#f8fbff;">
+            <div style="font-size:12px;font-weight:800;color:#0369a1;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">B. Credentials &amp; Inputs</div>
+                    <!-- Inline Cluster Identity Inputs -->
+          <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:14px;margin-top:12px;">
+            <div style="font-size:11px;font-weight:800;color:#0369a1;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">🏷 Cluster Identity</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+              <div>
+                <label class="ocqs-label">Organization Name</label>
+                <input class="ocqs-input" id="ocqs-org" value="my-org" oninput="ocqsUpdate()">
+              </div>
+              <div>
+                <label class="ocqs-label">Cluster Name</label>
+                <input class="ocqs-input" id="ocqs-cluster" value="my-cluster" oninput="ocqsUpdate()">
+              </div>
+              <div>
+                <label class="ocqs-label">Environment</label>
+                <select class="ocqs-select" id="ocqs-env" onchange="ocqsUpdate()">
+                  <option value="dev" selected>dev</option><option value="staging">staging</option><option value="production">production</option>
+                </select>
+              </div>
+              <div>
+                <label class="ocqs-label">Target Provider</label>
+                <select class="ocqs-select" id="ocqs-provider" onchange="ocqsUpdate()">
+                  <option value="openstack" selected>openstack</option><option value="kind">kind (local)</option><option value="vmware">vmware</option><option value="baremetal">baremetal</option>
+                </select>
+              </div>
+            </div>
+            <div style="margin-top:10px;">
+              <div class="ocqs-label">Config Path</div>
+              <div class="ocqs-path-badge" id="ocqs-configpath" style="font-size:10px;">/home/dzoan/.config/opencenter/clusters/blueprints/my-org/my-cluster/my-cluster-config.yaml</div>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:12px;">
+              <button class="ocqs-btn ocqs-btn-primary" id="ocqs-update-identity-btn" onclick="ocqsUpdateClusterIdentity(this)">&#128260; Update Cluster</button>
+              <span id="ocqs-update-identity-status" style="font-size:12px;color:#64748b;"></span>
+            </div>
+          </div>
+          <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:14px;margin-bottom:14px;">
+            <div style="font-size:11px;font-weight:800;color:#0369a1;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;">&#127760; Optional Services Setup</div>
+            <div style="font-size:11px;color:#64748b;margin-bottom:12px;">Service URLs are generated from your cluster name and region. Set admin passwords below to store them alongside the config.</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+
+              <div style="background:#fff;border:1px solid #e2e8f0;border-radius:6px;padding:10px;">
+                <div style="font-size:11px;font-weight:700;color:#0369a1;margin-bottom:6px;">&#128274; Keycloak (Authentication)</div>
+                <div style="font-size:11px;color:#334155;word-break:break-all;margin-bottom:6px;"><span id="ocqs-url-keycloak" style="color:#0369a1;">https://auth.&lt;cluster&gt;.&lt;region&gt;.k8s.opencenter.cloud</span></div>
+                <label class="ocqs-label">Service URL</label>
+                <input class="ocqs-input" id="ocqs-svc-keycloak-url" placeholder="custom URL (optional)" oninput="ocqsUpdate()">
+                <label class="ocqs-label">Admin Password</label>
+                <input class="ocqs-input" id="ocqs-svc-keycloak-pw" type="password" placeholder="set admin password" oninput="ocqsUpdate()">
+              </div>
+
+              <div style="background:#fff;border:1px solid #e2e8f0;border-radius:6px;padding:10px;">
+                <div style="font-size:11px;font-weight:700;color:#f59e0b;margin-bottom:6px;">&#128200; Grafana (Monitoring)</div>
+                <div style="font-size:11px;color:#334155;word-break:break-all;margin-bottom:6px;"><span id="ocqs-url-grafana" style="color:#0369a1;">https://grafana.&lt;cluster&gt;.&lt;region&gt;.k8s.opencenter.cloud</span></div>
+                <label class="ocqs-label">Service URL</label>
+                <input class="ocqs-input" id="ocqs-svc-grafana-url" placeholder="custom URL (optional)" oninput="ocqsUpdate()">
+                <label class="ocqs-label">Admin Password</label>
+                <input class="ocqs-input" id="ocqs-svc-grafana-pw" type="password" placeholder="set admin password" oninput="ocqsUpdate()">
+              </div>
+
+              <div style="background:#fff;border:1px solid #e2e8f0;border-radius:6px;padding:10px;">
+                <div style="font-size:11px;font-weight:700;color:#8b5cf6;margin-bottom:6px;">&#128202; Headlamp (Dashboard)</div>
+                <div style="font-size:11px;color:#334155;word-break:break-all;"><span id="ocqs-url-headlamp" style="color:#0369a1;">https://dashboard.&lt;cluster&gt;.&lt;region&gt;.k8s.opencenter.cloud</span></div>
+                <label class="ocqs-label">Service URL</label>
+                <input class="ocqs-input" id="ocqs-svc-headlamp-url" placeholder="custom URL (optional)" oninput="ocqsUpdate()">
+              </div>
+
+              <div style="background:#fff;border:1px solid #e2e8f0;border-radius:6px;padding:10px;">
+                <div style="font-size:11px;font-weight:700;color:#10b981;margin-bottom:6px;">&#128674; Harbor (Container Registry)</div>
+                <div style="font-size:11px;color:#334155;word-break:break-all;margin-bottom:6px;"><span id="ocqs-url-harbor" style="color:#0369a1;">https://harbor.&lt;cluster&gt;.&lt;region&gt;.k8s.opencenter.cloud</span></div>
+                <label class="ocqs-label">Service URL</label>
+                <input class="ocqs-input" id="ocqs-svc-harbor-url" placeholder="custom URL (optional)" oninput="ocqsUpdate()">
+                <label class="ocqs-label">Admin Password</label>
+                <input class="ocqs-input" id="ocqs-svc-harbor-pw" type="password" placeholder="set admin password" oninput="ocqsUpdate()">
+              </div>
+
+            </div>
+          </div>
+          <div style="background:#eff6ff;border:1px dashed #93c5fd;border-radius:8px;padding:12px 14px;margin-bottom:12px;">
+            <div style="font-size:12px;font-weight:700;color:#0369a1;margin-bottom:8px;">&#11014; Import OpenRC File <span style="font-weight:400;color:#64748b;">(auto-fills all fields below)</span></div>
+            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+              <label style="background:#0369a1;color:#fff;border-radius:6px;padding:7px 16px;font-size:12px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:6px;">
+                &#128194; Choose OpenRC File
+                <input type="file" id="ocqs-openrc-input" accept=".sh,.env,.rc,text/plain" style="display:none" onchange="ocqsParseOpenRC(this)">
+              </label>
+              <span id="ocqs-openrc-filename" style="font-size:12px;color:#64748b;font-style:italic;">No file chosen</span>
+              <span id="ocqs-openrc-status" style="font-size:12px;font-weight:700;"></span>
+            </div>
+          </div>
+          <label class="ocqs-label">Auth Type</label>
+          <select class="ocqs-select" id="ocqs-authtype" onchange="ocqsToggleAuthType();ocqsUpdate();ocqsReqCheck()">
+            <option value="password">Password (username + API key)</option>
+            <option value="v3applicationcredential">Application Credential</option>
+          </select>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px;">
+            <div><label class="ocqs-label">Auth URL</label><input class="ocqs-input" id="ocqs-authurl" value="https://keystone.api.iad3.rackspacecloud.com/v3/" oninput="ocqsUpdate()"></div>
+            <div><label class="ocqs-label">Region</label><input class="ocqs-input" id="ocqs-region" placeholder="IAD3" oninput="ocqsUpdate();ocqsReqCheck()"></div>
+          </div>
+          <div id="ocqs-pw-fields" style="margin-top:8px;">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+              <div><label class="ocqs-label">Username</label><input class="ocqs-input" id="ocqs-username" placeholder="dzng.8294" oninput="ocqsUpdate();ocqsReqCheck();ocqsSave()"></div>
+              <div><label class="ocqs-label">Password / API Key</label><input class="ocqs-input" id="ocqs-password" type="password" placeholder="your-api-key" oninput="ocqsUpdate();ocqsReqCheck();ocqsSave()"></div>
+              <div><label class="ocqs-label">User Domain Name</label><input class="ocqs-input" id="ocqs-userdomain" value="rackspace_cloud_domain" oninput="ocqsUpdate()"></div>
+              <div><label class="ocqs-label">Project Domain Name</label><input class="ocqs-input" id="ocqs-projdomain" value="rackspace_cloud_domain" oninput="ocqsUpdate()"></div>
+            </div>
+            <label class="ocqs-label" style="margin-top:8px;">Project ID</label>
+            <input class="ocqs-input" id="ocqs-projectid" placeholder="49a2c18a567c402ef560bb0f11821b61" oninput="ocqsUpdate()">
+          </div>
+          <div id="ocqs-appcred-fields" style="display:none;margin-top:8px;">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+              <div><label class="ocqs-label">App Credential ID</label><input class="ocqs-input" id="ocqs-credid" placeholder="YOUR_APP_CRED_ID" oninput="ocqsUpdate();ocqsReqCheck()"></div>
+              <div><label class="ocqs-label">App Credential Secret</label><input class="ocqs-input" id="ocqs-credsec" type="password" placeholder="YOUR_APP_CRED_SECRET" oninput="ocqsUpdate();ocqsReqCheck()"></div>
+            </div>
+          </div>
+          <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:14px;margin-top:14px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;flex-wrap:wrap;">
+              <div style="font-size:12px;font-weight:800;color:#15803d;">&#128269; Network / Subnet — Auto-Detect</div>
+              <div style="display:flex;gap:6px;">
+                <button onclick="ocqsSave();var st=this;st.textContent='\u2713 Saved';setTimeout(function(){st.innerHTML='&#128190; Save Credentials';},1200);" style="background:#0369a1;color:#fff;border:none;border-radius:5px;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer;">&#128190; Save Credentials</button>
+                <button onclick="ocqsAutoDetectNetwork()" id="ocqs-detect-btn" style="background:#15803d;color:#fff;border:none;border-radius:5px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer;">&#9654; Run Detection</button>
+              </div>
+            </div>
+            <div id="ocqs-detect-status" style="font-size:11px;color:#64748b;margin-bottom:10px;">Fill credentials above then click Run Detection to auto-populate network and subnet IDs.</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+              <div><label class="ocqs-label">Floating Network ID <span style="color:#94a3b8;font-size:9px;">(PUBLICNET)</span></label><input class="ocqs-input" id="ocqs-floatnet" placeholder="auto-detected" oninput="ocqsUpdate()" style="background:#fff;"></div>
+              <div><label class="ocqs-label">Tenant Network ID</label><input class="ocqs-input" id="ocqs-networkid" placeholder="auto-detected" oninput="ocqsUpdate()" style="background:#fff;"></div>
+              <div><label class="ocqs-label">Tenant Subnet ID</label><input class="ocqs-input" id="ocqs-subnetid" placeholder="auto-detected" oninput="ocqsUpdate()" style="background:#fff;"></div>
+            </div>
+          </div>
+          <div style="margin-top:14px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+              <div style="font-size:11px;font-weight:700;color:#64748b;">Generated Config Snippet</div>
+              <div style="display:flex;gap:6px;">
+                <button class="ocqs-btn ocqs-btn-copy" onclick="ocqsCopyEl('ocqs-yaml-3','ocqs-st-3')" style="padding:4px 10px;font-size:11px;">&#128203; Copy</button>
+                <button class="ocqs-btn ocqs-btn-copy" onclick="ocqsDownloadYaml()" style="padding:4px 10px;font-size:11px;">&#11015; Download</button>
+                <button onclick="ocqsApplyToConfig(this)" style="background:#15803d;color:#fff;border:none;border-radius:4px;padding:4px 12px;font-size:11px;font-weight:700;cursor:pointer;">&#128190; Apply to Config File</button>
+                <span id="ocqs-apply-status" style="font-size:11px;color:#64748b;align-self:center;"></span>
+              </div>
+            </div>
+            <pre class="ocqs-yaml" id="ocqs-yaml-3" style="max-height:220px;overflow-y:auto;"></pre>
+          </div>
+          <div class="ocqs-warn-box" style="margin-top:10px;">For production use secret files or environment variables instead of inline credentials.</div>
+          <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:14px;margin-bottom:12px;">
+            <div style="font-size:11px;font-weight:800;color:#0369a1;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">&#9881;&#65039; Optional Services</div>
+            <div class="ocqs-toggle-row"><span style="font-size:13px;color:#475569;">Keycloak</span><div class="ocqs-toggle" id="tog-keycloak" onclick="ocqsToggle('keycloak')"></div></div>
+            <div class="ocqs-toggle-row"><span style="font-size:13px;color:#475569;">Loki</span><div class="ocqs-toggle" id="tog-loki" onclick="ocqsToggle('loki')"></div></div>
+            <div class="ocqs-toggle-row"><span style="font-size:13px;color:#475569;">Tempo</span><div class="ocqs-toggle" id="tog-tempo" onclick="ocqsToggle('tempo')"></div></div>
+            <div class="ocqs-toggle-row"><span style="font-size:13px;color:#475569;">Velero</span><div class="ocqs-toggle" id="tog-velero" onclick="ocqsToggle('velero')"></div></div>
+            <div class="ocqs-toggle-row"><span style="font-size:13px;color:#475569;">kube-prometheus-stack</span><div class="ocqs-toggle" id="tog-monitoring" onclick="ocqsToggle('monitoring')"></div></div>
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;margin:10px 0 6px;">
+            <button onclick="ocqsApplyServices(this)" style="background:#15803d;color:#fff;border:none;border-radius:4px;padding:6px 16px;font-size:12px;font-weight:700;cursor:pointer;">&#128190; Apply to Config File</button>
+            <span id="ocqs-svc-status" style="font-size:11px;color:#64748b;align-self:center;"></span>
+          </div>
+          <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:14px;margin-bottom:14px;margin-top:10px;">
+            <div style="font-size:11px;font-weight:800;color:#0369a1;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">&#128230; GitOps Repository</div>
+            <label class="ocqs-label">Git Provider</label>
+            <select class="ocqs-select" id="ocqs-gitprovider" onchange="ocqsUpdate()"><option value="github" selected>GitHub</option><option value="gitlab">GitLab</option><option value="other">Other HTTPS Git</option></select>
+            <label class="ocqs-label" style="margin-top:8px;">GitOps Repository URL</label>
+            <input class="ocqs-input" id="ocqs-gitrepo" placeholder="https://github.com/YOUR_USER/opencenter-my-cluster-gitops.git" oninput="ocqsUpdate();ocqsReqCheck()">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px;">
+              <div><label class="ocqs-label">Git Branch</label><input class="ocqs-input" id="ocqs-gitbranch" value="main" oninput="ocqsUpdate()"></div>
+              <div><label class="ocqs-label">Token File Path</label><input class="ocqs-input" id="ocqs-tokfile" value="/home/dzoan/.config/opencenter/tokens/git-token.txt" oninput="ocqsUpdate()"></div>
+            </div>
+            <label class="ocqs-label" style="margin-top:8px;">Git Token Value <span style="color:#64748b;font-size:10px;">(for HTTPS auth)</span></label>
+            <input class="ocqs-input" id="ocqs-tokval" type="password" placeholder="ghp_xxxxxxxxxxxxxxxxxxxxx" oninput="ocqsUpdate();ocqsReqCheck()">
+            <label class="ocqs-label" style="margin-top:8px;">SSH Key Path <span style="color:#64748b;font-size:10px;">(for SSH auth — used in git push)</span></label>
+            <input class="ocqs-input" id="ocqs-sshkey" value="~/.ssh/id_rsa" oninput="ocqsUpdate()">
+            <div style="font-size:11px;color:#64748b;margin-top:4px;">Ensure the corresponding public key is added to your GitHub account.</div>
+            <div class="ocqs-label" style="margin-top:10px;">GitOps Repo Path</div>
+            <div class="ocqs-path-badge" id="ocqs-gitopspath" style="font-size:10px;">/home/dzoan/.config/opencenter/clusters/gitops/my-org</div>
+          </div>
+          </div>
+          <div style="margin-top:14px;display:flex;align-items:center;flex-wrap:wrap;gap:12px;padding:12px 14px;background:linear-gradient(135deg,#0f172a,#1e3a5f);border-radius:10px;">
+            <button id="ocqs-autorun-btn" onclick="ocqsAutoRunAll()" style="border:none;border-radius:8px;padding:10px 22px;font-size:13px;font-weight:900;cursor:pointer;color:#fff;background:linear-gradient(135deg,#0284c7,#38bdf8);box-shadow:0 4px 12px rgba(2,132,199,.5);">&#9889; AutoRun All Steps (A &rarr; Z)</button>
+            <label style="font-size:11px;color:#94a3b8;display:flex;align-items:center;gap:5px;cursor:pointer;"><input type="checkbox" id="ocqs-autorun-cont"> continue on error</label>
+            <span id="ocqs-autorun-status" style="font-size:12px;font-weight:800;color:#94a3b8;"></span>
+          </div>
         </div>
       </div>
 
@@ -210,7 +387,7 @@
             credId:s.credId,credSec:s.credSec,
             floatNet:s.floatNet,networkId:s.networkId,subnetId:s.subnetId,
             gitRepo:s.gitRepo,gitBranch:s.gitBranch,tokFile:s.tokFile,tokVal:s.tokVal,
-            services:_qs.services
+            services:(window._qs&&window._qs.services)||s.services||{}
           }));
         }catch(e){}
       };
@@ -608,69 +785,6 @@ opencenter cluster --help</div>
             <span class="ocqs-status ocqs-s-idle" id="ocqs-st-2">Not Started</span>
           </div>
           <p>Create a new cluster configuration. OpenCenter generates a complete config file with defaults.</p>
-                    <!-- Inline Cluster Identity Inputs -->
-          <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:14px;margin-top:12px;">
-            <div style="font-size:11px;font-weight:800;color:#0369a1;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">🏷 Cluster Identity</div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-              <div>
-                <label class="ocqs-label">Organization Name</label>
-                <input class="ocqs-input" id="ocqs-org" value="my-org" oninput="ocqsUpdate()">
-              </div>
-              <div>
-                <label class="ocqs-label">Cluster Name</label>
-                <input class="ocqs-input" id="ocqs-cluster" value="my-cluster" oninput="ocqsUpdate()">
-              </div>
-              <div>
-                <label class="ocqs-label">Environment</label>
-                <select class="ocqs-select" id="ocqs-env" onchange="ocqsUpdate()">
-                  <option value="dev" selected>dev</option><option value="uat">uat</option><option value="prod">prod</option>
-                </select>
-              </div>
-              <div>
-                <label class="ocqs-label">Target Provider</label>
-                <select class="ocqs-select" id="ocqs-provider" onchange="ocqsUpdate()">
-                  <option value="openstack" selected>openstack</option><option value="kind">kind (local)</option><option value="vmware">vmware</option><option value="baremetal">baremetal</option>
-                </select>
-              </div>
-            </div>
-            <div style="margin-top:10px;">
-              <div class="ocqs-label">Config Path</div>
-              <div class="ocqs-path-badge" id="ocqs-configpath" style="font-size:10px;">/home/dzoan/.config/opencenter/clusters/blueprints/my-org/my-cluster/my-cluster-config.yaml</div>
-            </div>
-          </div>
-          <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:14px;margin-bottom:14px;">
-            <div style="font-size:11px;font-weight:800;color:#0369a1;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;">&#127760; Step 10 — Access Services</div>
-            <div style="font-size:11px;color:#64748b;margin-bottom:12px;">Service URLs are generated from your cluster name and region. Set admin passwords below to store them alongside the config.</div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-
-              <div style="background:#fff;border:1px solid #e2e8f0;border-radius:6px;padding:10px;">
-                <div style="font-size:11px;font-weight:700;color:#0369a1;margin-bottom:6px;">&#128274; Keycloak (Authentication)</div>
-                <div style="font-size:11px;color:#334155;word-break:break-all;margin-bottom:6px;"><span id="ocqs-url-keycloak" style="color:#0369a1;">https://auth.&lt;cluster&gt;.&lt;region&gt;.k8s.opencenter.cloud</span></div>
-                <label class="ocqs-label">Admin Password</label>
-                <input class="ocqs-input" id="ocqs-svc-keycloak-pw" type="password" placeholder="set admin password" oninput="ocqsUpdate()">
-              </div>
-
-              <div style="background:#fff;border:1px solid #e2e8f0;border-radius:6px;padding:10px;">
-                <div style="font-size:11px;font-weight:700;color:#f59e0b;margin-bottom:6px;">&#128200; Grafana (Monitoring)</div>
-                <div style="font-size:11px;color:#334155;word-break:break-all;margin-bottom:6px;"><span id="ocqs-url-grafana" style="color:#0369a1;">https://grafana.&lt;cluster&gt;.&lt;region&gt;.k8s.opencenter.cloud</span></div>
-                <label class="ocqs-label">Admin Password</label>
-                <input class="ocqs-input" id="ocqs-svc-grafana-pw" type="password" placeholder="set admin password" oninput="ocqsUpdate()">
-              </div>
-
-              <div style="background:#fff;border:1px solid #e2e8f0;border-radius:6px;padding:10px;">
-                <div style="font-size:11px;font-weight:700;color:#8b5cf6;margin-bottom:6px;">&#128202; Headlamp (Dashboard)</div>
-                <div style="font-size:11px;color:#334155;word-break:break-all;"><span id="ocqs-url-headlamp" style="color:#0369a1;">https://dashboard.&lt;cluster&gt;.&lt;region&gt;.k8s.opencenter.cloud</span></div>
-              </div>
-
-              <div style="background:#fff;border:1px solid #e2e8f0;border-radius:6px;padding:10px;">
-                <div style="font-size:11px;font-weight:700;color:#10b981;margin-bottom:6px;">&#128674; Harbor (Container Registry)</div>
-                <div style="font-size:11px;color:#334155;word-break:break-all;margin-bottom:6px;"><span id="ocqs-url-harbor" style="color:#0369a1;">https://harbor.&lt;cluster&gt;.&lt;region&gt;.k8s.opencenter.cloud</span></div>
-                <label class="ocqs-label">Admin Password</label>
-                <input class="ocqs-input" id="ocqs-svc-harbor-pw" type="password" placeholder="set admin password" oninput="ocqsUpdate()">
-              </div>
-
-            </div>
-          </div>
           <hr style="border:none;border-top:2px solid #e2e8f0;margin:18px 0;">
           <div style="font-size:13px;font-weight:900;color:#0f172a;margin-bottom:10px;">Stage 2 — Init Cluster</div>
           <div class="ocqs-info-box"><strong>Note:</strong> Always use the config path printed by the init command — it may differ from old docs.</div>
@@ -692,70 +806,6 @@ opencenter cluster --help</div>
             <span class="ocqs-status ocqs-s-idle" id="ocqs-st-3">Not Started</span>
           </div>
           <p>Fill in your FLEX/OpenStack credentials. Import your OpenRC file to auto-fill, click <strong>&#9654; Run Detection</strong> to detect network IDs, then <strong>&#128190; Apply to Config File</strong> to write everything to the cluster config.</p>
-          <div style="background:#eff6ff;border:1px dashed #93c5fd;border-radius:8px;padding:12px 14px;margin-bottom:12px;">
-            <div style="font-size:12px;font-weight:700;color:#0369a1;margin-bottom:8px;">&#11014; Import OpenRC File <span style="font-weight:400;color:#64748b;">(auto-fills all fields below)</span></div>
-            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-              <label style="background:#0369a1;color:#fff;border-radius:6px;padding:7px 16px;font-size:12px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:6px;">
-                &#128194; Choose OpenRC File
-                <input type="file" id="ocqs-openrc-input" accept=".sh,.env,.rc,text/plain" style="display:none" onchange="ocqsParseOpenRC(this)">
-              </label>
-              <span id="ocqs-openrc-filename" style="font-size:12px;color:#64748b;font-style:italic;">No file chosen</span>
-              <span id="ocqs-openrc-status" style="font-size:12px;font-weight:700;"></span>
-            </div>
-          </div>
-          <label class="ocqs-label">Auth Type</label>
-          <select class="ocqs-select" id="ocqs-authtype" onchange="ocqsToggleAuthType();ocqsUpdate();ocqsReqCheck()">
-            <option value="password">Password (username + API key)</option>
-            <option value="v3applicationcredential">Application Credential</option>
-          </select>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px;">
-            <div><label class="ocqs-label">Auth URL</label><input class="ocqs-input" id="ocqs-authurl" value="https://keystone.api.iad3.rackspacecloud.com/v3/" oninput="ocqsUpdate()"></div>
-            <div><label class="ocqs-label">Region</label><input class="ocqs-input" id="ocqs-region" placeholder="IAD3" oninput="ocqsUpdate();ocqsReqCheck()"></div>
-          </div>
-          <div id="ocqs-pw-fields" style="margin-top:8px;">
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-              <div><label class="ocqs-label">Username</label><input class="ocqs-input" id="ocqs-username" placeholder="dzng.8294" oninput="ocqsUpdate();ocqsReqCheck();ocqsSave()"></div>
-              <div><label class="ocqs-label">Password / API Key</label><input class="ocqs-input" id="ocqs-password" type="password" placeholder="your-api-key" oninput="ocqsUpdate();ocqsReqCheck();ocqsSave()"></div>
-              <div><label class="ocqs-label">User Domain Name</label><input class="ocqs-input" id="ocqs-userdomain" value="rackspace_cloud_domain" oninput="ocqsUpdate()"></div>
-              <div><label class="ocqs-label">Project Domain Name</label><input class="ocqs-input" id="ocqs-projdomain" value="rackspace_cloud_domain" oninput="ocqsUpdate()"></div>
-            </div>
-            <label class="ocqs-label" style="margin-top:8px;">Project ID</label>
-            <input class="ocqs-input" id="ocqs-projectid" placeholder="49a2c18a567c402ef560bb0f11821b61" oninput="ocqsUpdate()">
-          </div>
-          <div id="ocqs-appcred-fields" style="display:none;margin-top:8px;">
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-              <div><label class="ocqs-label">App Credential ID</label><input class="ocqs-input" id="ocqs-credid" placeholder="YOUR_APP_CRED_ID" oninput="ocqsUpdate();ocqsReqCheck()"></div>
-              <div><label class="ocqs-label">App Credential Secret</label><input class="ocqs-input" id="ocqs-credsec" type="password" placeholder="YOUR_APP_CRED_SECRET" oninput="ocqsUpdate();ocqsReqCheck()"></div>
-            </div>
-          </div>
-          <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:14px;margin-top:14px;">
-            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;flex-wrap:wrap;">
-              <div style="font-size:12px;font-weight:800;color:#15803d;">&#128269; Network / Subnet — Auto-Detect</div>
-              <div style="display:flex;gap:6px;">
-                <button onclick="ocqsSave();var st=this;st.textContent='\u2713 Saved';setTimeout(function(){st.innerHTML='&#128190; Save Credentials';},1200);" style="background:#0369a1;color:#fff;border:none;border-radius:5px;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer;">&#128190; Save Credentials</button>
-                <button onclick="ocqsAutoDetectNetwork()" id="ocqs-detect-btn" style="background:#15803d;color:#fff;border:none;border-radius:5px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer;">&#9654; Run Detection</button>
-              </div>
-            </div>
-            <div id="ocqs-detect-status" style="font-size:11px;color:#64748b;margin-bottom:10px;">Fill credentials above then click Run Detection to auto-populate network and subnet IDs.</div>
-            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
-              <div><label class="ocqs-label">Floating Network ID <span style="color:#94a3b8;font-size:9px;">(PUBLICNET)</span></label><input class="ocqs-input" id="ocqs-floatnet" placeholder="auto-detected" oninput="ocqsUpdate()" style="background:#fff;"></div>
-              <div><label class="ocqs-label">Tenant Network ID</label><input class="ocqs-input" id="ocqs-networkid" placeholder="auto-detected" oninput="ocqsUpdate()" style="background:#fff;"></div>
-              <div><label class="ocqs-label">Tenant Subnet ID</label><input class="ocqs-input" id="ocqs-subnetid" placeholder="auto-detected" oninput="ocqsUpdate()" style="background:#fff;"></div>
-            </div>
-          </div>
-          <div style="margin-top:14px;">
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
-              <div style="font-size:11px;font-weight:700;color:#64748b;">Generated Config Snippet</div>
-              <div style="display:flex;gap:6px;">
-                <button class="ocqs-btn ocqs-btn-copy" onclick="ocqsCopyEl('ocqs-yaml-3','ocqs-st-3')" style="padding:4px 10px;font-size:11px;">&#128203; Copy</button>
-                <button class="ocqs-btn ocqs-btn-copy" onclick="ocqsDownloadYaml()" style="padding:4px 10px;font-size:11px;">&#11015; Download</button>
-                <button onclick="ocqsApplyToConfig(this)" style="background:#15803d;color:#fff;border:none;border-radius:4px;padding:4px 12px;font-size:11px;font-weight:700;cursor:pointer;">&#128190; Apply to Config File</button>
-                <span id="ocqs-apply-status" style="font-size:11px;color:#64748b;align-self:center;"></span>
-              </div>
-            </div>
-            <pre class="ocqs-yaml" id="ocqs-yaml-3" style="max-height:220px;overflow-y:auto;"></pre>
-          </div>
-          <div class="ocqs-warn-box" style="margin-top:10px;">For production use secret files or environment variables instead of inline credentials.</div>
           <p style="font-size:12px;color:#64748b;margin-top:14px;"><strong>Open config to edit:</strong></p>
           <div class="ocqs-cmd" id="ocqs-cmd-2b"></div>
           <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;">
@@ -800,18 +850,6 @@ opencenter cluster --help</div>
             <span class="ocqs-status ocqs-s-idle" id="ocqs-st-5">Not Started</span>
           </div>
           <p>Keycloak, Loki, and Tempo require extra secrets. Disable them for the first bootstrap.</p>
-          <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:14px;margin-bottom:12px;">
-            <div style="font-size:11px;font-weight:800;color:#0369a1;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">&#9881;&#65039; Optional Services</div>
-            <div class="ocqs-toggle-row"><span style="font-size:13px;color:#475569;">Keycloak</span><div class="ocqs-toggle" id="tog-keycloak" onclick="ocqsToggle('keycloak')"></div></div>
-            <div class="ocqs-toggle-row"><span style="font-size:13px;color:#475569;">Loki</span><div class="ocqs-toggle" id="tog-loki" onclick="ocqsToggle('loki')"></div></div>
-            <div class="ocqs-toggle-row"><span style="font-size:13px;color:#475569;">Tempo</span><div class="ocqs-toggle" id="tog-tempo" onclick="ocqsToggle('tempo')"></div></div>
-            <div class="ocqs-toggle-row"><span style="font-size:13px;color:#475569;">Velero</span><div class="ocqs-toggle" id="tog-velero" onclick="ocqsToggle('velero')"></div></div>
-            <div class="ocqs-toggle-row"><span style="font-size:13px;color:#475569;">kube-prometheus-stack</span><div class="ocqs-toggle" id="tog-monitoring" onclick="ocqsToggle('monitoring')"></div></div>
-          </div>
-          <div style="display:flex;flex-wrap:wrap;gap:8px;margin:10px 0 6px;">
-            <button onclick="ocqsApplyServices(this)" style="background:#15803d;color:#fff;border:none;border-radius:4px;padding:6px 16px;font-size:12px;font-weight:700;cursor:pointer;">&#128190; Apply to Config File</button>
-            <span id="ocqs-svc-status" style="font-size:11px;color:#64748b;align-self:center;"></span>
-          </div>
           <div class="ocqs-cmd" id="ocqs-cmd-5">grep -nE "keycloak|loki|tempo|enabled|CHANGEME" ~/.config/opencenter/clusters/blueprints/my-org/my-cluster/my-cluster-config.yaml</div>
           <button class="ocqs-btn ocqs-btn-copy" onclick="ocqsCopyCmd('ocqs-cmd-5','ocqs-st-5')">&#128203; Copy</button><button id="ocqs-run-5" onclick="ocqsRunCmd('ocqs-cmd-5','ocqs-out-5','ocqs-run-5')" style="background:#1e3a5f;color:#7dd3fc;border:1px solid #334155;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#9654; Run</button><button onclick="ocqsCopyOut('ocqs-out-5',this)" style="background:#334155;color:#cbd5e1;border:1px solid #475569;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#128203; Copy Output</button>
           <div id="ocqs-out-5" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#00ff41;white-space:pre-wrap;word-break:break-all;max-height:240px;overflow-y:auto;margin-top:6px;">$ waiting...
@@ -829,24 +867,6 @@ opencenter cluster --help</div>
             <span class="ocqs-status ocqs-s-idle" id="ocqs-st-7">Not Started</span>
           </div>
           <p>Configure your GitOps repository, then generate the FluxCD manifests with <code>cluster generate</code>.</p>
-          <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:14px;margin-bottom:14px;margin-top:10px;">
-            <div style="font-size:11px;font-weight:800;color:#0369a1;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">&#128230; GitOps Repository</div>
-            <label class="ocqs-label">Git Provider</label>
-            <select class="ocqs-select" id="ocqs-gitprovider" onchange="ocqsUpdate()"><option value="github" selected>GitHub</option><option value="gitlab">GitLab</option><option value="other">Other HTTPS Git</option></select>
-            <label class="ocqs-label" style="margin-top:8px;">GitOps Repository URL</label>
-            <input class="ocqs-input" id="ocqs-gitrepo" placeholder="https://github.com/YOUR_USER/opencenter-my-cluster-gitops.git" oninput="ocqsUpdate();ocqsReqCheck()">
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px;">
-              <div><label class="ocqs-label">Git Branch</label><input class="ocqs-input" id="ocqs-gitbranch" value="main" oninput="ocqsUpdate()"></div>
-              <div><label class="ocqs-label">Token File Path</label><input class="ocqs-input" id="ocqs-tokfile" value="/home/dzoan/.config/opencenter/tokens/git-token.txt" oninput="ocqsUpdate()"></div>
-            </div>
-            <label class="ocqs-label" style="margin-top:8px;">Git Token Value <span style="color:#64748b;font-size:10px;">(for HTTPS auth)</span></label>
-            <input class="ocqs-input" id="ocqs-tokval" type="password" placeholder="ghp_xxxxxxxxxxxxxxxxxxxxx" oninput="ocqsUpdate();ocqsReqCheck()">
-            <label class="ocqs-label" style="margin-top:8px;">SSH Key Path <span style="color:#64748b;font-size:10px;">(for SSH auth — used in git push)</span></label>
-            <input class="ocqs-input" id="ocqs-sshkey" value="~/.ssh/id_rsa" oninput="ocqsUpdate()">
-            <div style="font-size:11px;color:#64748b;margin-top:4px;">Ensure the corresponding public key is added to your GitHub account.</div>
-            <div class="ocqs-label" style="margin-top:10px;">GitOps Repo Path</div>
-            <div class="ocqs-path-badge" id="ocqs-gitopspath" style="font-size:10px;">/home/dzoan/.config/opencenter/clusters/gitops/my-org</div>
-          </div>
           <div class="ocqs-cmd" id="ocqs-cmd-7">opencenter secrets sync my-cluster
 opencenter cluster validate my-cluster
 opencenter cluster generate my-cluster</div>
@@ -924,6 +944,33 @@ git push -u origin main</div>
         </div>
 
         <!-- Step 9 -->
+      <!-- Section G: Safety Checklist -->
+      <div class="ocqs-section">
+        <h2>G. Safety Checklist Before Deploy</h2>
+        <div class="ocqs-warn-box" style="font-size:14px;font-weight:700;text-align:center;">
+          ⛔ Never run <code>opencenter cluster deploy</code> until <code>opencenter cluster validate</code> passes and no critical CHANGEME values remain.
+        </div>
+        <div class="ocqs-card" id="ocqs-checklist">
+          <div class="ocqs-checklist-item"><input type="checkbox" id="chk-1" onchange="ocqsChecklistUpdate()"><label for="chk-1">OpenCenter CLI installed and works</label></div>
+          <div class="ocqs-checklist-item"><input type="checkbox" id="chk-2" onchange="ocqsChecklistUpdate()"><label for="chk-2">Git installed</label></div>
+          <div class="ocqs-checklist-item"><input type="checkbox" id="chk-3" onchange="ocqsChecklistUpdate()"><label for="chk-3">GitOps repository exists (GitHub/GitLab)</label></div>
+          <div class="ocqs-checklist-item"><input type="checkbox" id="chk-4" onchange="ocqsChecklistUpdate()"><label for="chk-4">Git token configured at token file path</label></div>
+          <div class="ocqs-checklist-item"><input type="checkbox" id="chk-5" onchange="ocqsChecklistUpdate()"><label for="chk-5">OpenStack application credential ID configured</label></div>
+          <div class="ocqs-checklist-item"><input type="checkbox" id="chk-6" onchange="ocqsChecklistUpdate()"><label for="chk-6">OpenStack application credential secret configured</label></div>
+          <div class="ocqs-checklist-item"><input type="checkbox" id="chk-7" onchange="ocqsChecklistUpdate()"><label for="chk-7">Region selected</label></div>
+          <div class="ocqs-checklist-item"><input type="checkbox" id="chk-8" onchange="ocqsChecklistUpdate()"><label for="chk-8">Network / flavor / image values confirmed</label></div>
+          <div class="ocqs-checklist-item"><input type="checkbox" id="chk-9" onchange="ocqsChecklistUpdate()"><label for="chk-9">Keycloak/Loki/Tempo disabled OR secrets configured</label></div>
+          <div class="ocqs-checklist-item"><input type="checkbox" id="chk-10" onchange="ocqsChecklistUpdate()"><label for="chk-10"><code>opencenter cluster validate</code> passes with no blockers</label></div>
+          <div class="ocqs-checklist-item"><input type="checkbox" id="chk-11" onchange="ocqsChecklistUpdate()"><label for="chk-11">No critical CHANGEME placeholders in GitOps manifests</label></div>
+          <div class="ocqs-checklist-item"><input type="checkbox" id="chk-12" onchange="ocqsChecklistUpdate()"><label for="chk-12">GitOps repo committed and pushed</label></div>
+          <div class="ocqs-checklist-item"><input type="checkbox" id="chk-13" onchange="ocqsChecklistUpdate()"><label for="chk-13">I understand deployment will create cloud resources that may incur costs</label></div>
+          <div style="margin-top:14px;text-align:center;">
+            <div id="ocqs-checklist-status" style="font-size:13px;color:#f87171;margin-bottom:10px;">0 / 13 items checked — deploy blocked</div>
+            <button class="ocqs-btn ocqs-btn-danger" id="ocqs-deploy-btn2" disabled onclick="ocqsDeploy()" style="padding:10px 28px;font-size:14px;opacity:.5;cursor:not-allowed;">🚀 Deploy Cluster (Blocked)</button>
+          </div>
+        </div>
+      </div>
+
         <div class="ocqs-card" id="ocqs-step-9" style="border-color:#dc2626;">
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
             <span class="ocqs-step-num" style="background:#dc2626;">9</span>
@@ -1098,7 +1145,7 @@ kubectl describe kustomization &lt;name&gt; -n flux-system</div>
       </div>
 
       <div class="ocqs-section">
-        <h2>&#9989; Check Your Work</h2>
+        <h2>&#9989; Check your OpenCenter Cluster and Pods</h2>
         <div class="ocqs-card">
           <p>After deployment, verify everything is running:</p>
           <div class="ocqs-cmd" id="ocqs-cmd-chk1">kubectl get nodes</div>
@@ -1119,45 +1166,272 @@ kubectl describe kustomization &lt;name&gt; -n flux-system</div>
 </div>
         </div>
       </div>
-      <!-- Section G: Safety Checklist -->
+
+      <!-- Full cluster details summary -->
       <div class="ocqs-section">
-        <h2>G. Safety Checklist Before Deploy</h2>
-        <div class="ocqs-warn-box" style="font-size:14px;font-weight:700;text-align:center;">
-          ⛔ Never run <code>opencenter cluster deploy</code> until <code>opencenter cluster validate</code> passes and no critical CHANGEME values remain.
-        </div>
-        <div class="ocqs-card" id="ocqs-checklist">
-          <div class="ocqs-checklist-item"><input type="checkbox" id="chk-1" onchange="ocqsChecklistUpdate()"><label for="chk-1">OpenCenter CLI installed and works</label></div>
-          <div class="ocqs-checklist-item"><input type="checkbox" id="chk-2" onchange="ocqsChecklistUpdate()"><label for="chk-2">Git installed</label></div>
-          <div class="ocqs-checklist-item"><input type="checkbox" id="chk-3" onchange="ocqsChecklistUpdate()"><label for="chk-3">GitOps repository exists (GitHub/GitLab)</label></div>
-          <div class="ocqs-checklist-item"><input type="checkbox" id="chk-4" onchange="ocqsChecklistUpdate()"><label for="chk-4">Git token configured at token file path</label></div>
-          <div class="ocqs-checklist-item"><input type="checkbox" id="chk-5" onchange="ocqsChecklistUpdate()"><label for="chk-5">OpenStack application credential ID configured</label></div>
-          <div class="ocqs-checklist-item"><input type="checkbox" id="chk-6" onchange="ocqsChecklistUpdate()"><label for="chk-6">OpenStack application credential secret configured</label></div>
-          <div class="ocqs-checklist-item"><input type="checkbox" id="chk-7" onchange="ocqsChecklistUpdate()"><label for="chk-7">Region selected</label></div>
-          <div class="ocqs-checklist-item"><input type="checkbox" id="chk-8" onchange="ocqsChecklistUpdate()"><label for="chk-8">Network / flavor / image values confirmed</label></div>
-          <div class="ocqs-checklist-item"><input type="checkbox" id="chk-9" onchange="ocqsChecklistUpdate()"><label for="chk-9">Keycloak/Loki/Tempo disabled OR secrets configured</label></div>
-          <div class="ocqs-checklist-item"><input type="checkbox" id="chk-10" onchange="ocqsChecklistUpdate()"><label for="chk-10"><code>opencenter cluster validate</code> passes with no blockers</label></div>
-          <div class="ocqs-checklist-item"><input type="checkbox" id="chk-11" onchange="ocqsChecklistUpdate()"><label for="chk-11">No critical CHANGEME placeholders in GitOps manifests</label></div>
-          <div class="ocqs-checklist-item"><input type="checkbox" id="chk-12" onchange="ocqsChecklistUpdate()"><label for="chk-12">GitOps repo committed and pushed</label></div>
-          <div class="ocqs-checklist-item"><input type="checkbox" id="chk-13" onchange="ocqsChecklistUpdate()"><label for="chk-13">I understand deployment will create cloud resources that may incur costs</label></div>
-          <div style="margin-top:14px;text-align:center;">
-            <div id="ocqs-checklist-status" style="font-size:13px;color:#f87171;margin-bottom:10px;">0 / 13 items checked — deploy blocked</div>
-            <button class="ocqs-btn ocqs-btn-danger" id="ocqs-deploy-btn2" disabled onclick="ocqsDeploy()" style="padding:10px 28px;font-size:14px;opacity:.5;cursor:not-allowed;">🚀 Deploy Cluster (Blocked)</button>
+        <h2>&#128202; Full Cluster Details</h2>
+        <div class="ocqs-card">
+          <p>One-shot health summary: nodes, GitOps reconciliation, releases, pods, and endpoints.</p>
+          <div class="ocqs-cmd" id="ocqs-cmd-chksum"></div>
+          <div style="display:flex;gap:6px;margin:6px 0;"><button class="ocqs-btn ocqs-btn-copy" onclick="ocqsCopyCmd('ocqs-cmd-chksum','')">&#128203; Copy</button><button id="ocqs-run-chksum" onclick="ocqsRunCmd('ocqs-cmd-chksum','ocqs-out-chksum','ocqs-run-chksum')" style="background:#1e3a5f;color:#7dd3fc;border:1px solid #334155;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;">&#9654; Run</button><button onclick="ocqsCopyOut('ocqs-out-chksum',this)" style="background:#334155;color:#cbd5e1;border:1px solid #475569;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#128203; Copy Output</button></div>
+          <div id="ocqs-out-chksum" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:12px 14px;font-family:monospace;font-size:12px;color:#00ff41;white-space:pre-wrap;min-height:150px;max-height:280px;overflow-y:auto;">$ waiting...
+</div>
+          <div style="margin-top:14px;padding:14px;background:#0f172a;border-radius:10px;overflow-x:auto;">
+            <div style="font-size:10px;font-weight:800;color:#38bdf8;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:10px;">Cluster Topology</div>
+            <div style="display:flex;align-items:center;gap:8px;font-size:11px;font-weight:700;white-space:nowrap;">
+              <span style="display:inline-flex;align-items:center;border-radius:999px;border:1px solid #7dd3fc;color:#7dd3fc;padding:4px 10px;">OpenStack VMs 3cp+2wn</span><span style="color:#475569;">&rarr;</span><span style="display:inline-flex;align-items:center;border-radius:999px;border:1px solid #4ade80;color:#4ade80;padding:4px 10px;">Calico CNI</span><span style="color:#475569;">&rarr;</span><span style="display:inline-flex;align-items:center;border-radius:999px;border:1px solid #a78bfa;color:#a78bfa;padding:4px 10px;">FluxCD</span><span style="color:#475569;">&rarr;</span><span style="display:inline-flex;align-items:center;border-radius:999px;border:1px solid #fbbf24;color:#fbbf24;padding:4px 10px;">GitOps Repo</span><span style="color:#475569;">&rarr;</span><span style="display:inline-flex;align-items:center;border-radius:999px;border:1px solid #a78bfa;color:#a78bfa;padding:4px 10px;">Kustomizations</span><span style="color:#475569;">&rarr;</span><span style="display:inline-flex;align-items:center;border-radius:999px;border:1px solid #f472b6;color:#f472b6;padding:4px 10px;">HelmReleases</span><span style="color:#475569;">&rarr;</span><span style="display:inline-flex;align-items:center;border-radius:999px;border:1px solid #4ade80;color:#4ade80;padding:4px 10px;">Platform Services</span><span style="color:#475569;">&rarr;</span><span style="display:inline-flex;align-items:center;border-radius:999px;border:1px solid #7dd3fc;color:#7dd3fc;padding:4px 10px;">Envoy Gateway</span><span style="color:#475569;">&rarr;</span><span style="display:inline-flex;align-items:center;border-radius:999px;border:1px solid #fbbf24;color:#fbbf24;padding:4px 10px;">dashboard.&lt;cluster&gt;</span>
+            </div>
           </div>
         </div>
       </div>
 
     </div><!-- end ocqs-left -->
 
-    <!-- RIGHT COLUMN: Terminal + Quick Ref -->
+    <!-- RIGHT COLUMN: Output Terminal + Voice Over + AutoRun progress -->
+    <div class="ocqs-right" id="ocqs-right-panel">
+      <style>
+        #ocqs-right-panel .oct-vo { border:1px solid #7dd3fc; border-radius:12px; background:linear-gradient(135deg,#f0f9ff,#e0f2fe); padding:12px 14px; }
+        #ocqs-right-panel .oct-vo-hd { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:8px; }
+        #ocqs-right-panel .oct-vo-hd b { font-size:11px; font-weight:900; text-transform:uppercase; letter-spacing:1.5px; color:#0369a1; }
+        #ocqs-right-panel .oct-vo-txt { font-size:12px; line-height:1.6; color:#0f172a; min-height:34px; font-weight:600; }
+        #ocqs-right-panel .oct-mini { border:1px solid #cbd5e1; background:#fff; color:#334155; border-radius:6px; padding:4px 10px; font-size:11px; font-weight:800; cursor:pointer; }
+        #ocqs-right-panel .oct-steps { border:1px solid #e2e8f0; border-radius:12px; background:#fff; padding:10px 12px; max-height:220px; overflow-y:auto; }
+        #ocqs-right-panel .oct-step { display:flex; align-items:center; gap:8px; font-size:11px; font-weight:700; color:#475569; padding:3px 0; }
+        #ocqs-right-panel .oct-dot { width:9px; height:9px; border-radius:50%; background:#cbd5e1; flex:none; }
+        #ocqs-right-panel .oct-dot.run { background:#f59e0b; animation:octPulse 1s infinite; }
+        #ocqs-right-panel .oct-dot.pass { background:#16a34a; }
+        #ocqs-right-panel .oct-dot.fail { background:#dc2626; }
+        #ocqs-right-panel .oct-dot.skip { background:#94a3b8; }
+        @keyframes octPulse { 50% { opacity:.35; } }
+        #ocqs-right-panel .oct-term-wrap { display:flex; flex-direction:column; flex:1; min-height:340px; border-radius:12px; overflow:hidden; border:1px solid #1e293b; box-shadow:0 8px 24px rgba(2,6,23,.35); }
+        #ocqs-right-panel .oct-term-hd { display:flex; align-items:center; gap:8px; padding:8px 12px; background:#1e293b; }
+        #ocqs-right-panel .oct-term-hd i { width:10px; height:10px; border-radius:50%; display:inline-block; }
+        #ocqs-right-panel .oct-term-hd b { font-size:11px; font-weight:800; color:#94a3b8; letter-spacing:1px; text-transform:uppercase; margin-left:4px; flex:1; }
+        #ocqs-right-panel #ocqs-term { flex:1; margin:0; padding:12px 14px; background:#0d1117; color:#e2e8f0; font-family:'Cascadia Code','Fira Code',Consolas,monospace; font-size:11.5px; line-height:1.55; overflow-y:auto; white-space:pre-wrap; word-break:break-word; min-height:300px; }
+        #ocqs-right-panel #ocqs-term .l-cmd { color:#7dd3fc; font-weight:700; }
+        #ocqs-right-panel #ocqs-term .l-ok { color:#4ade80; }
+        #ocqs-right-panel #ocqs-term .l-err { color:#f87171; }
+        #ocqs-right-panel #ocqs-term .l-hd { color:#fbbf24; font-weight:800; }
+        #ocqs-right-panel #ocqs-term .l-dim { color:#64748b; font-style:italic; }
+        #ocqs-term-float { position:fixed; bottom:22px; right:22px; width:min(860px,72vw); height:480px; z-index:99990; display:flex; flex-direction:column; border-radius:12px; overflow:hidden; border:1px solid #1e293b; box-shadow:0 24px 64px rgba(2,6,23,.6); background:#0d1117; }
+        #ocqs-term-float.oct-min { width:auto; height:auto; }
+        #ocqs-term-float.oct-min .oct-term-body { display:none; }
+        .oct-track { display:flex; gap:3px; padding:8px 12px 4px; background:#0f172a; }
+        .oct-seg { flex:1; height:6px; border-radius:3px; background:#334155; min-width:6px; }
+        .oct-seg.run { background:#f59e0b; animation:octPulse 1s infinite; }
+        .oct-seg.pass { background:#16a34a; }
+        .oct-seg.fail { background:#dc2626; }
+        .oct-seg.skip { background:#64748b; }
+        .oct-track-label { font-size:10px; color:#94a3b8; padding:2px 12px 8px; background:#0f172a; font-weight:700; letter-spacing:.5px; }
+      </style>
+
+      <div style="padding:10px 14px;background:rgba(139,92,246,0.08);border:1px solid rgba(139,92,246,0.3);border-radius:10px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+        <label style="color:#6d28d9;font-size:12px;font-weight:700;display:flex;align-items:center;gap:8px;cursor:pointer;">
+          <input type="checkbox" id="ocqs-jarvis-enabled" checked style="width:15px;height:15px;accent-color:#8b5cf6;cursor:pointer;"
+            onchange="localStorage.setItem('mig_jarvis_voice', this.checked); var o=document.getElementById('enable_jarvis_voice'); if(o) o.checked=this.checked;">
+          &#127908;&#65039; Jarvis Pipeline Audio Alerts
+        </label>
+        <select id="ocqs-jarvis-gender" style="background:rgba(30,41,59,0.9);color:#8b5cf6;border:1px solid #8b5cf640;padding:4px 8px;border-radius:4px;font-size:11px;font-weight:600;cursor:pointer;"
+          onchange="localStorage.setItem('mig_jarvis_gender', this.value); var o=document.getElementById('jarvis_voice_gender'); if(o) o.value=this.value;">
+          <option value="female">British Female Voice</option>
+          <option value="male">British Male Voice</option>
+        </select>
+        <button type="button" onclick="if(window.jarvisAnnounce)jarvisAnnounce('Audio sub-systems on-line and standing by.')" style="background:#7f1d1d;border:1px solid #991b1b;color:#fff;font-size:11px;font-weight:700;padding:4px 12px;border-radius:4px;cursor:pointer;">Test Voice</button>
+        <div class="oct-vo-txt" id="ocqs-vo-text" style="flex-basis:100%;">Idle. Press "AutoRun All Steps" to execute the full tutorial A &rarr; Z with narration.</div>
+      </div>
+
+      <div class="oct-steps" id="ocqs-auto-steps">
+        <div style="font-size:11px;color:#94a3b8;font-weight:700;">AutoRun progress will appear here.</div>
+      </div>
+
+      <div style="border:1px dashed #cbd5e1;border-radius:10px;padding:10px 12px;font-size:11px;color:#64748b;font-weight:700;display:flex;align-items:center;gap:8px;">
+        &#128421;&#65039; Output terminal floats bottom-right
+        <button class="oct-mini" onclick="var t=document.getElementById('ocqs-term-float'); if(t) t.style.display = (t.style.display==='none'?'flex':'none');">Show / Hide</button>
+      </div>
+
+      <div class="oct-term-wrap" id="ocqs-term-float">
+        <div class="oct-term-hd">
+          <i style="background:#ef4444;"></i><i style="background:#f59e0b;"></i><i style="background:#22c55e;"></i>
+          <b>OpenCenter Output Terminal</b>
+          <button class="oct-mini" onclick="ocqsAutoRunAll()" id="ocqs-autorun-btn2" style="background:#0284c7;color:#fff;border-color:#0284c7;">&#9889; AutoRun</button>
+          <button class="oct-mini" onclick="var t=document.getElementById('ocqs-term');if(t)t.innerHTML='';">Clear</button>
+          <button class="oct-mini" onclick="document.getElementById('ocqs-term-float').classList.toggle('oct-min');this.textContent=this.textContent==='&#8722;'?'&#9634;':'&#8722;';">&#8722;</button>
+        </div>
+        <div class="oct-term-body" style="display:flex;flex-direction:column;flex:1;min-height:0;">
+        <div class="oct-track" id="ocqs-term-track"></div>
+        <div class="oct-track-label" id="ocqs-term-track-label">no autorun yet</div>
+        <pre id="ocqs-term" style="flex:1;min-height:0;"><span class="l-dim">$ waiting for commands...</span>
+</pre>
+        </div>
+      </div>
+    </div>
+
+    <script>
+    (function(){
+      window._ocqsVoMuted = false;
+      window._ocqsAuto = { running:false, stop:false, es:null };
+
+      window.ocqsVoice = function(txt){
+        var t = document.getElementById('ocqs-vo-text'); if (t) t.textContent = txt;
+        var en = document.getElementById('ocqs-jarvis-enabled');
+        if (window._ocqsVoMuted || (en && !en.checked)) return;
+        try {
+          if (window.jarvisAnnounce) { window.jarvisAnnounce(txt); return; }
+          if (window.jarvisSpeakBritish) { window.jarvisSpeakBritish(txt); return; }
+          if ('speechSynthesis' in window) {
+            window.speechSynthesis.cancel();
+            var m = new SpeechSynthesisUtterance(txt); m.rate = 1.03;
+            window.speechSynthesis.speak(m);
+          }
+        } catch(e){}
+      };
+
+      window.ocqsTermLine = function(txt, cls){
+        var term = document.getElementById('ocqs-term'); if (!term) return;
+        var s = document.createElement('span');
+        if (!cls) {
+          if (txt === '[EXIT 0]' || txt.charAt(0) === '✓') cls = 'ok';
+          else if (txt.indexOf('[EXIT') === 0 || txt.indexOf('[ERROR]') === 0 || txt.charAt(0) === '✗' || /^Error/i.test(txt)) cls = 'err';
+        }
+        if (cls) s.className = 'l-' + cls;
+        s.textContent = txt + '\n';
+        term.appendChild(s);
+        term.scrollTop = term.scrollHeight;
+      };
+
+      // Collect every ocqsRunCmd(...) Run button in the left column, in visual A->Z order.
+      window.ocqsAutoCollect = function(){
+        var root = document.getElementById('ocqs-inline-body') || document;
+        var left = root.querySelector('.ocqs-left') || root;
+        var btns = left.querySelectorAll('[onclick*="ocqsRunCmd("]');
+        var steps = [], seen = {};
+        Array.prototype.forEach.call(btns, function(b){
+          var m = (b.getAttribute('onclick')||'').match(/ocqsRunCmd\('([^']+)','([^']+)'/);
+          if (!m || seen[m[1]] || !document.getElementById(m[1])) return;
+          seen[m[1]] = 1;
+          steps.push({ cmdId:m[1], outId:m[2], name:m[1].replace('ocqs-cmd-','') });
+        });
+        return steps;
+      };
+
+      function setStepStatus(i, status){
+        var dot = document.getElementById('oct-dot-' + i);
+        if (dot) dot.className = 'oct-dot ' + status;
+        var seg = document.getElementById('oct-seg-' + i);
+        if (seg) seg.className = 'oct-seg ' + status;
+      }
+      function setTrackLabel(txt){
+        var l = document.getElementById('ocqs-term-track-label');
+        if (l) l.textContent = txt;
+      }
+
+      function runStepStream(step){
+        return new Promise(function(resolve){
+          var cmd = ((document.getElementById(step.cmdId)||{}).textContent||'').trim();
+          if (!cmd || /^#/.test(cmd) && cmd.split('\n').every(function(l){return !l.trim()||l.trim().charAt(0)==='#';})){
+            ocqsTermLine('-- skipped [' + step.name + '] (no runnable command; fill inputs above)', 'dim');
+            resolve('skip'); return;
+          }
+          var out = document.getElementById(step.outId);
+          if (out) out.textContent = '';
+          cmd.split('\n').forEach(function(l){ ocqsTermLine('$ ' + l, 'cmd'); });
+          var es = new EventSource('/api/stream/run-cmd?cmd=' + encodeURIComponent(cmd));
+          window._ocqsAuto.es = es;
+          var done = false;
+          es.onmessage = function(e){
+            ocqsTermLine(e.data);
+            if (out){ out.textContent += e.data + '\n'; out.scrollTop = out.scrollHeight; }
+            if (e.data.indexOf('[EXIT') === 0 || e.data.indexOf('[ERROR]') === 0){
+              done = true; es.close();
+              resolve(e.data === '[EXIT 0]' ? 'pass' : 'fail');
+            }
+          };
+          es.onerror = function(){ if (!done){ done = true; es.close(); resolve('fail'); } };
+        });
+      }
+
+      window.ocqsAutoRunAll = async function(){
+        var btn = document.getElementById('ocqs-autorun-btn');
+        var btn2 = document.getElementById('ocqs-autorun-btn2');
+        var stEl = document.getElementById('ocqs-autorun-status');
+        if (window._ocqsAuto.running){
+          window._ocqsAuto.stop = true;
+          if (window._ocqsAuto.es) window._ocqsAuto.es.close();
+          return;
+        }
+        var steps = ocqsAutoCollect();
+        if (!steps.length){ ocqsTermLine('No runnable steps found.', 'err'); return; }
+        window._ocqsAuto.running = true; window._ocqsAuto.stop = false;
+        if (btn) btn.innerHTML = '&#9632; Stop AutoRun';
+        if (btn2) btn2.innerHTML = '&#9632; Stop';
+        var list = document.getElementById('ocqs-auto-steps');
+        if (list){
+          list.innerHTML = '';
+          steps.forEach(function(s, i){
+            var d = document.createElement('div');
+            d.className = 'oct-step';
+            d.innerHTML = '<span class="oct-dot" id="oct-dot-' + i + '"></span><span>' + (i+1) + '. ' + s.name + '</span>';
+            list.appendChild(d);
+          });
+        }
+        var track = document.getElementById('ocqs-term-track');
+        if (track){
+          track.innerHTML = '';
+          steps.forEach(function(_, i){
+            var sg = document.createElement('div');
+            sg.className = 'oct-seg';
+            sg.id = 'oct-seg-' + i;
+            track.appendChild(sg);
+          });
+        }
+        var tf = document.getElementById('ocqs-term-float');
+        if (tf) tf.style.display = 'flex';
+        var panel = document.getElementById('ocqs-right-panel');
+        if (panel) panel.scrollIntoView({ behavior:'smooth', block:'nearest' });
+        ocqsVoice('Auto run started. Executing ' + steps.length + ' steps from A to Z.');
+        ocqsTermLine('', ''); ocqsTermLine('======== AUTORUN: ' + steps.length + ' steps ========', 'hd');
+        var pass = 0, fail = 0, skip = 0;
+        var contOnErr = (document.getElementById('ocqs-autorun-cont')||{}).checked;
+        for (var i = 0; i < steps.length; i++){
+          if (window._ocqsAuto.stop){ ocqsTermLine('-- AutoRun stopped by user --', 'hd'); break; }
+          setStepStatus(i, 'run');
+          if (stEl) stEl.textContent = 'Step ' + (i+1) + '/' + steps.length + ': ' + steps[i].name;
+          setTrackLabel('STEP ' + (i+1) + '/' + steps.length + ': ' + steps[i].name.toUpperCase());
+          ocqsVoice('Step ' + (i+1) + ' of ' + steps.length + ': ' + steps[i].name.replace(/-/g,' ') + '.');
+          ocqsTermLine('', ''); ocqsTermLine('== STEP ' + (i+1) + '/' + steps.length + ' [' + steps[i].name + '] ==', 'hd');
+          var r = await runStepStream(steps[i]);
+          setStepStatus(i, r);
+          if (r === 'pass') pass++; else if (r === 'skip') skip++; else fail++;
+          if (r === 'fail'){
+            ocqsVoice('Step ' + steps[i].name.replace(/-/g,' ') + ' failed.');
+            if (!contOnErr){
+              ocqsTermLine('STOPPED on failure at [' + steps[i].name + ']. Tick "continue on error" to run through all steps.', 'err');
+              for (var j = i+1; j < steps.length; j++) setStepStatus(j, 'skip');
+              break;
+            }
+          }
+        }
+        var summary = 'AutoRun done: ' + pass + ' passed, ' + fail + ' failed, ' + skip + ' skipped.';
+        ocqsTermLine('', ''); ocqsTermLine('======== ' + summary + ' ========', fail ? 'err' : 'ok');
+        ocqsVoice(summary);
+        if (stEl) stEl.textContent = summary;
+        setTrackLabel(summary.toUpperCase());
+        window._ocqsAuto.running = false;
+        if (btn) btn.innerHTML = '&#9889; AutoRun All Steps (A &rarr; Z)';
+        if (btn2) btn2.innerHTML = '&#9889; AutoRun';
+      };
+    })();
+    </script>
 
     </div><!-- end ocqs-body -->
 
     <script>
     (function(){
       var _qs = {
-        services: { keycloak:false, loki:false, tempo:false, velero:true, monitoring:true },
+        services: { keycloak:false, loki:false, tempo:false, velero:false, monitoring:false },
         steps: {}
       };
+      window._qs = _qs;
 
       function g(id){ return document.getElementById(id); }
       function v(id){ var el=g(id); return el?el.value.trim():''; }
@@ -1187,6 +1461,7 @@ kubectl describe kustomization &lt;name&gt; -n flux-system</div>
           tokFile:v('ocqs-tokfile')||'/home/dzoan/.config/opencenter/tokens/git-token.txt',
           tokVal: v('ocqs-tokval'),
           sshKey: v('ocqs-sshkey')||'~/.ssh/id_rsa',
+          services: _qs.services,
           svc: _qs.services
         };
       }
@@ -1199,7 +1474,7 @@ kubectl describe kustomization &lt;name&gt; -n flux-system</div>
         if(st){ st.textContent='Getting active cluster config path...'; st.style.color='#0369a1'; }
         var nm = {keycloak:'keycloak',loki:'loki',tempo:'tempo',velero:'velero',monitoring:'kube-prometheus-stack'};
         // Get config path from active cluster via CLI - no hardcoding
-        var getCfgCmd = 'opencenter cluster show | grep "Config File\|config_file\|blueprint" | head -1 | awk \'NF{print $NF}\' | tr -d "\n"';
+        var getCfgCmd = 'opencenter cluster describe --output yaml | awk -F": " \'/^config_path:/{print $2; exit}\' | tr -d "\n"';
         var es1 = new EventSource('/api/stream/run-cmd?cmd='+encodeURIComponent(getCfgCmd));
         var cfgPath = '';
         es1.onmessage = function(e){
@@ -1234,6 +1509,45 @@ kubectl describe kustomization &lt;name&gt; -n flux-system</div>
           }
         };
         es1.onerror=function(){es1.close();if(st){st.textContent='\u2717 CLI not reachable';st.style.color='#dc2626';}};
+      };
+      window.ocqsUpdateClusterIdentity = function(btn){
+        var s = ocqsGetState();
+        var slug = function(x){ return (x||'').trim().toLowerCase().replace(/[^a-z0-9-]+/g,'-').replace(/^-+|-+$/g,''); };
+        var org = slug(s.org) || 'my-org';
+        var cluster = slug(s.cluster) || 'my-cluster';
+        var env = (s.env === 'production' || s.env === 'staging') ? s.env : 'dev';
+        var provider = (s.provider || 'openstack').trim().toLowerCase();
+        var st = document.getElementById('ocqs-update-identity-status');
+        var out = document.getElementById('ocqs-out-2');
+        if(btn){ btn.disabled=true; btn.textContent='Updating...'; }
+        if(st){ st.textContent='Updating cluster config...'; st.style.color='#0369a1'; }
+        var cmd = [
+          'opencenter cluster init '+cluster+' --org '+org+' || true',
+          'opencenter cluster use '+org+'/'+cluster,
+          'opencenter cluster set '+org+'/'+cluster+
+            ' opencenter.meta.env='+env+
+            ' opencenter.meta.name='+cluster+
+            ' opencenter.meta.organization='+org+
+            ' opencenter.cluster.cluster_name='+cluster+
+            ' opencenter.infrastructure.provider='+provider
+        ].join('\n');
+        if(out) out.textContent='$ '+cmd+'\n';
+        var es = new EventSource('/api/stream/run-cmd?cmd='+encodeURIComponent(cmd));
+        es.onmessage = function(e){
+          if(out){ out.textContent += e.data+'\n'; out.scrollTop=out.scrollHeight; }
+          if(e.data.startsWith('[EXIT')){
+            es.close();
+            var ok = e.data === '[EXIT 0]';
+            if(st){ st.textContent = ok ? '\u2713 Cluster settings updated' : '\u2717 Update failed'; st.style.color = ok ? '#15803d' : '#dc2626'; }
+            if(btn){ btn.disabled=false; btn.innerHTML='&#128260; Update Cluster'; }
+            if(ok && typeof ocqsUpdate==='function') ocqsUpdate();
+          }
+        };
+        es.onerror = function(){
+          es.close();
+          if(st){ st.textContent='\u2717 Update stream error'; st.style.color='#dc2626'; }
+          if(btn){ btn.disabled=false; btn.innerHTML='&#128260; Update Cluster'; }
+        };
       };
       window.ocqsToggle = function(svc){
         _qs.services[svc] = !_qs.services[svc];
@@ -1404,6 +1718,22 @@ var c9l=g('ocqs-cmd-9logs');
         if(c9l) c9l.textContent='ls -lah '+logPath+'\ntail -f '+logPath+'*.log';
 var c9b=g('ocqs-cmd-9b');
         if(c9b) c9b.textContent='export KUBECONFIG='+gitopsPath+'/infrastructure/clusters/'+s.cluster+'/kubeconfig.yaml\nkubectl get nodes\nkubectl get kustomizations -n flux-system\nkubectl get helmreleases -A';
+// Check Your Work + summary commands (need KUBECONFIG)
+        var kcfg='export KUBECONFIG='+gitopsPath+'/infrastructure/clusters/'+s.cluster+'/kubeconfig.yaml';
+        var _chks={'ocqs-cmd-chk1':'kubectl get nodes -o wide',
+          'ocqs-cmd-chk2':'kubectl get kustomizations -n flux-system',
+          'ocqs-cmd-chk3':'kubectl get helmreleases -A',
+          'ocqs-cmd-chk4':'kubectl get pods -A | head -60\necho "--- pods NOT Running/Completed:"\nkubectl get pods -A --no-headers | grep -vE "Running|Completed" || echo "none - all healthy"'};
+        Object.keys(_chks).forEach(function(k){ var e=g(k); if(e) e.textContent=kcfg+'\n'+_chks[k]; });
+        var csum=g('ocqs-cmd-chksum');
+        if(csum) csum.textContent = kcfg + "\n"
+          + "echo '======== CLUSTER SUMMARY: " + s.org + "/" + s.cluster + " ========'\n"
+          + "kubectl get nodes --no-headers | awk '{r+=($2==\"Ready\")} END{print \"Nodes:          \" r \"/\" NR \" Ready\"}'\n"
+          + "kubectl get kustomizations -n flux-system --no-headers 2>/dev/null | awk '{t+=($3==\"True\")} END{print \"Kustomizations: \" t+0 \"/\" NR \" Ready\"}'\n"
+          + "kubectl get helmreleases -A --no-headers 2>/dev/null | awk '{n++; a=a (n>1?\", \":\"\") $2} END{print \"HelmReleases:   \" n+0 \" installed (\" a \")\"}'\n"
+          + "kubectl get pods -A --no-headers | awk '!/Running|Completed/{b++} END{print \"Pods:           \" NR \" total - \" b+0 \" not Running/Completed\"}'\n"
+          + "echo \"API:            $(kubectl config view --minify -o jsonpath='{.clusters[0].cluster.server}')\"\n"
+          + "echo 'Dashboard:      https://dashboard." + s.cluster + "." + (s.region||'dfw3').toLowerCase() + ".k8s.opencenter.cloud'";
 // YAML preview
         var yp=g('ocqs-yaml-preview');
         if(yp) yp.textContent=
@@ -1558,8 +1888,13 @@ var c9b=g('ocqs-cmd-9b');
         // Migrate stale default values in localStorage
         try{
           var _s=JSON.parse(localStorage.getItem('ocqs_state')||'null');
-
-
+          if(_s && _s.services && _s.optionalServicesDefaultVersion!=='all-off-v1'){
+            _s.services=Object.assign({keycloak:false,loki:false,tempo:false,velero:false,monitoring:false},_s.services);
+            _s.services.velero=false;
+            _s.services.monitoring=false;
+            _s.optionalServicesDefaultVersion='all-off-v1';
+            localStorage.setItem('ocqs_state',JSON.stringify(_s));
+          }
         }catch(e){}
         try{
           var saved=JSON.parse(localStorage.getItem('ocqs_state')||'null');
@@ -1593,7 +1928,7 @@ var c9b=g('ocqs-cmd-9b');
         setTimeout(_ocqsRestore,150);
       }
       window.addEventListener('beforeunload',function(){
-        try{ if(typeof ocqsGetState==='function'){ var s=ocqsGetState(); localStorage.setItem('ocqs_state',JSON.stringify({org:s.org,cluster:s.cluster,env:s.env,provider:s.provider,authType:s.authType,authUrl:s.authUrl,region:s.region,username:s.username,password:s.password,userDomain:s.userDomain,projDomain:s.projDomain,projectId:s.projectId,credId:s.credId,credSec:s.credSec,floatNet:s.floatNet,networkId:s.networkId,subnetId:s.subnetId,gitRepo:s.gitRepo,gitBranch:s.gitBranch,tokFile:s.tokFile,tokVal:s.tokVal,services:_qs.services})); } }catch(e){}
+        try{ if(typeof ocqsGetState==='function'){ var s=ocqsGetState(); localStorage.setItem('ocqs_state',JSON.stringify({org:s.org,cluster:s.cluster,env:s.env,provider:s.provider,authType:s.authType,authUrl:s.authUrl,region:s.region,username:s.username,password:s.password,userDomain:s.userDomain,projDomain:s.projDomain,projectId:s.projectId,credId:s.credId,credSec:s.credSec,floatNet:s.floatNet,networkId:s.networkId,subnetId:s.subnetId,gitRepo:s.gitRepo,gitBranch:s.gitBranch,tokFile:s.tokFile,tokVal:s.tokVal,services:_qs.services,optionalServicesDefaultVersion:'all-off-v1'})); } }catch(e){}
       });
 
     })();
