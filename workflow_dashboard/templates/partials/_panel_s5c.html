@@ -140,16 +140,11 @@
       <!-- ══════════════════════════════════════════════════════════════
            SECTION 4 — Cutover Gates From Business System Matrix
            ══════════════════════════════════════════════════════════════ -->
-      <div class="section-card" id="s5c-gates-card" style="display:none;">
-        <div class="section-header">
-          <div class="section-header-left">
-            <div class="section-icon"><i class="fas fa-shield-halved"></i></div>
-            <div class="section-title-group">
-              <h3>Cutover Gates</h3>
-              <p>Generated from the business system matrix above. <b style="color:#475569;">Why:</b> the go / no-go checklist that PASS CUTOVER validates before declaring the cutover done.</p>
-            </div>
-          </div>
-        </div>
+      <details class="section-card" id="s5c-gates-card" style="display:none;padding:0;">
+        <summary style="padding:14px 24px;cursor:pointer;font-weight:800;color:#0f172a;font-size:14px;display:flex;align-items:center;gap:10px;">
+          <i class="fas fa-shield-halved" style="color:#64748b;"></i> Cutover Gates
+          <span style="font-weight:400;font-size:12px;color:#64748b;">go / no-go checklist &mdash; auto-filled live; open to approve Rollback Plan &amp; Sign-Off</span>
+        </summary>
         <div class="section-body">
           <div class="table-scroll-shell">
             <table class="matrix-table">
@@ -158,7 +153,8 @@
             </table>
           </div>
         </div>
-      </div>
+      
+      </details>
 
       <!-- ══════════════════════════════════════════════════════════════
            CUTOVER VALIDATION — PASS / FIX (replaces the relocated UAT

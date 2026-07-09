@@ -622,11 +622,12 @@
           return '<table style="width:100%;border-collapse:collapse;font-size:11px;color:#e2e8f0;">'
             + '<thead><tr style="color:#7ecfff;text-align:left;"><th style="padding:4px;">Component</th><th>Type</th><th>Blue — OSPC</th><th>Green — FLEX</th><th>Status</th></tr></thead><tbody>'
             + lines.map(function(l){
+                var disp={PASS:'PASSED',FAIL:'FAILED'}[l.status]||l.status;
                 var col=l.status==='PASS'?'#4ade80':(l.status==='WARNING'?'#facc15':(l.status==='FAIL'?'#f87171':'#94a3b8'));
                 return '<tr style="border-top:1px solid #1e293b;"><td style="padding:4px 6px;">'+esc(l.name.length>46?l.name.slice(0,45)+'…':l.name)+'</td><td>'+l.kind.toUpperCase()+'</td>'
                   + '<td>'+(l.blue?(l.blue.oks+'/3 · '+l.blue.avg+'ms'):esc(l.skip||'—'))+'</td>'
                   + '<td>'+(l.green?(l.green.oks+'/3 · '+l.green.avg+'ms'):'—')+'</td>'
-                  + '<td style="color:'+col+';font-weight:800;">'+l.status+'</td></tr>';
+                  + '<td style="color:'+col+';font-weight:800;">'+disp+'</td></tr>';
               }).join('')+'</tbody></table>'
             + '<div style="font-size:10px;color:#94a3b8;margin-top:6px;">'+lines.length+'/'+total+' tested — frontend rows are covered by the full Cut over TEST above.</div>';
         }
@@ -643,11 +644,13 @@
           var lines=[];
           for(var i=0;i<comps.length;i++){
             var r=comps[i], kind=cbgKind(r);
-            if(kind==='frontend'){ lines.push({name:r.name, kind:kind, skip:'full Cut over TEST above', status:'TESTER'}); }
-            else if(badTarget(r.target)||!r.source){ r.status='NEEDS INPUT'; lines.push({name:r.name, kind:kind, skip:'missing source / FLEX target', status:'NEEDS INPUT'}); }
+            /* frontend rows are probed too (HTTP health) so every row gets a
+               PASSED/FAILED verdict; the deep flow stays in Cut over TEST */
+            var probeKind=(kind==='frontend')?'api':kind;
+            if(badTarget(r.target)||!r.source){ r.status='NEEDS INPUT'; lines.push({name:r.name, kind:kind, skip:'missing source / FLEX target', status:'NEEDS INPUT'}); }
             else {
-              var blue=await cbgProbeSide(r,kind,r.source);
-              var green=await cbgProbeSide(r,kind,r.target);
+              var blue=await cbgProbeSide(r,probeKind,r.source);
+              var green=await cbgProbeSide(r,probeKind,r.target);
               var pass=green.oks===3, warn=green.oks>0&&!pass;
               r.status=pass?'PASS':(warn?'WARNING':'FAIL');
               r.srcRes=(blue.oks===3?'✓ ':'✗ ')+blue.oks+'/3 '+blue.avg+'ms';
@@ -659,7 +662,7 @@
           }
           render(); verdict(); publishGates();
           var fails=lines.filter(function(l){return l.status==='FAIL';}).length;
-          if(st) st.textContent='✓ All-component blue/green test finished — '+fails+' FAIL out of '+lines.length+' component(s).';
+          if(st) st.textContent='✓ All-component blue/green test finished — '+fails+' FAILED out of '+lines.length+' component(s).';
         };
 
         function _bstpInit(){ bstpBuildPlan(); try{ window.cbgFillDropdown(); }catch(e){} }
@@ -755,6 +758,8 @@
             <input id="cutover_tester_key" type="hidden" value="~/.ssh/id_rsa">
             <input id="cutover_tester_api_url" type="hidden">
           </div>
+          <details style="margin:8px 0;">
+            <summary style="cursor:pointer;font-weight:800;font-size:13px;color:#334155;padding:10px 12px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;">Test Configuration, Performance Validation &amp; Results <span style="font-weight:400;font-size:11px;color:#64748b;">— collapsed; auto-filled and updated by Dry Run / Cut over TEST</span></summary>
           <div class="sub-section">
             <div class="sub-section-title"><i class="fas fa-cogs"></i> Test Configuration <span style="font-weight:400;font-size:11px;color:#6b7280;">— auto-filled by Feed Tester / component dropdown</span></div>
             <div class="form-grid" style="grid-template-columns:repeat(5,minmax(0,1fr));gap:8px 10px;font-size:12px;">
@@ -820,6 +825,7 @@
             </div>
           </div>
           <details style="margin-top:8px;"><summary style="cursor:pointer;font-size:11px;font-weight:700;color:#64748b;">Exported artifacts</summary><div class="artifact-list" id="cutover_tester_artifacts"><span style="color:#6b7280;">No cutover tester artifacts exported yet.</span></div></details>
+          </details>
           <div style="display:flex;justify-content:flex-end;gap:12px;margin-top:16px;padding-top:16px;border-top:1px solid #e5e7eb;">
             <button class="btn btn-secondary light" onclick="cutoverTesterRenderResults(cutoverTesterResults)"><i class="fas fa-sync"></i> Refresh</button>
             <button class="btn btn-primary" onclick="cutoverTesterExportResultsCsv()"><i class="fas fa-file-export"></i> Export Cutover Report</button>
@@ -837,15 +843,10 @@
               <p>Guided step-by-step cutover — run after Cutover TEST passes. <b>Why:</b> executes and tracks the real cutover once every test above is green.</p>
             </div>
           </div>
-          <div style="display:flex;align-items:center;gap:6px;margin-right:12px;">
-            <button id="co-tab-simple" onclick="coSetDashMode('simple')" style="padding:6px 14px;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;border:1.5px solid #0ea5e9;background:#0ea5e9;color:#fff;transition:all .2s;"><i class="fas fa-list-check"></i> Simple</button>
-            <button id="co-tab-advanced" onclick="coSetDashMode('advanced')" style="padding:6px 14px;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;border:1.5px solid #bfdbfe;background:transparent;color:#1e40af;transition:all .2s;"><i class="fas fa-gauge-high"></i> Advanced</button>
-          </div>
-          <div class="section-actions">
-            <button id="co-auto-btn" onclick="coToggleAutoChain()" style="border:1.5px solid #10b981;background:#10b981;color:#fff;padding:8px 14px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;transition:all .2s;"><i class="fas fa-link"></i> Auto Chain: ON</button>
-            <button class="btn btn-secondary light" onclick="coResetCockpit()"><i class="fas fa-redo"></i> Reset</button>
-            <button class="btn btn-dark" onclick="cutoverTesterExportResultsCsv()"><i class="fas fa-file-export"></i> Export Evidence</button>
-          </div>
+          <!-- Simple/Advanced tabs and duplicate action buttons removed
+               (2026-07-09): advanced dashboard is the only mode; the single
+               control row lives inside the dashboard header below. -->
+          <span hidden><button id="co-auto-btn" onclick="coToggleAutoChain()"></button></span>
         </div>
         <div class="section-body" id="co-simple-dash-body">
 
@@ -2943,12 +2944,9 @@
             <div class="adv-hdr-actions">
               <button id="adv-run-btn" class="adv-hbtn adv-hbtn-red" onclick="runAdvancedCutover()" title="Run full 16-step advanced cutover pipeline"><i class="fas fa-rocket"></i> Start Advanced Cutover</button>
               <button id="adv-stop-btn" class="adv-hbtn adv-hbtn-ghost" style="display:none;" onclick="stopAdvancedCutover()"><i class="fas fa-stop"></i> Stop</button>
-              <button id="adv-start-btn" class="adv-hbtn adv-hbtn-green" onclick="coAdvStartCutover()"><i class="fas fa-play"></i> Start Cutover</button>
-              <button id="adv-pause-btn" class="adv-hbtn adv-hbtn-amber" style="display:none;" onclick="coPauseCutover()"><i class="fas fa-pause"></i> Pause</button>
               <button class="adv-hbtn adv-hbtn-ghost" onclick="coToggleAutoChain()"><i class="fas fa-link"></i> Auto Chain</button>
               <button class="adv-hbtn adv-hbtn-ghost" onclick="coResetCockpit()"><i class="fas fa-rotate-right"></i> Reset</button>
               <button class="adv-hbtn adv-hbtn-ghost" onclick="cutoverTesterExportResultsCsv()"><i class="fas fa-file-export"></i> Export Evidence</button>
-              <button class="adv-hbtn adv-hbtn-ghost" onclick="coSetDashMode('simple')"><i class="fas fa-arrow-left"></i> Back to Execution</button>
             </div>
           </div>
 
@@ -3878,6 +3876,7 @@
           }
 
           window.coSetDashMode = function(mode) {
+            mode = 'advanced'; /* simple mode removed — advanced only */
             var simple = document.getElementById('co-simple-dash-body');
             var adv    = document.getElementById('co-adv-dash');
             var tabS   = document.getElementById('co-tab-simple');
@@ -3898,6 +3897,9 @@
             }
           };
 
+          try { localStorage.setItem('cutoverDashboardMode','advanced'); } catch(e) {}
+          if (document.readyState !== 'loading') setTimeout(function(){ try{ coSetDashMode('advanced'); }catch(e){} }, 0);
+          else document.addEventListener('DOMContentLoaded', function(){ try{ coSetDashMode('advanced'); }catch(e){} });
           window.coAdvNav = function(sectionId, el) {
             document.querySelectorAll('#co-adv-dash .adv-nav-item').forEach(function(n){ n.classList.remove('active'); });
             if (el) el.classList.add('active');

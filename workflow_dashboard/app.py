@@ -3646,25 +3646,47 @@ def stage4c_ramp_set():
     applied = False
     apply_output = ""
     if not preview_only and lb_host:
-        # Really reconfigure HAProxy — same admin-socket mechanism the Cutover
-        # Tester uses. Without this the ramp was only recorded to JSON, so the
-        # LB stayed at whatever Phase 2 last set (usually 0/100 => no OSPC).
-        remote_cmd = (
-            "printf '"
-            f"set server app_blue_green/blue_source weight {ospc_percent}\\n"
-            f"set server app_blue_green/green_flex weight {flex_percent}\\n"
-            "show servers state\\n"
-            "' | sudo socat stdio /run/haproxy/admin.sock"
-        )
-        ssh_cmd = [
-            "ssh", "-i", os.path.expanduser(ssh_key),
-            "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null",
-            "-o", "ConnectTimeout=10", f"{ssh_user}@{lb_host.split(':')[0]}", remote_cmd,
-        ]
-        try:
+        # Really reconfigure HAProxy via the admin socket. Checks HAProxy's
+        # reply for "No such server" (socat exits 0 even then) and, on a name
+        # mismatch, discovers the real backend/server names from
+        # "show servers state" and retries.
+        def _run_socket(cmd_text: str):
+            ssh_cmd = [
+                "ssh", "-i", os.path.expanduser(ssh_key),
+                "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null",
+                "-o", "ConnectTimeout=10", f"{ssh_user}@{lb_host.split(':')[0]}",
+                "printf '" + cmd_text + "' | sudo socat stdio /run/haproxy/admin.sock",
+            ]
             proc = subprocess.run(ssh_cmd, capture_output=True, text=True, timeout=45)
-            apply_output = ((proc.stdout or "") + (proc.stderr or ""))[-2000:]
-            applied = proc.returncode == 0
+            return proc.returncode, ((proc.stdout or "") + (proc.stderr or ""))
+        try:
+            blue_name, green_name = "app_blue_green/blue_source", "app_blue_green/green_flex"
+            rc, out = _run_socket(
+                f"set server {blue_name} weight {ospc_percent}\\n"
+                f"set server {green_name} weight {flex_percent}\\n"
+                "show servers state\\n"
+            )
+            if "No such server" in out or "No such backend" in out:
+                _, state = _run_socket("show servers state\\n")
+                blue2 = green2 = None
+                for line in state.splitlines():
+                    parts = line.split()
+                    if len(parts) > 4 and parts[0].isdigit():
+                        be, srv = parts[1], parts[3]
+                        low = srv.lower()
+                        if not blue2 and ("blue" in low or "source" in low or "ospc" in low):
+                            blue2 = f"{be}/{srv}"
+                        elif not green2 and ("green" in low or "flex" in low or "target" in low):
+                            green2 = f"{be}/{srv}"
+                if blue2 and green2:
+                    blue_name, green_name = blue2, green2
+                    rc, out = _run_socket(
+                        f"set server {blue_name} weight {ospc_percent}\\n"
+                        f"set server {green_name} weight {flex_percent}\\n"
+                        "show servers state\\n"
+                    )
+            applied = rc == 0 and "No such server" not in out and "No such backend" not in out
+            apply_output = f"[{blue_name}={ospc_percent} {green_name}={flex_percent}] " + out[-1800:]
         except Exception as exc:
             apply_output = str(exc)
             applied = False
