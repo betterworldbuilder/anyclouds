@@ -2411,6 +2411,7 @@ mise run build
     if (mgrInp) mgrInp.value = url;
     var stgInp = document.getElementById('stginp-' + key);
     if (stgInp) stgInp.value = url;
+    if (typeof window.stgVidApplyState === 'function') window.stgVidApplyState(key);
   };
   window.tourVidSaveOne = function(key) {
     var wrap = document.getElementById('tvurl-' + key);

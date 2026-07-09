@@ -8551,7 +8551,7 @@ ${certContent}
   /* Locked (saved) vs editing state for every stage video bar. */
   window.stgVidApplyState = function(key) {
     var inp = document.getElementById('stginp-' + key);
-    var badge = document.getElementById('stgbadge-' + key);
+    var badge = document.getElementById('stgbadge-' + key) || document.getElementById('tour-vid-' + key);
     var btxt = document.getElementById('stgbadgetxt-' + key);
     var eBtn = document.getElementById('stgedit-' + key);
     var sBtn = document.getElementById('stgsave-' + key);
@@ -8560,6 +8560,7 @@ ${certContent}
     var saved = !!url;
     inp.readOnly = saved;
     inp.style.opacity = saved ? '.65' : '1';
+    inp.style.display = saved ? 'none' : '';
     if (eBtn) eBtn.style.display = saved ? '' : 'none';
     if (sBtn) sBtn.style.display = saved ? 'none' : '';
     if (saved) {
@@ -8581,7 +8582,7 @@ ${certContent}
     var eBtn = document.getElementById('stgedit-' + key);
     var sBtn = document.getElementById('stgsave-' + key);
     if (!inp) return;
-    inp.readOnly = false; inp.style.opacity = '1'; inp.focus(); inp.select();
+    inp.readOnly = false; inp.style.opacity = '1'; inp.style.display = ''; inp.focus(); inp.select();
     if (eBtn) eBtn.style.display = 'none';
     if (sBtn) sBtn.style.display = '';
   };
@@ -8594,6 +8595,8 @@ ${certContent}
     else localStorage.removeItem('tour-vid-' + key);
     var link = document.getElementById('tour-vid-' + key);
     if (link && url) link.href = url;
+    var mgrInp = document.getElementById('tvmgr-' + key);
+    if (mgrInp) mgrInp.value = url;
     var sBtn = document.getElementById('stgsave-' + key);
     if (sBtn && url) { sBtn.textContent = '✓ Saved!'; setTimeout(function(){ sBtn.innerHTML = '&#10003; Save'; stgVidApplyState(key); }, 900); }
     else stgVidApplyState(key);
