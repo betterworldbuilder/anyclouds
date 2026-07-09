@@ -342,6 +342,7 @@
           </div>
           <div style="margin-top:14px;display:flex;align-items:center;flex-wrap:wrap;gap:12px;padding:12px 14px;background:linear-gradient(135deg,#0f172a,#1e3a5f);border-radius:10px;">
             <button id="ocqs-autorun-btn" onclick="ocqsAutoRunAll()" style="border:none;border-radius:8px;padding:10px 22px;font-size:13px;font-weight:900;cursor:pointer;color:#fff;background:linear-gradient(135deg,#0284c7,#38bdf8);box-shadow:0 4px 12px rgba(2,132,199,.5);">&#9889; AutoRun All Steps (A &rarr; Z)</button>
+            <button id="ocqs-autorun-restart" onclick="ocqsAutoRestart()" style="border:none;border-radius:8px;padding:10px 16px;font-size:13px;font-weight:900;cursor:pointer;color:#fff;background:#475569;">&#8635; Restart</button>
             <label style="font-size:11px;color:#94a3b8;display:flex;align-items:center;gap:5px;cursor:pointer;"><input type="checkbox" id="ocqs-autorun-cont"> continue on error</label>
             <span id="ocqs-autorun-status" style="font-size:12px;font-weight:800;color:#94a3b8;"></span>
           </div>
@@ -1254,6 +1255,7 @@ kubectl describe kustomization &lt;name&gt; -n flux-system</div>
           <i style="background:#ef4444;"></i><i style="background:#f59e0b;"></i><i style="background:#22c55e;"></i>
           <b>OpenCenter Output Terminal</b>
           <button class="oct-mini" onclick="ocqsAutoRunAll()" id="ocqs-autorun-btn2" style="background:#0284c7;color:#fff;border-color:#0284c7;">&#9889; AutoRun</button>
+          <button class="oct-mini" onclick="ocqsAutoRestart()" style="background:#475569;color:#fff;border-color:#475569;">&#8635; Restart</button>
           <button class="oct-mini" onclick="var t=document.getElementById('ocqs-term');if(t)t.innerHTML='';">Clear</button>
           <button class="oct-mini" onclick="document.getElementById('ocqs-term-float').classList.toggle('oct-min');this.textContent=this.textContent==='&#8722;'?'&#9634;':'&#8722;';">&#8722;</button>
         </div>
@@ -1269,7 +1271,7 @@ kubectl describe kustomization &lt;name&gt; -n flux-system</div>
     <script>
     (function(){
       window._ocqsVoMuted = false;
-      window._ocqsAuto = { running:false, stop:false, es:null };
+      window._ocqsAuto = { running:false, stop:false, es:null, abort:null };
 
       window.ocqsVoice = function(txt){
         var t = document.getElementById('ocqs-vo-text'); if (t) t.textContent = txt;
@@ -1338,6 +1340,12 @@ kubectl describe kustomization &lt;name&gt; -n flux-system</div>
           var es = new EventSource('/api/stream/run-cmd?cmd=' + encodeURIComponent(cmd));
           window._ocqsAuto.es = es;
           var done = false;
+          window._ocqsAuto.abort = function(){
+            if (done) return;
+            done = true; es.close();
+            ocqsTermLine('-- step aborted by user --', 'err');
+            resolve('stop');
+          };
           es.onmessage = function(e){
             ocqsTermLine(e.data);
             if (out){ out.textContent += e.data + '\n'; out.scrollTop = out.scrollHeight; }
@@ -1350,13 +1358,28 @@ kubectl describe kustomization &lt;name&gt; -n flux-system</div>
         });
       }
 
+      window.ocqsAutoRestart = async function(){
+        if (window._ocqsAuto.running){
+          window._ocqsAuto.stop = true;
+          if (window._ocqsAuto.abort) window._ocqsAuto.abort();
+          var t0 = Date.now();
+          while (window._ocqsAuto.running && Date.now() - t0 < 5000){
+            await new Promise(function(r){ setTimeout(r, 100); });
+          }
+        }
+        var term = document.getElementById('ocqs-term');
+        if (term) term.innerHTML = '';
+        ocqsVoice('Restarting auto run from step one.');
+        ocqsAutoRunAll();
+      };
       window.ocqsAutoRunAll = async function(){
         var btn = document.getElementById('ocqs-autorun-btn');
         var btn2 = document.getElementById('ocqs-autorun-btn2');
         var stEl = document.getElementById('ocqs-autorun-status');
         if (window._ocqsAuto.running){
           window._ocqsAuto.stop = true;
-          if (window._ocqsAuto.es) window._ocqsAuto.es.close();
+          if (window._ocqsAuto.abort) window._ocqsAuto.abort();
+          else if (window._ocqsAuto.es) window._ocqsAuto.es.close();
           return;
         }
         var steps = ocqsAutoCollect();
@@ -1400,6 +1423,12 @@ kubectl describe kustomization &lt;name&gt; -n flux-system</div>
           ocqsVoice('Step ' + (i+1) + ' of ' + steps.length + ': ' + steps[i].name.replace(/-/g,' ') + '.');
           ocqsTermLine('', ''); ocqsTermLine('== STEP ' + (i+1) + '/' + steps.length + ' [' + steps[i].name + '] ==', 'hd');
           var r = await runStepStream(steps[i]);
+          if (r === 'stop'){
+            setStepStatus(i, 'skip'); skip++;
+            ocqsTermLine('-- AutoRun stopped by user at [' + steps[i].name + '] --', 'hd');
+            for (var j = i+1; j < steps.length; j++) setStepStatus(j, 'skip');
+            break;
+          }
           setStepStatus(i, r);
           if (r === 'pass') pass++; else if (r === 'skip') skip++; else fail++;
           if (r === 'fail'){
