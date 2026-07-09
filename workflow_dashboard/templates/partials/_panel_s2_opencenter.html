@@ -2,8 +2,71 @@
       <div style="padding:12px 18px;">
         <div class="gov-header">
           <div class="gov-title-area">
-            <h2>🚀 OpenCenter Migration</h2>
-            <p>Stage 2 Migration Strategies Hub substage for importing R6 containerization outputs into the OpenCenter production Kubernetes/GitOps operating platform.</p>
+            <h2>🚀 Flex Apps to Cloud Native Migration Stage</h2>
+            <p>This stage turns the R6 containerization output into an OpenCenter-ready Kubernetes deployment package.</p>
+
+            <!-- ── Stage intro: pipeline + what/how/output ── -->
+            <style>
+              .ocm-pipe { display:flex; align-items:stretch; gap:10px; flex-wrap:wrap; margin:14px 0 16px; }
+              .ocm-node { flex:1; min-width:140px; background:#fff; border:1px solid #e2e8f0; border-radius:14px; padding:12px 14px; text-align:center; box-shadow:0 1px 3px rgba(15,23,42,.06); transition:transform .2s ease, box-shadow .2s ease; }
+              .ocm-node:hover { transform:translateY(-3px); box-shadow:0 10px 22px -10px rgba(15,23,42,.25); }
+              .ocm-node i { font-style:normal; display:flex; width:38px; height:38px; margin:0 auto 8px; border-radius:11px; align-items:center; justify-content:center; font-size:17px; color:#fff; }
+              .ocm-node b { display:block; font-size:12.5px; color:#0f172a; }
+              .ocm-node small { display:block; font-size:10.5px; color:#64748b; margin-top:2px; }
+              .ocm-arrow { align-self:center; color:#94a3b8; font-size:16px; font-weight:900; }
+              .ocm-cols { display:grid; grid-template-columns:1.2fr 1fr 1fr; gap:14px; margin:6px 0 4px; }
+              @media(max-width:1000px){ .ocm-cols{ grid-template-columns:1fr; } }
+              .ocm-box { background:#f8fafc; border:1px solid #e2e8f0; border-radius:14px; padding:14px 16px; }
+              .ocm-box h5 { margin:0 0 8px; font-size:11px; font-weight:800; letter-spacing:.12em; text-transform:uppercase; color:#0369a1; }
+              .ocm-box ul { margin:0; padding-left:16px; font-size:12.5px; color:#475569; line-height:1.75; }
+              .ocm-box p { margin:0; font-size:12.5px; color:#475569; line-height:1.7; }
+              .ocm-flow { display:flex; flex-wrap:wrap; align-items:center; gap:6px; margin:6px 0 10px; }
+              .ocm-flow span { background:#eff6ff; border:1px solid #bfdbfe; color:#1d4ed8; border-radius:999px; padding:4px 12px; font-size:11.5px; font-weight:800; }
+              .ocm-flow em { font-style:normal; color:#94a3b8; }
+              .ocm-envs span { display:inline-block; background:#fff; border:1px solid #e2e8f0; border-radius:999px; padding:3px 10px; font-size:11px; font-weight:700; color:#334155; margin:3px 4px 0 0; }
+              .ocm-goal { margin-top:12px; background:linear-gradient(90deg,#0f172a,#1e3a5f); border-radius:12px; padding:12px 18px; color:#fff; font-size:13.5px; font-weight:700; }
+              .ocm-goal b { color:#7dd3fc; }
+              .ocm-lead { margin:14px 0 0; font-size:15px; font-weight:800; color:#0f172a; }
+            </style>
+            <p style="color:#475569;font-size:13px;line-height:1.7;margin:8px 0 0;">It imports the R6 bundle, validates the generated Kubernetes assets, maps them into OpenCenter&rsquo;s declarative platform model, and prepares the workload for GitOps reconciliation.</p>
+
+            <div class="ocm-pipe">
+              <div class="ocm-node"><i style="background:linear-gradient(135deg,#64748b,#475569);">&#128451;</i><b>OSPC</b><small>Legacy VM estate</small></div>
+              <div class="ocm-arrow">&rarr;</div>
+              <div class="ocm-node"><i style="background:linear-gradient(135deg,#0ea5e9,#2563eb);">&#9729;</i><b>FLEX</b><small>Modern cloud foundation</small></div>
+              <div class="ocm-arrow">&rarr;</div>
+              <div class="ocm-node"><i style="background:linear-gradient(135deg,#f97316,#f59e0b);">&#128230;</i><b>Containerization</b><small>R6 apps &rarr; containers</small></div>
+              <div class="ocm-arrow">&rarr;</div>
+              <div class="ocm-node"><i style="background:linear-gradient(135deg,#16a34a,#22c55e);">&#9881;</i><b>OpenCenter Cluster</b><small>GitOps-managed Kubernetes</small></div>
+              <div class="ocm-arrow">&rarr;</div>
+              <div class="ocm-node"><i style="background:linear-gradient(135deg,#7c3aed,#6366f1);">&#10024;</i><b>RAX AI Platform</b><small>Private AI &amp; future services</small></div>
+            </div>
+
+            <div class="ocm-cols">
+              <div class="ocm-box">
+                <h5>What it does</h5>
+                <p style="margin-bottom:6px;">Converts containerized application outputs into production-ready platform inputs:</p>
+                <ul>
+                  <li>Kubernetes YAML, Helm, Kustomize, or Flux manifests</li>
+                  <li>Container image and registry configuration</li>
+                  <li>Service, ingress, storage, secrets, and runtime settings</li>
+                  <li>GitOps repository structure</li>
+                  <li>Platform dependency checks &amp; deployment readiness status</li>
+                </ul>
+              </div>
+              <div class="ocm-box">
+                <h5>How it works</h5>
+                <div class="ocm-flow"><span>Configure</span><em>&rarr;</em><span>Generate</span><em>&rarr;</em><span>Reconcile</span><em>&rarr;</em><span>Run</span></div>
+                <p>The R6 output is checked, converted into OpenCenter configuration, pushed into GitOps, and reconciled by FluxCD into the target Kubernetes platform.</p>
+              </div>
+              <div class="ocm-box">
+                <h5>Output</h5>
+                <p style="margin-bottom:6px;">A secure, auditable, GitOps-managed deployment package ready to run across:</p>
+                <div class="ocm-envs"><span>FLEX</span><span>OpenStack</span><span>VMware</span><span>AWS</span><span>Bare Metal</span><span>Air-Gapped Sites</span></div>
+              </div>
+            </div>
+            <div class="ocm-goal">The goal is simple: move from <b>containerized application</b> to <b>operated cloud-native platform workload</b>.</div>
+            <p class="ocm-lead">First, what is OpenCenter?</p>
           </div>
           <div class="gov-status-badge status-pending" id="s2opencenter-status">Awaiting R6 Bundle</div>
         </div>
