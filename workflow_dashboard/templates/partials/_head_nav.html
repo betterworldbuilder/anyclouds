@@ -317,6 +317,18 @@
       box-shadow: inset 0 0 8px rgba(125, 211, 252, 0.18);
     }
     .sub-btn:hover, .sub-btn-dropdown:hover { opacity: 1; border-color: rgba(125, 211, 252, 0.88); background: linear-gradient(135deg, #1d76c9, #155da8); }
+    .sub-btn.r1r2r7-btn,
+    .sub-btn.r1r2r7-btn:hover,
+    .sub-btn.r1r2r7-btn.active,
+    body.flex-skyline-mode .sub-bar .sub-btn.r1r2r7-btn,
+    body.flex-skyline-mode .sub-bar .sub-btn.r1r2r7-btn:hover,
+    body.flex-skyline-mode .sub-bar .sub-btn.r1r2r7-btn.active {
+      background: linear-gradient(135deg, #111827, #374151) !important;
+      border-color: #6b7280 !important;
+      color: #f9fafb !important;
+      box-shadow: inset 0 0 8px rgba(255,255,255,.08), 0 0 10px rgba(17,24,39,.35) !important;
+      text-shadow: none !important;
+    }
     .sub-btn.active {
       background: linear-gradient(135deg, #bbf7d0, #86efac) !important;
       border-color: #22c55e !important;
@@ -2311,8 +2323,9 @@ body.flex-skyline-mode .uat-s1-template-tab.active {
 <!-- ── Sub-tabs for Stage 2 ─────────────────────────── -->
 <div class="sub-bar" id="subBar2">
   <button class="sub-btn" data-sub="s2migstrategy">🗺 Migration Strategy</button>
-  <button class="sub-btn" data-sub="s2retain">⏸ R1 Retain — Keep on OSPC</button>
-  <button class="sub-btn" data-sub="s2retire">🗑 R2 Retire — Decommission</button>
+  <button class="sub-btn r1r2r7-btn" data-sub="s2retain">⏸ R1 Retain — Keep on OSPC</button>
+  <button class="sub-btn r1r2r7-btn" data-sub="s2retire">🗑 R2 Retire — Decommission</button>
+  <button class="sub-btn r1r2r7-btn" data-sub="s2repurchase">🛒 R7 Repurchase — Replace with SaaS/Product</button>
 
   <button class="sub-btn" data-sub="s2rehost_p1">🛠 Infrastructure Migration</button>
   <button class="sub-btn" data-sub="s2fullmig">🏢 Full Business System Rehost</button>
@@ -2324,8 +2337,6 @@ body.flex-skyline-mode .uat-s1-template-tab.active {
   <!-- R5 Data Replatform / Full Manual Runbook removed — see Stage 2 migration tools -->
   <button class="sub-btn" data-sub="s2rehost_p2_2">&#128640; R6 APPS to Container Refactor Engine</button>
   <button class="sub-btn" data-sub="s2opencenter">🚀 OpenCenter Migration</button>
-
-  <button class="sub-btn" data-sub="s2repurchase">🛒 R7 Repurchase — Replace with SaaS/Product</button>
 </div>
 
 <!-- ── Panels ─────────────────────────────────────────── -->
