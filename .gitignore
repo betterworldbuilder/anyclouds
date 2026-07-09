@@ -147,3 +147,4 @@ install_grub2_for_centos5_boot.sh
 quick_c5_repair_and_boot.sh
 recreate_like_centos7.sh
 run_centos5_module_repair_boot.sh
+workflow_dashboard/templates/*.ace_work_*
