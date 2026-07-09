@@ -9173,6 +9173,25 @@ ${certContent}
     text-shadow: 0 0 8px rgba(224,242,254,.5) !important;
     transform: none !important;
   }
+  #stageBar .stage-btn.green-roll-stage,
+  #stageBar .stage-btn.green-roll-stage.active,
+  body.flex-skyline-mode #stageBar .stage-btn.green-roll-stage,
+  body.flex-skyline-mode #stageBar .stage-btn.green-roll-stage.active {
+    border-color: #22c55e !important;
+    background: linear-gradient(100deg, rgba(0,24,70,.78) 0%, rgba(0,24,70,.78) 34%, rgba(34,197,94,.95) 48%, rgba(134,239,172,.92) 52%, rgba(0,24,70,.78) 66%, rgba(0,24,70,.78) 100%) !important;
+    background-size: 260% 100% !important;
+    color: #ffffff !important;
+    box-shadow: 0 0 8px rgba(34,197,94,.24), inset 0 0 8px rgba(34,197,94,.12) !important;
+    text-shadow: 0 0 8px rgba(187,247,208,.55) !important;
+    animation: stageGreenRoll 9.6s linear infinite !important;
+    animation-delay: var(--green-roll-delay, 0s) !important;
+    transform: none !important;
+  }
+  #stageBar .stage-btn.green-roll-stage small,
+  body.flex-skyline-mode #stageBar .stage-btn.green-roll-stage small {
+    color: #d1fae5 !important;
+    opacity: 1 !important;
+  }
 
   /* ───── Quick Tour page — Skyline / light mode ───── */
   body.flex-skyline-mode #panel-s_tour {
