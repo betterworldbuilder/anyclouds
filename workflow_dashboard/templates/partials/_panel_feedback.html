@@ -17,8 +17,21 @@
         <label style="display:grid;gap:4px;font-size:11px;font-weight:800;color:#64748b;text-transform:uppercase;flex:1;min-width:260px;">Admin notification email
           <input id="fb-admin-email" type="email" placeholder="admin@rackspace.com" style="border:1px solid #cbd5e1;border-radius:8px;padding:8px 10px;font-size:13px;">
         </label>
-        <button class="btn btn-primary" onclick="fbSaveAdmin()" style="padding:9px 16px;">Save Admin Email</button>
-        <span id="fb-admin-status" style="font-size:12px;color:#64748b;align-self:center;"></span>
+        <label style="display:grid;gap:4px;font-size:11px;font-weight:800;color:#64748b;text-transform:uppercase;min-width:180px;">SMTP host
+          <input id="fb-smtp-host" placeholder="smtp.emailsrvr.com / smtp.gmail.com" style="border:1px solid #cbd5e1;border-radius:8px;padding:8px 10px;font-size:13px;">
+        </label>
+        <label style="display:grid;gap:4px;font-size:11px;font-weight:800;color:#64748b;text-transform:uppercase;width:80px;">Port
+          <input id="fb-smtp-port" placeholder="587" style="border:1px solid #cbd5e1;border-radius:8px;padding:8px 10px;font-size:13px;">
+        </label>
+        <label style="display:grid;gap:4px;font-size:11px;font-weight:800;color:#64748b;text-transform:uppercase;min-width:170px;">SMTP user
+          <input id="fb-smtp-user" placeholder="mailer@yourdomain.com" style="border:1px solid #cbd5e1;border-radius:8px;padding:8px 10px;font-size:13px;">
+        </label>
+        <label style="display:grid;gap:4px;font-size:11px;font-weight:800;color:#64748b;text-transform:uppercase;min-width:140px;">SMTP password
+          <input id="fb-smtp-pass" type="password" placeholder="app password" style="border:1px solid #cbd5e1;border-radius:8px;padding:8px 10px;font-size:13px;">
+        </label>
+        <button class="btn btn-primary" onclick="fbSaveAdmin()" style="padding:9px 16px;">Save</button>
+        <button class="btn btn-secondary" onclick="fbTestEmail()" style="padding:9px 16px;">Send Test Email</button>
+        <span id="fb-admin-status" style="font-size:12px;color:#64748b;align-self:center;flex-basis:100%;"></span>
       </div>
 
       <!-- Feedback form -->
@@ -36,7 +49,24 @@
             <textarea id="fb-what" rows="3" placeholder="What happened / what should be improved" class="fb-in"></textarea>
           </label>
           <label class="fb-lbl">Where — stage / section
-            <input id="fb-where" placeholder="e.g. Stage 4 — Business System Cut Over" class="fb-in">
+            <select id="fb-where" class="fb-in">
+              <option value="">— pick stage / substage —</option>
+              <optgroup label="Why Who What When to Move to FLEX"><option>Why page — 2D/3D hero</option><option>Why page — TCO / pricing cards</option></optgroup>
+              <optgroup label="Quick Tour"><option>Quick Tour</option></optgroup>
+              <optgroup label="Migration Log"><option>Migration Log</option></optgroup>
+              <optgroup label="Stage 1 — Discovery &amp; Assessment"><option>Stage 1 — Preflight</option><option>Stage 1 — Inventory / Readiness</option><option>Stage 1 — App Dependency</option></optgroup>
+              <optgroup label="Stage 2 — Migration Strategies Hub"><option>Stage 2 — Migration Strategy</option><option>Stage 2 — R1 Retain</option><option>Stage 2 — R2 Retire</option><option>Stage 2 — Infrastructure Migration</option><option>Stage 2 — Full Business System Rehost</option><option>Stage 2 — VMware to FLEX</option><option>Stage 2 — R3 OSPC2FLEX VM Rehost</option><option>Stage 2 — AWS/GCP/Azure → HYPER FLEX</option><option>Stage 2 — R3 FLEX2FLEX Region Cloning</option><option>Stage 2 — R5 Replatform (App &amp; DB Replication)</option><option>Stage 2 — APPS to Container Refactor Engine</option><option>Stage 2 — R6 Refactor / Containerization</option><option>Stage 2 — OpenCenter Migration / Quickstart</option><option>Stage 2 — R7 Repurchase</option></optgroup>
+              <optgroup label="Stage 3 — Validation &amp; UAT"><option>UAT — Step 1 Server Targets</option><option>UAT — Step 2 Service Comparison</option><option>UAT — Step 3 Performance</option><option>UAT — Step 4 Issues Tracker</option><option>UAT — Step 5 Cutover Readiness</option><option>UAT — Source vs Target Live Test</option></optgroup>
+              <optgroup label="Stage 3a — Cost Optimization"><option>Stage 3a — Cost Optimization</option></optgroup>
+              <optgroup label="Stage 3b — Performance Gain"><option>Stage 3b — Performance Gain</option></optgroup>
+              <optgroup label="Stage 4 — Servers Cut Over"><option>Servers Cut Over — Cloud Credentials / Scan</option><option>Servers Cut Over — Cutover Test &amp; Result CSV</option><option>Servers Cut Over — Component Blue/Green Test</option><option>Servers Cut Over — Cutover Live Monitor Cockpit</option><option>Servers Cut Over — Advanced Dashboard</option></optgroup>
+              <optgroup label="Stage 4 — Business System Cut Over"><option>Business System Cut Over — Select / Edit System</option><option>Business System Cut Over — Cutover Matrix</option><option>Business System Cut Over — Cutover Gates</option><option>Business System Cut Over — Lean Live Cutover Monitor</option><option>Business System Cut Over — Cutover Validation (PASS/FIX)</option></optgroup>
+              <optgroup label="Stage 5 — IaC Backup, DR &amp; Restore"><option>Stage 5 — IaC Backup / DR</option></optgroup>
+              <optgroup label="Stage 6 — Handover &amp; Deliverables"><option>Stage 6 — Handover</option></optgroup>
+              <optgroup label="Stage 8 — AIOps &amp; Continuous Ops"><option>Stage 8 — AIOps</option></optgroup>
+              <optgroup label="Stage 9 — AI Power Up"><option>Stage 9 — AI Power Up</option></optgroup>
+              <optgroup label="Other"><option>Improvement Feedbacks stage</option><option>Navigation / general UI</option><option>Other</option></optgroup>
+            </select>
           </label>
           <label class="fb-lbl">When
             <input id="fb-when" type="datetime-local" class="fb-in">
@@ -85,14 +115,40 @@
       var FB=[];
 
       window.fbSaveAdmin = async function(){
-        var email=($('fb-admin-email')||{}).value||'';
         var st=$('fb-admin-status');
+        var payload={
+          admin_email:($('fb-admin-email')||{}).value||'',
+          smtp_host:($('fb-smtp-host')||{}).value||'',
+          smtp_port:($('fb-smtp-port')||{}).value||'',
+          smtp_user:($('fb-smtp-user')||{}).value||'',
+          smtp_pass:($('fb-smtp-pass')||{}).value||''
+        };
         try{
-          var r=await fetch('/api/feedback/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({admin_email:email})});
+          var r=await fetch('/api/feedback/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
           var d=await r.json();
-          if(st) st.textContent=d.ok?('✓ Admin email saved: '+(d.admin_email||'none')):('Save failed: '+(d.error||''));
+          if(st) st.textContent=d.ok?('✓ Saved — admin: '+(d.admin_email||'none')+', relay: '+(d.smtp_host||'not set')+'. Use Send Test Email to verify.')
+                                   :('Save failed: '+(d.error||''));
         }catch(e){ if(st) st.textContent='Save failed: '+e.message; }
       };
+      window.fbTestEmail = async function(){
+        var st=$('fb-admin-status');
+        if(st) st.textContent='Sending test email…';
+        try{
+          var r=await fetch('/api/feedback/test-email',{method:'POST'});
+          var d=await r.json();
+          if(st){ st.textContent=(d.ok?'✓ ':'✗ ')+d.status; st.style.color=d.ok?'#16a34a':'#dc2626'; }
+        }catch(e){ if(st){ st.textContent='✗ '+e.message; st.style.color='#dc2626'; } }
+      };
+      async function fbLoadConfig(){
+        try{
+          var r=await fetch('/api/feedback/config'); var d=await r.json();
+          if(($('fb-admin-email')||{}).value==='') $('fb-admin-email').value=d.admin_email||'';
+          if($('fb-smtp-host')) $('fb-smtp-host').value=d.smtp_host||'';
+          if($('fb-smtp-port')) $('fb-smtp-port').value=d.smtp_port||'';
+          if($('fb-smtp-user')) $('fb-smtp-user').value=d.smtp_user||'';
+          if($('fb-smtp-pass') && d.smtp_pass_set) $('fb-smtp-pass').value='********';
+        }catch(e){}
+      }
 
       window.fbSubmit = async function(){
         var st=$('fb-submit-status');
@@ -149,6 +205,7 @@
       };
 
       function init(){
+        fbLoadConfig();
         var w=$('fb-when');
         if(w && !w.value){ var d=new Date(); d.setMinutes(d.getMinutes()-d.getTimezoneOffset()); w.value=d.toISOString().slice(0,16); }
         fbLoad();

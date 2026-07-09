@@ -3653,35 +3653,63 @@ def _feedback_config():
         return {}
 
 
-def _feedback_email_admin(entry, admin_email):
-    """Best-effort admin notification. SMTP host/port/user/pass come from env
-    (FEEDBACK_SMTP_HOST/PORT/USER/PASS, FEEDBACK_SMTP_FROM); returns a status
-    string so the UI can show whether the mail really went out."""
+def _feedback_smtp_settings():
+    """SMTP settings: UI-saved config.json first, env vars as fallback."""
+    cfg = _feedback_config()
+    return {
+        "host": (cfg.get("smtp_host") or os.environ.get("FEEDBACK_SMTP_HOST", "")).strip(),
+        "port": int(cfg.get("smtp_port") or os.environ.get("FEEDBACK_SMTP_PORT", "587") or 587),
+        "user": (cfg.get("smtp_user") or os.environ.get("FEEDBACK_SMTP_USER", "")).strip(),
+        "password": cfg.get("smtp_pass") or os.environ.get("FEEDBACK_SMTP_PASS", ""),
+        "sender": (cfg.get("smtp_from") or os.environ.get("FEEDBACK_SMTP_FROM", "") or cfg.get("smtp_user") or "m3-dashboard@localhost").strip(),
+    }
+
+
+def _feedback_send_mail(subject, body, admin_email):
+    """Send via the configured relay. Returns a status string for the UI."""
     if not admin_email:
         return "no admin email configured"
-    host = os.environ.get("FEEDBACK_SMTP_HOST", "localhost")
+    st = _feedback_smtp_settings()
+    if not st["host"]:
+        return "smtp not configured — set SMTP host in the admin box above"
     try:
         import smtplib
         from email.message import EmailMessage
         msg = EmailMessage()
-        msg["Subject"] = f"[M3 Feedback #{entry['id']}] {entry['type']}: {entry['what'][:60]}"
-        msg["From"] = os.environ.get("FEEDBACK_SMTP_FROM", "m3-dashboard@localhost")
+        msg["Subject"] = subject
+        msg["From"] = st["sender"]
         msg["To"] = admin_email
-        msg.set_content(
-            "New improvement feedback\n\n"
-            + "\n".join(f"{k}: {entry.get(k, '')}" for k in
-                         ("id", "submitted_at", "name", "email", "type", "what", "where", "when", "how"))
-        )
-        port = int(os.environ.get("FEEDBACK_SMTP_PORT", "25"))
-        with smtplib.SMTP(host, port, timeout=10) as smtp:
-            user = os.environ.get("FEEDBACK_SMTP_USER")
-            if user:
-                smtp.starttls()
-                smtp.login(user, os.environ.get("FEEDBACK_SMTP_PASS", ""))
-            smtp.send_message(msg)
+        msg.set_content(body)
+        if st["port"] == 465:
+            import ssl
+            with smtplib.SMTP_SSL(st["host"], st["port"], timeout=15, context=ssl.create_default_context()) as smtp:
+                if st["user"]:
+                    smtp.login(st["user"], st["password"])
+                smtp.send_message(msg)
+        else:
+            with smtplib.SMTP(st["host"], st["port"], timeout=15) as smtp:
+                smtp.ehlo()
+                try:
+                    smtp.starttls()
+                    smtp.ehlo()
+                except Exception:
+                    pass  # relay without TLS (e.g. internal port 25)
+                if st["user"]:
+                    smtp.login(st["user"], st["password"])
+                smtp.send_message(msg)
         return "sent"
     except Exception as exc:
-        return f"send failed ({host}): {exc}"
+        return f"send failed ({st['host']}:{st['port']}): {exc}"
+
+
+def _feedback_email_admin(entry, admin_email):
+    return _feedback_send_mail(
+        f"[M3 Feedback #{entry['id']}] {entry['type']}: {entry['what'][:60]}",
+        "New improvement feedback\n\n"
+        + "\n".join(f"{k}: {entry.get(k, '')}" for k in
+                     ("id", "submitted_at", "name", "email", "type", "what", "where", "when", "how")),
+        admin_email,
+    )
 
 
 @app.get("/api/feedback/list")
@@ -3694,9 +3722,31 @@ def feedback_config_set():
     data = request.get_json(silent=True) or {}
     cfg = _feedback_config()
     cfg["admin_email"] = str(data.get("admin_email") or "").strip()
+    for k in ("smtp_host", "smtp_port", "smtp_user", "smtp_from"):
+        if k in data:
+            cfg[k] = str(data.get(k) or "").strip()
+    # keep the stored password unless a new (non-masked) one is supplied
+    if str(data.get("smtp_pass") or "") not in ("", "********"):
+        cfg["smtp_pass"] = str(data.get("smtp_pass"))
     _FEEDBACK_DIR.mkdir(parents=True, exist_ok=True)
     (_FEEDBACK_DIR / "config.json").write_text(json.dumps(cfg, indent=2), encoding="utf-8")
-    return jsonify({"ok": True, "admin_email": cfg["admin_email"]})
+    return jsonify({"ok": True, "admin_email": cfg["admin_email"], "smtp_host": cfg.get("smtp_host", "")})
+
+
+@app.get("/api/feedback/config")
+def feedback_config_get():
+    cfg = _feedback_config()
+    return jsonify({"ok": True, "admin_email": cfg.get("admin_email", ""),
+                    "smtp_host": cfg.get("smtp_host", ""), "smtp_port": cfg.get("smtp_port", ""),
+                    "smtp_user": cfg.get("smtp_user", ""), "smtp_from": cfg.get("smtp_from", ""),
+                    "smtp_pass_set": bool(cfg.get("smtp_pass"))})
+
+
+@app.post("/api/feedback/test-email")
+def feedback_test_email():
+    admin = _feedback_config().get("admin_email", "")
+    status = _feedback_send_mail("[M3 Feedback] Test email", "This is a test notification from the Improvement Feedbacks stage.", admin)
+    return jsonify({"ok": status == "sent", "status": status})
 
 
 @app.post("/api/feedback/submit")
