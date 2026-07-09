@@ -203,6 +203,66 @@
           if (btn){ var o=btn.textContent; btn.textContent='\u2713 Copied'; setTimeout(function(){ btn.textContent=o; }, 1500); }
         });
       };
+      /* ── Quickstart step 6/7 wiring (were alert() stubs) ── */
+      var OCQS_CHECKS = {
+        uat:      "echo '== UAT smoke: workloads =='; kubectl get pods -A -o wide 2>&1 | head -30",
+        health:   "kubectl get nodes -o wide 2>&1; echo ---; echo 'Pods not Running:'; kubectl get pods -A --field-selector=status.phase!=Running 2>&1 | head -20",
+        db:       "echo '== PVCs / StorageClasses =='; kubectl get pvc -A 2>&1 | head -20; echo ---; kubectl get sc 2>&1 | head -10",
+        perf:     "kubectl top nodes 2>&1 || echo 'metrics-server not installed'; echo ---; kubectl top pods -A --sort-by=cpu 2>&1 | head -15",
+        security: "echo '== NetworkPolicies =='; kubectl get networkpolicies -A 2>&1 | head -15; echo ---; kubectl version 2>&1 | head -3"
+      };
+      window.ocqsUatCheck = function(kind){
+        var cmd = OCQS_CHECKS[kind]; if (!cmd) return;
+        var box = document.getElementById('ocqs-cmd-uatchecks');
+        if (box) box.textContent = cmd;
+        var st = JSON.parse(localStorage.getItem('ocqs_cutover_state')||'{}');
+        st['check_'+kind] = new Date().toISOString();
+        localStorage.setItem('ocqs_cutover_state', JSON.stringify(st));
+        ocqsRunCmd('ocqs-cmd-uatchecks','ocqs-out-uatchecks','');
+      };
+      window.ocqsCutDecision = function(v){
+        var st = JSON.parse(localStorage.getItem('ocqs_cutover_state')||'{}');
+        st.uat_decision = v; st.uat_decision_at = new Date().toLocaleString();
+        localStorage.setItem('ocqs_cutover_state', JSON.stringify(st));
+        var n = document.getElementById('ocqs-uat-decision');
+        if (n){ n.textContent = 'UAT decision: ' + v + ' at ' + st.uat_decision_at; n.style.color = v==='APPROVED' ? '#16a34a' : '#dc2626'; }
+      };
+      window.ocqsCutState = function(v){
+        var st = JSON.parse(localStorage.getItem('ocqs_cutover_state')||'{}');
+        st.cutover_state = v; st.cutover_state_at = new Date().toLocaleString();
+        (st.timeline = st.timeline || []).push({state: v, at: st.cutover_state_at});
+        localStorage.setItem('ocqs_cutover_state', JSON.stringify(st));
+        var n = document.getElementById('ocqs-cut-state');
+        if (n){ n.textContent = 'Cutover state: ' + v + ' (' + st.cutover_state_at + ')';
+          n.style.color = v==='ROLLBACK' ? '#dc2626' : (v==='PAUSED' ? '#b45309' : '#16a34a'); }
+      };
+      function _ocqsDl(name, text, type){
+        var a = document.createElement('a');
+        a.href = URL.createObjectURL(new Blob([text], {type: type || 'text/plain'}));
+        a.download = name; a.click();
+      }
+      function _ocqsState(){ try{ return JSON.parse(localStorage.getItem('ocqs_cutover_state')||'{}'); }catch(e){ return {}; } }
+      function _ocqsBundleState(){ try{ return JSON.parse(localStorage.getItem('r6OpenCenterHandoffBundle')||'null'); }catch(e){ return null; } }
+      window.ocqsArtifact = function(name){
+        var st = _ocqsState(), bundle = _ocqsBundleState();
+        var hdr = '# ' + name + '\n\nGenerated: ' + new Date().toLocaleString()
+          + '\nCluster: ' + ((document.getElementById('ocqs-region')||{}).value || 'n/a')
+          + '\nR6 bundle: ' + (bundle ? 'imported' : 'not imported')
+          + '\nUAT decision: ' + (st.uat_decision || 'none') + '\nCutover state: ' + (st.cutover_state || 'NOT STARTED') + '\n\n';
+        if (name === 'production_evidence.json'){
+          _ocqsDl(name, JSON.stringify({generated: new Date().toISOString(), state: st, r6_bundle: bundle, checks_output: (document.getElementById('ocqs-out-uatchecks')||{}).textContent || ''}, null, 2), 'application/json');
+          return;
+        }
+        var body = '';
+        if (name === 'cutover_plan.md') body = '## Plan\n1. Freeze changes\n2. Final UAT checks (step 6)\n3. Ramp traffic in Stage 4 - Business System Cut Over (10% -> 25% -> 50% -> 100%)\n4. Verify journey gate + evidence\n5. Mark Production Live here\n\n## Rollback trigger\nAny journey gate FAIL or error rate > 5%.';
+        else if (name === 'rollback_plan.md') body = '## Rollback\n1. Stage 4 monitor -> Rollback to OSPC (HAProxy weights 100/0)\n2. Verify OSPC health rows\n3. Record ROLLBACK state here\n4. Root-cause via Evidence Timeline + Raw Terminal Logs.';
+        else if (name === 'uat_report.md') body = '## UAT checks output\n\n```\n' + ((document.getElementById('ocqs-out-uatchecks')||{}).textContent || 'no checks run') + '\n```';
+        else body = '## Timeline\n' + JSON.stringify(st.timeline || [], null, 2) + '\n\n## Checks\n```\n' + ((document.getElementById('ocqs-out-uatchecks')||{}).textContent || 'no checks run') + '\n```';
+        _ocqsDl(name, hdr + body, 'text/markdown');
+      };
+      window.ocqsFullBundle = function(){
+        ['final_production_report.md','production_evidence.json','cutover_plan.md','rollback_plan.md'].forEach(function(n, i){ setTimeout(function(){ ocqsArtifact(n); }, i * 350); });
+      };
       window.ocqsRunCmd = function(cmdId, outId, btnId){
         var cmd = ((document.getElementById(cmdId)||{}).textContent||'').trim();
         var out = document.getElementById(outId);
@@ -1235,8 +1295,7 @@ var c7b=g('ocqs-cmd-7b');
         if(c7b) c7b.textContent='grep -R "CHANGEME" '+gitopsPath+' || true';
 // Step 8
         var c8=g('ocqs-cmd-8');
-        if(c8) c8.textContent='cd '+gitopsPath+'\ngit status\ngit add .\ngit commit -m "Initial OpenCenter GitOps generation for '+s.cluster+'"\ngit remote set-url origin '+(s.gitRepo||'YOUR_GIT_REPO_URL').replace('https://github.com/','git@github.com:')+'
-export GIT_SSH_COMMAND="ssh -i '+(s.sshKey||'~/.ssh/id_rsa')+' -o StrictHostKeyChecking=no"'+\ngit branch -M '+s.gitBranch+'\ngit push -u origin '+s.gitBranch;
+        if(c8) c8.textContent='cd '+gitopsPath+'\ngit status\ngit add .\ngit commit -m "Initial OpenCenter GitOps generation for '+s.cluster+'"\ngit remote set-url origin '+(s.gitRepo||'YOUR_GIT_REPO_URL').replace('https://github.com/','git@github.com:')+'\nexport GIT_SSH_COMMAND="ssh -i '+(s.sshKey||'~/.ssh/id_rsa')+' -o StrictHostKeyChecking=no"\ngit branch -M '+s.gitBranch+'\ngit push -u origin '+s.gitBranch;
 // Step 9
         var c9=g('ocqs-cmd-9');
         if(c9) c9.textContent='opencenter cluster validate '+s.cluster+'\nopencenter cluster deploy --break-lock --yes '+s.cluster;
@@ -1617,18 +1676,23 @@ mise run build
 <div style="font-size:9px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:2px;margin-bottom:4px;">STAGE 13</div>
 <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;"><span class="ocqs-step-num" style="background:#0891b2;">13</span><h3 style="margin:0;">UAT & Production Validation</h3><span class="ocqs-status ocqs-s-idle" id="clf-st-13">Not Started</span></div>
 <p style="font-size:12px;color:#475569;margin-bottom:12px;">Validate app health, DB, storage, ingress, TLS, logs, performance, security, and rollback readiness.</p>
-<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;"><button onclick="alert('Running Run UAT...')" class="ocqs-btn ocqs-btn-primary" style="background:#0891b2;">Run UAT</button><button onclick="alert('Running Health Check...')" class="ocqs-btn ocqs-btn-primary" style="background:#0891b2;">Health Check</button><button onclick="alert('Running DB Check...')" class="ocqs-btn ocqs-btn-primary" style="background:#0891b2;">DB Check</button><button onclick="alert('Running Performance Test...')" class="ocqs-btn ocqs-btn-primary" style="background:#0891b2;">Performance Test</button><button onclick="alert('Running Security Check...')" class="ocqs-btn ocqs-btn-primary" style="background:#0891b2;">Security Check</button><button onclick="alert('Running Generate Report...')" class="ocqs-btn ocqs-btn-primary" style="background:#0891b2;">Generate Report</button><button onclick="alert('Running Approve for Cutover...')" class="ocqs-btn ocqs-btn-primary" style="background:#0891b2;">Approve for Cutover</button><button onclick="alert('Running Block Cutover...')" class="ocqs-btn ocqs-btn-primary" style="background:#0891b2;">Block Cutover</button></div></div>
+<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;"><button onclick="ocqsUatCheck('uat')" class="ocqs-btn ocqs-btn-primary" style="background:#0891b2;">Run UAT</button><button onclick="ocqsUatCheck('health')" class="ocqs-btn ocqs-btn-primary" style="background:#0891b2;">Health Check</button><button onclick="ocqsUatCheck('db')" class="ocqs-btn ocqs-btn-primary" style="background:#0891b2;">DB Check</button><button onclick="ocqsUatCheck('perf')" class="ocqs-btn ocqs-btn-primary" style="background:#0891b2;">Performance Test</button><button onclick="ocqsUatCheck('security')" class="ocqs-btn ocqs-btn-primary" style="background:#0891b2;">Security Check</button><button onclick="ocqsArtifact('uat_report.md')" class="ocqs-btn ocqs-btn-primary" style="background:#0891b2;">Generate Report</button><button onclick="ocqsCutDecision('APPROVED')" class="ocqs-btn ocqs-btn-primary" style="background:#16a34a;">Approve for Cutover</button><button onclick="ocqsCutDecision('BLOCKED')" class="ocqs-btn ocqs-btn-primary" style="background:#dc2626;">Block Cutover</button></div>
+<div class="ocqs-cmd" id="ocqs-cmd-uatchecks" style="display:none;"></div>
+<div id="ocqs-out-uatchecks" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#00ff41;white-space:pre-wrap;max-height:220px;overflow-y:auto;margin-bottom:10px;">$ pick a check above — commands run live via /api/stream/run-cmd (kubectl context from the steps above)...</div>
+<div id="ocqs-uat-decision" style="font-size:12px;font-weight:800;color:#64748b;margin-bottom:10px;"></div></div>
 <div class="ocqs-card" id="clf-step-14">
 <div style="font-size:9px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:2px;margin-bottom:4px;">STAGE 14</div>
 <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;"><span class="ocqs-step-num" style="background:#b45309;">14</span><h3 style="margin:0;">Cutover & Rollback</h3><span class="ocqs-status ocqs-s-idle" id="clf-st-14">Not Started</span></div>
 <p style="font-size:12px;color:#475569;margin-bottom:12px;">Switch traffic from the old FLEX workload to the new OpenCenter Kubernetes service.</p>
 <div style="background:#fef3c7;border:1px solid #f59e0b;border-radius:6px;padding:8px 12px;font-size:11px;font-weight:700;color:#92400e;margin-bottom:10px;">&#9888; Required: UAT passed, backup done, rollback target available, DNS TTL reduced, monitoring enabled, customer approval.</div>
-<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;"><button onclick="alert('Generate Cutover Plan...')" class="ocqs-btn ocqs-btn-primary" style="background:#0369a1;">Generate Cutover Plan</button><button onclick="alert('Start Cutover...')" class="ocqs-btn ocqs-btn-primary" style="background:#16a34a;">Start Cutover</button><button onclick="alert('Pause Cutover...')" class="ocqs-btn ocqs-btn-primary" style="background:#b45309;">Pause Cutover</button><button onclick="alert('Rollback...')" class="ocqs-btn ocqs-btn-primary" style="background:#dc2626;">Rollback</button><button onclick="alert('Mark Production Live...')" class="ocqs-btn ocqs-btn-primary" style="background:#16a34a;">Mark Production Live</button><button onclick="alert('Mark Migration Complete...')" class="ocqs-btn ocqs-btn-primary" style="background:#7c3aed;">Mark Migration Complete</button></div></div>
+<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;"><button onclick="ocqsArtifact('cutover_plan.md')" class="ocqs-btn ocqs-btn-primary" style="background:#0369a1;">Generate Cutover Plan</button><button onclick="ocqsCutState('STARTED')" class="ocqs-btn ocqs-btn-primary" style="background:#16a34a;">Start Cutover</button><button onclick="ocqsCutState('PAUSED')" class="ocqs-btn ocqs-btn-primary" style="background:#b45309;">Pause Cutover</button><button onclick="ocqsCutState('ROLLBACK')" class="ocqs-btn ocqs-btn-primary" style="background:#dc2626;">Rollback</button><button onclick="ocqsCutState('LIVE')" class="ocqs-btn ocqs-btn-primary" style="background:#16a34a;">Mark Production Live</button><button onclick="ocqsCutState('COMPLETE')" class="ocqs-btn ocqs-btn-primary" style="background:#7c3aed;">Mark Migration Complete</button></div>
+<div id="ocqs-cut-state" style="font-size:12px;font-weight:800;color:#64748b;margin-bottom:10px;">Cutover state: NOT STARTED</div>
+<div style="font-size:11px;color:#64748b;margin-bottom:10px;">Live traffic switching (HAProxy weights) runs in <b>Stage 4 — Business System Cut Over</b>; this records the OpenCenter-side decision trail.</div></div>
 <div class="ocqs-card" id="clf-step-15">
 <div style="font-size:9px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:2px;margin-bottom:4px;">STAGE 15</div>
 <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;"><span class="ocqs-step-num" style="background:#6366f1;">15</span><h3 style="margin:0;">Final Production Report</h3><span class="ocqs-status ocqs-s-idle" id="clf-st-15">Not Started</span></div>
 <p style="font-size:12px;color:#475569;margin-bottom:12px;">Export source/target evidence, image digest, Git commit, Flux status, UAT, cutover, and rollback plan.</p>
-<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;"><div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:8px 12px;display:flex;justify-content:space-between;align-items:center;"><span style="font-family:monospace;font-size:11px;">final_production_report.md</span><button onclick="alert('Generating final_production_report.md...')" class="ocqs-btn ocqs-btn-primary" style="padding:3px 10px;font-size:10px;">&#11015;</button></div><div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:8px 12px;display:flex;justify-content:space-between;align-items:center;"><span style="font-family:monospace;font-size:11px;">production_evidence.json</span><button onclick="alert('Generating production_evidence.json...')" class="ocqs-btn ocqs-btn-primary" style="padding:3px 10px;font-size:10px;">&#11015;</button></div><div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:8px 12px;display:flex;justify-content:space-between;align-items:center;"><span style="font-family:monospace;font-size:11px;">cutover_plan.md</span><button onclick="alert('Generating cutover_plan.md...')" class="ocqs-btn ocqs-btn-primary" style="padding:3px 10px;font-size:10px;">&#11015;</button></div><div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:8px 12px;display:flex;justify-content:space-between;align-items:center;"><span style="font-family:monospace;font-size:11px;">rollback_plan.md</span><button onclick="alert('Generating rollback_plan.md...')" class="ocqs-btn ocqs-btn-primary" style="padding:3px 10px;font-size:10px;">&#11015;</button></div></div><button onclick="alert('Generating full report bundle...')" class="ocqs-btn ocqs-btn-primary">&#9656; Generate Full Report Bundle</button></div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;"><div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:8px 12px;display:flex;justify-content:space-between;align-items:center;"><span style="font-family:monospace;font-size:11px;">final_production_report.md</span><button onclick="ocqsArtifact('final_production_report.md')" class="ocqs-btn ocqs-btn-primary" style="padding:3px 10px;font-size:10px;">&#11015;</button></div><div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:8px 12px;display:flex;justify-content:space-between;align-items:center;"><span style="font-family:monospace;font-size:11px;">production_evidence.json</span><button onclick="ocqsArtifact('production_evidence.json')" class="ocqs-btn ocqs-btn-primary" style="padding:3px 10px;font-size:10px;">&#11015;</button></div><div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:8px 12px;display:flex;justify-content:space-between;align-items:center;"><span style="font-family:monospace;font-size:11px;">cutover_plan.md</span><button onclick="ocqsArtifact('cutover_plan.md')" class="ocqs-btn ocqs-btn-primary" style="padding:3px 10px;font-size:10px;">&#11015;</button></div><div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:8px 12px;display:flex;justify-content:space-between;align-items:center;"><span style="font-family:monospace;font-size:11px;">rollback_plan.md</span><button onclick="ocqsArtifact('rollback_plan.md')" class="ocqs-btn ocqs-btn-primary" style="padding:3px 10px;font-size:10px;">&#11015;</button></div></div><button onclick="ocqsFullBundle()" class="ocqs-btn ocqs-btn-primary">&#9656; Generate Full Report Bundle</button></div>
 
             </div>
 

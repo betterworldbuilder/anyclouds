@@ -5806,6 +5806,7 @@ ${certContent}
       const currentSrc = activeEl.getAttribute('src') || '';
       if (!currentSrc || currentSrc === 'about:blank') activeEl.setAttribute('src', activeEl.dataset.src);
     }
+    if (stageId === 's_why') setTimeout(function(){ try { window.s0Ensure3D(); } catch(e) {} }, 200);
     requestAnimationFrame(syncVisibleIframeHeights);
   }
 
@@ -12546,6 +12547,11 @@ ${certContent}
   var _s03d_active = false;
   var _s03d_rafId  = null;
 
+  /* Why page loads in 3D fly-through by default. */
+  function s0Ensure3D(){ try { if (typeof _s03d_active !== 'undefined' && !_s03d_active) window.s0Toggle3D(); } catch(e) {} }
+  window.s0Ensure3D = s0Ensure3D;
+  if (document.readyState !== 'loading') setTimeout(function(){ var p = document.getElementById('panel-s_why'); if (p && p.classList.contains('active')) s0Ensure3D(); }, 400);
+  else document.addEventListener('DOMContentLoaded', function(){ setTimeout(function(){ var p = document.getElementById('panel-s_why'); if (p && p.classList.contains('active')) s0Ensure3D(); }, 400); });
   window.s0Toggle3D = function() {
     var overlay = document.getElementById('s0-hero-3d');
     var btn     = document.getElementById('s0-view-toggle');
@@ -12561,7 +12567,7 @@ ${certContent}
 
   var _s03d_inited = false;
   var _s03d_clouds = [], _s03d_rainbows = [], _s03d_bridge = [];
-  var _s03d_offsetX = 0, _s03d_offsetY = 0, _s03d_flySpeed = 1.3;
+  var _s03d_offsetX = 0, _s03d_offsetY = -160, _s03d_flySpeed = 1.3; /* -160 = lowered default view level */
   var _s03d_isFlying = { up:false, down:false, left:false, right:false };
   var _s03d_lastTime = 0;
 
@@ -14010,7 +14016,7 @@ ${certContent}
     var ctrBtn = document.getElementById('s0-btn-ctr');
     var spdEl  = document.getElementById('s0-3d-speed');
     if (ctrBtn) ctrBtn.addEventListener('click', function(){
-      _s03d_offsetX=0; _s03d_offsetY=0; _s03d_flySpeed=1.3;
+      _s03d_offsetX=0; _s03d_offsetY=-160; _s03d_flySpeed=1.3; /* lowered default view level */
       if (spdEl) spdEl.textContent='Speed: 1x';
     });
     document.addEventListener('keydown', function(e){

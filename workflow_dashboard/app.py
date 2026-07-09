@@ -3630,6 +3630,98 @@ def _stage4c_detect_backend(headers, body=""):
     return "UNKNOWN", "No backend identity headers detected"
 
 
+# ── Improvement Feedbacks (panel-s_fb) ─────────────────────────────────────
+_FEEDBACK_DIR = BASE_DIR / "outputs" / "feedback"
+
+
+def _feedback_load():
+    try:
+        return json.loads((_FEEDBACK_DIR / "feedback.json").read_text(encoding="utf-8"))
+    except Exception:
+        return []
+
+
+def _feedback_save(items):
+    _FEEDBACK_DIR.mkdir(parents=True, exist_ok=True)
+    (_FEEDBACK_DIR / "feedback.json").write_text(json.dumps(items, indent=2), encoding="utf-8")
+
+
+def _feedback_config():
+    try:
+        return json.loads((_FEEDBACK_DIR / "config.json").read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+
+def _feedback_email_admin(entry, admin_email):
+    """Best-effort admin notification. SMTP host/port/user/pass come from env
+    (FEEDBACK_SMTP_HOST/PORT/USER/PASS, FEEDBACK_SMTP_FROM); returns a status
+    string so the UI can show whether the mail really went out."""
+    if not admin_email:
+        return "no admin email configured"
+    host = os.environ.get("FEEDBACK_SMTP_HOST", "localhost")
+    try:
+        import smtplib
+        from email.message import EmailMessage
+        msg = EmailMessage()
+        msg["Subject"] = f"[M3 Feedback #{entry['id']}] {entry['type']}: {entry['what'][:60]}"
+        msg["From"] = os.environ.get("FEEDBACK_SMTP_FROM", "m3-dashboard@localhost")
+        msg["To"] = admin_email
+        msg.set_content(
+            "New improvement feedback\n\n"
+            + "\n".join(f"{k}: {entry.get(k, '')}" for k in
+                         ("id", "submitted_at", "name", "email", "type", "what", "where", "when", "how"))
+        )
+        port = int(os.environ.get("FEEDBACK_SMTP_PORT", "25"))
+        with smtplib.SMTP(host, port, timeout=10) as smtp:
+            user = os.environ.get("FEEDBACK_SMTP_USER")
+            if user:
+                smtp.starttls()
+                smtp.login(user, os.environ.get("FEEDBACK_SMTP_PASS", ""))
+            smtp.send_message(msg)
+        return "sent"
+    except Exception as exc:
+        return f"send failed ({host}): {exc}"
+
+
+@app.get("/api/feedback/list")
+def feedback_list():
+    return jsonify({"ok": True, "items": _feedback_load(), "admin_email": _feedback_config().get("admin_email", "")})
+
+
+@app.post("/api/feedback/config")
+def feedback_config_set():
+    data = request.get_json(silent=True) or {}
+    cfg = _feedback_config()
+    cfg["admin_email"] = str(data.get("admin_email") or "").strip()
+    _FEEDBACK_DIR.mkdir(parents=True, exist_ok=True)
+    (_FEEDBACK_DIR / "config.json").write_text(json.dumps(cfg, indent=2), encoding="utf-8")
+    return jsonify({"ok": True, "admin_email": cfg["admin_email"]})
+
+
+@app.post("/api/feedback/submit")
+def feedback_submit():
+    data = request.get_json(silent=True) or {}
+    items = _feedback_load()
+    entry = {
+        "id": (max((i.get("id", 0) for i in items), default=0) + 1),
+        "submitted_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "name": str(data.get("name") or "").strip()[:200],
+        "email": str(data.get("email") or "").strip()[:200],
+        "type": ("Improvement" if str(data.get("type")) == "Improvement" else "Issue"),
+        "what": str(data.get("what") or "").strip()[:4000],
+        "where": str(data.get("where") or "").strip()[:500],
+        "when": str(data.get("when") or "").strip()[:100],
+        "how": str(data.get("how") or "").strip()[:4000],
+    }
+    if not entry["name"] or not entry["what"]:
+        return jsonify({"ok": False, "error": "name and what are required"}), 400
+    entry["email_status"] = _feedback_email_admin(entry, _feedback_config().get("admin_email", ""))
+    items.append(entry)
+    _feedback_save(items)
+    return jsonify({"ok": True, "id": entry["id"], "email_status": entry["email_status"]})
+
+
 @app.post("/api/stage4c/ramp/set")
 def stage4c_ramp_set():
     data = request.get_json(silent=True) or {}

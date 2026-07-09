@@ -1,17 +1,17 @@
 <!-- APPS to Container Refactor Engine — r6ace_pane.html v3 -->
 <style>
 #s2r6ace-pane *{box-sizing:border-box;}
-.r6p-hero{background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 60%,#0369a1 100%);padding:28px 5%;}
+.r6p-hero{background:linear-gradient(135deg,#f8fafc 0%,#eff6ff 60%,#e0f2fe 100%);border-bottom:1px solid #e2e8f0;padding:28px 5%;}
 .r6p-hero-inner{display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:14px;}
-.r6p-title{font-size:26px;font-weight:900;color:#fff;margin:0 0 6px;}
-.r6p-sub{font-size:13px;color:#bfdbfe;margin:0 0 10px;}
-.r6p-flow{font-size:12px;color:#7dd3fc;font-weight:600;}
+.r6p-title{font-size:26px;font-weight:900;color:#0f172a;margin:0 0 6px;}
+.r6p-sub{font-size:13px;color:#334155;margin:0 0 10px;}
+.r6p-flow{font-size:12px;color:#0369a1;font-weight:700;}
 .r6p-hero-btns{display:flex;gap:8px;flex-shrink:0;}
-.r6p-hero-btn{background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.3);border-radius:6px;padding:8px 14px;font-size:12px;font-weight:600;cursor:pointer;}
-.r6p-summary{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;padding:14px 5%;background:#1e293b;}
-.r6p-sum-card{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);border-radius:8px;padding:12px 16px;}
-.r6p-sum-label{font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;}
-.r6p-sum-val{font-size:14px;font-weight:800;color:#fff;}
+.r6p-hero-btn{background:#fff;color:#0369a1;border:1px solid #bfdbfe;border-radius:6px;padding:8px 14px;font-size:12px;font-weight:700;cursor:pointer;}
+.r6p-summary{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;padding:14px 5%;background:#f8fafc;border-bottom:1px solid #e2e8f0;}
+.r6p-sum-card{background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:12px 16px;box-shadow:0 1px 2px rgba(15,23,42,.05);}
+.r6p-sum-label{font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;}
+.r6p-sum-val{font-size:14px;font-weight:800;color:#0f172a;}
 .r6p-progress{position:sticky;top:0;z-index:100;background:#fff;border-bottom:2px solid #e2e8f0;}
 .r6p-progress-inner{display:flex;align-items:center;padding:10px 5%;overflow-x:auto;gap:0;white-space:nowrap;}
 .r6p-step{display:inline-flex;align-items:center;gap:5px;padding:5px 11px;border-radius:999px;font-size:11px;font-weight:700;cursor:pointer;transition:all .2s;border:2px solid transparent;margin-right:2px;}
@@ -80,16 +80,16 @@
   <div class="r6p-hero">
     <div class="r6p-hero-inner">
       <div>
-        <div style="font-size:10px;font-weight:800;color:#7dd3fc;text-transform:uppercase;letter-spacing:2px;margin-bottom:8px;">R6 — APPS to Container Refactor Engine</div>
+        <div style="font-size:10px;font-weight:800;color:#0369a1;text-transform:uppercase;letter-spacing:2px;margin-bottom:8px;">R6 — APPS to Container Refactor Engine</div>
         <h1 class="r6p-title">APPS to Container Refactor Engine</h1>
         <p class="r6p-sub">Convert FLEX workloads into Kubernetes-ready and OpenCenter-ready applications.</p>
         <p style="font-size:12px;color:#64748b;margin:0 0 8px;">FLEX moves the infrastructure. The APPS to Container Refactor Engine converts the applications. OpenCenter operates them as secure, GitOps-managed Kubernetes workloads.</p>
         <div class="r6p-flow">FLEX Input &rarr; Capture &rarr; Scan &rarr; Convert &rarr; GitOps &rarr; OpenCenter</div>
       </div>
       <div class="r6p-hero-btns">
-        <button class="r6p-hero-btn" onclick="alert('Import JSON')">&#128228; Import JSON</button>
-        <button class="r6p-hero-btn" onclick="alert('Export Systems')">&#11015; Export Systems</button>
-        <button class="r6p-hero-btn" onclick="alert('Help')">? Help</button>
+        <button class="r6p-hero-btn" onclick="r6pHeroImport()">&#128228; Import JSON</button>
+        <button class="r6p-hero-btn" onclick="r6pHeroExport()">&#11015; Export Systems</button>
+        <button class="r6p-hero-btn" onclick="r6pHeroHelp()">? Help</button>
       </div>
     </div>
   </div>
@@ -98,8 +98,8 @@
   <div class="r6p-summary">
     <div class="r6p-sum-card"><div class="r6p-sum-label">Selected FLEX Input</div><div id="r6p-sum-input" class="r6p-sum-val">None selected</div></div>
     <div class="r6p-sum-card"><div class="r6p-sum-label">Components</div><div id="r6p-sum-comps" class="r6p-sum-val">0 selected</div></div>
-    <div class="r6p-sum-card"><div class="r6p-sum-label">Capture Method</div><div id="r6p-sum-method" class="r6p-sum-val" style="color:#38bdf8;">Smart Snapshot</div></div>
-    <div class="r6p-sum-card"><div class="r6p-sum-label">Bundle Status</div><div id="r6p-sum-bundle" class="r6p-sum-val" style="color:#94a3b8;">Not generated</div></div>
+    <div class="r6p-sum-card"><div class="r6p-sum-label">Capture Method</div><div id="r6p-sum-method" class="r6p-sum-val" style="color:#0369a1;">Smart Snapshot</div></div>
+    <div class="r6p-sum-card"><div class="r6p-sum-label">Bundle Status</div><div id="r6p-sum-bundle" class="r6p-sum-val" style="color:#64748b;">Not generated</div></div>
   </div>
 
   <!-- STICKY PROGRESS TRACKER -->
@@ -135,3 +135,40 @@
 
 </div>
 <script src="/static/r6ace.js"></script>
+<script>
+/* Hero buttons — were alert() placeholders; now real import/export/help. */
+window.r6pHeroExport = function(){
+  var keys = ['uatS1_systems','appsContainerRefactorOutput','r6OpenCenterHandoffBundle','openCenterImportState'];
+  var payload = { exported_at: new Date().toISOString() };
+  keys.forEach(function(k){ try{ payload[k] = JSON.parse(localStorage.getItem(k)||'null'); }catch(e){ payload[k]=null; } });
+  var a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([JSON.stringify(payload,null,2)],{type:'application/json'}));
+  a.download='r6ace_systems_export_'+Date.now()+'.json';
+  a.click();
+};
+window.r6pHeroImport = function(){
+  var inp=document.createElement('input'); inp.type='file'; inp.accept='.json,application/json';
+  inp.onchange=function(){
+    var f=inp.files && inp.files[0]; if(!f) return;
+    var r=new FileReader();
+    r.onload=function(){
+      try{
+        var d=JSON.parse(r.result);
+        var applied=[];
+        ['uatS1_systems','appsContainerRefactorOutput','r6OpenCenterHandoffBundle','openCenterImportState'].forEach(function(k){
+          if(d[k]!=null){ localStorage.setItem(k, JSON.stringify(d[k])); applied.push(k); }
+        });
+        if(!applied.length && Array.isArray(d)){ localStorage.setItem('uatS1_systems', JSON.stringify(d)); applied.push('uatS1_systems'); }
+        if(typeof r6pInit==='function') r6pInit();
+        alert(applied.length ? 'Imported: '+applied.join(', ')+' — engine reloaded.' : 'No recognised keys in that JSON (expected an r6ace export).');
+      }catch(e){ alert('Import failed: '+e.message); }
+    };
+    r.readAsText(f);
+  };
+  inp.click();
+};
+window.r6pHeroHelp = function(){
+  alert('APPS to Container Refactor Engine — flow:\n\n0. Preflight  — CLI tools, credentials, GitOps access\n1. Input      — pick the FLEX business system\n2. Discovery  — inspect VMs and services\n3. Snapshot   — capture app state (Smart Snapshot)\n4. Mapping    — components to containers\n5. Method     — choose capture/convert method\n6. Scan       — image and dependency scan\n7. Classify   — cloud-native readiness\n8. Readiness  — gates before build\n9. Build      — images + manifests\n10. GitOps    — Flux/Helm/Kustomize repo\n11. Bundle    — signed hand-off bundle\n12. OpenCenter — send to the OpenCenter platform\n\nUse Run Stage / Continue at the bottom, or Generate All.');
+  if(typeof r6pGoTo==='function') r6pGoTo(0);
+};
+</script>

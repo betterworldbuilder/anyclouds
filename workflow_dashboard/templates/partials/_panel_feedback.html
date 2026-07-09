@@ -1,0 +1,160 @@
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- IMPROVEMENT FEEDBACKS (panel-s_fb) — operator bug/improvement log   -->
+  <!-- Form -> /api/feedback/submit (persists + emails admin), table with  -->
+  <!-- CSV/JSON export, configurable admin email.                          -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <div class="panel" id="panel-s_fb" style="overflow:auto;">
+    <div style="max-width:1200px;margin:0 auto;padding:28px 24px 48px;">
+
+      <div style="text-align:center;margin-bottom:26px;">
+        <div style="font-size:42px;margin-bottom:8px;">&#128172;</div>
+        <h1 style="font-size:28px;font-weight:900;color:#0f172a;margin:0 0 8px;">Improvement Feedbacks</h1>
+        <p style="color:#64748b;font-size:14px;max-width:640px;margin:0 auto;">Flag any bug, issue or improvement idea. Every entry is saved, listed below, exportable, and emailed to the admin.</p>
+      </div>
+
+      <!-- Admin email config -->
+      <div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:14px 18px;margin-bottom:18px;display:flex;gap:10px;align-items:end;flex-wrap:wrap;box-shadow:0 1px 3px rgba(15,23,42,.06);">
+        <label style="display:grid;gap:4px;font-size:11px;font-weight:800;color:#64748b;text-transform:uppercase;flex:1;min-width:260px;">Admin notification email
+          <input id="fb-admin-email" type="email" placeholder="admin@rackspace.com" style="border:1px solid #cbd5e1;border-radius:8px;padding:8px 10px;font-size:13px;">
+        </label>
+        <button class="btn btn-primary" onclick="fbSaveAdmin()" style="padding:9px 16px;">Save Admin Email</button>
+        <span id="fb-admin-status" style="font-size:12px;color:#64748b;align-self:center;"></span>
+      </div>
+
+      <!-- Feedback form -->
+      <div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:20px;margin-bottom:18px;box-shadow:0 1px 3px rgba(15,23,42,.06);">
+        <h3 style="margin:0 0 14px;font-size:16px;font-weight:800;color:#0f172a;">New feedback</h3>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:12px;">
+          <label class="fb-lbl">Name <input id="fb-name" placeholder="Your name" class="fb-in"></label>
+          <label class="fb-lbl">Email <input id="fb-email" type="email" placeholder="you@rackspace.com" class="fb-in"></label>
+          <label class="fb-lbl">Type
+            <select id="fb-type" class="fb-in"><option>Issue</option><option>Improvement</option></select>
+          </label>
+        </div>
+        <div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:12px;margin-bottom:12px;">
+          <label class="fb-lbl">What — describe the issue or improvement
+            <textarea id="fb-what" rows="3" placeholder="What happened / what should be improved" class="fb-in"></textarea>
+          </label>
+          <label class="fb-lbl">Where — stage / section
+            <input id="fb-where" placeholder="e.g. Stage 4 — Business System Cut Over" class="fb-in">
+          </label>
+          <label class="fb-lbl">When
+            <input id="fb-when" type="datetime-local" class="fb-in">
+          </label>
+        </div>
+        <label class="fb-lbl" style="display:block;margin-bottom:14px;">How to fix it — your suggestion
+          <textarea id="fb-how" rows="2" placeholder="Suggested fix or improvement" class="fb-in" style="width:100%;"></textarea>
+        </label>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+          <button class="btn btn-primary" onclick="fbSubmit()" style="padding:10px 22px;font-weight:800;">Submit Feedback</button>
+          <span id="fb-submit-status" style="font-size:12.5px;font-weight:700;color:#64748b;"></span>
+        </div>
+      </div>
+
+      <!-- Feedback table -->
+      <div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:20px;box-shadow:0 1px 3px rgba(15,23,42,.06);">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px;">
+          <h3 style="margin:0;font-size:16px;font-weight:800;color:#0f172a;">All feedbacks <span id="fb-count" style="font-size:12px;color:#64748b;font-weight:600;"></span></h3>
+          <div style="display:flex;gap:8px;">
+            <button class="btn btn-secondary light" onclick="fbLoad(true)">Refresh</button>
+            <button class="btn btn-secondary" onclick="fbExport('csv')">Export CSV</button>
+            <button class="btn btn-secondary" onclick="fbExport('json')">Export JSON</button>
+          </div>
+        </div>
+        <div style="overflow-x:auto;">
+          <table class="matrix-table" style="font-size:12px;min-width:900px;">
+            <thead><tr><th>#</th><th>submitted</th><th>name</th><th>email</th><th>type</th><th>what</th><th>where</th><th>when</th><th>how to fix</th><th>email sent</th></tr></thead>
+            <tbody id="fb-rows"><tr><td colspan="10"><div class="empty-state">No feedback yet.</div></td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <style>
+      #panel-s_fb .fb-lbl{display:grid;gap:4px;font-size:11px;font-weight:800;color:#64748b;text-transform:uppercase;}
+      #panel-s_fb .fb-in{border:1px solid #cbd5e1;border-radius:8px;padding:8px 10px;font-size:13px;color:#0f172a;font-weight:500;text-transform:none;}
+      #panel-s_fb .fb-in:focus{outline:2px solid #bfdbfe;border-color:#3b82f6;}
+      #panel-s_fb .matrix-table tbody tr:nth-child(even){background:#fafbfd;}
+    </style>
+
+    <script>
+    (function(){
+      'use strict';
+      function $(id){ return document.getElementById(id); }
+      function esc(v){ return String(v==null?'':v).replace(/[&<>"']/g,function(c){return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]);}); }
+      var FB=[];
+
+      window.fbSaveAdmin = async function(){
+        var email=($('fb-admin-email')||{}).value||'';
+        var st=$('fb-admin-status');
+        try{
+          var r=await fetch('/api/feedback/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({admin_email:email})});
+          var d=await r.json();
+          if(st) st.textContent=d.ok?('✓ Admin email saved: '+(d.admin_email||'none')):('Save failed: '+(d.error||''));
+        }catch(e){ if(st) st.textContent='Save failed: '+e.message; }
+      };
+
+      window.fbSubmit = async function(){
+        var st=$('fb-submit-status');
+        var payload={
+          name:($('fb-name')||{}).value||'', email:($('fb-email')||{}).value||'',
+          type:($('fb-type')||{}).value||'Issue', what:($('fb-what')||{}).value||'',
+          where:($('fb-where')||{}).value||'', when:($('fb-when')||{}).value||'',
+          how:($('fb-how')||{}).value||''
+        };
+        if(!payload.name.trim()||!payload.what.trim()){ if(st){st.textContent='Name and What are required.'; st.style.color='#dc2626';} return; }
+        if(st){ st.textContent='Submitting…'; st.style.color='#64748b'; }
+        try{
+          var r=await fetch('/api/feedback/submit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+          var d=await r.json();
+          if(d.ok){
+            if(st){ st.textContent='✓ Saved #'+d.id+' — admin email: '+(d.email_status||'n/a'); st.style.color='#16a34a'; }
+            ['fb-what','fb-where','fb-how'].forEach(function(x){ var n=$(x); if(n) n.value=''; });
+            fbLoad();
+          } else if(st){ st.textContent='Failed: '+(d.error||'unknown'); st.style.color='#dc2626'; }
+        }catch(e){ if(st){ st.textContent='Failed: '+e.message; st.style.color='#dc2626'; } }
+      };
+
+      window.fbLoad = async function(announce){
+        try{
+          var r=await fetch('/api/feedback/list');
+          var d=await r.json();
+          FB=d.items||[];
+          var tb=$('fb-rows'); if(!tb) return;
+          $('fb-count').textContent='('+FB.length+')';
+          if(($('fb-admin-email')||{}).value==='' && d.admin_email) $('fb-admin-email').value=d.admin_email;
+          tb.innerHTML=FB.length?FB.map(function(f){
+            return '<tr><td>'+f.id+'</td><td style="white-space:nowrap;">'+esc(f.submitted_at||'')+'</td><td>'+esc(f.name)+'</td><td>'+esc(f.email)+'</td>'
+              +'<td><span style="font-size:10px;font-weight:800;padding:2px 8px;border-radius:8px;background:'+(f.type==='Issue'?'#fee2e2;color:#991b1b':'#dbeafe;color:#1d4ed8')+';">'+esc(f.type)+'</span></td>'
+              +'<td style="max-width:260px;">'+esc(f.what)+'</td><td>'+esc(f.where)+'</td><td style="white-space:nowrap;">'+esc(f.when)+'</td>'
+              +'<td style="max-width:220px;">'+esc(f.how)+'</td><td>'+(f.email_status==='sent'?'✓':esc(f.email_status||'-'))+'</td></tr>';
+          }).join(''):'<tr><td colspan="10"><div class="empty-state">No feedback yet.</div></td></tr>';
+          if(announce===true){ var st=$('fb-submit-status'); if(st){ st.textContent='✓ Refreshed — '+FB.length+' entr'+(FB.length===1?'y':'ies')+'.'; st.style.color='#16a34a'; } }
+        }catch(e){ var tb2=$('fb-rows'); if(tb2) tb2.innerHTML='<tr><td colspan="10"><div class="empty-state">Load failed: '+esc(e.message)+'</div></td></tr>'; }
+      };
+
+      window.fbExport = function(kind){
+        if(kind==='json'){
+          var a=document.createElement('a');
+          a.href=URL.createObjectURL(new Blob([JSON.stringify(FB,null,2)],{type:'application/json'}));
+          a.download='improvement_feedbacks.json'; a.click(); return;
+        }
+        var head=['id','submitted_at','name','email','type','what','where','when','how','email_status'];
+        var csv=head.join(',')+'\n'+FB.map(function(f){
+          return head.map(function(k){ return '"'+String(f[k]==null?'':f[k]).replace(/"/g,'""')+'"'; }).join(',');
+        }).join('\n')+'\n';
+        var a2=document.createElement('a');
+        a2.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
+        a2.download='improvement_feedbacks.csv'; a2.click();
+      };
+
+      function init(){
+        var w=$('fb-when');
+        if(w && !w.value){ var d=new Date(); d.setMinutes(d.getMinutes()-d.getTimezoneOffset()); w.value=d.toISOString().slice(0,16); }
+        fbLoad();
+      }
+      if(document.readyState!=='loading') init();
+      else document.addEventListener('DOMContentLoaded', init);
+    })();
+    </script>
+  </div>
