@@ -2880,8 +2880,10 @@ mise run build
         if(typeof _origAS2 === 'function') {
           window.activateSub = function(panes, id) {
             _origAS2(panes, id);
-            if(id === 's2rehost_p2_2') setTimeout(r6RenderTemplates, 60);
-            if(id === 's2r6ace') setTimeout(function(){ if(typeof r6aceInit==='function') r6aceInit(); }, 100);
+            if(id === 's2rehost_p2_2') {
+              setTimeout(r6RenderTemplates, 60);
+              setTimeout(function(){ if(typeof r6SetRefactorView==='function') r6SetRefactorView('engine'); }, 100);
+            }
           };
         }
       })();

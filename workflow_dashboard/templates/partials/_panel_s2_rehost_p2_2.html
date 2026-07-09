@@ -1,4 +1,41 @@
     <div id="s2rehost_p2_2-pane" class="gov-page" style="display:none;overflow:auto;padding:18px 20px;">
+      <style>
+        .r6-view-switch {
+          display:flex;
+          justify-content:center;
+          gap:8px;
+          flex-wrap:wrap;
+          margin:0 0 16px;
+          padding:10px;
+          background:#f8fafc;
+          border:1px solid #dbeafe;
+          border-radius:10px;
+        }
+        .r6-view-switch button {
+          border:1px solid #bae6fd;
+          border-radius:8px;
+          background:#fff;
+          color:#075985;
+          padding:10px 16px;
+          font-size:13px;
+          font-weight:900;
+          cursor:pointer;
+          box-shadow:0 6px 16px rgba(14,165,233,.08);
+        }
+        .r6-view-switch button.active {
+          background:linear-gradient(135deg,#0369a1,#0ea5e9,#38bdf8);
+          border-color:#38bdf8;
+          color:#fff;
+          box-shadow:0 10px 24px rgba(14,165,233,.22);
+        }
+        #r6-light-view { display:none; }
+      </style>
+      <div class="r6-view-switch" role="tablist" aria-label="R6 refactor engine mode">
+        <button id="r6-view-engine-btn" type="button" class="active" role="tab" aria-selected="true" onclick="r6SetRefactorView('engine')">Refactor Engine</button>
+        <button id="r6-view-light-btn" type="button" role="tab" aria-selected="false" onclick="r6SetRefactorView('light')">Refactor Engine Light</button>
+      </div>
+      {% include "partials/r6ace_pane.html" %}
+      <div id="r6-light-view">
       <div class="gov-header">
         <div class="gov-title-area">
           <h2>☸️ R6 Refactor / Rearchitect APPs to Containerization</h2>
@@ -90,6 +127,30 @@
       </div>
 
     </div>
+      </div>
+      <script>
+      window.r6SetRefactorView = function(view){
+        var engine = document.getElementById('s2r6ace-pane');
+        var light = document.getElementById('r6-light-view');
+        var engineBtn = document.getElementById('r6-view-engine-btn');
+        var lightBtn = document.getElementById('r6-view-light-btn');
+        var isLight = view === 'light';
+        if (engine) engine.style.display = isLight ? 'none' : 'block';
+        if (light) light.style.display = isLight ? 'block' : 'none';
+        if (engineBtn) {
+          engineBtn.classList.toggle('active', !isLight);
+          engineBtn.setAttribute('aria-selected', isLight ? 'false' : 'true');
+        }
+        if (lightBtn) {
+          lightBtn.classList.toggle('active', isLight);
+          lightBtn.setAttribute('aria-selected', isLight ? 'true' : 'false');
+        }
+        if (!isLight && typeof r6pInit === 'function') {
+          setTimeout(function(){ if (typeof r6pInit === 'function') r6pInit(); }, 60);
+        }
+      };
+      setTimeout(function(){ if (typeof r6SetRefactorView === 'function') r6SetRefactorView('engine'); }, 80);
+      </script>
 
 
 
@@ -248,5 +309,4 @@
       ocilUpdate();
     })();
     </script>
-
 

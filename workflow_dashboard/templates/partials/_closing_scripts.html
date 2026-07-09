@@ -5,7 +5,7 @@
   const subBar1 = document.getElementById('subBar1');
   const subBar2 = document.getElementById('subBar2');
   const s1Panes = ['s1info','s1ospc','s1flex2flex_infra','s1flex2flex_mapper','s1hyper_aws','s1hyper_aws_mapper','s1hyper_aws_flavors','s1hyper_gcp','s1hyper_gcp_mapper','s1hyper_gcp_flavors','s1hyper_azure','s1hyper_azure_mapper','s1hyper_azure_flavors','s1analyze','s1flavors','s1flex2flex_flavors','s1tco','s1appdep','s1business_ontology','s1system_ontology_handoff','s1readiness','s1preflight','s1k8s'];
-  const s2Panes = ['s2migstrategy','s2retain','s2retire','s2rehost_p1','s2fullmig','s2vmware','s2image','s2flex2flex','s2flexanywhere','s2rehost_p2_1','s2rehost_p2_2','s2r6ace','s2opencenter','s2rehost_manual','s2repurchase'];
+  const s2Panes = ['s2migstrategy','s2retain','s2retire','s2rehost_p1','s2fullmig','s2vmware','s2image','s2flex2flex','s2flexanywhere','s2rehost_p2_1','s2rehost_p2_2','s2opencenter','s2rehost_manual','s2repurchase'];
 
   function addWorkloadRow(bodyId) {
     const body = document.getElementById(bodyId);
@@ -1471,6 +1471,7 @@
   }
 
   function stage2OpenPath(substage) {
+    if (substage === 's2r6ace') substage = 's2rehost_p2_2';
     if (substage === 's2fullmig') {
       const infraPane = document.getElementById('s2rehost_p1-pane');
       if (infraPane) {
@@ -1481,6 +1482,9 @@
     activateStage('s2');
     document.querySelectorAll('#subBar2 .sub-btn').forEach(b => b.classList.toggle('active', b.dataset.sub === substage));
     activateSub(s2Panes, substage || 's2image');
+    if (substage === 's2rehost_p2_2') {
+      setTimeout(function(){ if (typeof r6SetRefactorView === 'function') r6SetRefactorView('engine'); }, 80);
+    }
   }
 
   function migrationBadge(status) {
@@ -5788,6 +5792,7 @@ ${certContent}
   }
 
   function activateSub(paneIds, activeId) {
+    if (activeId === 's2r6ace') activeId = 's2rehost_p2_2';
     if (activeId === 's2fullmig') {
       const infraPane = document.getElementById('s2rehost_p1-pane');
       if (infraPane) {
@@ -5805,6 +5810,9 @@ ${certContent}
     if (activeEl && activeEl.tagName === 'IFRAME' && activeEl.dataset && activeEl.dataset.src) {
       const currentSrc = activeEl.getAttribute('src') || '';
       if (!currentSrc || currentSrc === 'about:blank') activeEl.setAttribute('src', activeEl.dataset.src);
+    }
+    if (activeId === 's2rehost_p2_2') {
+      setTimeout(function(){ if (typeof r6SetRefactorView === 'function') r6SetRefactorView('engine'); }, 60);
     }
     if (stageId === 's_why') setTimeout(function(){ try { window.s0Ensure3D(); } catch(e) {} }, 200);
     requestAnimationFrame(syncVisibleIframeHeights);
@@ -9191,6 +9199,25 @@ ${certContent}
   body.flex-skyline-mode #stageBar .stage-btn.green-roll-stage small {
     color: #d1fae5 !important;
     opacity: 1 !important;
+  }
+  .r6-view-switch button,
+  body.flex-skyline-mode .r6-view-switch button {
+    border: 1px solid #bae6fd !important;
+    border-radius: 8px !important;
+    background: #ffffff !important;
+    color: #075985 !important;
+    padding: 10px 16px !important;
+    font-size: 13px !important;
+    font-weight: 900 !important;
+    box-shadow: 0 6px 16px rgba(14,165,233,.08) !important;
+    text-shadow: none !important;
+  }
+  .r6-view-switch button.active,
+  body.flex-skyline-mode .r6-view-switch button.active {
+    background: linear-gradient(135deg,#0369a1,#0ea5e9,#38bdf8) !important;
+    border-color: #38bdf8 !important;
+    color: #ffffff !important;
+    box-shadow: 0 10px 24px rgba(14,165,233,.22) !important;
   }
 
   /* ───── Quick Tour page — Skyline / light mode ───── */
