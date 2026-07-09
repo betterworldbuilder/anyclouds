@@ -62,12 +62,12 @@
           <div>
             <div class="ocm-badge"><i></i> Flex Apps Migration</div>
             <h1 class="ocm-title">Flex Apps to<span>Cloud Native Migration Stage</span></h1>
-            <p class="ocm-sub">Turn R6 containerization output into an OpenCenter-ready Kubernetes deployment package with GitOps, validation, registry planning, and production handoff.</p>
+            <p class="ocm-sub">Turn Previous Flex Apps system containerization output into an OpenCenter-ready Kubernetes deployment package with GitOps, validation, registry planning, and production handoff.</p>
             <div class="ocm-strat">
               <div class="ocm-strat-ico">&#128640;</div>
               <div>
                 <small>Strategic Message</small>
-                <p>Use <b>R6</b> to convert legacy application assets into containers.<br>Use <b>OpenCenter</b> to operate those workloads as secure, auditable, cloud-native services.</p>
+                <p>Use <b>Previous Flex Apps Containerization Stage</b> to convert legacy application assets into containers.<br>Use <b>OpenCenter</b> to operate those workloads as secure, auditable, cloud-native services.</p>
               </div>
             </div>
             <div class="ocm-chips">
@@ -111,11 +111,9 @@
         </div>
       </div>
 
-      {% include "_opencenter_platform.html" %}
-
       <!-- ── OpenCenter Quick Start Guide (collapsed) ── -->
-      <div style="margin-bottom:18px;border:2px solid #f59e0b;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(245,158,11,.2);">
-        <div id="ocqs-inline-toggle" onclick="(function(){var b=document.getElementById('ocqs-inline-body');var a=document.getElementById('ocqs-inline-arrow');var open=b.style.display!=='none';b.style.display=open?'none':'block';a.textContent=open?'▶':'▼';})()" style="display:flex;align-items:center;justify-content:space-between;padding:14px 20px;background:linear-gradient(135deg,#b45309,#d97706);cursor:pointer;user-select:none;">
+      <div style="margin-bottom:18px;border:2px solid #38bdf8;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(14,165,233,.2);">
+        <div id="ocqs-inline-toggle" onclick="(function(){var b=document.getElementById('ocqs-inline-body');var a=document.getElementById('ocqs-inline-arrow');var open=b.style.display!=='none';b.style.display=open?'none':'block';a.textContent=open?'▶':'▼';})()" style="display:flex;align-items:center;justify-content:space-between;padding:14px 20px;background:linear-gradient(135deg,#0369a1,#0ea5e9,#38bdf8);cursor:pointer;user-select:none;">
           <div style="display:flex;align-items:center;gap:12px;">
             <span style="font-size:20px;">🚀</span>
             <div>
@@ -150,6 +148,55 @@
             <div>&#10003; Calico CNI networking</div>
           </div>
           <div style="margin-top:10px;font-size:12px;color:#64748b;">&#8987; <strong>Time to complete:</strong> 10-15 min setup + 30-50 min infrastructure provisioning</div>
+        </div>
+
+        <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:16px 20px;margin-bottom:16px;">
+          <div style="font-size:12px;font-weight:800;color:#0369a1;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">How It Works</div>
+          <div style="font-size:12px;color:#475569;margin-bottom:12px;"><strong>One cluster blueprint YAML &rarr; generated GitOps platform package.</strong> Everything below lives under <code>~/.config/opencenter/clusters/</code> (<code>blueprints/</code>, <code>gitops/</code>, <code>state/</code>, <code>secrets/</code>).</div>
+
+          <div style="font-size:11px;font-weight:800;color:#334155;margin:8px 0 6px;">1 &mdash; The toolchain, top to bottom</div>
+          <table class="ocqs-req-table" style="margin-bottom:14px;">
+            <thead><tr><th>Step</th><th>Tool</th><th>What happens</th></tr></thead>
+            <tbody>
+              <tr><td>1</td><td><strong>OpenCenter YAML</strong></td><td>Describes the desired platform</td></tr>
+              <tr><td>2</td><td><strong>OpenCenter CLI</strong></td><td>Validates the config and generates deployment assets</td></tr>
+              <tr><td>3</td><td><strong>OpenTofu / Terraform</strong></td><td>Provisions infrastructure</td></tr>
+              <tr><td>4</td><td><strong>Kubespray</strong></td><td>Installs Kubernetes cluster</td></tr>
+              <tr><td>5</td><td><strong>FluxCD</strong></td><td>Reconciles platform services and workloads</td></tr>
+              <tr><td>6</td><td><strong>Helm / Kustomize</strong></td><td>Configures apps and services</td></tr>
+              <tr><td>7</td><td><strong>Kubernetes</strong></td><td>Runs pods and workloads</td></tr>
+              </tbody>
+          </table>
+
+          <div style="font-size:11px;font-weight:800;color:#334155;margin:8px 0 6px;">2 &mdash; From one blueprint to a running cluster</div>
+          <table class="ocqs-req-table" style="margin-bottom:14px;">
+            <thead><tr><th>Step</th><th>File / Output</th><th>Meaning</th></tr></thead>
+            <tbody>
+              <tr><td><code>opencenter cluster init</code></td><td><code>blueprints/&lt;org&gt;/&lt;cluster&gt;/&lt;cluster&gt;-config.yaml</code></td><td>Creates the main OpenCenter cluster YAML blueprint</td></tr>
+              <tr><td><code>opencenter cluster edit</code></td><td>same YAML file</td><td>User configures OpenStack credentials, cluster size, networking, storage, services</td></tr>
+              <tr><td><code>opencenter cluster validate</code></td><td>validation result</td><td>Checks schema, business rules, OpenStack constraints, and connectivity</td></tr>
+              <tr><td><code>opencenter cluster generate</code></td><td><code>gitops/&lt;org&gt;/</code> GitOps repository</td><td>Generates the full GitOps repository</td></tr>
+              <tr><td>generated GitOps repo</td><td>OpenTofu, Kubespray, FluxCD, SOPS files</td><td>Actual deployment package used to build and reconcile the platform</td></tr>
+              <tr><td><code>opencenter cluster deploy</code></td><td>running cluster</td><td>Provisions infra, installs Kubernetes, installs FluxCD, deploys platform services</td></tr>
+              </tbody>
+          </table>
+
+          <div style="font-size:11px;font-weight:800;color:#334155;margin:8px 0 6px;">3 &mdash; Who does what at runtime</div>
+          <table class="ocqs-req-table" style="margin-bottom:14px;">
+            <thead><tr><th>Job</th><th>Main tool</th><th>What it does</th></tr></thead>
+            <tbody>
+              <tr><td><strong>Deploy infrastructure</strong></td><td><strong>OpenTofu / Terraform</strong></td><td>Creates VMs, networks, security groups, load balancers, storage, etc.</td></tr>
+              <tr><td><strong>Install Kubernetes cluster</strong></td><td><strong>Kubespray</strong></td><td>Installs and configures Kubernetes control plane, worker nodes, CNI, kubelet, container runtime.</td></tr>
+              <tr><td><strong>Generate platform config</strong></td><td><strong>OpenCenter CLI</strong></td><td>Takes one YAML and generates infrastructure, Kubernetes, GitOps, secrets, and platform service configuration.</td></tr>
+              <tr><td><strong>Install platform services</strong></td><td><strong>FluxCD + Helm/Kustomize</strong></td><td>Deploys cert-manager, Kyverno, Keycloak, Harbor, Velero, observability, ingress, storage services, etc.</td></tr>
+              <tr><td><strong>Deploy application pods</strong></td><td><strong>FluxCD</strong></td><td>Reads GitOps repo and applies the app manifests into Kubernetes.</td></tr>
+              <tr><td><strong>Render app manifests</strong></td><td><strong>Helm / Kustomize</strong></td><td>Creates or customizes Kubernetes YAML for the app: Deployment, Service, Ingress, ConfigMap, Secret, PVC.</td></tr>
+              <tr><td><strong>Actually runs the pods</strong></td><td><strong>Kubernetes scheduler + kubelet</strong></td><td>Kubernetes schedules pods onto nodes; kubelet starts containers using the container runtime.</td></tr>
+              <tr><td><strong>Store container images</strong></td><td><strong>Harbor / container registry</strong></td><td>Stores trusted container images built from the R6 output.</td></tr>
+              <tr><td><strong>Configure which image to run</strong></td><td><strong>Helm values / Kustomize patches / Kubernetes manifests</strong></td><td>Defines image repository, tag, pull policy, and image pull secrets.</td></tr>
+              <tr><td><strong>Pull images onto nodes</strong></td><td><strong>kubelet + container runtime</strong></td><td>Pulls images from Harbor or another registry and starts containers.</td></tr>
+              </tbody>
+          </table>
         </div>
         <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:16px 20px;margin-bottom:4px;">
           <div style="font-size:12px;font-weight:800;color:#0369a1;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">A. What You Need</div>
@@ -1966,16 +2013,16 @@ var c9b=g('ocqs-cmd-9b');
         </div><!-- end inline body -->
       </div><!-- end quick start collapsed -->
       <!-- Clone FLEX Apps to Cluster Containers -->
-      <div style="margin-top:20px;border:2px solid #16a34a;border-radius:12px;overflow:hidden;">
-        <div id="clf-toggle" onclick="(function(){var b=document.getElementById('clf-body');var a=document.getElementById('clf-arrow');var o=b.style.display!=='none';b.style.display=o?'none':'block';a.textContent=o?'&#9654;':'&#9660;'})()" style="display:flex;align-items:center;justify-content:space-between;padding:16px 22px;background:linear-gradient(135deg,#14532d,#16a34a,#22c55e);cursor:pointer;user-select:none;">
+      <div style="margin-top:20px;border:2px solid #38bdf8;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(14,165,233,.2);">
+        <div id="clf-toggle" onclick="(function(){var b=document.getElementById('clf-body');var a=document.getElementById('clf-arrow');var o=b.style.display!=='none';b.style.display=o?'none':'block';a.textContent=o?'&#9654;':'&#9660;'})()" style="display:flex;align-items:center;justify-content:space-between;padding:16px 22px;background:linear-gradient(135deg,#0369a1,#0ea5e9,#38bdf8);cursor:pointer;user-select:none;">
           <div>
-            <div style="font-size:10px;font-weight:800;color:#bbf7d0;text-transform:uppercase;letter-spacing:2px;margin-bottom:4px;">Deploy Converted Cloud-Native Apps</div>
-            <div style="font-size:18px;font-weight:900;color:#fff;">Deploy Production Cloud Native Apps with OpenCenter</div>
-            <div style="font-size:12px;color:#bbf7d0;margin-top:3px;">Apps Container Converter Output &#8594; OpenCenter GitOps &#8594; Kubernetes Platform &#8594; Cloud-Native App</div>
+            <div style="font-size:10px;font-weight:800;color:#e0f2fe;text-transform:uppercase;letter-spacing:2px;margin-bottom:4px;">Cloud Native Migration Stage</div>
+            <div style="font-size:18px;font-weight:900;color:#fff;">Turn Previous Flex Apps system containerization output into an OpenCenter-ready section</div>
+            <div style="font-size:12px;color:#e0f2fe;margin-top:3px;">Previous Flex Apps Output &#8594; OpenCenter GitOps &#8594; Kubernetes Platform &#8594; Cloud-Native App</div>
           </div>
-          <span id="clf-arrow" style="color:#fff;font-size:18px;font-weight:900;">&#9660;</span>
+          <span id="clf-arrow" style="color:#fff;font-size:18px;font-weight:900;">&#9654;</span>
         </div>
-        <div id="clf-body" style="background:#f0f4f8;padding:0;">
+        <div id="clf-body" style="display:none;background:#f0f4f8;padding:0;">
           <div class="ocqs-body">
           <div class="ocqs-left">
 
@@ -2166,6 +2213,8 @@ mise run build
         </div>
       </div>
       <!-- end Clone FLEX Apps to Cluster Containers -->
+
+      {% include "_opencenter_platform.html" %}
 
 
       <!-- Hidden (2026-07-09): redundant with the green "Deploy Production Cloud
