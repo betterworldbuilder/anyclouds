@@ -1252,6 +1252,21 @@ kubectl describe kustomization &lt;name&gt; -n flux-system</div>
             <div style="display:flex;align-items:center;gap:8px;font-size:11px;font-weight:700;white-space:nowrap;">
               <span style="display:inline-flex;align-items:center;border-radius:999px;border:1px solid #7dd3fc;color:#7dd3fc;padding:4px 10px;">OpenStack VMs 3cp+2wn</span><span style="color:#475569;">&rarr;</span><span style="display:inline-flex;align-items:center;border-radius:999px;border:1px solid #4ade80;color:#4ade80;padding:4px 10px;">Calico CNI</span><span style="color:#475569;">&rarr;</span><span style="display:inline-flex;align-items:center;border-radius:999px;border:1px solid #a78bfa;color:#a78bfa;padding:4px 10px;">FluxCD</span><span style="color:#475569;">&rarr;</span><span style="display:inline-flex;align-items:center;border-radius:999px;border:1px solid #fbbf24;color:#fbbf24;padding:4px 10px;">GitOps Repo</span><span style="color:#475569;">&rarr;</span><span style="display:inline-flex;align-items:center;border-radius:999px;border:1px solid #a78bfa;color:#a78bfa;padding:4px 10px;">Kustomizations</span><span style="color:#475569;">&rarr;</span><span style="display:inline-flex;align-items:center;border-radius:999px;border:1px solid #f472b6;color:#f472b6;padding:4px 10px;">HelmReleases</span><span style="color:#475569;">&rarr;</span><span style="display:inline-flex;align-items:center;border-radius:999px;border:1px solid #4ade80;color:#4ade80;padding:4px 10px;">Platform Services</span><span style="color:#475569;">&rarr;</span><span style="display:inline-flex;align-items:center;border-radius:999px;border:1px solid #7dd3fc;color:#7dd3fc;padding:4px 10px;">Envoy Gateway</span><span style="color:#475569;">&rarr;</span><span style="display:inline-flex;align-items:center;border-radius:999px;border:1px solid #fbbf24;color:#fbbf24;padding:4px 10px;">dashboard.&lt;cluster&gt;</span>
             </div>
+            <pre style="margin:12px 0 0;background:#020817;border:1px solid #1e3a5f;border-radius:8px;padding:12px 14px;color:#86efac;font-family:monospace;font-size:11px;line-height:1.55;white-space:pre;overflow-x:auto;">OpenStack / FLEX
+  ├─ Control plane: cp0 + cp1 + cp2
+  ├─ Workers:       wn0 + wn1
+  └─ Bastion:       kubeconfig + GitOps bootstrap
+
+Kubernetes Cluster
+  ├─ Calico CNI               → pod networking
+  ├─ FluxCD                   → watches GitOps repository
+  │   ├─ Kustomizations       → platform desired state
+  │   └─ HelmReleases         → service installs and upgrades
+  ├─ Platform Services        → cert-manager, Headlamp, CCM, CSI, RBAC, Postgres
+  └─ Envoy Gateway            → routes HTTPS traffic
+
+User Access
+  └─ dashboard.&lt;cluster&gt;      → Headlamp / OpenCenter dashboard endpoint</pre>
           </div>
         </div>
       </div>
