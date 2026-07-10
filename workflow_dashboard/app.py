@@ -20803,6 +20803,26 @@ def patch_config_file():
             cur[leaf] = value
             return changed
 
+        def get_nested(root, dotted_path):
+            cur = root
+            for part in [p for p in str(dotted_path).split(".") if p]:
+                if not isinstance(cur, dict) or part not in cur:
+                    return None
+                cur = cur[part]
+            return cur
+
+        def delete_nested(root, dotted_path):
+            cur = root
+            parts = [p for p in str(dotted_path).split(".") if p]
+            for part in parts[:-1]:
+                if not isinstance(cur, dict):
+                    return False
+                cur = cur.get(part)
+            if not parts or not isinstance(cur, dict) or parts[-1] not in cur:
+                return False
+            del cur[parts[-1]]
+            return True
+
         os.makedirs(os.path.dirname(cfg_path), exist_ok=True)
         if os.path.exists(cfg_path):
             with open(cfg_path, "r", encoding="utf-8", errors="replace") as f:
@@ -20817,6 +20837,26 @@ def patch_config_file():
             return jsonify({"ok": False, "error": "config root must be a YAML mapping"}), 400
 
         patched = 0
+        # Repair older dashboard writes that OpenCenter v2 rejects during cluster use.
+        for invalid_path in (
+            "opencenter.infrastructure.cloud.openstack.username",
+            "opencenter.infrastructure.cloud.openstack.password",
+        ):
+            if delete_nested(data, invalid_path):
+                patched += 1
+
+        root_services = data.get("services")
+        if isinstance(root_services, dict):
+            current_services = get_nested(data, "opencenter.services")
+            if not isinstance(current_services, dict):
+                current_services = {}
+                set_nested(data, "opencenter.services", current_services)
+            for svc_name, svc_cfg in root_services.items():
+                if svc_name not in current_services:
+                    current_services[svc_name] = svc_cfg
+            if delete_nested(data, "services"):
+                patched += 1
+
         for dot_path, value in fields.items():
             if value is None or value == "":
                 continue
@@ -20829,11 +20869,11 @@ def patch_config_file():
         }
         for svc in disable_services:
             name = service_names.get(str(svc), str(svc))
-            if name and set_nested(data, f"services.{name}.enabled", False):
+            if name and set_nested(data, f"opencenter.services.{name}.enabled", False):
                 patched += 1
         for svc in enable_services:
             name = service_names.get(str(svc), str(svc))
-            if name and set_nested(data, f"services.{name}.enabled", True):
+            if name and set_nested(data, f"opencenter.services.{name}.enabled", True):
                 patched += 1
 
         with open(cfg_path, "w", encoding="utf-8") as f:

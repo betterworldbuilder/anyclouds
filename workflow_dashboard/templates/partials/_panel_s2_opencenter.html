@@ -507,8 +507,6 @@
           fields: {
             'opencenter.infrastructure.cloud.openstack.auth_url': s.authUrl,
             'opencenter.infrastructure.cloud.openstack.region': (s.region||'').toUpperCase(),
-            'opencenter.infrastructure.cloud.openstack.username': s.username,
-            'opencenter.infrastructure.cloud.openstack.password': s.password,
             'opencenter.infrastructure.cloud.openstack.user_domain_name': s.userDomain||'rackspace_cloud_domain',
             'opencenter.infrastructure.cloud.openstack.project_domain_name': s.projDomain||'rackspace_cloud_domain',
             'opencenter.infrastructure.cloud.openstack.project_id': s.projectId,
@@ -516,8 +514,8 @@
             'opencenter.infrastructure.cloud.openstack.subnet_id': s.subnetId,
             'opencenter.infrastructure.cloud.openstack.router_external_network_id': s.floatNet,
             'opencenter.infrastructure.cloud.openstack.floating_ip_pool': 'PUBLICNET',
-            'opencenter.infrastructure.cloud.openstack.application_credential_id': s.credId||s.username,
-            'opencenter.infrastructure.cloud.openstack.application_credential_secret': s.credSec||s.password
+            'opencenter.infrastructure.cloud.openstack.application_credential_id': s.credId,
+            'opencenter.infrastructure.cloud.openstack.application_credential_secret': s.credSec
           },
           disable_services: Object.keys(_qs.services).filter(function(k){ return !_qs.services[k]; }),
           enable_services: Object.keys(_qs.services).filter(function(k){ return !!_qs.services[k]; })
@@ -2264,16 +2262,12 @@ var c2b=g('ocqs-cmd-2b');
 // Step 3
         var y3=g('ocqs-yaml-3');
         if(y3){
-          var _pw = s.password ? '••••••••••••' : 'YOUR_API_KEY';
           var _cs = s.credSec ? '••••••••••••' : 'YOUR_OPENSTACK_APP_CRED_SECRET';
-          var _cred = (s.authType==='password')
-            ? '        username: "'+(s.username||'YOUR_USERNAME')+'"\n'
-              +'        password: "'+_pw+'"\n'
-              +'        user_domain_name: "'+(s.userDomain||'rackspace_cloud_domain')+'"\n'
-              +'        project_domain_name: "'+(s.projDomain||'rackspace_cloud_domain')+'"\n'
-              +'        project_id: "'+(s.projectId||'YOUR_PROJECT_ID')+'"\n'
-            : '        application_credential_id: "'+(s.credId||'YOUR_OPENSTACK_APP_CRED_ID')+'"\n'
-              +'        application_credential_secret: "'+_cs+'"\n';
+          var _cred = '        application_credential_id: "'+(s.credId||'YOUR_OPENSTACK_APP_CRED_ID')+'"\n'
+            +'        application_credential_secret: "'+_cs+'"\n'
+            +'        user_domain_name: "'+(s.userDomain||'rackspace_cloud_domain')+'"\n'
+            +'        project_domain_name: "'+(s.projDomain||'rackspace_cloud_domain')+'"\n'
+            +'        project_id: "'+(s.projectId||'YOUR_PROJECT_ID')+'"\n';
           var _net = '        network_id: "'+(s.networkId||'YOUR_NETWORK_ID')+'"\n'
             +'        subnet_id: "'+(s.subnetId||'YOUR_SUBNET_ID')+'"\n'
             +'        floating_ip_pool: PUBLICNET\n'
@@ -2295,7 +2289,7 @@ var y4=g('ocqs-yaml-4');
         var c5=g('ocqs-cmd-5');
         if(c5) c5.textContent='grep -nE "keycloak|loki|tempo|enabled|CHANGEME" "'+configPath+'"';
 var y5=g('ocqs-yaml-5');
-        if(y5) y5.textContent='services:\n  keycloak:\n    enabled: '+(_qs.services.keycloak?'true':'false')+'\n  loki:\n    enabled: '+(_qs.services.loki?'true':'false')+'\n  tempo:\n    enabled: '+(_qs.services.tempo?'true':'false')+'\n  velero:\n    enabled: '+(_qs.services.velero?'true':'false')+'\n  kube-prometheus-stack:\n    enabled: '+(_qs.services.monitoring?'true':'false');
+        if(y5) y5.textContent='opencenter:\n  services:\n    keycloak:\n      enabled: '+(_qs.services.keycloak?'true':'false')+'\n    loki:\n      enabled: '+(_qs.services.loki?'true':'false')+'\n    tempo:\n      enabled: '+(_qs.services.tempo?'true':'false')+'\n    velero:\n      enabled: '+(_qs.services.velero?'true':'false')+'\n    kube-prometheus-stack:\n      enabled: '+(_qs.services.monitoring?'true':'false');
 
         // Step 6
         var c6=g('ocqs-cmd-6');
@@ -2334,7 +2328,7 @@ var c9b=g('ocqs-cmd-9b');
 // YAML preview
         var yp=g('ocqs-yaml-preview');
         if(yp) yp.textContent=
-          'opencenter:\n  cluster:\n    cluster_name: "'+s.cluster+'"\n    organization: "'+s.org+'"\n\n  infrastructure:\n    provider: "'+s.provider+'"\n    cloud:\n      openstack:\n        auth_url: "'+s.authUrl+'"\n        region: "'+s.region+'"\n        application_credential_id: "'+(s.credId||'YOUR_OPENSTACK_APP_CRED_ID')+'"\n        application_credential_secret: "'+(s.credSec?'••••••••••••':'YOUR_OPENSTACK_APP_CRED_SECRET')+'"\n\n  gitops:\n    repository:\n      url: "'+(s.gitRepo||'YOUR_GITOPS_REPO_URL')+'"\n    auth:\n      token:\n        token_file: "'+s.tokFile+'"\n\nservices:\n  keycloak:\n    enabled: '+(_qs.services.keycloak)+'\n  loki:\n    enabled: '+(_qs.services.loki)+'\n  tempo:\n    enabled: '+(_qs.services.tempo)+'\n  velero:\n    enabled: '+(_qs.services.velero)+'\n  kube-prometheus-stack:\n    enabled: '+(_qs.services.monitoring);
+          'opencenter:\n  cluster:\n    cluster_name: "'+s.cluster+'"\n    organization: "'+s.org+'"\n\n  infrastructure:\n    provider: "'+s.provider+'"\n    cloud:\n      openstack:\n        auth_url: "'+s.authUrl+'"\n        region: "'+s.region+'"\n        application_credential_id: "'+(s.credId||'YOUR_OPENSTACK_APP_CRED_ID')+'"\n        application_credential_secret: "'+(s.credSec?'••••••••••••':'YOUR_OPENSTACK_APP_CRED_SECRET')+'"\n\n  gitops:\n    repository:\n      url: "'+(s.gitRepo||'YOUR_GITOPS_REPO_URL')+'"\n    auth:\n      token:\n        token_file: "'+s.tokFile+'"\n\n  services:\n    keycloak:\n      enabled: '+(_qs.services.keycloak)+'\n    loki:\n      enabled: '+(_qs.services.loki)+'\n    tempo:\n      enabled: '+(_qs.services.tempo)+'\n    velero:\n      enabled: '+(_qs.services.velero)+'\n    kube-prometheus-stack:\n      enabled: '+(_qs.services.monitoring);
 
         // Full flow
         var ff=g('ocqs-full-flow');
@@ -2952,8 +2946,6 @@ var c9b=g('ocqs-cmd-9b');
           fields: {
             'opencenter.infrastructure.cloud.openstack.auth_url': s.authUrl,
             'opencenter.infrastructure.cloud.openstack.region': (s.region||'').toUpperCase(),
-            'opencenter.infrastructure.cloud.openstack.username': s.username,
-            'opencenter.infrastructure.cloud.openstack.password': s.password,
             'opencenter.infrastructure.cloud.openstack.user_domain_name': s.userDomain||'rackspace_cloud_domain',
             'opencenter.infrastructure.cloud.openstack.project_domain_name': s.projDomain||'rackspace_cloud_domain',
             'opencenter.infrastructure.cloud.openstack.project_id': s.projectId,
@@ -2961,8 +2953,8 @@ var c9b=g('ocqs-cmd-9b');
             'opencenter.infrastructure.cloud.openstack.subnet_id': s.subnetId,
             'opencenter.infrastructure.cloud.openstack.router_external_network_id': s.floatNet,
             'opencenter.infrastructure.cloud.openstack.floating_ip_pool': 'PUBLICNET',
-            'opencenter.infrastructure.cloud.openstack.application_credential_id': s.credId||s.username,
-            'opencenter.infrastructure.cloud.openstack.application_credential_secret': s.credSec||s.password
+            'opencenter.infrastructure.cloud.openstack.application_credential_id': s.credId,
+            'opencenter.infrastructure.cloud.openstack.application_credential_secret': s.credSec
           },
           disable_services: Object.keys(_qp.services).filter(function(k){ return !_qp.services[k]; }),
           enable_services: Object.keys(_qp.services).filter(function(k){ return !!_qp.services[k]; })
@@ -4654,16 +4646,12 @@ var c2b=g('ocqp-cmd-2b');
 // Step 3
         var y3=g('ocqp-yaml-3');
         if(y3){
-          var _pw = s.password ? '••••••••••••' : 'YOUR_API_KEY';
           var _cs = s.credSec ? '••••••••••••' : 'YOUR_OPENSTACK_APP_CRED_SECRET';
-          var _cred = (s.authType==='password')
-            ? '        username: "'+(s.username||'YOUR_USERNAME')+'"\n'
-              +'        password: "'+_pw+'"\n'
-              +'        user_domain_name: "'+(s.userDomain||'rackspace_cloud_domain')+'"\n'
-              +'        project_domain_name: "'+(s.projDomain||'rackspace_cloud_domain')+'"\n'
-              +'        project_id: "'+(s.projectId||'YOUR_PROJECT_ID')+'"\n'
-            : '        application_credential_id: "'+(s.credId||'YOUR_OPENSTACK_APP_CRED_ID')+'"\n'
-              +'        application_credential_secret: "'+_cs+'"\n';
+          var _cred = '        application_credential_id: "'+(s.credId||'YOUR_OPENSTACK_APP_CRED_ID')+'"\n'
+            +'        application_credential_secret: "'+_cs+'"\n'
+            +'        user_domain_name: "'+(s.userDomain||'rackspace_cloud_domain')+'"\n'
+            +'        project_domain_name: "'+(s.projDomain||'rackspace_cloud_domain')+'"\n'
+            +'        project_id: "'+(s.projectId||'YOUR_PROJECT_ID')+'"\n';
           var _net = '        network_id: "'+(s.networkId||'YOUR_NETWORK_ID')+'"\n'
             +'        subnet_id: "'+(s.subnetId||'YOUR_SUBNET_ID')+'"\n'
             +'        floating_ip_pool: PUBLICNET\n'
@@ -4685,7 +4673,7 @@ var y4=g('ocqp-yaml-4');
         var c5=g('ocqp-cmd-5');
         if(c5) c5.textContent='grep -nE "keycloak|loki|tempo|enabled|CHANGEME" "'+configPath+'"';
 var y5=g('ocqp-yaml-5');
-        if(y5) y5.textContent='services:\n  keycloak:\n    enabled: '+(_qp.services.keycloak?'true':'false')+'\n  loki:\n    enabled: '+(_qp.services.loki?'true':'false')+'\n  tempo:\n    enabled: '+(_qp.services.tempo?'true':'false')+'\n  velero:\n    enabled: '+(_qp.services.velero?'true':'false')+'\n  kube-prometheus-stack:\n    enabled: '+(_qp.services.monitoring?'true':'false');
+        if(y5) y5.textContent='opencenter:\n  services:\n    keycloak:\n      enabled: '+(_qp.services.keycloak?'true':'false')+'\n    loki:\n      enabled: '+(_qp.services.loki?'true':'false')+'\n    tempo:\n      enabled: '+(_qp.services.tempo?'true':'false')+'\n    velero:\n      enabled: '+(_qp.services.velero?'true':'false')+'\n    kube-prometheus-stack:\n      enabled: '+(_qp.services.monitoring?'true':'false');
 
         // Step 6
         var c6=g('ocqp-cmd-6');
@@ -4724,7 +4712,7 @@ var c9b=g('ocqp-cmd-9b');
 // YAML preview
         var yp=g('ocqp-yaml-preview');
         if(yp) yp.textContent=
-          'opencenter:\n  cluster:\n    cluster_name: "'+s.cluster+'"\n    organization: "'+s.org+'"\n\n  infrastructure:\n    provider: "'+s.provider+'"\n    cloud:\n      openstack:\n        auth_url: "'+s.authUrl+'"\n        region: "'+s.region+'"\n        application_credential_id: "'+(s.credId||'YOUR_OPENSTACK_APP_CRED_ID')+'"\n        application_credential_secret: "'+(s.credSec?'••••••••••••':'YOUR_OPENSTACK_APP_CRED_SECRET')+'"\n\n  gitops:\n    repository:\n      url: "'+(s.gitRepo||'YOUR_GITOPS_REPO_URL')+'"\n    auth:\n      token:\n        token_file: "'+s.tokFile+'"\n\nservices:\n  keycloak:\n    enabled: '+(_qp.services.keycloak)+'\n  loki:\n    enabled: '+(_qp.services.loki)+'\n  tempo:\n    enabled: '+(_qp.services.tempo)+'\n  velero:\n    enabled: '+(_qp.services.velero)+'\n  kube-prometheus-stack:\n    enabled: '+(_qp.services.monitoring);
+          'opencenter:\n  cluster:\n    cluster_name: "'+s.cluster+'"\n    organization: "'+s.org+'"\n\n  infrastructure:\n    provider: "'+s.provider+'"\n    cloud:\n      openstack:\n        auth_url: "'+s.authUrl+'"\n        region: "'+s.region+'"\n        application_credential_id: "'+(s.credId||'YOUR_OPENSTACK_APP_CRED_ID')+'"\n        application_credential_secret: "'+(s.credSec?'••••••••••••':'YOUR_OPENSTACK_APP_CRED_SECRET')+'"\n\n  gitops:\n    repository:\n      url: "'+(s.gitRepo||'YOUR_GITOPS_REPO_URL')+'"\n    auth:\n      token:\n        token_file: "'+s.tokFile+'"\n\n  services:\n    keycloak:\n      enabled: '+(_qp.services.keycloak)+'\n    loki:\n      enabled: '+(_qp.services.loki)+'\n    tempo:\n      enabled: '+(_qp.services.tempo)+'\n    velero:\n      enabled: '+(_qp.services.velero)+'\n    kube-prometheus-stack:\n      enabled: '+(_qp.services.monitoring);
 
         // Full flow
         var ff=g('ocqp-full-flow');
