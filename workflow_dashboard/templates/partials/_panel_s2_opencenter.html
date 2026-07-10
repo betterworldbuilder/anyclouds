@@ -2483,11 +2483,14 @@ var c9b=g('ocqs-cmd-9b');
         // Migrate stale default values in localStorage
         try{
           var _s=JSON.parse(localStorage.getItem('ocqs_state')||'null');
-          if(_s && _s.services && _s.optionalServicesDefaultVersion!=='all-off-v1'){
+          if(_s && _s.services && _s.optionalServicesDefaultVersion!=='all-off-v2'){
             _s.services=Object.assign({keycloak:false,loki:false,tempo:false,velero:false,monitoring:false},_s.services);
+            _s.services.keycloak=false;
+            _s.services.loki=false;
+            _s.services.tempo=false;
             _s.services.velero=false;
             _s.services.monitoring=false;
-            _s.optionalServicesDefaultVersion='all-off-v1';
+            _s.optionalServicesDefaultVersion='all-off-v2';
             localStorage.setItem('ocqs_state',JSON.stringify(_s));
           }
         }catch(e){}
@@ -2523,7 +2526,7 @@ var c9b=g('ocqs-cmd-9b');
         setTimeout(_ocqsRestore,150);
       }
       window.addEventListener('beforeunload',function(){
-        try{ if(typeof ocqsGetState==='function'){ var s=ocqsGetState(); localStorage.setItem('ocqs_state',JSON.stringify({org:s.org,cluster:s.cluster,env:s.env,provider:s.provider,authType:s.authType,authUrl:s.authUrl,region:s.region,username:s.username,password:s.password,userDomain:s.userDomain,projDomain:s.projDomain,projectId:s.projectId,credId:s.credId,credSec:s.credSec,floatNet:s.floatNet,networkId:s.networkId,subnetId:s.subnetId,gitRepo:s.gitRepo,gitBranch:s.gitBranch,tokFile:s.tokFile,tokVal:s.tokVal,services:_qs.services,optionalServicesDefaultVersion:'all-off-v1'})); } }catch(e){}
+        try{ if(typeof ocqsGetState==='function'){ var s=ocqsGetState(); localStorage.setItem('ocqs_state',JSON.stringify({org:s.org,cluster:s.cluster,env:s.env,provider:s.provider,authType:s.authType,authUrl:s.authUrl,region:s.region,username:s.username,password:s.password,userDomain:s.userDomain,projDomain:s.projDomain,projectId:s.projectId,credId:s.credId,credSec:s.credSec,floatNet:s.floatNet,networkId:s.networkId,subnetId:s.subnetId,gitRepo:s.gitRepo,gitBranch:s.gitBranch,tokFile:s.tokFile,tokVal:s.tokVal,services:_qs.services,optionalServicesDefaultVersion:'all-off-v2'})); } }catch(e){}
       });
 
     })();
@@ -4867,11 +4870,14 @@ var c9b=g('ocqp-cmd-9b');
         // Migrate stale default values in localStorage
         try{
           var _s=JSON.parse(localStorage.getItem('ocqp_state')||'null');
-          if(_s && _s.services && _s.optionalServicesDefaultVersion!=='all-off-v1'){
+          if(_s && _s.services && _s.optionalServicesDefaultVersion!=='all-off-v2'){
             _s.services=Object.assign({keycloak:false,loki:false,tempo:false,velero:false,monitoring:false},_s.services);
+            _s.services.keycloak=false;
+            _s.services.loki=false;
+            _s.services.tempo=false;
             _s.services.velero=false;
             _s.services.monitoring=false;
-            _s.optionalServicesDefaultVersion='all-off-v1';
+            _s.optionalServicesDefaultVersion='all-off-v2';
             localStorage.setItem('ocqp_state',JSON.stringify(_s));
           }
         }catch(e){}
@@ -4907,7 +4913,7 @@ var c9b=g('ocqp-cmd-9b');
         setTimeout(_ocqpRestore,150);
       }
       window.addEventListener('beforeunload',function(){
-        try{ if(typeof ocqpGetState==='function'){ var s=ocqpGetState(); localStorage.setItem('ocqp_state',JSON.stringify({org:s.org,cluster:s.cluster,env:s.env,provider:s.provider,authType:s.authType,authUrl:s.authUrl,region:s.region,username:s.username,password:s.password,userDomain:s.userDomain,projDomain:s.projDomain,projectId:s.projectId,credId:s.credId,credSec:s.credSec,floatNet:s.floatNet,networkId:s.networkId,subnetId:s.subnetId,gitRepo:s.gitRepo,gitBranch:s.gitBranch,tokFile:s.tokFile,tokVal:s.tokVal,services:_qp.services,optionalServicesDefaultVersion:'all-off-v1'})); } }catch(e){}
+        try{ if(typeof ocqpGetState==='function'){ var s=ocqpGetState(); localStorage.setItem('ocqp_state',JSON.stringify({org:s.org,cluster:s.cluster,env:s.env,provider:s.provider,authType:s.authType,authUrl:s.authUrl,region:s.region,username:s.username,password:s.password,userDomain:s.userDomain,projDomain:s.projDomain,projectId:s.projectId,credId:s.credId,credSec:s.credSec,floatNet:s.floatNet,networkId:s.networkId,subnetId:s.subnetId,gitRepo:s.gitRepo,gitBranch:s.gitBranch,tokFile:s.tokFile,tokVal:s.tokVal,services:_qp.services,optionalServicesDefaultVersion:'all-off-v2'})); } }catch(e){}
       });
 
     })();
