@@ -8971,6 +8971,8 @@ def _run_deploy_job(
                 line = proc.stdout.readline()
                 if line:
                     _deploy_job_append(job_id, line)
+                elif proc.poll() is None:
+                    time.sleep(0.5)  # EOF'd pipe stays select-ready; avoid tight spin
 
             if proc.poll() is not None:
                 break
@@ -14862,6 +14864,7 @@ exit 0
                     if not line:
                         if process.poll() is not None:
                             break
+                        time.sleep(1)  # EOF'd pipe stays select-ready; sleep to avoid a GIL-starving spin
                         continue
                     if "R3 FLEX2FLEX-Region Cloning complete" in line:
                         saw_remote_success = True
@@ -20773,8 +20776,7 @@ def stream_run_cmd():
 
 @app.post("/api/openrc/patch-config")
 def patch_config_file():
-    """Patch specific dot-path fields in the YAML config and optionally disable services."""
-    import re as _re
+    """Patch dot-path fields in the OpenCenter YAML config."""
     body = request.get_json(force=True, silent=True) or {}
     cfg_path = (body.get("path") or "").strip()
     fields = body.get("fields") or {}
@@ -20783,35 +20785,60 @@ def patch_config_file():
     if not cfg_path:
         return jsonify({"ok": False, "error": "no path"}), 400
     try:
-        with open(cfg_path, "r", encoding="utf-8") as f:
-            text = f.read()
+        import yaml
+
+        def set_nested(root, dotted_path, value):
+            cur = root
+            parts = [p for p in str(dotted_path).split(".") if p]
+            for part in parts[:-1]:
+                nxt = cur.get(part)
+                if not isinstance(nxt, dict):
+                    nxt = {}
+                    cur[part] = nxt
+                cur = nxt
+            if not parts:
+                return False
+            leaf = parts[-1]
+            changed = cur.get(leaf) != value
+            cur[leaf] = value
+            return changed
+
+        os.makedirs(os.path.dirname(cfg_path), exist_ok=True)
+        if os.path.exists(cfg_path):
+            with open(cfg_path, "r", encoding="utf-8", errors="replace") as f:
+                existing = f.read()
+        else:
+            existing = ""
+
+        data = yaml.safe_load(existing) if existing.strip() else {}
+        if data is None:
+            data = {}
+        if not isinstance(data, dict):
+            return jsonify({"ok": False, "error": "config root must be a YAML mapping"}), 400
+
         patched = 0
-        # For each leaf key, find and replace value in YAML using regex on the last key segment
         for dot_path, value in fields.items():
-            if not value:
+            if value is None or value == "":
                 continue
-            key = dot_path.split(".")[-1]
-            # Match: "  key: <anything>" and replace with new value (quoted string)
-            pattern = rf'(\b{_re.escape(key)}:\s*)(["\']?)[^\n]*(["\']?)'
-            replacement = f'{key}: "{value}"'
-            new_text, n = _re.subn(rf'^(\s*){_re.escape(key)}:\s*[^\n]*', lambda m: m.group(1) + replacement, text, flags=_re.MULTILINE)
-            if n:
-                text = new_text
-                patched += n
-        # Disable/enable services based on toggle state
+            if set_nested(data, dot_path, str(value)):
+                patched += 1
+
+        service_names = {
+            "monitoring": "kube-prometheus-stack",
+            "kube-prometheus-stack": "kube-prometheus-stack",
+        }
         for svc in disable_services:
-            text = _re.sub(
-                rf'(?m)(^\s+{_re.escape(svc)}:[^\n]*\n(?:\s+[^\n]+\n)*?\s+enabled:\s*)true',
-                r'\g<1>false', text
-            )
+            name = service_names.get(str(svc), str(svc))
+            if name and set_nested(data, f"services.{name}.enabled", False):
+                patched += 1
         for svc in enable_services:
-            text = _re.sub(
-                rf'(?m)(^\s+{_re.escape(svc)}:[^\n]*\n(?:\s+[^\n]+\n)*?\s+enabled:\s*)false',
-                r'\g<1>true', text
-            )
+            name = service_names.get(str(svc), str(svc))
+            if name and set_nested(data, f"services.{name}.enabled", True):
+                patched += 1
+
         with open(cfg_path, "w", encoding="utf-8") as f:
-            f.write(text)
-        return jsonify({"ok": True, "patched": patched})
+            yaml.safe_dump(data, f, sort_keys=False, default_flow_style=False)
+        return jsonify({"ok": True, "patched": patched, "path": cfg_path})
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500
 

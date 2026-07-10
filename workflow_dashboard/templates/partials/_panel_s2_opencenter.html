@@ -311,36 +311,39 @@
               <span id="ocqs-openrc-status" style="font-size:12px;font-weight:700;"></span>
             </div>
           </div>
-          <label class="ocqs-label">Auth Type</label>
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:4px;">
+            <label class="ocqs-label" style="margin:0;">Auth Type</label>
+            <button id="ocqs-mask-toggle" type="button" onclick="ocqsToggleSensitiveMask()" title="Show or hide sensitive credential fields" style="background:#0f172a;color:#e2e8f0;border:1px solid #334155;border-radius:5px;padding:5px 10px;font-size:11px;font-weight:800;cursor:pointer;">Unmask Sensitive</button>
+          </div>
           <select class="ocqs-select" id="ocqs-authtype" onchange="ocqsToggleAuthType();ocqsUpdate();ocqsReqCheck()">
             <option value="password">Password (username + API key)</option>
             <option value="v3applicationcredential">Application Credential</option>
           </select>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px;">
-            <div><label class="ocqs-label">Auth URL</label><input class="ocqs-input" id="ocqs-authurl" value="https://keystone.api.iad3.rackspacecloud.com/v3/" oninput="ocqsUpdate()"></div>
-            <div><label class="ocqs-label">Target Region</label><input class="ocqs-input" id="ocqs-region" placeholder="DFW3" list="ocqs-region-list" oninput="ocqsRegionSync();ocqsUpdate();ocqsReqCheck()"><datalist id="ocqs-region-list"><option value="DFW3"></option><option value="SJC3"></option><option value="IAD3"></option></datalist></div>
+            <div><label class="ocqs-label">Auth URL</label><input class="ocqs-input" id="ocqs-authurl" type="password" data-ocqs-sensitive="1" value="https://keystone.api.iad3.rackspacecloud.com/v3/" oninput="ocqsUpdate()"></div>
+            <div><label class="ocqs-label">Target Region</label><select class="ocqs-input" id="ocqs-region" onchange="ocqsRegionSync();ocqsUpdate();ocqsReqCheck()" oninput="ocqsRegionSync();ocqsUpdate();ocqsReqCheck()"><option value="DFW3">DFW3</option><option value="SJC3">SJC3</option><option value="IAD3">IAD3</option></select></div>
           </div>
           <div id="ocqs-pw-fields" style="margin-top:8px;">
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-              <div><label class="ocqs-label">Username</label><input class="ocqs-input" id="ocqs-username" placeholder="dzng.8294" oninput="ocqsUpdate();ocqsReqCheck();ocqsSave()"></div>
-              <div><label class="ocqs-label">Password / API Key</label><input class="ocqs-input" id="ocqs-password" type="password" placeholder="your-api-key" oninput="ocqsUpdate();ocqsReqCheck();ocqsSave()"></div>
-              <div><label class="ocqs-label">User Domain Name</label><input class="ocqs-input" id="ocqs-userdomain" value="rackspace_cloud_domain" oninput="ocqsUpdate()"></div>
-              <div><label class="ocqs-label">Project Domain Name</label><input class="ocqs-input" id="ocqs-projdomain" value="rackspace_cloud_domain" oninput="ocqsUpdate()"></div>
+              <div><label class="ocqs-label">Username</label><input class="ocqs-input" id="ocqs-username" type="password" data-ocqs-sensitive="1" placeholder="dzng.8294" oninput="ocqsUpdate();ocqsReqCheck();ocqsSave()"></div>
+              <div><label class="ocqs-label">Password / API Key</label><input class="ocqs-input" id="ocqs-password" type="password" data-ocqs-sensitive="1" placeholder="your-api-key" oninput="ocqsUpdate();ocqsReqCheck();ocqsSave()"></div>
+              <div><label class="ocqs-label">User Domain Name</label><input class="ocqs-input" id="ocqs-userdomain" type="password" data-ocqs-sensitive="1" value="rackspace_cloud_domain" oninput="ocqsUpdate()"></div>
+              <div><label class="ocqs-label">Project Domain Name</label><input class="ocqs-input" id="ocqs-projdomain" type="password" data-ocqs-sensitive="1" value="rackspace_cloud_domain" oninput="ocqsUpdate()"></div>
             </div>
             <label class="ocqs-label" style="margin-top:8px;">Project ID</label>
-            <input class="ocqs-input" id="ocqs-projectid" placeholder="49a2c18a567c402ef560bb0f11821b61" oninput="ocqsUpdate()">
+            <input class="ocqs-input" id="ocqs-projectid" type="password" data-ocqs-sensitive="1" placeholder="49a2c18a567c402ef560bb0f11821b61" oninput="ocqsUpdate()">
           </div>
           <div id="ocqs-appcred-fields" style="display:none;margin-top:8px;">
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-              <div><label class="ocqs-label">App Credential ID</label><input class="ocqs-input" id="ocqs-credid" placeholder="YOUR_APP_CRED_ID" oninput="ocqsUpdate();ocqsReqCheck()"></div>
-              <div><label class="ocqs-label">App Credential Secret</label><input class="ocqs-input" id="ocqs-credsec" type="password" placeholder="YOUR_APP_CRED_SECRET" oninput="ocqsUpdate();ocqsReqCheck()"></div>
+              <div><label class="ocqs-label">App Credential ID</label><input class="ocqs-input" id="ocqs-credid" type="password" data-ocqs-sensitive="1" placeholder="YOUR_APP_CRED_ID" oninput="ocqsUpdate();ocqsReqCheck()"></div>
+              <div><label class="ocqs-label">App Credential Secret</label><input class="ocqs-input" id="ocqs-credsec" type="password" data-ocqs-sensitive="1" placeholder="YOUR_APP_CRED_SECRET" oninput="ocqsUpdate();ocqsReqCheck()"></div>
             </div>
           </div>
           <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:14px;margin-top:14px;">
             <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;flex-wrap:wrap;">
               <div style="font-size:12px;font-weight:800;color:#15803d;">&#128269; Network / Subnet — Auto-Detect</div>
               <div style="display:flex;gap:6px;">
-                <button onclick="ocqsSave();var st=this;st.textContent='\u2713 Saved';setTimeout(function(){st.innerHTML='&#128190; Save Credentials';},1200);" style="background:#0369a1;color:#fff;border:none;border-radius:5px;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer;">&#128190; Save Credentials</button>
+                <button onclick="ocqsSave();if(window.ocqsApplyToConfig)ocqsApplyToConfig(null);var st=this;st.textContent='\u2713 Saved';setTimeout(function(){st.innerHTML='&#128190; Save Credentials';},1200);" style="background:#0369a1;color:#fff;border:none;border-radius:5px;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer;">&#128190; Save Credentials</button>
                 <button onclick="ocqsAutoDetectNetwork()" id="ocqs-detect-btn" style="background:#15803d;color:#fff;border:none;border-radius:5px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer;">&#9654; Run Detection</button>
               </div>
             </div>
@@ -431,6 +434,22 @@
 <script>
       // Global ocqsGetState shim - available before main script loads
       var _v=function(id){var el=document.getElementById(id);return el?el.value.trim():'';};
+      window._ocqsSensitiveMasked = true;
+      window.ocqsToggleSensitiveMask = function(force){
+        var masked = (typeof force === 'boolean') ? force : !window._ocqsSensitiveMasked;
+        window._ocqsSensitiveMasked = masked;
+        document.querySelectorAll('[data-ocqs-sensitive="1"]').forEach(function(el){
+          if(el && el.tagName === 'INPUT') el.type = masked ? 'password' : 'text';
+        });
+        var btn = document.getElementById('ocqs-mask-toggle');
+        if(btn){
+          btn.textContent = masked ? 'Unmask Sensitive' : 'Mask Sensitive';
+          btn.style.background = masked ? '#0f172a' : '#991b1b';
+          btn.style.borderColor = masked ? '#334155' : '#fecaca';
+          btn.title = masked ? 'Show sensitive credential fields' : 'Hide sensitive credential fields';
+        }
+      };
+      setTimeout(function(){ if(window.ocqsToggleSensitiveMask) window.ocqsToggleSensitiveMask(true); }, 0);
       window.ocqsGetState=function(){
         try{
           var _svcs={keycloak:false,loki:false,tempo:false,velero:false,monitoring:false};
@@ -480,6 +499,8 @@
         var cfgPath = cfgEl ? cfgEl.textContent.trim() : '';
         if (!cfgPath) { if(st){st.textContent='No config path — fill Stage 2 inputs.';st.style.color='#dc2626';} return; }
         if(st){ st.textContent='Applying...'; st.style.color='#0369a1'; }
+        var oldBtn = btn ? btn.innerHTML : '';
+        if(btn){ btn.disabled=true; btn.textContent='Applying...'; }
         // Build patch: credentials + network + disable optional services that need Swift
         var patch = {
           path: cfgPath,
@@ -501,11 +522,20 @@
           disable_services: Object.keys(_qs.services).filter(function(k){ return !_qs.services[k]; }),
           enable_services: Object.keys(_qs.services).filter(function(k){ return !!_qs.services[k]; })
         };
-        fetch('/api/openrc/patch-config', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(patch)})
+        var _ctl = new AbortController();
+        var _tmo = setTimeout(function(){ _ctl.abort(); }, 45000);
+        fetch('/api/openrc/patch-config', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(patch), signal:_ctl.signal})
           .then(function(r){return r.json();})
           .then(function(d){
+            clearTimeout(_tmo);
             if(st){ st.textContent = d.ok ? ('\u2713 Applied '+d.patched+' fields') : ('\u2717 '+(d.error||'failed')); st.style.color=d.ok?'#15803d':'#dc2626'; }
-          }).catch(function(e){ if(st){ st.textContent='\u2717 '+e; st.style.color='#dc2626'; } });
+            if(btn){ btn.disabled=false; btn.innerHTML=oldBtn||'&#128190; Apply to Config File'; }
+          }).catch(function(e){
+            clearTimeout(_tmo);
+            var msg = (e && e.name === 'AbortError') ? 'request timed out - retry Apply or check the dashboard log' : String(e);
+            if(st){ st.textContent='\u2717 '+msg; st.style.color='#dc2626'; }
+            if(btn){ btn.disabled=false; btn.innerHTML=oldBtn||'&#128190; Apply to Config File'; }
+          });
       };
       window.ocqsLoadConfig = function(btn){
         var path=ocqsCfgPath();
@@ -901,19 +931,21 @@ cat ~/.ssh/id_ed25519.pub</div>
           </div>
           <p>OpenCenter CLI initializes cluster configuration, validates readiness, generates the GitOps repository, and deploys the Kubernetes platform.</p>
           <p style="font-size:12px;color:#64748b;"><strong>Recommended — Clone &amp; build:</strong></p>
-          <div class="ocqs-cmd" id="ocqs-cmd-1rec"># Clone repository
-git clone https://github.com/opencenter-cloud/openCenter-cli.git
-cd openCenter-cli
-
-# Trust the project config, then install tools
-mise trust
-mise install
-
-# Build the binary
-mise run build
+          <div class="ocqs-cmd" id="ocqs-cmd-1rec"># Idempotent install - skips finished steps, never prompts (no hang)
+export GIT_TERMINAL_PROMPT=0 MISE_YES=1
+if [ -x openCenter-cli/bin/opencenter ]; then
+  echo "OpenCenter CLI already built - skipping clone and build"
+else
+  [ -d openCenter-cli/.git ] || git clone --depth 1 https://github.com/opencenter-cloud/openCenter-cli.git
+  cd openCenter-cli
+  mise trust
+  mise install
+  mise run build
+  cd ..
+fi
 
 # Verify installation
-./bin/opencenter version</div>
+./openCenter-cli/bin/opencenter version</div>
           <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:6px;">
             <button class="ocqs-btn ocqs-btn-copy" onclick="ocqsCopyCmd('ocqs-cmd-1rec','ocqs-st-1')">&#128203; Copy</button><button id="ocqs-run-1rec" onclick="ocqsRunCmd('ocqs-cmd-1rec','ocqs-out-1rec','ocqs-run-1rec')" style="background:#1e3a5f;color:#7dd3fc;border:1px solid #334155;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#9654; Run</button><button onclick="ocqsCopyOut('ocqs-out-1rec',this)" style="background:#334155;color:#cbd5e1;border:1px solid #475569;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#128203; Copy Output</button>
           </div>
@@ -1666,7 +1698,7 @@ kubectl describe kustomization &lt;name&gt; -n flux-system</div>
         #ocqs-right-panel #ocqs-term .l-err { color:#f87171; }
         #ocqs-right-panel #ocqs-term .l-hd { color:#fbbf24; font-weight:800; }
         #ocqs-right-panel #ocqs-term .l-dim { color:#64748b; font-style:italic; }
-        #ocqs-term-float { position:fixed; top:150px; right:30px; width:340px; height:calc(100vh - 170px); z-index:99990; display:flex; flex-direction:column; border-radius:12px; overflow:hidden; border:1px solid #1e293b; box-shadow:0 24px 64px rgba(2,6,23,.6); background:#0d1117; }
+        #ocqs-term-float { position:fixed; top:60px; right:48px; width:335px; height:calc(100vh - 155px); z-index:99990; display:flex; flex-direction:column; border-radius:12px; overflow:hidden; border:1px solid #1e293b; box-shadow:0 24px 64px rgba(2,6,23,.6); background:#0d1117; }
         #ocqs-term-float.oct-min { width:auto; height:auto; }
         #ocqs-term-float.oct-min .oct-term-body { display:none; }
         .oct-track { display:flex; gap:3px; padding:8px 12px 4px; background:#0f172a; }
@@ -2080,9 +2112,16 @@ kubectl describe kustomization &lt;name&gt; -n flux-system</div>
         ].join('\n');
         if(out) out.textContent='$ '+cmd+'\n';
         var es = new EventSource('/api/stream/run-cmd?cmd='+encodeURIComponent(cmd));
+        var _wd = setTimeout(function(){
+          es.close();
+          if(st){ st.textContent='\u2717 timed out - retry Update Cluster or check the dashboard log'; st.style.color='#dc2626'; }
+          if(btn){ btn.disabled=false; btn.innerHTML='&#128260; Update Cluster'; }
+        }, 20000);
         es.onmessage = function(e){
+          clearTimeout(_wd); _wd = setTimeout(function(){ es.close(); if(btn){ btn.disabled=false; btn.innerHTML='&#128260; Update Cluster'; } }, 60000);
           if(out){ out.textContent += e.data+'\n'; out.scrollTop=out.scrollHeight; }
           if(e.data.startsWith('[EXIT')){
+            clearTimeout(_wd);
             es.close();
             var ok = e.data === '[EXIT 0]';
             if(st){ st.textContent = ok ? '\u2713 Cluster settings updated' : '\u2717 Update failed'; st.style.color = ok ? '#15803d' : '#dc2626'; }
@@ -2161,6 +2200,7 @@ kubectl describe kustomization &lt;name&gt; -n flux-system</div>
                 var n = [d.external_network_id, d.network_id, d.subnet_id].filter(Boolean).length;
                 if (st) { st.textContent = n ? ('✓ ' + n + ' network field(s) auto-populated') : 'No networks found — check credentials/region'; st.style.color = n ? '#15803d' : '#dc2626'; }
                 if (typeof ocqsUpdate === 'function') ocqsUpdate();
+                if (n && typeof ocqsApplyToConfig === 'function') ocqsApplyToConfig(null); // auto-apply to config file
             }).catch(function(e){ reset(); if (st) { st.textContent='✗ ' + e; st.style.color='#dc2626'; } });
         };
         var _autoApplyTimer=null;
@@ -2715,36 +2755,39 @@ var c9b=g('ocqs-cmd-9b');
               <span id="ocqp-openrc-status" style="font-size:12px;font-weight:700;"></span>
             </div>
           </div>
-          <label class="ocqs-label">Auth Type</label>
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:4px;">
+            <label class="ocqs-label" style="margin:0;">Auth Type</label>
+            <button id="ocqp-mask-toggle" type="button" onclick="ocqpToggleSensitiveMask()" title="Show or hide sensitive credential fields" style="background:#0f172a;color:#e2e8f0;border:1px solid #334155;border-radius:5px;padding:5px 10px;font-size:11px;font-weight:800;cursor:pointer;">Unmask Sensitive</button>
+          </div>
           <select class="ocqs-select" id="ocqp-authtype" onchange="ocqpToggleAuthType();ocqpUpdate();ocqpReqCheck()">
             <option value="password">Password (username + API key)</option>
             <option value="v3applicationcredential">Application Credential</option>
           </select>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px;">
-            <div><label class="ocqs-label">Auth URL</label><input class="ocqs-input" id="ocqp-authurl" value="https://keystone.api.iad3.rackspacecloud.com/v3/" oninput="ocqpUpdate()"></div>
-            <div><label class="ocqs-label">Target Region</label><input class="ocqs-input" id="ocqp-region" placeholder="DFW3" list="ocqp-region-list" oninput="ocqpRegionSync();ocqpUpdate();ocqpReqCheck()"><datalist id="ocqp-region-list"><option value="DFW3"></option><option value="SJC3"></option><option value="IAD3"></option></datalist></div>
+            <div><label class="ocqs-label">Auth URL</label><input class="ocqs-input" id="ocqp-authurl" type="password" data-ocqp-sensitive="1" value="https://keystone.api.iad3.rackspacecloud.com/v3/" oninput="ocqpUpdate()"></div>
+            <div><label class="ocqs-label">Target Region</label><select class="ocqs-input" id="ocqp-region" onchange="ocqpRegionSync();ocqpUpdate();ocqpReqCheck()" oninput="ocqpRegionSync();ocqpUpdate();ocqpReqCheck()"><option value="DFW3">DFW3</option><option value="SJC3">SJC3</option><option value="IAD3">IAD3</option></select></div>
           </div>
           <div id="ocqp-pw-fields" style="margin-top:8px;">
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-              <div><label class="ocqs-label">Username</label><input class="ocqs-input" id="ocqp-username" placeholder="dzng.8294" oninput="ocqpUpdate();ocqpReqCheck();ocqpSave()"></div>
-              <div><label class="ocqs-label">Password / API Key</label><input class="ocqs-input" id="ocqp-password" type="password" placeholder="your-api-key" oninput="ocqpUpdate();ocqpReqCheck();ocqpSave()"></div>
-              <div><label class="ocqs-label">User Domain Name</label><input class="ocqs-input" id="ocqp-userdomain" value="rackspace_cloud_domain" oninput="ocqpUpdate()"></div>
-              <div><label class="ocqs-label">Project Domain Name</label><input class="ocqs-input" id="ocqp-projdomain" value="rackspace_cloud_domain" oninput="ocqpUpdate()"></div>
+              <div><label class="ocqs-label">Username</label><input class="ocqs-input" id="ocqp-username" type="password" data-ocqp-sensitive="1" placeholder="dzng.8294" oninput="ocqpUpdate();ocqpReqCheck();ocqpSave()"></div>
+              <div><label class="ocqs-label">Password / API Key</label><input class="ocqs-input" id="ocqp-password" type="password" data-ocqp-sensitive="1" placeholder="your-api-key" oninput="ocqpUpdate();ocqpReqCheck();ocqpSave()"></div>
+              <div><label class="ocqs-label">User Domain Name</label><input class="ocqs-input" id="ocqp-userdomain" type="password" data-ocqp-sensitive="1" value="rackspace_cloud_domain" oninput="ocqpUpdate()"></div>
+              <div><label class="ocqs-label">Project Domain Name</label><input class="ocqs-input" id="ocqp-projdomain" type="password" data-ocqp-sensitive="1" value="rackspace_cloud_domain" oninput="ocqpUpdate()"></div>
             </div>
             <label class="ocqs-label" style="margin-top:8px;">Project ID</label>
-            <input class="ocqs-input" id="ocqp-projectid" placeholder="49a2c18a567c402ef560bb0f11821b61" oninput="ocqpUpdate()">
+            <input class="ocqs-input" id="ocqp-projectid" type="password" data-ocqp-sensitive="1" placeholder="49a2c18a567c402ef560bb0f11821b61" oninput="ocqpUpdate()">
           </div>
           <div id="ocqp-appcred-fields" style="display:none;margin-top:8px;">
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-              <div><label class="ocqs-label">App Credential ID</label><input class="ocqs-input" id="ocqp-credid" placeholder="YOUR_APP_CRED_ID" oninput="ocqpUpdate();ocqpReqCheck()"></div>
-              <div><label class="ocqs-label">App Credential Secret</label><input class="ocqs-input" id="ocqp-credsec" type="password" placeholder="YOUR_APP_CRED_SECRET" oninput="ocqpUpdate();ocqpReqCheck()"></div>
+              <div><label class="ocqs-label">App Credential ID</label><input class="ocqs-input" id="ocqp-credid" type="password" data-ocqp-sensitive="1" placeholder="YOUR_APP_CRED_ID" oninput="ocqpUpdate();ocqpReqCheck()"></div>
+              <div><label class="ocqs-label">App Credential Secret</label><input class="ocqs-input" id="ocqp-credsec" type="password" data-ocqp-sensitive="1" placeholder="YOUR_APP_CRED_SECRET" oninput="ocqpUpdate();ocqpReqCheck()"></div>
             </div>
           </div>
           <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:14px;margin-top:14px;">
             <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;flex-wrap:wrap;">
               <div style="font-size:12px;font-weight:800;color:#15803d;">&#128269; Network / Subnet — Auto-Detect</div>
               <div style="display:flex;gap:6px;">
-                <button onclick="ocqpSave();var st=this;st.textContent='\u2713 Saved';setTimeout(function(){st.innerHTML='&#128190; Save Credentials';},1200);" style="background:#0369a1;color:#fff;border:none;border-radius:5px;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer;">&#128190; Save Credentials</button>
+                <button onclick="ocqpSave();if(window.ocqpApplyToConfig)ocqpApplyToConfig(null);var st=this;st.textContent='\u2713 Saved';setTimeout(function(){st.innerHTML='&#128190; Save Credentials';},1200);" style="background:#0369a1;color:#fff;border:none;border-radius:5px;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer;">&#128190; Save Credentials</button>
                 <button onclick="ocqpAutoDetectNetwork()" id="ocqp-detect-btn" style="background:#15803d;color:#fff;border:none;border-radius:5px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer;">&#9654; Run Detection</button>
               </div>
             </div>
@@ -2836,6 +2879,22 @@ var c9b=g('ocqs-cmd-9b');
 <script>
       // Global ocqpGetState shim - available before main script loads
       var _v=function(id){var el=document.getElementById(id);return el?el.value.trim():'';};
+      window._ocqpSensitiveMasked = true;
+      window.ocqpToggleSensitiveMask = function(force){
+        var masked = (typeof force === 'boolean') ? force : !window._ocqpSensitiveMasked;
+        window._ocqpSensitiveMasked = masked;
+        document.querySelectorAll('[data-ocqp-sensitive="1"]').forEach(function(el){
+          if(el && el.tagName === 'INPUT') el.type = masked ? 'password' : 'text';
+        });
+        var btn = document.getElementById('ocqp-mask-toggle');
+        if(btn){
+          btn.textContent = masked ? 'Unmask Sensitive' : 'Mask Sensitive';
+          btn.style.background = masked ? '#0f172a' : '#991b1b';
+          btn.style.borderColor = masked ? '#334155' : '#fecaca';
+          btn.title = masked ? 'Show sensitive credential fields' : 'Hide sensitive credential fields';
+        }
+      };
+      setTimeout(function(){ if(window.ocqpToggleSensitiveMask) window.ocqpToggleSensitiveMask(true); }, 0);
       window.ocqpGetState=function(){
         try{
           var _svcs={keycloak:false,loki:false,tempo:false,velero:false,monitoring:false};
@@ -2885,6 +2944,8 @@ var c9b=g('ocqs-cmd-9b');
         var cfgPath = cfgEl ? cfgEl.textContent.trim() : '';
         if (!cfgPath) { if(st){st.textContent='No config path — fill Stage 2 inputs.';st.style.color='#dc2626';} return; }
         if(st){ st.textContent='Applying...'; st.style.color='#0369a1'; }
+        var oldBtn = btn ? btn.innerHTML : '';
+        if(btn){ btn.disabled=true; btn.textContent='Applying...'; }
         // Build patch: credentials + network + disable optional services that need Swift
         var patch = {
           path: cfgPath,
@@ -2906,11 +2967,20 @@ var c9b=g('ocqs-cmd-9b');
           disable_services: Object.keys(_qp.services).filter(function(k){ return !_qp.services[k]; }),
           enable_services: Object.keys(_qp.services).filter(function(k){ return !!_qp.services[k]; })
         };
-        fetch('/api/openrc/patch-config', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(patch)})
+        var _ctl = new AbortController();
+        var _tmo = setTimeout(function(){ _ctl.abort(); }, 45000);
+        fetch('/api/openrc/patch-config', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(patch), signal:_ctl.signal})
           .then(function(r){return r.json();})
           .then(function(d){
+            clearTimeout(_tmo);
             if(st){ st.textContent = d.ok ? ('\u2713 Applied '+d.patched+' fields') : ('\u2717 '+(d.error||'failed')); st.style.color=d.ok?'#15803d':'#dc2626'; }
-          }).catch(function(e){ if(st){ st.textContent='\u2717 '+e; st.style.color='#dc2626'; } });
+            if(btn){ btn.disabled=false; btn.innerHTML=oldBtn||'&#128190; Apply to Config File'; }
+          }).catch(function(e){
+            clearTimeout(_tmo);
+            var msg = (e && e.name === 'AbortError') ? 'request timed out - retry Apply or check the dashboard log' : String(e);
+            if(st){ st.textContent='\u2717 '+msg; st.style.color='#dc2626'; }
+            if(btn){ btn.disabled=false; btn.innerHTML=oldBtn||'&#128190; Apply to Config File'; }
+          });
       };
       window.ocqpLoadConfig = function(btn){
         var path=ocqpCfgPath();
@@ -3306,19 +3376,21 @@ cat ~/.ssh/id_ed25519.pub</div>
           </div>
           <p>OpenCenter CLI initializes cluster configuration, validates readiness, generates the GitOps repository, and deploys the Kubernetes platform.</p>
           <p style="font-size:12px;color:#64748b;"><strong>Recommended — Clone &amp; build:</strong></p>
-          <div class="ocqs-cmd" id="ocqp-cmd-1rec"># Clone repository
-git clone https://github.com/opencenter-cloud/openCenter-cli.git
-cd openCenter-cli
-
-# Trust the project config, then install tools
-mise trust
-mise install
-
-# Build the binary
-mise run build
+          <div class="ocqs-cmd" id="ocqp-cmd-1rec"># Idempotent install - skips finished steps, never prompts (no hang)
+export GIT_TERMINAL_PROMPT=0 MISE_YES=1
+if [ -x openCenter-cli/bin/opencenter ]; then
+  echo "OpenCenter CLI already built - skipping clone and build"
+else
+  [ -d openCenter-cli/.git ] || git clone --depth 1 https://github.com/opencenter-cloud/openCenter-cli.git
+  cd openCenter-cli
+  mise trust
+  mise install
+  mise run build
+  cd ..
+fi
 
 # Verify installation
-./bin/opencenter version</div>
+./openCenter-cli/bin/opencenter version</div>
           <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:6px;">
             <button class="ocqs-btn ocqs-btn-copy" onclick="ocqpCopyCmd('ocqp-cmd-1rec','ocqp-st-1')">&#128203; Copy</button><button id="ocqp-run-1rec" onclick="ocqpRunCmd('ocqp-cmd-1rec','ocqp-out-1rec','ocqp-run-1rec')" style="background:#1e3a5f;color:#7dd3fc;border:1px solid #334155;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#9654; Run</button><button onclick="ocqpCopyOut('ocqp-out-1rec',this)" style="background:#334155;color:#cbd5e1;border:1px solid #475569;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#128203; Copy Output</button>
           </div>
@@ -4069,7 +4141,7 @@ kubectl describe kustomization &lt;name&gt; -n flux-system</div>
         #ocqp-right-panel #ocqp-term .l-err { color:#f87171; }
         #ocqp-right-panel #ocqp-term .l-hd { color:#fbbf24; font-weight:800; }
         #ocqp-right-panel #ocqp-term .l-dim { color:#64748b; font-style:italic; }
-        #ocqp-term-float { position:fixed; top:150px; right:30px; width:340px; height:calc(100vh - 170px); z-index:99990; display:flex; flex-direction:column; border-radius:12px; overflow:hidden; border:1px solid #1e293b; box-shadow:0 24px 64px rgba(2,6,23,.6); background:#0d1117; }
+        #ocqp-term-float { position:fixed; top:60px; right:48px; width:335px; height:calc(100vh - 155px); z-index:99990; display:flex; flex-direction:column; border-radius:12px; overflow:hidden; border:1px solid #1e293b; box-shadow:0 24px 64px rgba(2,6,23,.6); background:#0d1117; }
         #ocqp-term-float.oct-min { width:auto; height:auto; }
         #ocqp-term-float.oct-min .oct-term-body { display:none; }
         .oct-track { display:flex; gap:3px; padding:8px 12px 4px; background:#0f172a; }
@@ -4430,9 +4502,16 @@ kubectl describe kustomization &lt;name&gt; -n flux-system</div>
         ].join('\n');
         if(out) out.textContent='$ '+cmd+'\n';
         var es = new EventSource('/api/stream/run-cmd?cmd='+encodeURIComponent(cmd));
+        var _wd = setTimeout(function(){
+          es.close();
+          if(st){ st.textContent='\u2717 timed out - retry Update Cluster or check the dashboard log'; st.style.color='#dc2626'; }
+          if(btn){ btn.disabled=false; btn.innerHTML='&#128260; Update Cluster'; }
+        }, 20000);
         es.onmessage = function(e){
+          clearTimeout(_wd); _wd = setTimeout(function(){ es.close(); if(btn){ btn.disabled=false; btn.innerHTML='&#128260; Update Cluster'; } }, 60000);
           if(out){ out.textContent += e.data+'\n'; out.scrollTop=out.scrollHeight; }
           if(e.data.startsWith('[EXIT')){
+            clearTimeout(_wd);
             es.close();
             var ok = e.data === '[EXIT 0]';
             if(st){ st.textContent = ok ? '\u2713 Cluster settings updated' : '\u2717 Update failed'; st.style.color = ok ? '#15803d' : '#dc2626'; }
@@ -4511,6 +4590,7 @@ kubectl describe kustomization &lt;name&gt; -n flux-system</div>
                 var n = [d.external_network_id, d.network_id, d.subnet_id].filter(Boolean).length;
                 if (st) { st.textContent = n ? ('✓ ' + n + ' network field(s) auto-populated') : 'No networks found — check credentials/region'; st.style.color = n ? '#15803d' : '#dc2626'; }
                 if (typeof ocqpUpdate === 'function') ocqpUpdate();
+                if (n && typeof ocqpApplyToConfig === 'function') ocqpApplyToConfig(null); // auto-apply to config file
             }).catch(function(e){ reset(); if (st) { st.textContent='✗ ' + e; st.style.color='#dc2626'; } });
         };
         var _autoApplyTimer=null;
