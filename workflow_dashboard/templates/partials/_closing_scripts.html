@@ -12827,8 +12827,11 @@ ${certContent}
 
   var _s03d_inited = false;
   var _s03d_clouds = [], _s03d_rainbows = [], _s03d_bridge = [];
-  var _s03d_offsetX = 0, _s03d_offsetY = -160, _s03d_flySpeed = 1.3; /* -160 = lowered default view level */
+  var _s03d_offsetX = 0, _s03d_offsetY = -160, _s03d_flySpeed = parseFloat(localStorage.getItem('s0_cloud_speed')||'1.3'); /* -160 = lowered default view level */
   var _s03d_isFlying = { up:false, down:false, left:false, right:false };
+  /* real setter: _s03d_flySpeed is closure-scoped, outside code can't assign it directly */
+  window._s03dSetFlySpeed = function(v){ v = parseFloat(v)||1.3; _s03d_flySpeed = v;
+    var i = document.getElementById('s0-3d-speed'); if (i) i.textContent = 'Speed: ' + v + 'x'; };
   var _s03d_lastTime = 0;
 
 
@@ -14276,7 +14279,7 @@ ${certContent}
     var ctrBtn = document.getElementById('s0-btn-ctr');
     var spdEl  = document.getElementById('s0-3d-speed');
     if (ctrBtn) ctrBtn.addEventListener('click', function(){
-      _s03d_offsetX=0; _s03d_offsetY=-160; _s03d_flySpeed=1.3; /* lowered default view level */
+      _s03d_offsetX=0; _s03d_offsetY=-160; _s03d_flySpeed=parseFloat(localStorage.getItem('s0_cloud_speed')||'1.3'); /* lowered default view level */
       if (spdEl) spdEl.textContent='Speed: 1x';
     });
     document.addEventListener('keydown', function(e){

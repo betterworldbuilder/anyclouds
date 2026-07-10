@@ -44,14 +44,18 @@
   #opencenter-platform .oc-arrow svg { width:16px; height:16px; }
 </style>
 <!-- Section title -->
-<h2 style="text-align:center;font-size:40px;line-height:1.12;font-weight:950;letter-spacing:0;color:#0f172a;margin:34px 0 8px;overflow-wrap:anywhere;">Want to know more about <span style="background:linear-gradient(90deg,#0ea5e9,#38bdf8);-webkit-background-clip:text;background-clip:text;color:transparent;">OpenCenter</span></h2>
-<p style="text-align:center;color:#64748b;font-size:14px;margin:0 0 14px;">The platform operating layer that turns migrated infrastructure into a cloud-native, GitOps-run environment.</p>
-<div style="display:flex;justify-content:center;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 16px;font-size:13px;font-weight:800;">
-  <a href="https://opencenter.cloud/" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;gap:6px;border:1px solid #bae6fd;border-radius:999px;background:#f0f9ff;color:#0369a1;padding:8px 14px;text-decoration:none;box-shadow:0 8px 20px rgba(14,165,233,.1);">OpenCenter Web</a>
-  <a href="https://docs.opencenter.dev/opencenter-cli/latest/getting-started/openstack-first-cluster.html" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;gap:6px;border:1px solid #bae6fd;border-radius:999px;background:#f0f9ff;color:#0369a1;padding:8px 14px;text-decoration:none;box-shadow:0 8px 20px rgba(14,165,233,.1);">Other Tutorials</a>
+<h2 style="text-align:center;font-size:40px;line-height:1.12;font-weight:950;letter-spacing:0;color:#0f172a;margin:34px 0 8px;overflow-wrap:anywhere;"><span style="background:linear-gradient(90deg,#0ea5e9,#38bdf8);-webkit-background-clip:text;background-clip:text;color:transparent;">OpenCenter</span></h2>
+<p style="text-align:center;color:#64748b;font-size:14px;margin:0 0 14px;">The platform operating layer that turns Flex migrated Apps and infrastructure into a cloud-native, GitOps-run environment.</p>
+<div style="display:flex;justify-content:center;margin:0 0 14px;">
+  <button id="oc-what-open-toggle" type="button" onclick="(function(){var b=document.getElementById('oc-what-open-body');var t=document.getElementById('oc-what-open-toggle');if(!b||!t)return;var closed=b.style.display==='none';b.style.display=closed?'block':'none';t.textContent=closed?'Collapse':'Overview Here';t.setAttribute('aria-expanded',closed?'true':'false');})()" aria-expanded="false" aria-controls="oc-what-open-body" style="border:1px solid #38bdf8;border-radius:999px;background:linear-gradient(135deg,#0369a1,#0ea5e9,#38bdf8);color:#fff;padding:9px 18px;font-size:13px;font-weight:900;cursor:pointer;box-shadow:0 10px 22px rgba(14,165,233,.22);">Overview Here</button>
 </div>
-<div style="display:flex;justify-content:center;margin:0 0 18px;">
-  <button id="oc-what-open-toggle" type="button" onclick="(function(){var b=document.getElementById('oc-what-open-body');var t=document.getElementById('oc-what-open-toggle');if(!b||!t)return;var closed=b.style.display==='none';b.style.display=closed?'block':'none';t.textContent=closed?'Collapse':'Expand';t.setAttribute('aria-expanded',closed?'true':'false');})()" aria-expanded="false" aria-controls="oc-what-open-body" style="border:1px solid #38bdf8;border-radius:999px;background:linear-gradient(135deg,#0369a1,#0ea5e9,#38bdf8);color:#fff;padding:9px 18px;font-size:13px;font-weight:900;cursor:pointer;box-shadow:0 10px 22px rgba(14,165,233,.22);">Expand</button>
+<div style="display:flex;justify-content:center;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 10px;font-size:13px;">
+  <span style="color:#475569;font-weight:700;">Full Details here :</span>
+  <a href="https://opencenter.cloud/" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;gap:6px;border:1px solid #bae6fd;border-radius:999px;background:#f0f9ff;color:#0369a1;padding:8px 14px;text-decoration:none;font-weight:800;box-shadow:0 8px 20px rgba(14,165,233,.1);">Official Website &mdash; OpenCenter Web</a>
+</div>
+<div style="display:flex;justify-content:center;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 18px;font-size:13px;">
+  <span style="color:#475569;font-weight:700;">Want to learn more ?</span>
+  <a href="https://docs.opencenter.dev/opencenter-cli/latest/getting-started/openstack-first-cluster.html" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;gap:6px;border:1px solid #bae6fd;border-radius:999px;background:#f0f9ff;color:#0369a1;padding:8px 14px;text-decoration:none;font-weight:800;box-shadow:0 8px 20px rgba(14,165,233,.1);">Other Tutorials</a>
 </div>
 <div id="oc-what-open-body" style="display:none;">
 <!-- ── Intro version toggle: Deck (default) vs IntroLight (iframe) ── -->
@@ -310,7 +314,6 @@
     &nbsp;OpenStack&nbsp; · &nbsp;VMware vSphere&nbsp; · &nbsp;AWS&nbsp; · &nbsp;Bare Metal&nbsp; · &nbsp;Air-Gapped Sites
   </div>
 </div>
-</div>
 
 <div id="opencenter-platform" style="background:#fff; border:1px solid #d8e2f0; border-radius:16px; padding:26px 28px; color:#0f172a; box-shadow:0 10px 30px rgba(15,23,42,.08);">
   <div style="text-align:center;">
@@ -428,6 +431,7 @@
 
 
 </div>
+</div><!-- end oc-what-open-body -->
 <script>
   window.opencenterAction = function(kind) {
     var bar = document.getElementById('opencenter-status');

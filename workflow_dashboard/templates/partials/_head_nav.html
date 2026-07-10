@@ -605,8 +605,8 @@
     }
     .s0-dawn-badge {
       display:inline-flex; align-items:center; gap:8px;
-      background:rgba(255,255,255,0.25); backdrop-filter:blur(10px);
-      border:1px solid rgba(255,255,255,0.35); border-radius:50px;
+      background:rgba(56,189,248,0.3); backdrop-filter:blur(10px);
+      border:1px solid rgba(125,211,252,0.55); border-radius:50px;
       padding:8px 20px; margin-bottom:24px;
       font-size:12px; font-weight:600; letter-spacing:1.5px; text-transform:uppercase;
       color:#ffffff; text-shadow:0 1px 3px rgba(0,0,0,0.2);
@@ -630,15 +630,15 @@
       font-size:1em;
       color:transparent;
       animation-name:s0-title-lightup;
-      animation-duration:12s;
+      animation-duration:var(--s0wc,4s);
       animation-iteration-count:infinite;
       animation-timing-function:ease-in-out;
     }
-    /* Words start invisible; each lights up white in turn and stays lit ~3s (round-robin), 12s loop. */
+    /* Words light up round-robin; loop length driven by --s0wc (default 8s), user-configurable. */
     .s0-title-why  { animation-delay:0s; }
-    .s0-title-who  { animation-delay:3s; }
-    .s0-title-what { animation-delay:6s; }
-    .s0-title-when { animation-delay:9s; }
+    .s0-title-who  { animation-delay:calc(var(--s0wc,4s)*0.25); }
+    .s0-title-what { animation-delay:calc(var(--s0wc,4s)*0.5); }
+    .s0-title-when { animation-delay:calc(var(--s0wc,4s)*0.75); }
     @keyframes s0-title-lightup {
       0% { color:transparent; text-shadow:none; }
       2%, 23% { color:#ffffff; text-shadow:0 0 12px rgba(224,242,254,0.95),0 0 26px rgba(56,189,248,0.82),0 0 46px rgba(14,165,233,0.46),0 2px 12px rgba(0,0,0,0.24); }
@@ -655,7 +655,7 @@
       background:linear-gradient(90deg,rgba(37,99,235,0.92),rgba(96,165,250,0.82));
       text-shadow:0 2px 8px rgba(0,0,0,0.18);
       box-shadow:0 8px 26px rgba(37,99,235,0.35);
-      animation:s0-flex-block-blink 11s ease-in-out infinite;
+      animation:s0-flex-block-blink calc(var(--s0wc,4s)*0.92) ease-in-out infinite;
     }
     /* After the Why/Who/What/When sweep, the whole FLEX block double-blinks (~78–88% of the 11s loop). */
     @keyframes s0-flex-block-blink {
@@ -2334,7 +2334,7 @@ body.flex-skyline-mode .uat-s1-template-tab.active {
   <button class="sub-btn" data-sub="s2rehost_p2_1">⚙️ R5 Replatform — App & DB Replication</button>
   <!-- R5 Data Replatform / Full Manual Runbook removed — see Stage 2 migration tools -->
   <button class="sub-btn" data-sub="s2rehost_p2_2">&#128640; Apps Containerization Readiness</button>
-  <button class="sub-btn" data-sub="s2opencenter">🚀 Flex Apps to OpenCenter Cloud Native Apps</button>
+  <button class="sub-btn" data-sub="s2opencenter">🚀 Refactor to Cloud Native Apps Systems with OpenCenter</button>
   <button class="sub-btn" data-stage-target="s10">Stage 8<br><small>AIOps &amp; Continuous Operations</small></button>
   <button class="sub-btn" data-stage-target="sai">Stage 9<br><small>AI Power Up</small></button>
 </div>

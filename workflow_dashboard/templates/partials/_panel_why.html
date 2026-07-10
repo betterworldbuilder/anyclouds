@@ -92,6 +92,19 @@
             <div class="s03d-ctrl-row"><button id="s0-btn-left" class="s03d-btn">&#9664;</button><button id="s0-btn-ctr" class="s03d-btn s03d-btn-ctr">&#9679;</button><button id="s0-btn-right" class="s03d-btn">&#9654;</button></div>
             <div class="s03d-ctrl-row"><div style="width:38px;"></div><button id="s0-btn-down" class="s03d-btn">&#9660;</button><div style="width:38px;"></div></div>
             <div class="s03d-speed-ind" id="s0-3d-speed">Speed: 1x</div>
+            <div style="display:flex;align-items:center;gap:5px;margin-top:6px;font-size:10px;">
+              <span style="font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#0369a1;">Cloud speed</span>
+              <select class="s0-cloud-speed" onchange="localStorage.setItem('s0_cloud_speed',this.value);if(window._s03dSetFlySpeed)_s03dSetFlySpeed(this.value);"
+                style="border:1px solid #7dd3fc;border-radius:7px;background:#e0f2fe;color:#0f172a;font-size:10px;font-weight:800;padding:2px 6px;cursor:pointer;">
+                <option value="0.5">0.5x</option>
+                <option value="1">1x</option>
+                <option value="1.3" selected>1.3x</option>
+                <option value="2">2x</option>
+                <option value="3">3x</option>
+                <option value="5">5x</option>
+              </select>
+            </div>
+            <script>(function(){var v=localStorage.getItem('s0_cloud_speed');if(v){var e=document.querySelectorAll('.s0-cloud-speed');for(var i=0;i<e.length;i++)e[i].value=v;var t=document.getElementById('s0-3d-speed');if(t)t.textContent='Speed: '+parseFloat(v)+'x';}})();</script>
           </div>
         </div>
         <div class="s0-dawn-content">
@@ -99,7 +112,7 @@
             <span class="s0-dawn-badge-dot">&#9733;</span>
             MIGRATION STRATEGY GUIDE
           </div>
-          <h1 class="s0-dawn-title"><span class="s0-dawn-title-line"><span class="s0-dawn-title-word s0-title-why">Why</span><span class="s0-dawn-title-word s0-title-who">Who</span><span class="s0-dawn-title-word s0-title-what">What</span><span class="s0-dawn-title-word s0-title-when">When</span> <span style="font-size:0.6em;">Move to</span></span><span class="s0-dawn-title-line"><span class="s0-dawn-title-highlight">FLEX <span style="font-size:0.6em;">Your AI-Ready Open Cloud Hub</span></span></span></h1>
+          <h1 class="s0-dawn-title"><span class="s0-dawn-title-line"><span class="s0-dawn-title-word s0-title-why">Why</span><span class="s0-dawn-title-word s0-title-who">Who</span><span class="s0-dawn-title-word s0-title-what">What</span><span class="s0-dawn-title-word s0-title-when">When</span> <span style="font-size:0.6em;">Move to</span></span><span class="s0-dawn-title-line"><span class="s0-dawn-title-highlight">FLEX <span style="font-size:0.6em;">your “Anyware to AnyWhere” OpenStack HUB</span></span></span></h1>
           <p class="s0-dawn-desc">Before any technical migration begins, customers need a clear business answer: <strong>who should move, why the move matters, and when the move makes sense.</strong> FLEX is the next-generation platform for customers who want better performance, lower TCO, and a more future-ready cloud foundation.</p>
           <div class="s0-dawn-stats">
             <div class="s0-dawn-stat"><div class="s0-dawn-stat-num">4</div><div class="s0-dawn-stat-lbl">WHY REASONS</div></div>
