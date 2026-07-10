@@ -1218,25 +1218,25 @@ git push -u origin main</div>
           }
         </style>
         <h2 class="ocqs-coffee-warning">Coffee Break Warning : Safety Checklist Before Deploy</h2>
-        <div class="ocqs-coffee-warning" style="font-size:14px;">
-          ⛔ Never run <code>opencenter cluster deploy</code> until <code>opencenter cluster validate</code> passes and no critical CHANGEME values remain.
+        <div style="font-size:14px;background:#dc2626;border:2px solid #fecaca;border-radius:8px;color:#fff;font-weight:900;margin:0 0 10px;padding:11px 16px;text-align:center;">
+          ⛔ Never run <code>opencenter cluster deploy</code> until all checkpoints pass
         </div>
         <style>
-        #ocqs-checklist{background:#0f172a;border:1px solid #1e293b;border-radius:14px;padding:0 0 14px;overflow:hidden;box-shadow:0 12px 34px rgba(2,6,23,.4);counter-reset:chkrow;color:#cbd5e1;}
-        #ocqs-checklist .chk-head{display:flex;align-items:center;gap:12px;padding:14px 18px;background:linear-gradient(135deg,#0f172a,#16324f);border-bottom:1px solid #1e293b;}
+        #ocqs-checklist{background:#ffffff;border:1px solid #e2e8f0;border-radius:14px;padding:0 0 14px;overflow:hidden;box-shadow:0 10px 28px rgba(15,23,42,.08);counter-reset:chkrow;color:#334155;}
+        #ocqs-checklist .chk-head{display:flex;align-items:center;gap:12px;padding:14px 18px;background:linear-gradient(135deg,#f8fafc,#e0f2fe);border-bottom:1px solid #e2e8f0;}
         #ocqs-checklist input[type=checkbox]{display:none;}
-        #ocqs-checklist .ocqs-checklist-item{display:grid;grid-template-columns:40px 1fr auto;align-items:center;gap:10px;padding:9px 18px;border-bottom:1px solid rgba(148,163,184,.12);counter-increment:chkrow;transition:background .15s;}
-        #ocqs-checklist .ocqs-checklist-item:nth-of-type(even){background:rgba(148,163,184,.05);}
-        #ocqs-checklist .ocqs-checklist-item:hover{background:rgba(56,189,248,.09);}
-        #ocqs-checklist .ocqs-checklist-item::before{content:counter(chkrow,decimal-leading-zero);font-family:monospace;font-size:11px;color:#38bdf8;font-weight:800;}
-        #ocqs-checklist .ocqs-checklist-item label{color:#e2e8f0;font-size:12.5px;font-weight:600;cursor:default;}
+        #ocqs-checklist .ocqs-checklist-item{display:grid;grid-template-columns:40px 1fr auto;align-items:center;gap:10px;padding:9px 18px;border-bottom:1px solid #eef2f7;counter-increment:chkrow;transition:background .15s;}
+        #ocqs-checklist .ocqs-checklist-item:nth-of-type(even){background:#f8fafc;}
+        #ocqs-checklist .ocqs-checklist-item:hover{background:#e0f2fe;}
+        #ocqs-checklist .ocqs-checklist-item::before{content:counter(chkrow,decimal-leading-zero);font-family:monospace;font-size:11px;color:#0284c7;font-weight:800;}
+        #ocqs-checklist .ocqs-checklist-item label{color:#334155;font-size:12.5px;font-weight:600;cursor:default;}
         #ocqs-checklist .ocqs-checklist-item label code{background:#1e293b;color:#7dd3fc;border-radius:4px;padding:1px 5px;}
-        #ocqs-checklist .chk-st{border-radius:999px;border:1px solid #fca5a5;background:#fee2e2;color:#b91c1c;padding:3px 12px;font-size:10.5px;font-weight:900;white-space:nowrap;box-shadow:0 2px 6px rgba(2,6,23,.35);}
+        #ocqs-checklist .chk-st{border-radius:999px;border:1px solid #fca5a5;background:#fee2e2;color:#b91c1c;padding:3px 12px;font-size:10.5px;font-weight:900;white-space:nowrap;box-shadow:0 1px 3px rgba(15,23,42,.12);}
         #ocqs-quota-result{background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:8px 10px;}
         </style>
         <div class="ocqs-card" id="ocqs-checklist">
-          <div class="chk-head"><span style="font-size:17px;">&#128737;&#65039;</span><div style="flex:1;"><div style="font-size:12.5px;font-weight:900;color:#e2e8f0;letter-spacing:1.6px;text-transform:uppercase;">Deploy Readiness</div><div style="font-size:10px;color:#94a3b8;margin-top:1px;">All checks must pass to unlock the cluster deploy</div></div><span id="ocqs-chk-chip" style="font-family:monospace;font-size:12.5px;font-weight:900;color:#38bdf8;background:rgba(56,189,248,.12);border:1px solid rgba(56,189,248,.4);border-radius:999px;padding:4px 14px;">0/14</span></div>
-          <div style="height:5px;background:#1e293b;"><div id="ocqs-chk-bar" style="height:100%;width:0%;background:linear-gradient(90deg,#0ea5e9,#22c55e);transition:width .45s ease;"></div></div>
+          <div class="chk-head"><span style="font-size:17px;">&#128737;&#65039;</span><div style="flex:1;"><div style="font-size:12.5px;font-weight:900;color:#0f172a;letter-spacing:1.6px;text-transform:uppercase;">Deploy Readiness</div><div style="font-size:10px;color:#64748b;margin-top:1px;">All checks must pass to unlock the cluster deploy</div></div><span id="ocqs-chk-chip" style="font-family:monospace;font-size:12.5px;font-weight:900;color:#0369a1;background:#e0f2fe;border:1px solid #7dd3fc;border-radius:999px;padding:4px 14px;">0/14</span></div>
+          <div style="height:5px;background:#e2e8f0;"><div id="ocqs-chk-bar" style="height:100%;width:0%;background:linear-gradient(90deg,#0ea5e9,#22c55e);transition:width .45s ease;"></div></div>
           <div class="ocqs-checklist-item"><input type="checkbox" id="chk-1" onchange="ocqsChecklistUpdate()"><label for="chk-1">OpenCenter CLI installed and works</label><span class="chk-st" id="chk-1-st">not installed</span></div>
           <div class="ocqs-checklist-item"><input type="checkbox" id="chk-2" onchange="ocqsChecklistUpdate()"><label for="chk-2">Git installed</label><span class="chk-st" id="chk-2-st">not installed</span></div>
           <div class="ocqs-checklist-item"><input type="checkbox" id="chk-3" onchange="ocqsChecklistUpdate()"><label for="chk-3">GitOps repository exists (GitHub/GitLab)</label><span class="chk-st" id="chk-3-st">not installed</span></div>
@@ -2656,10 +2656,10 @@ var c9b=g('ocqs-cmd-9b');
         var deployBtn=g('ocqs-deploy-btn2');
         if(statusEl){
           if(checked===total){
-            statusEl.style.color='#4ade80';
+            statusEl.style.color='#15803d';
             statusEl.textContent=total+' / '+total+' ✓ Ready to deploy';
           } else {
-            statusEl.style.color='#f87171';
+            statusEl.style.color='#dc2626';
             statusEl.textContent=checked+' / '+total+' items checked — deploy blocked';
           }
         }
@@ -3859,25 +3859,25 @@ git push -u origin main</div>
           }
         </style>
         <h2 class="ocqs-coffee-warning">Coffee Break Warning : Safety Checklist Before Deploy</h2>
-        <div class="ocqs-coffee-warning" style="font-size:14px;">
-          ⛔ Never run <code>opencenter cluster deploy</code> until <code>opencenter cluster validate</code> passes and no critical CHANGEME values remain.
+        <div style="font-size:14px;background:#dc2626;border:2px solid #fecaca;border-radius:8px;color:#fff;font-weight:900;margin:0 0 10px;padding:11px 16px;text-align:center;">
+          ⛔ Never run <code>opencenter cluster deploy</code> until all checkpoints pass
         </div>
         <style>
-        #ocqp-checklist{background:#0f172a;border:1px solid #1e293b;border-radius:14px;padding:0 0 14px;overflow:hidden;box-shadow:0 12px 34px rgba(2,6,23,.4);counter-reset:chkrow;color:#cbd5e1;}
-        #ocqp-checklist .chk-head{display:flex;align-items:center;gap:12px;padding:14px 18px;background:linear-gradient(135deg,#0f172a,#16324f);border-bottom:1px solid #1e293b;}
+        #ocqp-checklist{background:#ffffff;border:1px solid #e2e8f0;border-radius:14px;padding:0 0 14px;overflow:hidden;box-shadow:0 10px 28px rgba(15,23,42,.08);counter-reset:chkrow;color:#334155;}
+        #ocqp-checklist .chk-head{display:flex;align-items:center;gap:12px;padding:14px 18px;background:linear-gradient(135deg,#f8fafc,#e0f2fe);border-bottom:1px solid #e2e8f0;}
         #ocqp-checklist input[type=checkbox]{display:none;}
-        #ocqp-checklist .ocqs-checklist-item{display:grid;grid-template-columns:40px 1fr auto;align-items:center;gap:10px;padding:9px 18px;border-bottom:1px solid rgba(148,163,184,.12);counter-increment:chkrow;transition:background .15s;}
-        #ocqp-checklist .ocqs-checklist-item:nth-of-type(even){background:rgba(148,163,184,.05);}
-        #ocqp-checklist .ocqs-checklist-item:hover{background:rgba(56,189,248,.09);}
-        #ocqp-checklist .ocqs-checklist-item::before{content:counter(chkrow,decimal-leading-zero);font-family:monospace;font-size:11px;color:#38bdf8;font-weight:800;}
-        #ocqp-checklist .ocqs-checklist-item label{color:#e2e8f0;font-size:12.5px;font-weight:600;cursor:default;}
+        #ocqp-checklist .ocqs-checklist-item{display:grid;grid-template-columns:40px 1fr auto;align-items:center;gap:10px;padding:9px 18px;border-bottom:1px solid #eef2f7;counter-increment:chkrow;transition:background .15s;}
+        #ocqp-checklist .ocqs-checklist-item:nth-of-type(even){background:#f8fafc;}
+        #ocqp-checklist .ocqs-checklist-item:hover{background:#e0f2fe;}
+        #ocqp-checklist .ocqs-checklist-item::before{content:counter(chkrow,decimal-leading-zero);font-family:monospace;font-size:11px;color:#0284c7;font-weight:800;}
+        #ocqp-checklist .ocqs-checklist-item label{color:#334155;font-size:12.5px;font-weight:600;cursor:default;}
         #ocqp-checklist .ocqs-checklist-item label code{background:#1e293b;color:#7dd3fc;border-radius:4px;padding:1px 5px;}
-        #ocqp-checklist .chk-st{border-radius:999px;border:1px solid #fca5a5;background:#fee2e2;color:#b91c1c;padding:3px 12px;font-size:10.5px;font-weight:900;white-space:nowrap;box-shadow:0 2px 6px rgba(2,6,23,.35);}
+        #ocqp-checklist .chk-st{border-radius:999px;border:1px solid #fca5a5;background:#fee2e2;color:#b91c1c;padding:3px 12px;font-size:10.5px;font-weight:900;white-space:nowrap;box-shadow:0 1px 3px rgba(15,23,42,.12);}
         #ocqp-quota-result{background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:8px 10px;}
         </style>
         <div class="ocqs-card" id="ocqp-checklist">
-          <div class="chk-head"><span style="font-size:17px;">&#128737;&#65039;</span><div style="flex:1;"><div style="font-size:12.5px;font-weight:900;color:#e2e8f0;letter-spacing:1.6px;text-transform:uppercase;">Deploy Readiness</div><div style="font-size:10px;color:#94a3b8;margin-top:1px;">All checks must pass to unlock the cluster deploy</div></div><span id="ocqp-chk-chip" style="font-family:monospace;font-size:12.5px;font-weight:900;color:#38bdf8;background:rgba(56,189,248,.12);border:1px solid rgba(56,189,248,.4);border-radius:999px;padding:4px 14px;">0/14</span></div>
-          <div style="height:5px;background:#1e293b;"><div id="ocqp-chk-bar" style="height:100%;width:0%;background:linear-gradient(90deg,#0ea5e9,#22c55e);transition:width .45s ease;"></div></div>
+          <div class="chk-head"><span style="font-size:17px;">&#128737;&#65039;</span><div style="flex:1;"><div style="font-size:12.5px;font-weight:900;color:#0f172a;letter-spacing:1.6px;text-transform:uppercase;">Deploy Readiness</div><div style="font-size:10px;color:#64748b;margin-top:1px;">All checks must pass to unlock the cluster deploy</div></div><span id="ocqp-chk-chip" style="font-family:monospace;font-size:12.5px;font-weight:900;color:#0369a1;background:#e0f2fe;border:1px solid #7dd3fc;border-radius:999px;padding:4px 14px;">0/14</span></div>
+          <div style="height:5px;background:#e2e8f0;"><div id="ocqp-chk-bar" style="height:100%;width:0%;background:linear-gradient(90deg,#0ea5e9,#22c55e);transition:width .45s ease;"></div></div>
           <div class="ocqs-checklist-item"><input type="checkbox" id="chp-1" onchange="ocqpChecklistUpdate()"><label for="chp-1">OpenCenter CLI installed and works</label><span class="chk-st" id="chp-1-st">not installed</span></div>
           <div class="ocqs-checklist-item"><input type="checkbox" id="chp-2" onchange="ocqpChecklistUpdate()"><label for="chp-2">Git installed</label><span class="chk-st" id="chp-2-st">not installed</span></div>
           <div class="ocqs-checklist-item"><input type="checkbox" id="chp-3" onchange="ocqpChecklistUpdate()"><label for="chp-3">GitOps repository exists (GitHub/GitLab)</label><span class="chk-st" id="chp-3-st">not installed</span></div>
@@ -5221,10 +5221,10 @@ var c9b=g('ocqp-cmd-9b');
         var deployBtn=g('ocqp-deploy-btn2');
         if(statusEl){
           if(checked===total){
-            statusEl.style.color='#4ade80';
+            statusEl.style.color='#15803d';
             statusEl.textContent=total+' / '+total+' ✓ Ready to deploy';
           } else {
-            statusEl.style.color='#f87171';
+            statusEl.style.color='#dc2626';
             statusEl.textContent=checked+' / '+total+' items checked — deploy blocked';
           }
         }
