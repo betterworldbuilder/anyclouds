@@ -721,7 +721,7 @@
         var btn = document.getElementById(btnId);
         if (!out) return;
         if (!cmd){ out.textContent = 'No command yet - fill credentials above first.'; return; }
-        out.textContent = '$ ' + cmd.split('\n')[0] + '...\n';
+        out.textContent = '$ ' + cmd.split('\n')[0] + '...\n'; if (window.octMirror){ octMirror('ocqs-term', ''); octMirror('ocqs-term', '$ ' + cmd); }
         if (btn){ btn.disabled=true; btn.textContent='Stop'; }
         if (window._ocqsES) window._ocqsES.close();
         var es = new EventSource('/api/stream/run-cmd?cmd=' + encodeURIComponent(cmd));
@@ -1221,8 +1221,22 @@ git push -u origin main</div>
         <div class="ocqs-coffee-warning" style="font-size:14px;">
           ⛔ Never run <code>opencenter cluster deploy</code> until <code>opencenter cluster validate</code> passes and no critical CHANGEME values remain.
         </div>
-        <style>#ocqs-checklist input[type=checkbox]{display:none;}#ocqs-checklist .ocqs-checklist-item{display:flex;align-items:center;justify-content:space-between;gap:10px;}#ocqs-checklist .ocqs-checklist-item label{flex:1;}#ocqs-checklist .chk-st{flex:none;border-radius:999px;border:1px solid #fca5a5;background:#fee2e2;color:#b91c1c;padding:3px 12px;font-size:10.5px;font-weight:900;white-space:nowrap;}</style>
+        <style>
+        #ocqs-checklist{background:#0f172a;border:1px solid #1e293b;border-radius:14px;padding:0 0 14px;overflow:hidden;box-shadow:0 12px 34px rgba(2,6,23,.4);counter-reset:chkrow;color:#cbd5e1;}
+        #ocqs-checklist .chk-head{display:flex;align-items:center;gap:12px;padding:14px 18px;background:linear-gradient(135deg,#0f172a,#16324f);border-bottom:1px solid #1e293b;}
+        #ocqs-checklist input[type=checkbox]{display:none;}
+        #ocqs-checklist .ocqs-checklist-item{display:grid;grid-template-columns:40px 1fr auto;align-items:center;gap:10px;padding:9px 18px;border-bottom:1px solid rgba(148,163,184,.12);counter-increment:chkrow;transition:background .15s;}
+        #ocqs-checklist .ocqs-checklist-item:nth-of-type(even){background:rgba(148,163,184,.05);}
+        #ocqs-checklist .ocqs-checklist-item:hover{background:rgba(56,189,248,.09);}
+        #ocqs-checklist .ocqs-checklist-item::before{content:counter(chkrow,decimal-leading-zero);font-family:monospace;font-size:11px;color:#38bdf8;font-weight:800;}
+        #ocqs-checklist .ocqs-checklist-item label{color:#e2e8f0;font-size:12.5px;font-weight:600;cursor:default;}
+        #ocqs-checklist .ocqs-checklist-item label code{background:#1e293b;color:#7dd3fc;border-radius:4px;padding:1px 5px;}
+        #ocqs-checklist .chk-st{border-radius:999px;border:1px solid #fca5a5;background:#fee2e2;color:#b91c1c;padding:3px 12px;font-size:10.5px;font-weight:900;white-space:nowrap;box-shadow:0 2px 6px rgba(2,6,23,.35);}
+        #ocqs-quota-result{background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:8px 10px;}
+        </style>
         <div class="ocqs-card" id="ocqs-checklist">
+          <div class="chk-head"><span style="font-size:17px;">&#128737;&#65039;</span><div style="flex:1;"><div style="font-size:12.5px;font-weight:900;color:#e2e8f0;letter-spacing:1.6px;text-transform:uppercase;">Deploy Readiness</div><div style="font-size:10px;color:#94a3b8;margin-top:1px;">All checks must pass to unlock the cluster deploy</div></div><span id="ocqs-chk-chip" style="font-family:monospace;font-size:12.5px;font-weight:900;color:#38bdf8;background:rgba(56,189,248,.12);border:1px solid rgba(56,189,248,.4);border-radius:999px;padding:4px 14px;">0/14</span></div>
+          <div style="height:5px;background:#1e293b;"><div id="ocqs-chk-bar" style="height:100%;width:0%;background:linear-gradient(90deg,#0ea5e9,#22c55e);transition:width .45s ease;"></div></div>
           <div class="ocqs-checklist-item"><input type="checkbox" id="chk-1" onchange="ocqsChecklistUpdate()"><label for="chk-1">OpenCenter CLI installed and works</label><span class="chk-st" id="chk-1-st">not installed</span></div>
           <div class="ocqs-checklist-item"><input type="checkbox" id="chk-2" onchange="ocqsChecklistUpdate()"><label for="chk-2">Git installed</label><span class="chk-st" id="chk-2-st">not installed</span></div>
           <div class="ocqs-checklist-item"><input type="checkbox" id="chk-3" onchange="ocqsChecklistUpdate()"><label for="chk-3">GitOps repository exists (GitHub/GitLab)</label><span class="chk-st" id="chk-3-st">not installed</span></div>
@@ -1239,6 +1253,8 @@ git push -u origin main</div>
           <div class="ocqs-checklist-item"><input type="checkbox" id="chk-13" onchange="ocqsChecklistUpdate()"><label for="chk-13">I understand deployment will create cloud resources that may incur costs</label><span class="chk-st" id="chk-13-st" style="cursor:pointer;" onclick="var c=document.getElementById('chk-13');c.checked=!c.checked;ocqsChecklistUpdate();">click to acknowledge</span></div>
           <div style="margin-top:14px;text-align:center;">
             <div style="text-align:center;margin:6px 0;"><button onclick="ocqsVerifyReadiness(this)" style="background:#0369a1;color:#fff;border:none;border-radius:6px;padding:7px 16px;font-size:11.5px;font-weight:800;cursor:pointer;">&#8635; Verify readiness</button> <span style="font-size:10.5px;color:#64748b;">checks validate / CHANGEME / git push server-side</span></div>
+            <div style="text-align:center;margin:6px 0;"><button onclick="ocqsQuotaCheck(this)" style="background:#15803d;color:#fff;border:none;border-radius:6px;padding:7px 16px;font-size:11.5px;font-weight:800;cursor:pointer;">&#128269; Check FLEX region quotas</button> <button id="ocqs-freefip-btn" onclick="ocqsFreeFips(this)" style="display:none;background:#b45309;color:#fff;border:none;border-radius:6px;padding:7px 16px;font-size:11.5px;font-weight:800;cursor:pointer;margin-left:6px;">&#129529; Free orphaned floating IPs</button></div>
+            <div id="ocqs-quota-result" style="display:none;margin:8px auto;max-width:640px;"></div>
             <div id="ocqs-checklist-status" style="font-size:13px;color:#f87171;margin-bottom:10px;">0 / 13 items checked — deploy blocked</div>
             <button class="ocqs-btn ocqs-btn-danger" id="ocqs-deploy-btn2" disabled onclick="ocqsDeploy()" style="padding:10px 28px;font-size:14px;opacity:.5;cursor:not-allowed;">🚀 Deploy Cluster (Blocked)</button>
           </div>
@@ -1323,7 +1339,6 @@ tail -f /home/dzoan/.local/state/opencenter/logs/bootstrap/my-org/my-cluster/*.l
         <h2>&#9989; Check your OpenCenter Cluster and Pods</h2>
         <div class="ocqs-card">
           <p>After deployment, verify everything is running:</p>
-          <div style="text-align:center;margin:4px 0 14px;"><button onclick="ocqpRunAllChecks(this)" style="background:linear-gradient(135deg,#0284c7,#38bdf8);color:#fff;border:none;border-radius:8px;padding:11px 26px;font-size:13px;font-weight:900;cursor:pointer;box-shadow:0 4px 12px rgba(2,132,199,.45);">&#9654;&#9654; Run All Checks (nodes &middot; kustomizations &middot; helmreleases &middot; pods)</button></div>
           <div style="text-align:center;margin:4px 0 14px;"><button onclick="ocqsRunAllChecks(this)" style="background:linear-gradient(135deg,#0284c7,#38bdf8);color:#fff;border:none;border-radius:8px;padding:11px 26px;font-size:13px;font-weight:900;cursor:pointer;box-shadow:0 4px 12px rgba(2,132,199,.45);">&#9654;&#9654; Run All Checks (nodes &middot; kustomizations &middot; helmreleases &middot; pods)</button></div>
           <div class="ocqs-cmd" id="ocqs-cmd-chk1">kubectl get nodes</div>
           <div style="display:flex;gap:6px;margin:6px 0;"><button class="ocqs-btn ocqs-btn-copy" onclick="ocqsCopyCmd('ocqs-cmd-chk1','')">&#128203; Copy</button><button id="ocqs-run-chk1" onclick="ocqsRunCmd('ocqs-cmd-chk1','ocqs-out-chk1','ocqs-run-chk1')" style="background:#1e3a5f;color:#7dd3fc;border:1px solid #334155;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;">&#9654; Run</button><button onclick="ocqsCopyOut('ocqs-out-chk1',this)" style="background:#334155;color:#cbd5e1;border:1px solid #475569;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#128203; Copy Output</button></div>
@@ -1872,6 +1887,47 @@ kubectl describe kustomization &lt;name&gt; -n flux-system</div>
           if (ac) ac.querySelector('.ds-detail').textContent = tl.slice(0, 90);
         }
       };
+      window.ocqsQuotaCheck = function(btn){
+        var st = ocqsGetState();
+        var box = document.getElementById('ocqs-quota-result');
+        if (btn){ btn.disabled = true; btn.textContent = '\u23f3 checking region...'; }
+        fetch('/api/openstack/quota-check', {method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({org: st.org, cluster: st.cluster})})
+          .then(function(r){ return r.json(); })
+          .then(function(d){
+            if (btn){ btn.disabled = false; btn.innerHTML = '&#128269; Check FLEX region quotas'; }
+            if (!box) return;
+            box.style.display = 'block';
+            if (d.error){ box.innerHTML = '<div style="color:#b91c1c;font-size:11px;">\u2717 ' + d.error + '</div>'; return; }
+            var h = '<table style="width:100%;border-collapse:collapse;font-size:11px;">' +
+              '<tr style="color:#64748b;font-weight:800;"><td style="padding:3px 8px;">' + d.region + ' resource</td><td>free</td><td>needed</td><td>status</td><td>note</td></tr>';
+            d.rows.forEach(function(r){
+              h += '<tr style="border-top:1px solid #e2e8f0;"><td style="padding:3px 8px;font-weight:700;">' + r.resource + '</td><td>' + r.free + '</td><td>' + r.need + '</td>' +
+                '<td style="font-weight:900;color:' + (r.ok ? '#15803d' : '#b91c1c') + ';">' + (r.ok ? '\u2713 enough' : '\u2717 short') + '</td>' +
+                '<td style="color:#94a3b8;">' + (r.note || '') + '</td></tr>';
+            });
+            h += '</table>';
+            h += '<div style="margin-top:6px;font-size:11px;font-weight:800;color:' + (d.ok ? '#15803d' : '#b91c1c') + ';">' +
+              (d.ok ? '\u2713 Region has enough resources for this OpenCenter deployment' : '\u2717 Not enough free resources \u2014 free up or request quota') + '</div>';
+            box.innerHTML = h;
+            var fb = document.getElementById('ocqs-freefip-btn');
+            if (fb) fb.style.display = (d.orphaned_fips > 0) ? 'inline-block' : 'none';
+            var cb = document.getElementById('chk-14');
+            if (cb){ cb.checked = !!d.ok; if (typeof ocqsChecklistUpdate === 'function') ocqsChecklistUpdate(); }
+          }).catch(function(e){ if (btn){ btn.disabled = false; btn.innerHTML = '&#128269; Check FLEX region quotas'; }
+            if (box){ box.style.display = 'block'; box.innerHTML = '<div style="color:#b91c1c;font-size:11px;">\u2717 ' + e + '</div>'; } });
+      };
+      window.ocqsFreeFips = function(btn){
+        var st = ocqsGetState();
+        if (btn){ btn.disabled = true; btn.textContent = '\u23f3 releasing...'; }
+        fetch('/api/openstack/free-fips', {method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({org: st.org, cluster: st.cluster})})
+          .then(function(r){ return r.json(); })
+          .then(function(d){
+            if (btn){ btn.disabled = false; btn.innerHTML = '&#129529; Free orphaned floating IPs'; }
+            if (d.ok) ocqsQuotaCheck(null); // re-check with freed quota
+          }).catch(function(){ if (btn){ btn.disabled = false; btn.innerHTML = '&#129529; Free orphaned floating IPs'; } });
+      };
       window.ocqsVerifyReadiness = function(btn){
         var s = ocqsGetState();
         if (btn){ btn.disabled = true; btn.textContent = '\u23f3 verifying...'; }
@@ -2250,7 +2306,7 @@ kubectl describe kustomization &lt;name&gt; -n flux-system</div>
             ' opencenter.cluster.cluster_name='+cluster+
             ' opencenter.infrastructure.provider='+provider
         ].join('\n');
-        if(out) out.textContent='$ '+cmd+'\n';
+        if(out) out.textContent='$ '+cmd+'\n'; if (window.octMirror){ octMirror('ocqs-term', ''); octMirror('ocqs-term', '$ ' + cmd); }
         var es = new EventSource('/api/stream/run-cmd?cmd='+encodeURIComponent(cmd));
         var _wd = setTimeout(function(){
           es.close();
@@ -2288,7 +2344,7 @@ kubectl describe kustomization &lt;name&gt; -n flux-system</div>
         var out = document.getElementById(outId);
         var btn = document.getElementById(btnId);
         if (!out) return;
-        out.textContent = '$ ' + cmd + '\n';
+        out.textContent = '$ ' + cmd + '\n'; if (window.octMirror){ octMirror('ocqs-term', ''); octMirror('ocqs-term', '$ ' + cmd); }
         if (btn) { btn.disabled = true; btn.textContent = '⏹ Stop'; btn.onclick = function(){ if(window._ocqsES) window._ocqsES.close(); btn.disabled=false; btn.textContent='▶ Run'; btn.onclick=function(){ ocqsRunCmd(cmdId,outId,btnId); }; }; }
         if (window._ocqsES) window._ocqsES.close();
         var es = new EventSource('/api/stream/run-cmd?cmd=' + encodeURIComponent(cmd));
@@ -2589,6 +2645,8 @@ var c9b=g('ocqs-cmd-9b');
         var total=14, checked=0;
         for(var i=1;i<=14;i++){ var cb=g('chk-'+i); if(cb&&cb.checked) checked++; }
         var pct=Math.round(checked/total*100);
+        var chip=g('ocqs-chk-chip'); if(chip) chip.textContent=checked+'/'+total;
+        var bar=g('ocqs-chk-bar'); if(bar) bar.style.width=pct+'%';
         for(var i=1;i<=14;i++){ var cb=g('chk-'+i), st=g('chk-'+i+'-st');
           if(cb&&st){ var on=cb.checked;
             st.textContent = (i===13) ? (on?'\u2713 accepted':'click to acknowledge') : (i===14) ? (on?'\u2713 confirmed':'click to confirm') : (on?'\u2713 installed':'not installed');
@@ -3304,7 +3362,7 @@ var c9b=g('ocqs-cmd-9b');
         var btn = document.getElementById(btnId);
         if (!out) return;
         if (!cmd){ out.textContent = 'No command yet - fill credentials above first.'; return; }
-        out.textContent = '$ ' + cmd.split('\n')[0] + '...\n';
+        out.textContent = '$ ' + cmd.split('\n')[0] + '...\n'; if (window.octMirror){ octMirror('ocqp-term', ''); octMirror('ocqp-term', '$ ' + cmd); }
         if (btn){ btn.disabled=true; btn.textContent='Stop'; }
         if (window._ocqpES) window._ocqpES.close();
         var es = new EventSource('/api/stream/run-cmd?cmd=' + encodeURIComponent(cmd));
@@ -3804,8 +3862,22 @@ git push -u origin main</div>
         <div class="ocqs-coffee-warning" style="font-size:14px;">
           ⛔ Never run <code>opencenter cluster deploy</code> until <code>opencenter cluster validate</code> passes and no critical CHANGEME values remain.
         </div>
-        <style>#ocqp-checklist input[type=checkbox]{display:none;}#ocqp-checklist .ocqs-checklist-item{display:flex;align-items:center;justify-content:space-between;gap:10px;}#ocqp-checklist .ocqs-checklist-item label{flex:1;}#ocqp-checklist .chk-st{flex:none;border-radius:999px;border:1px solid #fca5a5;background:#fee2e2;color:#b91c1c;padding:3px 12px;font-size:10.5px;font-weight:900;white-space:nowrap;}</style>
+        <style>
+        #ocqp-checklist{background:#0f172a;border:1px solid #1e293b;border-radius:14px;padding:0 0 14px;overflow:hidden;box-shadow:0 12px 34px rgba(2,6,23,.4);counter-reset:chkrow;color:#cbd5e1;}
+        #ocqp-checklist .chk-head{display:flex;align-items:center;gap:12px;padding:14px 18px;background:linear-gradient(135deg,#0f172a,#16324f);border-bottom:1px solid #1e293b;}
+        #ocqp-checklist input[type=checkbox]{display:none;}
+        #ocqp-checklist .ocqs-checklist-item{display:grid;grid-template-columns:40px 1fr auto;align-items:center;gap:10px;padding:9px 18px;border-bottom:1px solid rgba(148,163,184,.12);counter-increment:chkrow;transition:background .15s;}
+        #ocqp-checklist .ocqs-checklist-item:nth-of-type(even){background:rgba(148,163,184,.05);}
+        #ocqp-checklist .ocqs-checklist-item:hover{background:rgba(56,189,248,.09);}
+        #ocqp-checklist .ocqs-checklist-item::before{content:counter(chkrow,decimal-leading-zero);font-family:monospace;font-size:11px;color:#38bdf8;font-weight:800;}
+        #ocqp-checklist .ocqs-checklist-item label{color:#e2e8f0;font-size:12.5px;font-weight:600;cursor:default;}
+        #ocqp-checklist .ocqs-checklist-item label code{background:#1e293b;color:#7dd3fc;border-radius:4px;padding:1px 5px;}
+        #ocqp-checklist .chk-st{border-radius:999px;border:1px solid #fca5a5;background:#fee2e2;color:#b91c1c;padding:3px 12px;font-size:10.5px;font-weight:900;white-space:nowrap;box-shadow:0 2px 6px rgba(2,6,23,.35);}
+        #ocqp-quota-result{background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:8px 10px;}
+        </style>
         <div class="ocqs-card" id="ocqp-checklist">
+          <div class="chk-head"><span style="font-size:17px;">&#128737;&#65039;</span><div style="flex:1;"><div style="font-size:12.5px;font-weight:900;color:#e2e8f0;letter-spacing:1.6px;text-transform:uppercase;">Deploy Readiness</div><div style="font-size:10px;color:#94a3b8;margin-top:1px;">All checks must pass to unlock the cluster deploy</div></div><span id="ocqp-chk-chip" style="font-family:monospace;font-size:12.5px;font-weight:900;color:#38bdf8;background:rgba(56,189,248,.12);border:1px solid rgba(56,189,248,.4);border-radius:999px;padding:4px 14px;">0/14</span></div>
+          <div style="height:5px;background:#1e293b;"><div id="ocqp-chk-bar" style="height:100%;width:0%;background:linear-gradient(90deg,#0ea5e9,#22c55e);transition:width .45s ease;"></div></div>
           <div class="ocqs-checklist-item"><input type="checkbox" id="chp-1" onchange="ocqpChecklistUpdate()"><label for="chp-1">OpenCenter CLI installed and works</label><span class="chk-st" id="chp-1-st">not installed</span></div>
           <div class="ocqs-checklist-item"><input type="checkbox" id="chp-2" onchange="ocqpChecklistUpdate()"><label for="chp-2">Git installed</label><span class="chk-st" id="chp-2-st">not installed</span></div>
           <div class="ocqs-checklist-item"><input type="checkbox" id="chp-3" onchange="ocqpChecklistUpdate()"><label for="chp-3">GitOps repository exists (GitHub/GitLab)</label><span class="chk-st" id="chp-3-st">not installed</span></div>
@@ -3822,6 +3894,8 @@ git push -u origin main</div>
           <div class="ocqs-checklist-item"><input type="checkbox" id="chp-13" onchange="ocqpChecklistUpdate()"><label for="chp-13">I understand deployment will create cloud resources that may incur costs</label><span class="chk-st" id="chp-13-st" style="cursor:pointer;" onclick="var c=document.getElementById('chp-13');c.checked=!c.checked;ocqpChecklistUpdate();">click to acknowledge</span></div>
           <div style="margin-top:14px;text-align:center;">
             <div style="text-align:center;margin:6px 0;"><button onclick="ocqpVerifyReadiness(this)" style="background:#0369a1;color:#fff;border:none;border-radius:6px;padding:7px 16px;font-size:11.5px;font-weight:800;cursor:pointer;">&#8635; Verify readiness</button> <span style="font-size:10.5px;color:#64748b;">checks validate / CHANGEME / git push server-side</span></div>
+            <div style="text-align:center;margin:6px 0;"><button onclick="ocqpQuotaCheck(this)" style="background:#15803d;color:#fff;border:none;border-radius:6px;padding:7px 16px;font-size:11.5px;font-weight:800;cursor:pointer;">&#128269; Check FLEX region quotas</button> <button id="ocqp-freefip-btn" onclick="ocqpFreeFips(this)" style="display:none;background:#b45309;color:#fff;border:none;border-radius:6px;padding:7px 16px;font-size:11.5px;font-weight:800;cursor:pointer;margin-left:6px;">&#129529; Free orphaned floating IPs</button></div>
+            <div id="ocqp-quota-result" style="display:none;margin:8px auto;max-width:640px;"></div>
             <div id="ocqp-checklist-status" style="font-size:13px;color:#f87171;margin-bottom:10px;">0 / 13 items checked — deploy blocked</div>
             <button class="ocqs-btn ocqs-btn-danger" id="ocqp-deploy-btn2" disabled onclick="ocqpDeploy()" style="padding:10px 28px;font-size:14px;opacity:.5;cursor:not-allowed;">🚀 Deploy Cluster (Blocked)</button>
           </div>
@@ -3906,6 +3980,7 @@ tail -f /home/dzoan/.local/state/opencenter/logs/bootstrap/my-org/my-cluster/*.l
         <h2>&#9989; Check your OpenCenter Cluster and Pods</h2>
         <div class="ocqs-card">
           <p>After deployment, verify everything is running:</p>
+          <div style="text-align:center;margin:4px 0 14px;"><button onclick="ocqpRunAllChecks(this)" style="background:linear-gradient(135deg,#0284c7,#38bdf8);color:#fff;border:none;border-radius:8px;padding:11px 26px;font-size:13px;font-weight:900;cursor:pointer;box-shadow:0 4px 12px rgba(2,132,199,.45);">&#9654;&#9654; Run All Checks (nodes &middot; kustomizations &middot; helmreleases &middot; pods)</button></div>
           <div class="ocqs-cmd" id="ocqp-cmd-chk1">kubectl get nodes</div>
           <div style="display:flex;gap:6px;margin:6px 0;"><button class="ocqs-btn ocqs-btn-copy" onclick="ocqpCopyCmd('ocqp-cmd-chk1','')">&#128203; Copy</button><button id="ocqp-run-chk1" onclick="ocqpRunCmd('ocqp-cmd-chk1','ocqp-out-chk1','ocqp-run-chk1')" style="background:#1e3a5f;color:#7dd3fc;border:1px solid #334155;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;">&#9654; Run</button><button onclick="ocqpCopyOut('ocqp-out-chk1',this)" style="background:#334155;color:#cbd5e1;border:1px solid #475569;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#128203; Copy Output</button></div>
           <div id="ocqp-out-chk1" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#00ff41;white-space:pre-wrap;max-height:140px;overflow-y:auto;margin-bottom:8px;">$ waiting...
@@ -4430,6 +4505,47 @@ kubectl describe kustomization &lt;name&gt; -n flux-system</div>
           if (ac) ac.querySelector('.ds-detail').textContent = tl.slice(0, 90);
         }
       };
+      window.ocqpQuotaCheck = function(btn){
+        var st = ocqpGetState();
+        var box = document.getElementById('ocqp-quota-result');
+        if (btn){ btn.disabled = true; btn.textContent = '\u23f3 checking region...'; }
+        fetch('/api/openstack/quota-check', {method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({org: st.org, cluster: st.cluster})})
+          .then(function(r){ return r.json(); })
+          .then(function(d){
+            if (btn){ btn.disabled = false; btn.innerHTML = '&#128269; Check FLEX region quotas'; }
+            if (!box) return;
+            box.style.display = 'block';
+            if (d.error){ box.innerHTML = '<div style="color:#b91c1c;font-size:11px;">\u2717 ' + d.error + '</div>'; return; }
+            var h = '<table style="width:100%;border-collapse:collapse;font-size:11px;">' +
+              '<tr style="color:#64748b;font-weight:800;"><td style="padding:3px 8px;">' + d.region + ' resource</td><td>free</td><td>needed</td><td>status</td><td>note</td></tr>';
+            d.rows.forEach(function(r){
+              h += '<tr style="border-top:1px solid #e2e8f0;"><td style="padding:3px 8px;font-weight:700;">' + r.resource + '</td><td>' + r.free + '</td><td>' + r.need + '</td>' +
+                '<td style="font-weight:900;color:' + (r.ok ? '#15803d' : '#b91c1c') + ';">' + (r.ok ? '\u2713 enough' : '\u2717 short') + '</td>' +
+                '<td style="color:#94a3b8;">' + (r.note || '') + '</td></tr>';
+            });
+            h += '</table>';
+            h += '<div style="margin-top:6px;font-size:11px;font-weight:800;color:' + (d.ok ? '#15803d' : '#b91c1c') + ';">' +
+              (d.ok ? '\u2713 Region has enough resources for this OpenCenter deployment' : '\u2717 Not enough free resources \u2014 free up or request quota') + '</div>';
+            box.innerHTML = h;
+            var fb = document.getElementById('ocqp-freefip-btn');
+            if (fb) fb.style.display = (d.orphaned_fips > 0) ? 'inline-block' : 'none';
+            var cb = document.getElementById('chp-14');
+            if (cb){ cb.checked = !!d.ok; if (typeof ocqpChecklistUpdate === 'function') ocqpChecklistUpdate(); }
+          }).catch(function(e){ if (btn){ btn.disabled = false; btn.innerHTML = '&#128269; Check FLEX region quotas'; }
+            if (box){ box.style.display = 'block'; box.innerHTML = '<div style="color:#b91c1c;font-size:11px;">\u2717 ' + e + '</div>'; } });
+      };
+      window.ocqpFreeFips = function(btn){
+        var st = ocqpGetState();
+        if (btn){ btn.disabled = true; btn.textContent = '\u23f3 releasing...'; }
+        fetch('/api/openstack/free-fips', {method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({org: st.org, cluster: st.cluster})})
+          .then(function(r){ return r.json(); })
+          .then(function(d){
+            if (btn){ btn.disabled = false; btn.innerHTML = '&#129529; Free orphaned floating IPs'; }
+            if (d.ok) ocqpQuotaCheck(null); // re-check with freed quota
+          }).catch(function(){ if (btn){ btn.disabled = false; btn.innerHTML = '&#129529; Free orphaned floating IPs'; } });
+      };
       window.ocqpVerifyReadiness = function(btn){
         var s = ocqpGetState();
         if (btn){ btn.disabled = true; btn.textContent = '\u23f3 verifying...'; }
@@ -4755,7 +4871,7 @@ kubectl describe kustomization &lt;name&gt; -n flux-system</div>
             ' opencenter.cluster.cluster_name='+cluster+
             ' opencenter.infrastructure.provider='+provider
         ].join('\n');
-        if(out) out.textContent='$ '+cmd+'\n';
+        if(out) out.textContent='$ '+cmd+'\n'; if (window.octMirror){ octMirror('ocqp-term', ''); octMirror('ocqp-term', '$ ' + cmd); }
         var es = new EventSource('/api/stream/run-cmd?cmd='+encodeURIComponent(cmd));
         var _wd = setTimeout(function(){
           es.close();
@@ -4793,7 +4909,7 @@ kubectl describe kustomization &lt;name&gt; -n flux-system</div>
         var out = document.getElementById(outId);
         var btn = document.getElementById(btnId);
         if (!out) return;
-        out.textContent = '$ ' + cmd + '\n';
+        out.textContent = '$ ' + cmd + '\n'; if (window.octMirror){ octMirror('ocqp-term', ''); octMirror('ocqp-term', '$ ' + cmd); }
         if (btn) { btn.disabled = true; btn.textContent = '⏹ Stop'; btn.onclick = function(){ if(window._ocqpES) window._ocqpES.close(); btn.disabled=false; btn.textContent='▶ Run'; btn.onclick=function(){ ocqpRunCmd(cmdId,outId,btnId); }; }; }
         if (window._ocqpES) window._ocqpES.close();
         var es = new EventSource('/api/stream/run-cmd?cmd=' + encodeURIComponent(cmd));
@@ -5094,6 +5210,8 @@ var c9b=g('ocqp-cmd-9b');
         var total=14, checked=0;
         for(var i=1;i<=14;i++){ var cb=g('chp-'+i); if(cb&&cb.checked) checked++; }
         var pct=Math.round(checked/total*100);
+        var chip=g('ocqp-chk-chip'); if(chip) chip.textContent=checked+'/'+total;
+        var bar=g('ocqp-chk-bar'); if(bar) bar.style.width=pct+'%';
         for(var i=1;i<=14;i++){ var cb=g('chp-'+i), st=g('chp-'+i+'-st');
           if(cb&&st){ var on=cb.checked;
             st.textContent = (i===13) ? (on?'\u2713 accepted':'click to acknowledge') : (i===14) ? (on?'\u2713 confirmed':'click to confirm') : (on?'\u2713 installed':'not installed');

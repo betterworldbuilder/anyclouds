@@ -20641,6 +20641,111 @@ printf 'avg_ms=%s\np95_ms=%s\nerror_pct=%s\ncpu_load=%s\nmem_pct=%s\niowait=%s\n
     return resp
 
 
+def _flex_project_session(org, cluster):
+    """Token + regional endpoints from a cluster blueprint's app credential."""
+    import requests as _rq
+    import yaml as _yaml
+    home = os.path.expanduser("~")
+    bp = os.path.join(home, ".config", "opencenter", "clusters", "blueprints", org, cluster,
+                      f"{cluster}-config.yaml")
+    cfg = _yaml.safe_load(open(bp))
+    osc = cfg["opencenter"]["infrastructure"]["cloud"]["openstack"]
+    auth_url = (osc.get("auth_url") or "").rstrip("/")
+    token_url = auth_url + ("/auth/tokens" if auth_url.endswith("/v3") else "/v3/auth/tokens")
+    tr = _rq.post(token_url, json={"auth": {"identity": {"methods": ["application_credential"],
+        "application_credential": {"id": osc.get("application_credential_id"),
+                                   "secret": osc.get("application_credential_secret")}}}}, timeout=20)
+    if tr.status_code not in (200, 201):
+        raise RuntimeError(f"Keystone auth failed ({tr.status_code})")
+    region = (osc.get("region") or "").upper()
+    eps = {svc["type"]: ep["url"].rstrip("/") for svc in tr.json()["token"]["catalog"]
+           for ep in svc.get("endpoints", [])
+           if ep.get("interface") == "public" and ep.get("region", "").upper() == region}
+    return tr.headers.get("X-Subject-Token", ""), eps, osc
+
+
+@app.post("/api/openstack/quota-check")
+def openstack_quota_check():
+    """Live free-vs-needed check of the target FLEX region for an OpenCenter cluster
+    (3 masters + 2 workers + bastion, flavors from the blueprint, 3 floating IPs)."""
+    import re as _re
+    import requests as _rq
+    body = request.get_json(force=True, silent=True) or {}
+    org = (body.get("org") or "").strip()
+    cluster = (body.get("cluster") or "").strip()
+    if not _re.fullmatch(r"[a-z0-9][a-z0-9-]*", org) or not _re.fullmatch(r"[a-z0-9][a-z0-9-]*", cluster):
+        return jsonify({"ok": False, "error": "invalid org/cluster"}), 400
+    try:
+        tok, eps, osc = _flex_project_session(org, cluster)
+        hh = {"X-Auth-Token": tok}
+
+        # needs from blueprint flavors (3 cp + 2 wn + 1 bastion)
+        fl = {f["name"]: f for f in _rq.get(eps["compute"] + "/flavors/detail",
+                                            headers=hh, timeout=20).json().get("flavors", [])}
+        def spec(name):
+            f = fl.get(name) or {}
+            return f.get("vcpus", 0), f.get("ram", 0)
+        counts = [(osc.get("flavor_master") or "gp.0.4.8", 3),
+                  (osc.get("flavor_worker") or "gp.0.4.16", 2),
+                  (osc.get("flavor_bastion") or "gp.0.2.4", 1)]
+        need_cores = sum(spec(n)[0] * c for n, c in counts)
+        need_ram_gb = sum(spec(n)[1] * c for n, c in counts) // 1024
+        need_fip, need_inst = 3, 6
+
+        lim = _rq.get(eps["compute"] + "/limits", headers=hh, timeout=20).json()["limits"]["absolute"]
+        cores_free = lim.get("maxTotalCores", 0) - lim.get("totalCoresUsed", 0)
+        ram_free_gb = (lim.get("maxTotalRAMSize", 0) - lim.get("totalRAMUsed", 0)) // 1024
+        inst_free = lim.get("maxTotalInstances", 0) - lim.get("totalInstancesUsed", 0)
+
+        fips = _rq.get(eps["network"] + "/v2.0/floatingips", headers=hh, timeout=20).json()["floatingips"]
+        q = _rq.get(eps["network"] + "/v2.0/quotas/" + (osc.get("project_id") or ""),
+                    headers=hh, timeout=20).json()
+        fip_quota = q.get("quota", {}).get("floatingip", 0)
+        fip_free = fip_quota - len(fips)
+        orphans = sum(1 for f in fips if f.get("port_id") is None and f.get("status") == "DOWN")
+
+        rows = [
+            {"resource": "Floating IPs", "free": fip_free, "need": need_fip,
+             "ok": fip_free >= need_fip, "note": f"{orphans} orphaned (reclaimable)" if orphans else ""},
+            {"resource": "vCPU cores", "free": cores_free, "need": need_cores, "ok": cores_free >= need_cores,
+             "note": f"{lim.get('totalCoresUsed')}/{lim.get('maxTotalCores')} used"},
+            {"resource": "RAM (GB)", "free": ram_free_gb, "need": need_ram_gb, "ok": ram_free_gb >= need_ram_gb,
+             "note": f"{lim.get('totalRAMUsed', 0)//1024}/{lim.get('maxTotalRAMSize', 0)//1024} GB used"},
+            {"resource": "Instances", "free": inst_free, "need": need_inst, "ok": inst_free >= need_inst,
+             "note": f"{lim.get('totalInstancesUsed')}/{lim.get('maxTotalInstances')} used"},
+        ]
+        return jsonify({"ok": all(r["ok"] for r in rows), "rows": rows, "orphaned_fips": orphans,
+                        "region": (osc.get("region") or "").upper()})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@app.post("/api/openstack/free-fips")
+def openstack_free_fips():
+    """Release orphaned floating IPs (DOWN + unattached) - the only resource that is
+    safe to reclaim automatically. Freeing RAM/cores would mean deleting VMs."""
+    import re as _re
+    import requests as _rq
+    body = request.get_json(force=True, silent=True) or {}
+    org = (body.get("org") or "").strip()
+    cluster = (body.get("cluster") or "").strip()
+    if not _re.fullmatch(r"[a-z0-9][a-z0-9-]*", org) or not _re.fullmatch(r"[a-z0-9][a-z0-9-]*", cluster):
+        return jsonify({"ok": False, "error": "invalid org/cluster"}), 400
+    try:
+        tok, eps, _osc = _flex_project_session(org, cluster)
+        hh = {"X-Auth-Token": tok}
+        fips = _rq.get(eps["network"] + "/v2.0/floatingips", headers=hh, timeout=20).json()["floatingips"]
+        freed = 0
+        for f in fips:
+            if f.get("port_id") is None and f.get("status") == "DOWN":
+                d = _rq.delete(eps["network"] + "/v2.0/floatingips/" + f["id"], headers=hh, timeout=20)
+                if d.status_code in (202, 204):
+                    freed += 1
+        return jsonify({"ok": True, "freed": freed})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
 @app.post("/api/opencenter/deploy-readiness")
 def opencenter_deploy_readiness():
     """Verify the three deploy-gate facts server-side: validate passes,
