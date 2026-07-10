@@ -234,7 +234,7 @@
               </div>
               <div>
                 <label class="ocqs-label">Cluster Name</label>
-                <input class="ocqs-input" id="ocqs-cluster" value="my-cluster" list="ocqs-cluster-history" oninput="ocqsUpdate()" onchange="ocqsRecordClusterName(this.value)">
+                <input class="ocqs-input" id="ocqs-cluster" value="my-cluster" list="ocqs-cluster-history" oninput="ocqsUpdate()" onchange="ocqsRecordClusterName(this.value)"><select id="ocqs-cluster-prev" onchange="if(this.value){var i=document.getElementById('ocqs-cluster');i.value=this.value;i.dispatchEvent(new Event('input'));ocqsUpdate();this.selectedIndex=0;}" style="margin-top:4px;width:100%;border:1px solid #cbd5e1;border-radius:6px;padding:5px 8px;font-size:11px;font-weight:700;color:#334155;background:#f8fafc;cursor:pointer;"><option value="">&#9662; previous clusters&hellip;</option></select>
                 <datalist id="ocqs-cluster-history"></datalist>
               </div>
               <div>
@@ -520,6 +520,7 @@
           disable_services: Object.keys(_qs.services).filter(function(k){ return !_qs.services[k]; }),
           enable_services: Object.keys(_qs.services).filter(function(k){ return !!_qs.services[k]; })
         };
+        var _send = function(){
         var _ctl = new AbortController();
         var _tmo = setTimeout(function(){ _ctl.abort(); }, 45000);
         fetch('/api/openrc/patch-config', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(patch), signal:_ctl.signal})
@@ -534,6 +535,33 @@
             if(st){ st.textContent='\u2717 '+msg; st.style.color='#dc2626'; }
             if(btn){ btn.disabled=false; btn.innerHTML=oldBtn||'&#128190; Apply to Config File'; }
           });
+        };
+        // Deploy (OpenTofu) only accepts application-credential auth. In password mode,
+        // auto-create one via Keystone instead of leaving the blueprint without deploy auth.
+        var credOk = /^[0-9a-f]{32}$/.test((s.credId||'').trim());
+        if (!credOk){
+          delete patch.fields['opencenter.infrastructure.cloud.openstack.application_credential_id'];
+          delete patch.fields['opencenter.infrastructure.cloud.openstack.application_credential_secret'];
+        }
+        if (!credOk && s.username && s.password){
+          if(st){ st.textContent='Creating application credential from password auth...'; st.style.color='#0369a1'; }
+          fetch('/api/openstack/ensure-appcred', {method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({auth_url: s.authUrl, username: s.username, password: s.password,
+              user_domain_name: s.userDomain||'rackspace_cloud_domain', project_id: s.projectId, cluster: s.cluster})})
+            .then(function(r){ return r.json(); })
+            .then(function(d){
+              if (d.ok && d.id){
+                var ci = document.getElementById('ocqs-credid'), cs = document.getElementById('ocqs-credsec');
+                if (ci){ ci.value = d.id; ci.dispatchEvent(new Event('input')); }
+                if (cs){ cs.value = d.secret; cs.dispatchEvent(new Event('input')); }
+                patch.fields['opencenter.infrastructure.cloud.openstack.application_credential_id'] = d.id;
+                patch.fields['opencenter.infrastructure.cloud.openstack.application_credential_secret'] = d.secret;
+              } else if (st){ st.textContent='⚠ app credential: '+(d.error||'failed')+' — applying rest'; st.style.color='#b45309'; }
+              _send();
+            }).catch(function(){ _send(); });
+        } else {
+          _send();
+        }
       };
       window.ocqsLoadConfig = function(btn){
         var path=ocqsCfgPath();
@@ -743,6 +771,24 @@
           var nu = a.value.replace(/keystone\.api\.[a-z0-9]+\./, 'keystone.api.' + r.toLowerCase() + '.');
           if (nu !== a.value){ a.value = nu; a.dispatchEvent(new Event('input')); }
         }
+        // Per-region credential sets: app credentials and network IDs are region-scoped
+        // (password auth is global). Snapshot the old region, load the new one if saved.
+        var prev = window._ocqsRegionPrev || '';
+        if (r && prev && r !== prev){
+          var cur = localStorage.getItem('ocqs_creds_v2');
+          if (cur) localStorage.setItem('ocqs_creds_r_' + prev, cur);
+          window._ocqsRegionPrev = r;
+          var snap = localStorage.getItem('ocqs_creds_r_' + r);
+          if (snap){
+            localStorage.setItem('ocqs_creds_v2', snap);
+            if (typeof ocqsRestoreCreds === 'function') ocqsRestoreCreds();
+          } else {
+            ['ocqs-credid','ocqs-credsec','ocqs-floatnet','ocqs-networkid','ocqs-subnetid'].forEach(function(id){
+              var el = document.getElementById(id);
+              if (el && el.value){ el.value = ''; el.dispatchEvent(new Event('input')); }
+            });
+          }
+        } else if (r){ window._ocqsRegionPrev = r; }
       };
       window.ocqsPersist = function(){
         try{
@@ -791,12 +837,17 @@
         try { return JSON.parse(localStorage.getItem('ocqs_cluster_history') || '[]'); } catch(e){ return []; }
       };
       window.ocqsFillClusterHistory = function(){
+        var names = ocqsClusterHistory();
         var dl = document.getElementById('ocqs-cluster-history');
-        if (!dl) return;
-        dl.innerHTML = '';
-        ocqsClusterHistory().forEach(function(n){
-          var o = document.createElement('option'); o.value = n; dl.appendChild(o);
-        });
+        if (dl){
+          dl.innerHTML = '';
+          names.forEach(function(n){ var o = document.createElement('option'); o.value = n; dl.appendChild(o); });
+        }
+        var sel = document.getElementById('ocqs-cluster-prev');
+        if (sel){
+          sel.innerHTML = '<option value="">&#9662; previous clusters&hellip; (' + names.length + ')</option>' +
+            names.map(function(n){ return '<option value="' + n + '">' + n + '</option>'; }).join('');
+        }
       };
       window.ocqsRecordClusterName = function(name){
         name = (name || '').trim().toLowerCase().replace(/[^a-z0-9-]+/g,'-').replace(/^-+|-+$/g,'');
@@ -832,6 +883,7 @@
           setTimeout(ocqsRestoreCreds, 400);
           ocqsFillClusterHistory();
           setTimeout(ocqsSeedClusterHistory, 800);
+          setTimeout(function(){ window._ocqsRegionPrev = ((document.getElementById('ocqs-region')||{}).value||'').trim().toUpperCase(); }, 900);
         }, 500);
       });
 
@@ -1076,9 +1128,9 @@ opencenter cluster --help</div>
             <span class="ocqs-status ocqs-s-idle" id="ocqs-st-7">Not Started</span>
           </div>
           <p>Configure your GitOps repository, then generate the FluxCD manifests with <code>cluster generate</code>.</p>
-          <div class="ocqs-cmd" id="ocqs-cmd-7">opencenter secrets sync my-cluster
-opencenter cluster validate my-cluster
-opencenter cluster generate my-cluster</div>
+          <div class="ocqs-cmd" id="ocqs-cmd-7">opencenter cluster generate my-cluster
+opencenter secrets sync my-cluster
+opencenter cluster validate my-cluster</div>
           <button class="ocqs-btn ocqs-btn-copy" onclick="ocqsCopyCmd('ocqs-cmd-7','ocqs-st-7')">📋 Copy</button><button id="ocqs-run-7" onclick="ocqsRunCmd('ocqs-cmd-7','ocqs-out-7','ocqs-run-7')" style="background:#1e3a5f;color:#7dd3fc;border:1px solid #334155;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#9654; Run</button><button onclick="ocqsCopyOut('ocqs-out-7',this)" style="background:#334155;color:#cbd5e1;border:1px solid #475569;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#128203; Copy Output</button>
           <div id="ocqs-out-7" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#00ff41;white-space:pre-wrap;word-break:break-all;max-height:240px;overflow-y:auto;margin-top:6px;">$ waiting...
           </div>
@@ -2296,7 +2348,7 @@ var y5=g('ocqs-yaml-5');
         if(c6) c6.textContent='opencenter cluster validate '+s.cluster;
 // Step 7
         var c7=g('ocqs-cmd-7');
-        if(c7) c7.textContent='opencenter secrets sync '+s.cluster+'\nopencenter cluster validate '+s.cluster+'\nopencenter cluster generate '+s.cluster;
+        if(c7) c7.textContent='opencenter cluster generate '+s.cluster+'\nopencenter secrets sync '+s.cluster+'\nopencenter cluster validate '+s.cluster;
 var c7b=g('ocqs-cmd-7b');
         if(c7b) c7b.textContent='grep -R "CHANGEME" '+gitopsPath+' || true';
 // Step 8
@@ -2675,7 +2727,7 @@ var c9b=g('ocqs-cmd-9b');
               </div>
               <div>
                 <label class="ocqs-label">Cluster Name</label>
-                <input class="ocqs-input" id="ocqp-cluster" value="my-cluster" list="ocqp-cluster-history" oninput="ocqpUpdate()" onchange="ocqpRecordClusterName(this.value)">
+                <input class="ocqs-input" id="ocqp-cluster" value="my-cluster" list="ocqp-cluster-history" oninput="ocqpUpdate()" onchange="ocqpRecordClusterName(this.value)"><select id="ocqp-cluster-prev" onchange="if(this.value){var i=document.getElementById('ocqp-cluster');i.value=this.value;i.dispatchEvent(new Event('input'));ocqpUpdate();this.selectedIndex=0;}" style="margin-top:4px;width:100%;border:1px solid #cbd5e1;border-radius:6px;padding:5px 8px;font-size:11px;font-weight:700;color:#334155;background:#f8fafc;cursor:pointer;"><option value="">&#9662; previous clusters&hellip;</option></select>
                 <datalist id="ocqp-cluster-history"></datalist>
               </div>
               <div>
@@ -2962,6 +3014,7 @@ var c9b=g('ocqs-cmd-9b');
           disable_services: Object.keys(_qp.services).filter(function(k){ return !_qp.services[k]; }),
           enable_services: Object.keys(_qp.services).filter(function(k){ return !!_qp.services[k]; })
         };
+        var _send = function(){
         var _ctl = new AbortController();
         var _tmo = setTimeout(function(){ _ctl.abort(); }, 45000);
         fetch('/api/openrc/patch-config', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(patch), signal:_ctl.signal})
@@ -2976,6 +3029,33 @@ var c9b=g('ocqs-cmd-9b');
             if(st){ st.textContent='\u2717 '+msg; st.style.color='#dc2626'; }
             if(btn){ btn.disabled=false; btn.innerHTML=oldBtn||'&#128190; Apply to Config File'; }
           });
+        };
+        // Deploy (OpenTofu) only accepts application-credential auth. In password mode,
+        // auto-create one via Keystone instead of leaving the blueprint without deploy auth.
+        var credOk = /^[0-9a-f]{32}$/.test((s.credId||'').trim());
+        if (!credOk){
+          delete patch.fields['opencenter.infrastructure.cloud.openstack.application_credential_id'];
+          delete patch.fields['opencenter.infrastructure.cloud.openstack.application_credential_secret'];
+        }
+        if (!credOk && s.username && s.password){
+          if(st){ st.textContent='Creating application credential from password auth...'; st.style.color='#0369a1'; }
+          fetch('/api/openstack/ensure-appcred', {method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({auth_url: s.authUrl, username: s.username, password: s.password,
+              user_domain_name: s.userDomain||'rackspace_cloud_domain', project_id: s.projectId, cluster: s.cluster})})
+            .then(function(r){ return r.json(); })
+            .then(function(d){
+              if (d.ok && d.id){
+                var ci = document.getElementById('ocqp-credid'), cs = document.getElementById('ocqp-credsec');
+                if (ci){ ci.value = d.id; ci.dispatchEvent(new Event('input')); }
+                if (cs){ cs.value = d.secret; cs.dispatchEvent(new Event('input')); }
+                patch.fields['opencenter.infrastructure.cloud.openstack.application_credential_id'] = d.id;
+                patch.fields['opencenter.infrastructure.cloud.openstack.application_credential_secret'] = d.secret;
+              } else if (st){ st.textContent='⚠ app credential: '+(d.error||'failed')+' — applying rest'; st.style.color='#b45309'; }
+              _send();
+            }).catch(function(){ _send(); });
+        } else {
+          _send();
+        }
       };
       window.ocqpLoadConfig = function(btn){
         var path=ocqpCfgPath();
@@ -3185,6 +3265,24 @@ var c9b=g('ocqs-cmd-9b');
           var nu = a.value.replace(/keystone\.api\.[a-z0-9]+\./, 'keystone.api.' + r.toLowerCase() + '.');
           if (nu !== a.value){ a.value = nu; a.dispatchEvent(new Event('input')); }
         }
+        // Per-region credential sets: app credentials and network IDs are region-scoped
+        // (password auth is global). Snapshot the old region, load the new one if saved.
+        var prev = window._ocqpRegionPrev || '';
+        if (r && prev && r !== prev){
+          var cur = localStorage.getItem('ocqp_creds_v2');
+          if (cur) localStorage.setItem('ocqp_creds_r_' + prev, cur);
+          window._ocqpRegionPrev = r;
+          var snap = localStorage.getItem('ocqp_creds_r_' + r);
+          if (snap){
+            localStorage.setItem('ocqp_creds_v2', snap);
+            if (typeof ocqpRestoreCreds === 'function') ocqpRestoreCreds();
+          } else {
+            ['ocqp-credid','ocqp-credsec','ocqp-floatnet','ocqp-networkid','ocqp-subnetid'].forEach(function(id){
+              var el = document.getElementById(id);
+              if (el && el.value){ el.value = ''; el.dispatchEvent(new Event('input')); }
+            });
+          }
+        } else if (r){ window._ocqpRegionPrev = r; }
       };
       window.ocqpPersist = function(){
         try{
@@ -3233,12 +3331,17 @@ var c9b=g('ocqs-cmd-9b');
         try { return JSON.parse(localStorage.getItem('ocqp_cluster_history') || '[]'); } catch(e){ return []; }
       };
       window.ocqpFillClusterHistory = function(){
+        var names = ocqpClusterHistory();
         var dl = document.getElementById('ocqp-cluster-history');
-        if (!dl) return;
-        dl.innerHTML = '';
-        ocqpClusterHistory().forEach(function(n){
-          var o = document.createElement('option'); o.value = n; dl.appendChild(o);
-        });
+        if (dl){
+          dl.innerHTML = '';
+          names.forEach(function(n){ var o = document.createElement('option'); o.value = n; dl.appendChild(o); });
+        }
+        var sel = document.getElementById('ocqp-cluster-prev');
+        if (sel){
+          sel.innerHTML = '<option value="">&#9662; previous clusters&hellip; (' + names.length + ')</option>' +
+            names.map(function(n){ return '<option value="' + n + '">' + n + '</option>'; }).join('');
+        }
       };
       window.ocqpRecordClusterName = function(name){
         name = (name || '').trim().toLowerCase().replace(/[^a-z0-9-]+/g,'-').replace(/^-+|-+$/g,'');
@@ -3274,6 +3377,7 @@ var c9b=g('ocqs-cmd-9b');
           setTimeout(ocqpRestoreCreds, 400);
           ocqpFillClusterHistory();
           setTimeout(ocqpSeedClusterHistory, 800);
+          setTimeout(function(){ window._ocqpRegionPrev = ((document.getElementById('ocqp-region')||{}).value||'').trim().toUpperCase(); }, 900);
         }, 500);
       });
 
@@ -3518,9 +3622,9 @@ opencenter cluster --help</div>
             <span class="ocqs-status ocqs-s-idle" id="ocqp-st-7">Not Started</span>
           </div>
           <p>Configure your GitOps repository, then generate the FluxCD manifests with <code>cluster generate</code>.</p>
-          <div class="ocqs-cmd" id="ocqp-cmd-7">opencenter secrets sync my-cluster
-opencenter cluster validate my-cluster
-opencenter cluster generate my-cluster</div>
+          <div class="ocqs-cmd" id="ocqp-cmd-7">opencenter cluster generate my-cluster
+opencenter secrets sync my-cluster
+opencenter cluster validate my-cluster</div>
           <button class="ocqs-btn ocqs-btn-copy" onclick="ocqpCopyCmd('ocqp-cmd-7','ocqp-st-7')">📋 Copy</button><button id="ocqp-run-7" onclick="ocqpRunCmd('ocqp-cmd-7','ocqp-out-7','ocqp-run-7')" style="background:#1e3a5f;color:#7dd3fc;border:1px solid #334155;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#9654; Run</button><button onclick="ocqpCopyOut('ocqp-out-7',this)" style="background:#334155;color:#cbd5e1;border:1px solid #475569;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#128203; Copy Output</button>
           <div id="ocqp-out-7" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#00ff41;white-space:pre-wrap;word-break:break-all;max-height:240px;overflow-y:auto;margin-top:6px;">$ waiting...
           </div>
@@ -4683,7 +4787,7 @@ var y5=g('ocqp-yaml-5');
         if(c6) c6.textContent='opencenter cluster validate '+s.cluster;
 // Step 7
         var c7=g('ocqp-cmd-7');
-        if(c7) c7.textContent='opencenter secrets sync '+s.cluster+'\nopencenter cluster validate '+s.cluster+'\nopencenter cluster generate '+s.cluster;
+        if(c7) c7.textContent='opencenter cluster generate '+s.cluster+'\nopencenter secrets sync '+s.cluster+'\nopencenter cluster validate '+s.cluster;
 var c7b=g('ocqp-cmd-7b');
         if(c7b) c7b.textContent='grep -R "CHANGEME" '+gitopsPath+' || true';
 // Step 8

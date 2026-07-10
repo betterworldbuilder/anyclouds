@@ -20641,6 +20641,48 @@ printf 'avg_ms=%s\np95_ms=%s\nerror_pct=%s\ncpu_load=%s\nmem_pct=%s\niowait=%s\n
     return resp
 
 
+@app.post("/api/openstack/ensure-appcred")
+def openstack_ensure_appcred():
+    """Create an OpenStack application credential from password auth.
+
+    Deploy (OpenTofu) only supports app-credential auth, but the dashboard's
+    default auth type is password - this bridges the two automatically.
+    """
+    import requests as _rq
+    import time as _t
+    body = request.get_json(force=True, silent=True) or {}
+    auth_url = (body.get("auth_url") or "").rstrip("/")
+    if not auth_url:
+        return jsonify({"ok": False, "error": "missing auth_url"}), 400
+    token_url = auth_url + ("/auth/tokens" if auth_url.endswith("/v3") else "/v3/auth/tokens")
+    user = {"name": body.get("username", ""), "password": body.get("password", ""),
+            "domain": {"name": body.get("user_domain_name") or "Default"}}
+    auth_body = {"auth": {"identity": {"methods": ["password"], "password": {"user": user}}}}
+    if body.get("project_id"):
+        auth_body["auth"]["scope"] = {"project": {"id": body["project_id"]}}
+    try:
+        tr = _rq.post(token_url, json=auth_body, timeout=20)
+        if tr.status_code not in (200, 201):
+            return jsonify({"ok": False, "error": f"Keystone auth failed ({tr.status_code}): {tr.text[:200]}"}), 502
+        token = tr.headers.get("X-Subject-Token", "")
+        uid = tr.json().get("token", {}).get("user", {}).get("id", "")
+        if not uid:
+            return jsonify({"ok": False, "error": "no user id in token response"}), 502
+        name = f"opencenter-{(body.get('cluster') or 'cluster').strip()}-{int(_t.time())}"
+        base = auth_url if auth_url.endswith("/v3") else auth_url + "/v3"
+        cr = _rq.post(f"{base}/users/{uid}/application_credentials",
+                      headers={"X-Auth-Token": token},
+                      json={"application_credential": {"name": name,
+                            "description": "created by OSPC2FLEX mission control"}},
+                      timeout=20)
+        if cr.status_code not in (200, 201):
+            return jsonify({"ok": False, "error": f"app credential create failed ({cr.status_code}): {cr.text[:200]}"}), 502
+        ac = cr.json().get("application_credential", {})
+        return jsonify({"ok": True, "id": ac.get("id"), "secret": ac.get("secret"), "name": name})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
 @app.post("/api/openstack/networks")
 def openstack_networks():
     """Auto-detect network/subnet IDs via the OpenStack REST API (Keystone -> Neutron).
@@ -20742,9 +20784,14 @@ def stream_run_cmd():
                     pass
             # Auto-set SOPS_AGE_KEY_FILE if not set — scans known locations
             sops_setup = (
+                # Combine every cluster age key into one identity file - SOPS_AGE_KEY_FILE
+                # supports multiple keys per file; picking just the first cluster key broke
+                # decryption for every other cluster.
                 'if [ -z "$SOPS_AGE_KEY_FILE" ]; then '
-                'for _f in $HOME/.config/opencenter/clusters/secrets/*/*/age/keys/*.txt; do '
-                '[ -f "$_f" ] && export SOPS_AGE_KEY_FILE="$_f" && break; done; fi; '
+                'cat $HOME/.config/opencenter/clusters/secrets/*/*/age/keys/*.txt '
+                '> $HOME/.config/opencenter/.all-age-keys.txt 2>/dev/null; '
+                '[ -s "$HOME/.config/opencenter/.all-age-keys.txt" ] && '
+                'export SOPS_AGE_KEY_FILE="$HOME/.config/opencenter/.all-age-keys.txt"; fi; '
             )
             wrapped = (
                 f'export PATH="{local_bin}:$PATH"; '
