@@ -410,20 +410,7 @@
             <label style="font-size:11px;color:#94a3b8;display:flex;align-items:center;gap:5px;cursor:pointer;"><input type="checkbox" id="ocqs-autorun-cont"> continue on error</label>
             <span id="ocqs-autorun-status" style="font-size:12px;font-weight:800;color:#94a3b8;"></span>
           </div>
-      <div style="margin-top:10px;padding:10px 14px;background:rgba(139,92,246,0.08);border:1px solid rgba(139,92,246,0.3);border-radius:10px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
-        <label style="color:#6d28d9;font-size:12px;font-weight:700;display:flex;align-items:center;gap:8px;cursor:pointer;">
-          <input type="checkbox" id="ocqs-jarvis-enabled" checked style="width:15px;height:15px;accent-color:#8b5cf6;cursor:pointer;"
-            onchange="localStorage.setItem('mig_jarvis_voice', this.checked); var o=document.getElementById('enable_jarvis_voice'); if(o) o.checked=this.checked;">
-          &#127908;&#65039; Jarvis Pipeline Audio Alerts
-        </label>
-        <select id="ocqs-jarvis-gender" style="background:rgba(30,41,59,0.9);color:#8b5cf6;border:1px solid #8b5cf640;padding:4px 8px;border-radius:4px;font-size:11px;font-weight:600;cursor:pointer;"
-          onchange="localStorage.setItem('mig_jarvis_gender', this.value); var o=document.getElementById('jarvis_voice_gender'); if(o) o.value=this.value;">
-          <option value="female">British Female Voice</option>
-          <option value="male">British Male Voice</option>
-        </select>
-        <button type="button" onclick="if(window.jarvisAnnounce)jarvisAnnounce('Audio sub-systems on-line and standing by.')" style="background:#7f1d1d;border:1px solid #991b1b;color:#fff;font-size:11px;font-weight:700;padding:4px 12px;border-radius:4px;cursor:pointer;">Test Voice</button>
-        <div class="oct-vo-txt" id="ocqs-vo-text" style="flex-basis:100%;">Idle. Press "AutoRun All Steps" to execute the full tutorial A &rarr; Z with narration.</div>
-      </div>
+      
         </div>
       </div>
 
@@ -626,7 +613,7 @@
             out.textContent = '';
             var es = new EventSource('/api/stream/run-cmd?cmd=' + encodeURIComponent(cmd));
             es.onmessage = function(e){
-              out.textContent += e.data + '\n'; out.scrollTop = out.scrollHeight;
+              octAppend(out, e.data); if (window.octMirror) octMirror('ocqs-term', e.data); if (window.ocqsDeployStage) ocqsDeployStage(out.id, e.data);
               if (e.data.indexOf('[EXIT') === 0 || e.data.indexOf('[ERROR]') === 0){
                 es.close(); out.style.borderColor = e.data === '[EXIT 0]' ? '#16a34a' : '#dc2626'; res();
               }
@@ -740,8 +727,7 @@
         var es = new EventSource('/api/stream/run-cmd?cmd=' + encodeURIComponent(cmd));
         window._ocqsES = es;
         es.onmessage = function(e){
-          out.textContent += e.data + '\n';
-          out.scrollTop = out.scrollHeight;
+          octAppend(out, e.data); if (window.octMirror) octMirror('ocqs-term', e.data); if (window.ocqsDeployStage) ocqsDeployStage(out.id, e.data);
           if (e.data.indexOf('[EXIT') === 0 || e.data.indexOf('[ERROR]') === 0){
             es.close();
             if (btn){ btn.disabled=false; btn.textContent='\u25b6 Run'; }
@@ -883,6 +869,7 @@
           setTimeout(ocqsRestoreCreds, 400);
           ocqsFillClusterHistory();
           setTimeout(ocqsSeedClusterHistory, 800);
+          setTimeout(function(){ if (window.ocqsVerifyReadiness) ocqsVerifyReadiness(null); }, 1500);
           setTimeout(function(){ window._ocqsRegionPrev = ((document.getElementById('ocqs-region')||{}).value||'').trim().toUpperCase(); }, 900);
         }, 500);
       });
@@ -1209,12 +1196,12 @@ git push -u origin main</div>
       <div class="ocqs-section">
         <style>
           @keyframes ocqsCoffeeWarningBlink {
-            0%, 100% { background:#991b1b; box-shadow:0 0 0 rgba(220,38,38,0); }
-            50% { background:#dc2626; box-shadow:0 0 22px rgba(220,38,38,.55); }
+            0%, 100% { background:#000000; box-shadow:0 0 0 rgba(220,38,38,0); }
+            50% { background:#111827; box-shadow:0 0 22px rgba(220,38,38,.55); }
           }
           .ocqs-coffee-warning {
             animation:ocqsCoffeeWarningBlink 1.15s ease-in-out infinite;
-            border:2px solid #fecaca;
+            border:2px solid #475569;
             border-radius:8px;
             color:#fff;
             font-size:16px;
@@ -1230,7 +1217,7 @@ git push -u origin main</div>
             border-radius:4px;
           }
         </style>
-        <h2 class="ocqs-coffee-warning">Coffe Break Warning : Safety Checklist Before Deploy</h2>
+        <h2 class="ocqs-coffee-warning">Coffee Break Warning : Safety Checklist Before Deploy</h2>
         <div class="ocqs-coffee-warning" style="font-size:14px;">
           ⛔ Never run <code>opencenter cluster deploy</code> until <code>opencenter cluster validate</code> passes and no critical CHANGEME values remain.
         </div>
@@ -1248,8 +1235,10 @@ git push -u origin main</div>
           <div class="ocqs-checklist-item"><input type="checkbox" id="chk-10" onchange="ocqsChecklistUpdate()"><label for="chk-10"><code>opencenter cluster validate</code> passes with no blockers</label><span class="chk-st" id="chk-10-st">not installed</span></div>
           <div class="ocqs-checklist-item"><input type="checkbox" id="chk-11" onchange="ocqsChecklistUpdate()"><label for="chk-11">No critical CHANGEME placeholders in GitOps manifests</label><span class="chk-st" id="chk-11-st">not installed</span></div>
           <div class="ocqs-checklist-item"><input type="checkbox" id="chk-12" onchange="ocqsChecklistUpdate()"><label for="chk-12">GitOps repo committed and pushed</label><span class="chk-st" id="chk-12-st">not installed</span></div>
+          <div class="ocqs-checklist-item"><input type="checkbox" id="chk-14" onchange="ocqsChecklistUpdate()"><label for="chk-14">Target FLEX region has the resources OpenCenter needs (&ge;3 floating IPs free, &ge;22 vCPU, &ge;60 GB RAM, flavors/images available)</label><span class="chk-st" id="chk-14-st" style="cursor:pointer;" onclick="var c=document.getElementById('chk-14');c.checked=!c.checked;ocqsChecklistUpdate();">click to confirm</span></div>
           <div class="ocqs-checklist-item"><input type="checkbox" id="chk-13" onchange="ocqsChecklistUpdate()"><label for="chk-13">I understand deployment will create cloud resources that may incur costs</label><span class="chk-st" id="chk-13-st" style="cursor:pointer;" onclick="var c=document.getElementById('chk-13');c.checked=!c.checked;ocqsChecklistUpdate();">click to acknowledge</span></div>
           <div style="margin-top:14px;text-align:center;">
+            <div style="text-align:center;margin:6px 0;"><button onclick="ocqsVerifyReadiness(this)" style="background:#0369a1;color:#fff;border:none;border-radius:6px;padding:7px 16px;font-size:11.5px;font-weight:800;cursor:pointer;">&#8635; Verify readiness</button> <span style="font-size:10.5px;color:#64748b;">checks validate / CHANGEME / git push server-side</span></div>
             <div id="ocqs-checklist-status" style="font-size:13px;color:#f87171;margin-bottom:10px;">0 / 13 items checked — deploy blocked</div>
             <button class="ocqs-btn ocqs-btn-danger" id="ocqs-deploy-btn2" disabled onclick="ocqsDeploy()" style="padding:10px 28px;font-size:14px;opacity:.5;cursor:not-allowed;">🚀 Deploy Cluster (Blocked)</button>
           </div>
@@ -1278,6 +1267,7 @@ opencenter cluster deploy --break-lock --yes my-cluster</div>
             <span style="display:inline-flex;align-items:center;gap:5px;background:#fef3c7;border:1px solid #fcd34d;color:#92400e;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:800;margin-left:4px;">&#128274; Gated &mdash; run via the Safety Checklist 'Deploy Cluster' button (13/13 required)</span>
             <button onclick="ocqsCopyOut('ocqs-out-9',this)" style="background:#334155;color:#cbd5e1;border:1px solid #475569;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#128203; Copy Output</button>
           </div>
+          <div id="ocqs-deploy-stages" style="display:none;flex-wrap:wrap;gap:8px;margin:10px 0;"></div>
           <div id="ocqs-out-9" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#00ff41;white-space:pre-wrap;max-height:300px;overflow-y:auto;margin-top:6px;">$ waiting...
           </div>
           <div class="ocqs-info-box" style="margin-top:10px;"><strong>If deploy fails — view logs:</strong></div>
@@ -1604,7 +1594,7 @@ User Access
           dhrSelect();
         };
         function note(t){ var n = document.getElementById('dhr-action-note'); if (n) n.textContent = t; }
-        function tlog(txt){ var t = document.getElementById('dhr-term'); if (!t) return; t.textContent += txt + '\n'; t.scrollTop = t.scrollHeight; }
+        function tlog(txt){ var t = document.getElementById('dhr-term'); if (!t) return; octAppend(t, txt); if (window.octMirror) octMirror('ocqs-term', txt); }
         function stream(cmd, label){
           var t = document.getElementById('dhr-term'); if (t){ t.textContent = ''; t.style.borderColor = '#334155'; }
           tlog('== ' + label + ' ==');
@@ -1742,6 +1732,8 @@ kubectl describe kustomization &lt;name&gt; -n flux-system</div>
         #ocqs-right-panel .oct-term-hd { display:flex; align-items:center; gap:8px; padding:8px 12px; background:#1e293b; }
         #ocqs-right-panel .oct-term-hd i { width:10px; height:10px; border-radius:50%; display:inline-block; }
         #ocqs-right-panel .oct-term-hd b { font-size:11px; font-weight:800; color:#94a3b8; letter-spacing:1px; text-transform:uppercase; margin-left:4px; flex:1; }
+        #ocqs-term-float label { color:#c4b5fd !important; }
+        #ocqs-term-float .oct-vo-txt { color:#cbd5e1 !important; }
         #ocqs-right-panel #ocqs-term { flex:1; margin:0; padding:12px 14px; background:#0d1117; color:#e2e8f0; font-family:'Cascadia Code','Fira Code',Consolas,monospace; font-size:11.5px; line-height:1.55; overflow-y:auto; white-space:pre-wrap; word-break:break-word; min-height:300px; }
         #ocqs-right-panel #ocqs-term .l-cmd { color:#7dd3fc; font-weight:700; }
         #ocqs-right-panel #ocqs-term .l-ok { color:#4ade80; }
@@ -1782,6 +1774,20 @@ kubectl describe kustomization &lt;name&gt; -n flux-system</div>
         <div class="oct-term-body" style="display:flex;flex-direction:column;flex:1;min-height:0;">
         <div class="oct-track" id="ocqs-term-track"></div>
         <div class="oct-track-label" id="ocqs-term-track-label">no autorun yet</div>
+        <div style="padding:6px 10px;background:rgba(139,92,246,0.18);border-bottom:1px solid #334155;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        <label style="color:#6d28d9;font-size:12px;font-weight:700;display:flex;align-items:center;gap:8px;cursor:pointer;">
+          <input type="checkbox" id="ocqs-jarvis-enabled" checked style="width:15px;height:15px;accent-color:#8b5cf6;cursor:pointer;"
+            onchange="localStorage.setItem('mig_jarvis_voice', this.checked); var o=document.getElementById('enable_jarvis_voice'); if(o) o.checked=this.checked;">
+          &#127908;&#65039; Jarvis Pipeline Audio Alerts
+        </label>
+        <select id="ocqs-jarvis-gender" style="background:rgba(30,41,59,0.9);color:#8b5cf6;border:1px solid #8b5cf640;padding:4px 8px;border-radius:4px;font-size:11px;font-weight:600;cursor:pointer;"
+          onchange="localStorage.setItem('mig_jarvis_gender', this.value); var o=document.getElementById('jarvis_voice_gender'); if(o) o.value=this.value;">
+          <option value="female">British Female Voice</option>
+          <option value="male">British Male Voice</option>
+        </select>
+        <button type="button" onclick="if(window.jarvisAnnounce)jarvisAnnounce('Audio sub-systems on-line and standing by.')" style="background:#7f1d1d;border:1px solid #991b1b;color:#fff;font-size:11px;font-weight:700;padding:4px 12px;border-radius:4px;cursor:pointer;">Test Voice</button>
+        <div class="oct-vo-txt" id="ocqs-vo-text" style="flex-basis:100%;">Idle. Press "AutoRun All Steps" to execute the full tutorial A &rarr; Z with narration.</div>
+      </div>
         <pre id="ocqs-term" style="flex:1;min-height:0;"><span class="l-dim">$ waiting for commands...</span>
 </pre>
         </div>
@@ -1790,13 +1796,97 @@ kubectl describe kustomization &lt;name&gt; -n flux-system</div>
 
     <script>
     (function(){
+      // Batched log appender: textContent+= on huge logs froze the tab (O(n^2) rewrites).
+      // Buffers lines and flushes as text nodes 4x/sec, capping total size.
+      window.octAppend = function(out, line){
+        if (!out) return;
+        if (!out._obuf){
+          out._obuf = [];
+          out._otimer = setInterval(function(){
+            if (!out._obuf.length) return;
+            out.appendChild(document.createTextNode(out._obuf.join('\n') + '\n'));
+            out._obuf.length = 0;
+            if (out.textContent.length > 400000){
+              var t = out.textContent;
+              out.textContent = '...[older output trimmed]...\n' + t.slice(-250000);
+            }
+            out.scrollTop = out.scrollHeight;
+          }, 250);
+        }
+        out._obuf.push(line);
+      };
+      window.octMirror = function(termId, line){
+        var t = document.getElementById(termId);
+        if (t) octAppend(t, line);
+      };
       window._ocqsVoMuted = false;
-      window._ocqsEvidence = { validate:false, push:false };
+      window._ocqsEvidence = (function(){ try { return JSON.parse(localStorage.getItem('ocqs_evidence_v1')) || {validate:false, push:false}; } catch(e){ return {validate:false, push:false}; } })();
       window.ocqsMarkEvidence = function(cmd, ok){
         if (!ok || !cmd) return;
         if (/cluster validate/.test(cmd)) window._ocqsEvidence.validate = true;
         if (/git push/.test(cmd)) window._ocqsEvidence.push = true;
+        localStorage.setItem('ocqs_evidence_v1', JSON.stringify(window._ocqsEvidence));
         if (window.ocqsAutoChecklist) ocqsAutoChecklist();
+      };
+      window.ocqsDeployStage = function(outId, line){
+        if (outId !== 'ocqs-out-9') return;
+        var wrap = document.getElementById('ocqs-deploy-stages'); if (!wrap) return;
+        var m = line.match(/^\s*\[(\d+)\/(\d+)\]\s*(\u23ed|\u2192|\u2713|\u2717)?\s*(.+)$/);
+        if (m){
+          wrap.style.display = 'flex';
+          var k = +m[1], n = +m[2], i, c;
+          for (i = 1; i <= n; i++){
+            c = document.getElementById('ocqs-dstage-' + i);
+            if (!c){
+              c = document.createElement('div'); c.id = 'ocqs-dstage-' + i;
+              c.style.cssText = 'flex:1;min-width:130px;border:1px solid #e2e8f0;border-radius:8px;padding:8px 10px;background:#f8fafc;';
+              c.innerHTML = '<div style="font-size:10px;font-weight:800;color:#64748b;">STEP ' + i + '/' + n + '</div>' +
+                '<div class="ds-title" style="font-size:11px;font-weight:700;color:#334155;">&hellip;</div>' +
+                '<div class="ds-detail" style="font-size:10px;color:#94a3b8;margin-top:2px;min-height:12px;"></div>';
+              wrap.appendChild(c);
+            }
+          }
+          var card = document.getElementById('ocqs-dstage-' + k);
+          var title = m[4].replace(/\s*\(already completed\)\s*$/, '').replace(/\.\.\.\s*$/, '');
+          card.querySelector('.ds-title').textContent = title;
+          var icon = m[3] || '';
+          var done = icon === '\u23ed' || icon === '\u2713' || /already completed/.test(line);
+          var fail = icon === '\u2717';
+          var run = icon === '\u2192' && !done;
+          card.style.background = fail ? '#fee2e2' : done ? '#dcfce7' : run ? '#e0f2fe' : '#f8fafc';
+          card.style.borderColor = fail ? '#fca5a5' : done ? '#86efac' : run ? '#7dd3fc' : '#e2e8f0';
+          card.querySelector('.ds-detail').textContent = fail ? 'failed' : done ? 'completed' : run ? 'running...' : '';
+          window._ocqsDsActive = run ? k : (window._ocqsDsActive === k && (done || fail) ? 0 : window._ocqsDsActive);
+          return;
+        }
+        var tl = line.trim();
+        if (/^(Provisioning|Deploying|Bootstrapping|Installing|Running|Configuring)/.test(tl)){
+          var b = document.getElementById('ocqs-dstage-phase');
+          if (!b){ b = document.createElement('div'); b.id = 'ocqs-dstage-phase';
+            b.style.cssText = 'flex-basis:100%;font-size:11px;font-weight:800;color:#0369a1;';
+            wrap.insertBefore(b, wrap.firstChild); wrap.style.display = 'flex'; }
+          b.textContent = tl;
+        }
+        if (window._ocqsDsActive && tl){
+          var ac = document.getElementById('ocqs-dstage-' + window._ocqsDsActive);
+          if (ac) ac.querySelector('.ds-detail').textContent = tl.slice(0, 90);
+        }
+      };
+      window.ocqsVerifyReadiness = function(btn){
+        var s = ocqsGetState();
+        if (btn){ btn.disabled = true; btn.textContent = '\u23f3 verifying...'; }
+        fetch('/api/opencenter/deploy-readiness', {method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({org: s.org, cluster: s.cluster})})
+          .then(function(r){ return r.json(); })
+          .then(function(d){
+            if (btn){ btn.disabled = false; btn.textContent = '\u21bb Verify readiness'; }
+            var ev = window._ocqsEvidence;
+            if (d.validate_ok) ev.validate = true;
+            if (d.pushed_ok) ev.push = true;
+            ev.changeme = !!d.changeme_ok;
+            localStorage.setItem('ocqs_evidence_v1', JSON.stringify(ev));
+            if (window.ocqsAutoChecklist) ocqsAutoChecklist();
+          }).catch(function(){ if (btn){ btn.disabled = false; btn.textContent = '\u21bb Verify readiness'; } });
       };
       window.ocqsAutoChecklist = function(){
         var ready = function(id){ var e = document.getElementById(id); return !!(e && /Ready/i.test(e.textContent)); };
@@ -1812,7 +1902,7 @@ kubectl describe kustomization &lt;name&gt; -n flux-system</div>
         set('chk-8', val('ocqs-floatnet') && val('ocqs-networkid'));
         set('chk-9', !!(window._qs && Object.keys(_qs.services).every(function(k){ return !_qs.services[k]; })));
         set('chk-10', window._ocqsEvidence.validate);
-        set('chk-11', window._ocqsEvidence.validate);
+        set('chk-11', window._ocqsEvidence.changeme || window._ocqsEvidence.validate);
         set('chk-12', window._ocqsEvidence.push);
         if (typeof ocqsChecklistUpdate === 'function') ocqsChecklistUpdate();
       };
@@ -1947,7 +2037,7 @@ kubectl describe kustomization &lt;name&gt; -n flux-system</div>
           };
           es.onmessage = function(e){
             ocqsTermLine(e.data);
-            if (out){ out.textContent += e.data + '\n'; out.scrollTop = out.scrollHeight; }
+            if (out){ octAppend(out, e.data); if (window.octMirror) octMirror('ocqs-term', e.data); if (window.ocqsDeployStage) ocqsDeployStage(out.id, e.data); }
             if (e.data.indexOf('[EXIT') === 0 || e.data.indexOf('[ERROR]') === 0){
               done = true; es.close();
               if (window.ocqsMarkEvidence) ocqsMarkEvidence(cmd, e.data === '[EXIT 0]');
@@ -2169,7 +2259,7 @@ kubectl describe kustomization &lt;name&gt; -n flux-system</div>
         }, 20000);
         es.onmessage = function(e){
           clearTimeout(_wd); _wd = setTimeout(function(){ es.close(); if(btn){ btn.disabled=false; btn.innerHTML='&#128260; Update Cluster'; } }, 60000);
-          if(out){ out.textContent += e.data+'\n'; out.scrollTop=out.scrollHeight; }
+          if(out){ octAppend(out, e.data); if (window.octMirror) octMirror('ocqs-term', e.data); if (window.ocqsDeployStage) ocqsDeployStage(out.id, e.data); }
           if(e.data.startsWith('[EXIT')){
             clearTimeout(_wd);
             es.close();
@@ -2204,8 +2294,7 @@ kubectl describe kustomization &lt;name&gt; -n flux-system</div>
         var es = new EventSource('/api/stream/run-cmd?cmd=' + encodeURIComponent(cmd));
         window._ocqsES = es;
         es.onmessage = function(e){
-            out.textContent += e.data + '\n';
-            out.scrollTop = out.scrollHeight;
+            octAppend(out, e.data); if (window.octMirror) octMirror('ocqs-term', e.data); if (window.ocqsDeployStage) ocqsDeployStage(out.id, e.data);
             if (e.data.startsWith('[EXIT') || e.data.startsWith('[ERROR]')) {
                 es.close();
                 var ok = e.data === '[EXIT 0]';
@@ -2497,12 +2586,12 @@ var c9b=g('ocqs-cmd-9b');
       };
 
       window.ocqsChecklistUpdate = function(){
-        var total=13, checked=0;
-        for(var i=1;i<=13;i++){ var cb=g('chk-'+i); if(cb&&cb.checked) checked++; }
+        var total=14, checked=0;
+        for(var i=1;i<=14;i++){ var cb=g('chk-'+i); if(cb&&cb.checked) checked++; }
         var pct=Math.round(checked/total*100);
-        for(var i=1;i<=13;i++){ var cb=g('chk-'+i), st=g('chk-'+i+'-st');
+        for(var i=1;i<=14;i++){ var cb=g('chk-'+i), st=g('chk-'+i+'-st');
           if(cb&&st){ var on=cb.checked;
-            st.textContent = (i===13) ? (on?'\u2713 accepted':'click to acknowledge') : (on?'\u2713 installed':'not installed');
+            st.textContent = (i===13) ? (on?'\u2713 accepted':'click to acknowledge') : (i===14) ? (on?'\u2713 confirmed':'click to confirm') : (on?'\u2713 installed':'not installed');
             st.style.color=on?'#15803d':'#b91c1c'; st.style.background=on?'#dcfce7':'#fee2e2'; st.style.borderColor=on?'#86efac':'#fca5a5';
           } }
         var statusEl=g('ocqs-checklist-status');
@@ -2904,20 +2993,7 @@ var c9b=g('ocqs-cmd-9b');
             <label style="font-size:11px;color:#94a3b8;display:flex;align-items:center;gap:5px;cursor:pointer;"><input type="checkbox" id="ocqp-autorun-cont"> continue on error</label>
             <span id="ocqp-autorun-status" style="font-size:12px;font-weight:800;color:#94a3b8;"></span>
           </div>
-      <div style="margin-top:10px;padding:10px 14px;background:rgba(139,92,246,0.08);border:1px solid rgba(139,92,246,0.3);border-radius:10px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
-        <label style="color:#6d28d9;font-size:12px;font-weight:700;display:flex;align-items:center;gap:8px;cursor:pointer;">
-          <input type="checkbox" id="ocqp-jarvis-enabled" checked style="width:15px;height:15px;accent-color:#8b5cf6;cursor:pointer;"
-            onchange="localStorage.setItem('mig_jarvis_voice', this.checked); var o=document.getElementById('enable_jarvis_voice'); if(o) o.checked=this.checked;">
-          &#127908;&#65039; Jarvis Pipeline Audio Alerts
-        </label>
-        <select id="ocqp-jarvis-gender" style="background:rgba(30,41,59,0.9);color:#8b5cf6;border:1px solid #8b5cf640;padding:4px 8px;border-radius:4px;font-size:11px;font-weight:600;cursor:pointer;"
-          onchange="localStorage.setItem('mig_jarvis_gender', this.value); var o=document.getElementById('jarvis_voice_gender'); if(o) o.value=this.value;">
-          <option value="female">British Female Voice</option>
-          <option value="male">British Male Voice</option>
-        </select>
-        <button type="button" onclick="if(window.jarvisAnnounce)jarvisAnnounce('Audio sub-systems on-line and standing by.')" style="background:#7f1d1d;border:1px solid #991b1b;color:#fff;font-size:11px;font-weight:700;padding:4px 12px;border-radius:4px;cursor:pointer;">Test Voice</button>
-        <div class="oct-vo-txt" id="ocqp-vo-text" style="flex-basis:100%;">Idle. Press "AutoRun All Steps" to execute the full tutorial A &rarr; Z with narration.</div>
-      </div>
+      
         </div>
       </div>
 
@@ -3120,7 +3196,7 @@ var c9b=g('ocqs-cmd-9b');
             out.textContent = '';
             var es = new EventSource('/api/stream/run-cmd?cmd=' + encodeURIComponent(cmd));
             es.onmessage = function(e){
-              out.textContent += e.data + '\n'; out.scrollTop = out.scrollHeight;
+              octAppend(out, e.data); if (window.octMirror) octMirror('ocqp-term', e.data); if (window.ocqpDeployStage) ocqpDeployStage(out.id, e.data);
               if (e.data.indexOf('[EXIT') === 0 || e.data.indexOf('[ERROR]') === 0){
                 es.close(); out.style.borderColor = e.data === '[EXIT 0]' ? '#16a34a' : '#dc2626'; res();
               }
@@ -3234,8 +3310,7 @@ var c9b=g('ocqs-cmd-9b');
         var es = new EventSource('/api/stream/run-cmd?cmd=' + encodeURIComponent(cmd));
         window._ocqpES = es;
         es.onmessage = function(e){
-          out.textContent += e.data + '\n';
-          out.scrollTop = out.scrollHeight;
+          octAppend(out, e.data); if (window.octMirror) octMirror('ocqp-term', e.data); if (window.ocqpDeployStage) ocqpDeployStage(out.id, e.data);
           if (e.data.indexOf('[EXIT') === 0 || e.data.indexOf('[ERROR]') === 0){
             es.close();
             if (btn){ btn.disabled=false; btn.textContent='\u25b6 Run'; }
@@ -3377,6 +3452,7 @@ var c9b=g('ocqs-cmd-9b');
           setTimeout(ocqpRestoreCreds, 400);
           ocqpFillClusterHistory();
           setTimeout(ocqpSeedClusterHistory, 800);
+          setTimeout(function(){ if (window.ocqpVerifyReadiness) ocqpVerifyReadiness(null); }, 1500);
           setTimeout(function(){ window._ocqpRegionPrev = ((document.getElementById('ocqp-region')||{}).value||'').trim().toUpperCase(); }, 900);
         }, 500);
       });
@@ -3703,12 +3779,12 @@ git push -u origin main</div>
       <div class="ocqs-section">
         <style>
           @keyframes ocqpCoffeeWarningBlink {
-            0%, 100% { background:#991b1b; box-shadow:0 0 0 rgba(220,38,38,0); }
-            50% { background:#dc2626; box-shadow:0 0 22px rgba(220,38,38,.55); }
+            0%, 100% { background:#000000; box-shadow:0 0 0 rgba(220,38,38,0); }
+            50% { background:#111827; box-shadow:0 0 22px rgba(220,38,38,.55); }
           }
           .ocqs-coffee-warning {
             animation:ocqpCoffeeWarningBlink 1.15s ease-in-out infinite;
-            border:2px solid #fecaca;
+            border:2px solid #475569;
             border-radius:8px;
             color:#fff;
             font-size:16px;
@@ -3724,7 +3800,7 @@ git push -u origin main</div>
             border-radius:4px;
           }
         </style>
-        <h2 class="ocqs-coffee-warning">Coffe Break Warning : Safety Checklist Before Deploy</h2>
+        <h2 class="ocqs-coffee-warning">Coffee Break Warning : Safety Checklist Before Deploy</h2>
         <div class="ocqs-coffee-warning" style="font-size:14px;">
           ⛔ Never run <code>opencenter cluster deploy</code> until <code>opencenter cluster validate</code> passes and no critical CHANGEME values remain.
         </div>
@@ -3742,8 +3818,10 @@ git push -u origin main</div>
           <div class="ocqs-checklist-item"><input type="checkbox" id="chp-10" onchange="ocqpChecklistUpdate()"><label for="chp-10"><code>opencenter cluster validate</code> passes with no blockers</label><span class="chk-st" id="chp-10-st">not installed</span></div>
           <div class="ocqs-checklist-item"><input type="checkbox" id="chp-11" onchange="ocqpChecklistUpdate()"><label for="chp-11">No critical CHANGEME placeholders in GitOps manifests</label><span class="chk-st" id="chp-11-st">not installed</span></div>
           <div class="ocqs-checklist-item"><input type="checkbox" id="chp-12" onchange="ocqpChecklistUpdate()"><label for="chp-12">GitOps repo committed and pushed</label><span class="chk-st" id="chp-12-st">not installed</span></div>
+          <div class="ocqs-checklist-item"><input type="checkbox" id="chp-14" onchange="ocqpChecklistUpdate()"><label for="chp-14">Target FLEX region has the resources OpenCenter needs (&ge;3 floating IPs free, &ge;22 vCPU, &ge;60 GB RAM, flavors/images available)</label><span class="chk-st" id="chp-14-st" style="cursor:pointer;" onclick="var c=document.getElementById('chp-14');c.checked=!c.checked;ocqpChecklistUpdate();">click to confirm</span></div>
           <div class="ocqs-checklist-item"><input type="checkbox" id="chp-13" onchange="ocqpChecklistUpdate()"><label for="chp-13">I understand deployment will create cloud resources that may incur costs</label><span class="chk-st" id="chp-13-st" style="cursor:pointer;" onclick="var c=document.getElementById('chp-13');c.checked=!c.checked;ocqpChecklistUpdate();">click to acknowledge</span></div>
           <div style="margin-top:14px;text-align:center;">
+            <div style="text-align:center;margin:6px 0;"><button onclick="ocqpVerifyReadiness(this)" style="background:#0369a1;color:#fff;border:none;border-radius:6px;padding:7px 16px;font-size:11.5px;font-weight:800;cursor:pointer;">&#8635; Verify readiness</button> <span style="font-size:10.5px;color:#64748b;">checks validate / CHANGEME / git push server-side</span></div>
             <div id="ocqp-checklist-status" style="font-size:13px;color:#f87171;margin-bottom:10px;">0 / 13 items checked — deploy blocked</div>
             <button class="ocqs-btn ocqs-btn-danger" id="ocqp-deploy-btn2" disabled onclick="ocqpDeploy()" style="padding:10px 28px;font-size:14px;opacity:.5;cursor:not-allowed;">🚀 Deploy Cluster (Blocked)</button>
           </div>
@@ -3772,6 +3850,7 @@ opencenter cluster deploy --break-lock --yes my-cluster</div>
             <span style="display:inline-flex;align-items:center;gap:5px;background:#fef3c7;border:1px solid #fcd34d;color:#92400e;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:800;margin-left:4px;">&#128274; Gated &mdash; run via the Safety Checklist 'Deploy Cluster' button (13/13 required)</span>
             <button onclick="ocqpCopyOut('ocqp-out-9',this)" style="background:#334155;color:#cbd5e1;border:1px solid #475569;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#128203; Copy Output</button>
           </div>
+          <div id="ocqp-deploy-stages" style="display:none;flex-wrap:wrap;gap:8px;margin:10px 0;"></div>
           <div id="ocqp-out-9" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#00ff41;white-space:pre-wrap;max-height:300px;overflow-y:auto;margin-top:6px;">$ waiting...
           </div>
           <div class="ocqs-info-box" style="margin-top:10px;"><strong>If deploy fails — view logs:</strong></div>
@@ -4096,7 +4175,7 @@ User Access
           dhpSelect();
         };
         function note(t){ var n = document.getElementById('dhp-action-note'); if (n) n.textContent = t; }
-        function tlog(txt){ var t = document.getElementById('dhp-term'); if (!t) return; t.textContent += txt + '\n'; t.scrollTop = t.scrollHeight; }
+        function tlog(txt){ var t = document.getElementById('dhp-term'); if (!t) return; octAppend(t, txt); if (window.octMirror) octMirror('ocqp-term', txt); }
         function stream(cmd, label){
           var t = document.getElementById('dhp-term'); if (t){ t.textContent = ''; t.style.borderColor = '#334155'; }
           tlog('== ' + label + ' ==');
@@ -4234,6 +4313,8 @@ kubectl describe kustomization &lt;name&gt; -n flux-system</div>
         #ocqp-right-panel .oct-term-hd { display:flex; align-items:center; gap:8px; padding:8px 12px; background:#1e293b; }
         #ocqp-right-panel .oct-term-hd i { width:10px; height:10px; border-radius:50%; display:inline-block; }
         #ocqp-right-panel .oct-term-hd b { font-size:11px; font-weight:800; color:#94a3b8; letter-spacing:1px; text-transform:uppercase; margin-left:4px; flex:1; }
+        #ocqp-term-float label { color:#c4b5fd !important; }
+        #ocqp-term-float .oct-vo-txt { color:#cbd5e1 !important; }
         #ocqp-right-panel #ocqp-term { flex:1; margin:0; padding:12px 14px; background:#0d1117; color:#e2e8f0; font-family:'Cascadia Code','Fira Code',Consolas,monospace; font-size:11.5px; line-height:1.55; overflow-y:auto; white-space:pre-wrap; word-break:break-word; min-height:300px; }
         #ocqp-right-panel #ocqp-term .l-cmd { color:#7dd3fc; font-weight:700; }
         #ocqp-right-panel #ocqp-term .l-ok { color:#4ade80; }
@@ -4274,6 +4355,20 @@ kubectl describe kustomization &lt;name&gt; -n flux-system</div>
         <div class="oct-term-body" style="display:flex;flex-direction:column;flex:1;min-height:0;">
         <div class="oct-track" id="ocqp-term-track"></div>
         <div class="oct-track-label" id="ocqp-term-track-label">no autorun yet</div>
+        <div style="padding:6px 10px;background:rgba(139,92,246,0.18);border-bottom:1px solid #334155;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        <label style="color:#6d28d9;font-size:12px;font-weight:700;display:flex;align-items:center;gap:8px;cursor:pointer;">
+          <input type="checkbox" id="ocqp-jarvis-enabled" checked style="width:15px;height:15px;accent-color:#8b5cf6;cursor:pointer;"
+            onchange="localStorage.setItem('mig_jarvis_voice', this.checked); var o=document.getElementById('enable_jarvis_voice'); if(o) o.checked=this.checked;">
+          &#127908;&#65039; Jarvis Pipeline Audio Alerts
+        </label>
+        <select id="ocqp-jarvis-gender" style="background:rgba(30,41,59,0.9);color:#8b5cf6;border:1px solid #8b5cf640;padding:4px 8px;border-radius:4px;font-size:11px;font-weight:600;cursor:pointer;"
+          onchange="localStorage.setItem('mig_jarvis_gender', this.value); var o=document.getElementById('jarvis_voice_gender'); if(o) o.value=this.value;">
+          <option value="female">British Female Voice</option>
+          <option value="male">British Male Voice</option>
+        </select>
+        <button type="button" onclick="if(window.jarvisAnnounce)jarvisAnnounce('Audio sub-systems on-line and standing by.')" style="background:#7f1d1d;border:1px solid #991b1b;color:#fff;font-size:11px;font-weight:700;padding:4px 12px;border-radius:4px;cursor:pointer;">Test Voice</button>
+        <div class="oct-vo-txt" id="ocqp-vo-text" style="flex-basis:100%;">Idle. Press "AutoRun All Steps" to execute the full tutorial A &rarr; Z with narration.</div>
+      </div>
         <pre id="ocqp-term" style="flex:1;min-height:0;"><span class="l-dim">$ waiting for commands...</span>
 </pre>
         </div>
@@ -4283,12 +4378,73 @@ kubectl describe kustomization &lt;name&gt; -n flux-system</div>
     <script>
     (function(){
       window._ocqpVoMuted = false;
-      window._ocqpEvidence = { validate:false, push:false };
+      window._ocqpEvidence = (function(){ try { return JSON.parse(localStorage.getItem('ocqp_evidence_v1')) || {validate:false, push:false}; } catch(e){ return {validate:false, push:false}; } })();
       window.ocqpMarkEvidence = function(cmd, ok){
         if (!ok || !cmd) return;
         if (/cluster validate/.test(cmd)) window._ocqpEvidence.validate = true;
         if (/git push/.test(cmd)) window._ocqpEvidence.push = true;
+        localStorage.setItem('ocqp_evidence_v1', JSON.stringify(window._ocqpEvidence));
         if (window.ocqpAutoChecklist) ocqpAutoChecklist();
+      };
+      window.ocqpDeployStage = function(outId, line){
+        if (outId !== 'ocqp-out-9') return;
+        var wrap = document.getElementById('ocqp-deploy-stages'); if (!wrap) return;
+        var m = line.match(/^\s*\[(\d+)\/(\d+)\]\s*(\u23ed|\u2192|\u2713|\u2717)?\s*(.+)$/);
+        if (m){
+          wrap.style.display = 'flex';
+          var k = +m[1], n = +m[2], i, c;
+          for (i = 1; i <= n; i++){
+            c = document.getElementById('ocqp-dstage-' + i);
+            if (!c){
+              c = document.createElement('div'); c.id = 'ocqp-dstage-' + i;
+              c.style.cssText = 'flex:1;min-width:130px;border:1px solid #e2e8f0;border-radius:8px;padding:8px 10px;background:#f8fafc;';
+              c.innerHTML = '<div style="font-size:10px;font-weight:800;color:#64748b;">STEP ' + i + '/' + n + '</div>' +
+                '<div class="ds-title" style="font-size:11px;font-weight:700;color:#334155;">&hellip;</div>' +
+                '<div class="ds-detail" style="font-size:10px;color:#94a3b8;margin-top:2px;min-height:12px;"></div>';
+              wrap.appendChild(c);
+            }
+          }
+          var card = document.getElementById('ocqp-dstage-' + k);
+          var title = m[4].replace(/\s*\(already completed\)\s*$/, '').replace(/\.\.\.\s*$/, '');
+          card.querySelector('.ds-title').textContent = title;
+          var icon = m[3] || '';
+          var done = icon === '\u23ed' || icon === '\u2713' || /already completed/.test(line);
+          var fail = icon === '\u2717';
+          var run = icon === '\u2192' && !done;
+          card.style.background = fail ? '#fee2e2' : done ? '#dcfce7' : run ? '#e0f2fe' : '#f8fafc';
+          card.style.borderColor = fail ? '#fca5a5' : done ? '#86efac' : run ? '#7dd3fc' : '#e2e8f0';
+          card.querySelector('.ds-detail').textContent = fail ? 'failed' : done ? 'completed' : run ? 'running...' : '';
+          window._ocqpDsActive = run ? k : (window._ocqpDsActive === k && (done || fail) ? 0 : window._ocqpDsActive);
+          return;
+        }
+        var tl = line.trim();
+        if (/^(Provisioning|Deploying|Bootstrapping|Installing|Running|Configuring)/.test(tl)){
+          var b = document.getElementById('ocqp-dstage-phase');
+          if (!b){ b = document.createElement('div'); b.id = 'ocqp-dstage-phase';
+            b.style.cssText = 'flex-basis:100%;font-size:11px;font-weight:800;color:#0369a1;';
+            wrap.insertBefore(b, wrap.firstChild); wrap.style.display = 'flex'; }
+          b.textContent = tl;
+        }
+        if (window._ocqpDsActive && tl){
+          var ac = document.getElementById('ocqp-dstage-' + window._ocqpDsActive);
+          if (ac) ac.querySelector('.ds-detail').textContent = tl.slice(0, 90);
+        }
+      };
+      window.ocqpVerifyReadiness = function(btn){
+        var s = ocqpGetState();
+        if (btn){ btn.disabled = true; btn.textContent = '\u23f3 verifying...'; }
+        fetch('/api/opencenter/deploy-readiness', {method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({org: s.org, cluster: s.cluster})})
+          .then(function(r){ return r.json(); })
+          .then(function(d){
+            if (btn){ btn.disabled = false; btn.textContent = '\u21bb Verify readiness'; }
+            var ev = window._ocqpEvidence;
+            if (d.validate_ok) ev.validate = true;
+            if (d.pushed_ok) ev.push = true;
+            ev.changeme = !!d.changeme_ok;
+            localStorage.setItem('ocqp_evidence_v1', JSON.stringify(ev));
+            if (window.ocqpAutoChecklist) ocqpAutoChecklist();
+          }).catch(function(){ if (btn){ btn.disabled = false; btn.textContent = '\u21bb Verify readiness'; } });
       };
       window.ocqpAutoChecklist = function(){
         var ready = function(id){ var e = document.getElementById(id); return !!(e && /Ready/i.test(e.textContent)); };
@@ -4304,7 +4460,7 @@ kubectl describe kustomization &lt;name&gt; -n flux-system</div>
         set('chp-8', val('ocqp-floatnet') && val('ocqp-networkid'));
         set('chp-9', !!(window._qp && Object.keys(_qp.services).every(function(k){ return !_qp.services[k]; })));
         set('chp-10', window._ocqpEvidence.validate);
-        set('chp-11', window._ocqpEvidence.validate);
+        set('chp-11', window._ocqpEvidence.changeme || window._ocqpEvidence.validate);
         set('chp-12', window._ocqpEvidence.push);
         if (typeof ocqpChecklistUpdate === 'function') ocqpChecklistUpdate();
       };
@@ -4386,7 +4542,7 @@ kubectl describe kustomization &lt;name&gt; -n flux-system</div>
           };
           es.onmessage = function(e){
             ocqpTermLine(e.data);
-            if (out){ out.textContent += e.data + '\n'; out.scrollTop = out.scrollHeight; }
+            if (out){ octAppend(out, e.data); if (window.octMirror) octMirror('ocqp-term', e.data); if (window.ocqpDeployStage) ocqpDeployStage(out.id, e.data); }
             if (e.data.indexOf('[EXIT') === 0 || e.data.indexOf('[ERROR]') === 0){
               done = true; es.close();
               if (window.ocqpMarkEvidence) ocqpMarkEvidence(cmd, e.data === '[EXIT 0]');
@@ -4608,7 +4764,7 @@ kubectl describe kustomization &lt;name&gt; -n flux-system</div>
         }, 20000);
         es.onmessage = function(e){
           clearTimeout(_wd); _wd = setTimeout(function(){ es.close(); if(btn){ btn.disabled=false; btn.innerHTML='&#128260; Update Cluster'; } }, 60000);
-          if(out){ out.textContent += e.data+'\n'; out.scrollTop=out.scrollHeight; }
+          if(out){ octAppend(out, e.data); if (window.octMirror) octMirror('ocqp-term', e.data); if (window.ocqpDeployStage) ocqpDeployStage(out.id, e.data); }
           if(e.data.startsWith('[EXIT')){
             clearTimeout(_wd);
             es.close();
@@ -4643,8 +4799,7 @@ kubectl describe kustomization &lt;name&gt; -n flux-system</div>
         var es = new EventSource('/api/stream/run-cmd?cmd=' + encodeURIComponent(cmd));
         window._ocqpES = es;
         es.onmessage = function(e){
-            out.textContent += e.data + '\n';
-            out.scrollTop = out.scrollHeight;
+            octAppend(out, e.data); if (window.octMirror) octMirror('ocqp-term', e.data); if (window.ocqpDeployStage) ocqpDeployStage(out.id, e.data);
             if (e.data.startsWith('[EXIT') || e.data.startsWith('[ERROR]')) {
                 es.close();
                 var ok = e.data === '[EXIT 0]';
@@ -4936,12 +5091,12 @@ var c9b=g('ocqp-cmd-9b');
       };
 
       window.ocqpChecklistUpdate = function(){
-        var total=13, checked=0;
-        for(var i=1;i<=13;i++){ var cb=g('chp-'+i); if(cb&&cb.checked) checked++; }
+        var total=14, checked=0;
+        for(var i=1;i<=14;i++){ var cb=g('chp-'+i); if(cb&&cb.checked) checked++; }
         var pct=Math.round(checked/total*100);
-        for(var i=1;i<=13;i++){ var cb=g('chp-'+i), st=g('chp-'+i+'-st');
+        for(var i=1;i<=14;i++){ var cb=g('chp-'+i), st=g('chp-'+i+'-st');
           if(cb&&st){ var on=cb.checked;
-            st.textContent = (i===13) ? (on?'\u2713 accepted':'click to acknowledge') : (on?'\u2713 installed':'not installed');
+            st.textContent = (i===13) ? (on?'\u2713 accepted':'click to acknowledge') : (i===14) ? (on?'\u2713 confirmed':'click to confirm') : (on?'\u2713 installed':'not installed');
             st.style.color=on?'#15803d':'#b91c1c'; st.style.background=on?'#dcfce7':'#fee2e2'; st.style.borderColor=on?'#86efac':'#fca5a5';
           } }
         var statusEl=g('ocqp-checklist-status');

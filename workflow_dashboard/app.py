@@ -20641,6 +20641,65 @@ printf 'avg_ms=%s\np95_ms=%s\nerror_pct=%s\ncpu_load=%s\nmem_pct=%s\niowait=%s\n
     return resp
 
 
+@app.post("/api/opencenter/deploy-readiness")
+def opencenter_deploy_readiness():
+    """Verify the three deploy-gate facts server-side: validate passes,
+    no CHANGEME in the cluster overlay, GitOps repo committed and pushed."""
+    import re as _re
+    body = request.get_json(force=True, silent=True) or {}
+    org = (body.get("org") or "").strip()
+    cluster = (body.get("cluster") or "").strip()
+    if not _re.fullmatch(r"[a-z0-9][a-z0-9-]*", org) or not _re.fullmatch(r"[a-z0-9][a-z0-9-]*", cluster):
+        return jsonify({"ok": False, "error": "invalid org/cluster"}), 400
+    home = os.path.expanduser("~")
+    repo = os.path.join(home, ".config", "opencenter", "clusters", "gitops", org)
+    overlay = os.path.join(repo, "applications", "overlays", cluster)
+    result = {"ok": True, "validate_ok": False, "changeme_ok": False, "pushed_ok": False, "detail": {}}
+
+    # 1. no CHANGEME anywhere in the cluster overlay (secrets are SOPS-encrypted, so
+    #    any plaintext CHANGEME here would really ship to the cluster)
+    hits = 0
+    for root, _dirs, files in os.walk(overlay):
+        for f in files:
+            try:
+                with open(os.path.join(root, f), "r", errors="ignore") as fh:
+                    if "CHANGEME" in fh.read():
+                        hits += 1
+            except OSError:
+                pass
+    result["changeme_ok"] = os.path.isdir(overlay) and hits == 0
+    result["detail"]["changeme_hits"] = hits
+
+    # 2. repo clean and nothing unpushed
+    try:
+        st = subprocess.run(["git", "-C", repo, "status", "--porcelain"],
+                            capture_output=True, text=True, timeout=20)
+        ahead = subprocess.run(["git", "-C", repo, "rev-list", "--count", "@{u}..HEAD"],
+                               capture_output=True, text=True, timeout=20)
+        result["pushed_ok"] = (st.returncode == 0 and not st.stdout.strip()
+                               and ahead.returncode == 0 and ahead.stdout.strip() == "0")
+        result["detail"]["git_dirty"] = bool(st.stdout.strip())
+        result["detail"]["ahead"] = ahead.stdout.strip()
+    except Exception as e:
+        result["detail"]["git_error"] = str(e)
+
+    # 3. offline validate via the CLI
+    try:
+        cmd = ('export PATH="$HOME/.local/bin:$PATH"; '
+               "cat $HOME/.config/opencenter/clusters/secrets/*/*/age/keys/*.txt "
+               "> $HOME/.config/opencenter/.all-age-keys.txt 2>/dev/null; "
+               'export SOPS_AGE_KEY_FILE="$HOME/.config/opencenter/.all-age-keys.txt"; '
+               f"opencenter cluster validate {org}/{cluster}")
+        vr = subprocess.run(["bash", "-lc", cmd], capture_output=True, text=True,
+                            timeout=120, cwd=home)
+        result["validate_ok"] = vr.returncode == 0
+        result["detail"]["validate_tail"] = (vr.stdout or vr.stderr)[-300:]
+    except Exception as e:
+        result["detail"]["validate_error"] = str(e)
+
+    return jsonify(result)
+
+
 @app.post("/api/openstack/ensure-appcred")
 def openstack_ensure_appcred():
     """Create an OpenStack application credential from password auth.
