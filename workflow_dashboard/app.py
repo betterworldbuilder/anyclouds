@@ -461,7 +461,7 @@ def normalize_flex_region(region: str, auth_url: str = "") -> str:
     raw = (region or "").strip() or _extract_flex_region_slug_from_auth_url(auth_url)
     raw = raw.upper()
     if not raw:
-        return "DFW3"
+        return "IAD3"
     m = re.fullmatch(r"([A-Z]{3})(\d*)", raw)
     if not m:
         return raw
@@ -512,7 +512,7 @@ def build_flex_method_ab_openrc(
     app_cred_secret: str = "",
 ) -> str:
     flex_region = normalize_flex_region(region, auth_url)
-    flex_auth_url = normalize_flex_auth_url(auth_url or "https://keystone.api.dfw3.rackspacecloud.com/v3/", flex_region)
+    flex_auth_url = normalize_flex_auth_url(auth_url, flex_region)
     flex_domain = domain or "rackspace_cloud_domain"
     use_app_cred = str(auth_type or "password").strip().lower() in (
         "v3applicationcredential",
@@ -20815,7 +20815,8 @@ def openstack_ensure_appcred():
     import requests as _rq
     import time as _t
     body = request.get_json(force=True, silent=True) or {}
-    auth_url = (body.get("auth_url") or "").rstrip("/")
+    region = normalize_flex_region(str(body.get("region") or ""), str(body.get("auth_url") or ""))
+    auth_url = normalize_flex_auth_url(str(body.get("auth_url") or ""), region).rstrip("/")
     if not auth_url:
         return jsonify({"ok": False, "error": "missing auth_url"}), 400
     token_url = auth_url + ("/auth/tokens" if auth_url.endswith("/v3") else "/v3/auth/tokens")
@@ -20832,7 +20833,7 @@ def openstack_ensure_appcred():
         uid = tr.json().get("token", {}).get("user", {}).get("id", "")
         if not uid:
             return jsonify({"ok": False, "error": "no user id in token response"}), 502
-        name = f"opencenter-{(body.get('cluster') or 'cluster').strip()}-{int(_t.time())}"
+        name = f"opencenter-{(body.get('cluster') or 'cluster').strip()}-{region.lower()}-{int(_t.time())}"
         base = auth_url if auth_url.endswith("/v3") else auth_url + "/v3"
         cr = _rq.post(f"{base}/users/{uid}/application_credentials",
                       headers={"X-Auth-Token": token},
@@ -20842,7 +20843,7 @@ def openstack_ensure_appcred():
         if cr.status_code not in (200, 201):
             return jsonify({"ok": False, "error": f"app credential create failed ({cr.status_code}): {cr.text[:200]}"}), 502
         ac = cr.json().get("application_credential", {})
-        return jsonify({"ok": True, "id": ac.get("id"), "secret": ac.get("secret"), "name": name})
+        return jsonify({"ok": True, "id": ac.get("id"), "secret": ac.get("secret"), "name": name, "region": region, "auth_url": auth_url + "/"})
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500
 
@@ -20855,8 +20856,8 @@ def openstack_networks():
     """
     import requests as _rq
     body = request.get_json(force=True, silent=True) or {}
-    auth_url = (body.get("auth_url") or "").rstrip("/")
-    region = body.get("region") or ""
+    region = normalize_flex_region(str(body.get("region") or ""), str(body.get("auth_url") or ""))
+    auth_url = normalize_flex_auth_url(str(body.get("auth_url") or ""), region).rstrip("/")
     if not auth_url:
         return jsonify({"error": "missing auth_url"}), 400
     # Keystone v3 token URL
@@ -21071,8 +21072,73 @@ def patch_config_file():
         for dot_path, value in fields.items():
             if value is None or value == "":
                 continue
-            if set_nested(data, dot_path, str(value)):
+            if set_nested(data, dot_path, value):
                 patched += 1
+
+        openstack_fields = fields if isinstance(fields, dict) else {}
+        target_region = normalize_flex_region(
+            str(
+                openstack_fields.get("opencenter.infrastructure.cloud.openstack.region")
+                or get_nested(data, "opencenter.infrastructure.cloud.openstack.region")
+                or get_nested(data, "opencenter.meta.region")
+                or ""
+            ),
+            str(
+                openstack_fields.get("opencenter.infrastructure.cloud.openstack.auth_url")
+                or get_nested(data, "opencenter.infrastructure.cloud.openstack.auth_url")
+                or ""
+            ),
+        )
+        if target_region:
+            region_slug = target_region.lower()
+            cluster_name = (
+                get_nested(data, "opencenter.cluster.cluster_name")
+                or get_nested(data, "opencenter.meta.name")
+                or os.path.basename(cfg_path).replace("-config.yaml", "")
+            )
+            cluster_name = str(cluster_name or "my-cluster").strip() or "my-cluster"
+            cluster_fqdn = f"{cluster_name}.{region_slug}.k8s.opencenter.cloud"
+            derived_region_fields = {
+                "opencenter.meta.region": target_region,
+                "opencenter.cluster.cluster_fqdn": cluster_fqdn,
+                "opencenter.infrastructure.node_naming.suffix": region_slug,
+                "opencenter.infrastructure.networking.dns_zone_name": cluster_fqdn,
+                "opencenter.infrastructure.networking.ntp_servers": [
+                    f"time.{region_slug}.rackspace.com",
+                    f"time2.{region_slug}.rackspace.com",
+                ],
+                "opencenter.infrastructure.cloud.openstack.region": target_region,
+                "opencenter.infrastructure.cloud.openstack.auth_url": normalize_flex_auth_url(
+                    str(get_nested(data, "opencenter.infrastructure.cloud.openstack.auth_url") or ""),
+                    target_region,
+                ),
+                "opencenter.infrastructure.cloud.openstack.dns_zone_name": cluster_fqdn,
+                "opencenter.infrastructure.cloud.openstack.networking.designate.dns_zone_name": cluster_fqdn,
+                "opencenter.services.headlamp.hostname": f"dashboard.{cluster_fqdn}",
+                "opencenter.services.keycloak.hostname": f"auth.{cluster_fqdn}",
+                "opencenter.managed_services.alert-proxy.http_route_fqdn": f"alerts.{cluster_fqdn}",
+                "secrets.global.aws.application.region": region_slug,
+            }
+            for dot_path, value in derived_region_fields.items():
+                if set_nested(data, dot_path, value):
+                    patched += 1
+
+            # Some existing blueprints were initialized with legacy DFW-style
+            # gp.5 flavor names. Flex IAD/SJC catalogs expose the same shapes as
+            # gp.0, so translate only untouched gp.5 defaults for the selected
+            # target region instead of letting deploy fail at Nova flavor lookup.
+            if target_region in {"IAD3", "SJC3"}:
+                for flavor_path in (
+                    "opencenter.infrastructure.bastion.flavor",
+                    "opencenter.infrastructure.compute.flavor_bastion",
+                    "opencenter.infrastructure.compute.flavor_master",
+                    "opencenter.infrastructure.compute.flavor_worker",
+                    "opencenter.infrastructure.compute.flavor_worker_windows",
+                ):
+                    current_flavor = get_nested(data, flavor_path)
+                    if isinstance(current_flavor, str) and current_flavor.startswith("gp.5."):
+                        if set_nested(data, flavor_path, "gp.0." + current_flavor[len("gp.5."):]):
+                            patched += 1
 
         service_names = {
             "monitoring": "kube-prometheus-stack",

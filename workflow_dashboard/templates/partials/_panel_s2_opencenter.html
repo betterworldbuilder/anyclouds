@@ -321,7 +321,7 @@
           </select>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px;">
             <div><label class="ocqs-label">Auth URL</label><input class="ocqs-input" id="ocqs-authurl" type="password" data-ocqs-sensitive="1" value="https://keystone.api.iad3.rackspacecloud.com/v3/" oninput="ocqsUpdate()"></div>
-            <div><label class="ocqs-label">Target Region</label><select class="ocqs-input" id="ocqs-region" onchange="ocqsRegionSync();ocqsUpdate();ocqsReqCheck()" oninput="ocqsRegionSync();ocqsUpdate();ocqsReqCheck()"><option value="DFW3">DFW3</option><option value="SJC3">SJC3</option><option value="IAD3">IAD3</option></select></div>
+            <div><label class="ocqs-label">Target Region</label><select class="ocqs-input" id="ocqs-region" onchange="ocqsRegionSync();ocqsUpdate();ocqsReqCheck()" oninput="ocqsRegionSync();ocqsUpdate();ocqsReqCheck()"><option value="IAD3" selected>IAD3</option><option value="SJC3">SJC3</option><option value="DFW3">DFW3</option></select></div>
           </div>
           <div id="ocqs-pw-fields" style="margin-top:8px;">
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
@@ -421,6 +421,25 @@
 <script>
       // Global ocqsGetState shim - available before main script loads
       var _v=function(id){var el=document.getElementById(id);return el?el.value.trim():'';};
+      window.ocqsCanonicalRegion = function(region, authUrl){
+        var raw = (region || '').trim().toUpperCase();
+        if(!raw && authUrl){
+          var m = String(authUrl).match(/keystone\.api\.([a-z0-9-]+)\.rackspacecloud\.com/i);
+          if(m) raw = m[1].toUpperCase();
+        }
+        if(!raw) raw = 'IAD3';
+        var mm = raw.match(/^([A-Z]{3})(\d*)$/);
+        return mm ? (mm[1] + (mm[2] || '3')) : raw;
+      };
+      window.ocqsAuthUrlForRegion = function(authUrl, region){
+        var r = ocqsCanonicalRegion(region, authUrl).toLowerCase();
+        var raw = (authUrl || '').trim();
+        if(!raw || /^[A-Za-z]{3}\d*$/.test(raw)) return 'https://keystone.api.' + r + '.rackspacecloud.com/v3/';
+        if(/keystone\.api\.[a-z0-9-]+\.rackspacecloud\.com/i.test(raw)){
+          return raw.replace(/keystone\.api\.[a-z0-9-]+\./i, 'keystone.api.' + r + '.');
+        }
+        return raw;
+      };
       window._ocqsSensitiveMasked = true;
       window.ocqsToggleSensitiveMask = function(force){
         var masked = (typeof force === 'boolean') ? force : !window._ocqsSensitiveMasked;
@@ -444,8 +463,8 @@
           return {
             org:_v('ocqs-org')||'my-org', cluster:_v('ocqs-cluster')||'my-cluster',
             env:_v('ocqs-env')||'dev', provider:_v('ocqs-provider')||'openstack',
-            authUrl:_v('ocqs-authurl')||'https://keystone.api.iad3.rackspacecloud.com/v3/',
-            region:_v('ocqs-region')||'IAD3', authType:_v('ocqs-authtype')||'password',
+            authUrl:ocqsAuthUrlForRegion(_v('ocqs-authurl')||'https://keystone.api.iad3.rackspacecloud.com/v3/', _v('ocqs-region')),
+            region:ocqsCanonicalRegion(_v('ocqs-region'), _v('ocqs-authurl')), authType:_v('ocqs-authtype')||'password',
             username:_v('ocqs-username'), password:_v('ocqs-password'),
             userDomain:_v('ocqs-userdomain')||'rackspace_cloud_domain',
             projDomain:_v('ocqs-projdomain')||'rackspace_cloud_domain',
@@ -480,6 +499,10 @@
       window.ocqsApplyToConfig = function(btn, silent){
         if(typeof ocqsGetState!=='function') return;
         var s = ocqsGetState();
+        var region = ocqsCanonicalRegion(s.region, s.authUrl);
+        var regionSlug = region.toLowerCase();
+        var authUrl = ocqsAuthUrlForRegion(s.authUrl, region);
+        var fqdn = (s.cluster || 'my-cluster') + '.' + regionSlug + '.k8s.opencenter.cloud';
         if(silent && !s.password && !s.credSec) return;
         var st = silent ? null : document.getElementById('ocqs-apply-status');
         var cfgEl = document.getElementById('ocqs-configpath');
@@ -492,8 +515,14 @@
         var patch = {
           path: cfgPath,
           fields: {
-            'opencenter.infrastructure.cloud.openstack.auth_url': s.authUrl,
-            'opencenter.infrastructure.cloud.openstack.region': (s.region||'').toUpperCase(),
+            'opencenter.meta.region': region,
+            'opencenter.meta.status': 'configured',
+            'opencenter.cluster.cluster_fqdn': fqdn,
+            'opencenter.infrastructure.node_naming.suffix': regionSlug,
+            'opencenter.infrastructure.networking.dns_zone_name': fqdn,
+            'opencenter.infrastructure.networking.ntp_servers': ['time.' + regionSlug + '.rackspace.com', 'time2.' + regionSlug + '.rackspace.com'],
+            'opencenter.infrastructure.cloud.openstack.auth_url': authUrl,
+            'opencenter.infrastructure.cloud.openstack.region': region,
             'opencenter.infrastructure.cloud.openstack.user_domain_name': s.userDomain||'rackspace_cloud_domain',
             'opencenter.infrastructure.cloud.openstack.project_domain_name': s.projDomain||'rackspace_cloud_domain',
             'opencenter.infrastructure.cloud.openstack.project_id': s.projectId,
@@ -501,8 +530,16 @@
             'opencenter.infrastructure.cloud.openstack.subnet_id': s.subnetId,
             'opencenter.infrastructure.cloud.openstack.router_external_network_id': s.floatNet,
             'opencenter.infrastructure.cloud.openstack.floating_ip_pool': 'PUBLICNET',
+            'opencenter.infrastructure.cloud.openstack.dns_zone_name': fqdn,
+            'opencenter.infrastructure.cloud.openstack.networking.router_external_network_id': s.floatNet,
+            'opencenter.infrastructure.cloud.openstack.networking.floating_ip_pool': 'PUBLICNET',
+            'opencenter.infrastructure.cloud.openstack.networking.designate.dns_zone_name': fqdn,
             'opencenter.infrastructure.cloud.openstack.application_credential_id': s.credId,
-            'opencenter.infrastructure.cloud.openstack.application_credential_secret': s.credSec
+            'opencenter.infrastructure.cloud.openstack.application_credential_secret': s.credSec,
+            'opencenter.services.headlamp.hostname': 'dashboard.' + fqdn,
+            'opencenter.services.keycloak.hostname': 'auth.' + fqdn,
+            'opencenter.managed_services.alert-proxy.http_route_fqdn': 'alerts.' + fqdn,
+            'secrets.global.aws.application.region': regionSlug
           },
           disable_services: Object.keys(_qs.services).filter(function(k){ return !_qs.services[k]; }),
           enable_services: Object.keys(_qs.services).filter(function(k){ return !!_qs.services[k]; })
@@ -533,7 +570,7 @@
         if (!credOk && s.username && s.password){
           if(st){ st.textContent='Creating application credential from password auth...'; st.style.color='#0369a1'; }
           fetch('/api/openstack/ensure-appcred', {method:'POST', headers:{'Content-Type':'application/json'},
-            body: JSON.stringify({auth_url: s.authUrl, username: s.username, password: s.password,
+            body: JSON.stringify({auth_url: authUrl, region: region, username: s.username, password: s.password,
               user_domain_name: s.userDomain||'rackspace_cloud_domain', project_id: s.projectId, cluster: s.cluster})})
             .then(function(r){ return r.json(); })
             .then(function(d){
@@ -1517,7 +1554,7 @@ User Access
               generated_gitops_path:'~/.config/opencenter/clusters/gitops/opencentertest-from-mission-control',
               tool_versions:{ opencenter:'0.0.1-90992c1', kubespray:'2.31.0', opentofu:'1.12.3', fluxcd:'2.x', helm:'4.2.2' },
               image_manifest:'ubuntu-24.04 (6e3967a7) / calico v3.31.6 / cert-manager v1.18.2 / headlamp 0.35.0',
-              opencenter_config_snapshot:'opencenter:\n  cluster:\n    cluster_name: my1st-opencenter-cluster\n    kubernetes: 1.35.4 (3 cp + 2 wn)\n  infrastructure:\n    provider: openstack (DFW3)\n    application_credential_id: 3e27a1c8...\n    application_credential_secret: <secret-ref>\n  gitops:\n    url: ssh://git@github.com/Sherlock2019/opencenter-my-cluster-gitops.git\n    auth: ssh (~/.ssh/id_rsa)\nsecrets: SOPS age (refs only)',
+              opencenter_config_snapshot:'opencenter:\n  cluster:\n    cluster_name: my1st-opencenter-cluster\n    kubernetes: 1.35.4 (3 cp + 2 wn)\n  infrastructure:\n    provider: openstack (IAD3)\n    application_credential_id: 3e27a1c8...\n    application_credential_secret: <secret-ref>\n  gitops:\n    url: ssh://git@github.com/Sherlock2019/opencenter-my-cluster-gitops.git\n    auth: ssh (~/.ssh/id_rsa)\nsecrets: SOPS age (refs only)',
               phases:[ {n:'Configure',s:'ok',d:'12m',i:1}, {n:'Generate',s:'ok',d:'3m',i:1}, {n:'Provision',s:'ok',d:'11m',i:1}, {n:'Kubernetes Install',s:'ok',d:'28m',i:1}, {n:'GitOps Reconcile',s:'ok',d:'21m',i:3}, {n:'Validate',s:'ok',d:'4m',i:0} ],
               issues:[
                 ['Configure','Stub CHANGEME credentials','Blueprint created from template','Applied real app credential + project id','Platform Engineer','Fixed'],
@@ -1534,10 +1571,10 @@ User Access
               generated_gitops_path:'~/.config/opencenter/clusters/gitops/opencentertest-from-mission-control',
               tool_versions:{ opencenter:'0.0.1-90992c1', kubespray:'2.31.0', opentofu:'1.12.3', fluxcd:'2.x', helm:'4.2.2' },
               image_manifest:'ubuntu-24.04 (6e3967a7) / calico v3.31.6',
-              opencenter_config_snapshot:'opencenter:\n  cluster:\n    cluster_name: my2nd-opencenter-cluster\n  infrastructure:\n    provider: openstack (DFW3)\n    external_network: 82be3711...\n  gitops:\n    url: ssh://git@github.com/Sherlock2019/opencenter-my-cluster-gitops.git\nsecrets: SOPS age (refs only)',
+              opencenter_config_snapshot:'opencenter:\n  cluster:\n    cluster_name: my2nd-opencenter-cluster\n  infrastructure:\n    provider: openstack (IAD3)\n    external_network: 27f1ceeb...\n  gitops:\n    url: ssh://git@github.com/Sherlock2019/opencenter-my-cluster-gitops.git\nsecrets: SOPS age (refs only)',
               phases:[ {n:'Configure',s:'ok',d:'9m',i:3}, {n:'Generate',s:'ok',d:'3m',i:1}, {n:'Provision',s:'bad',d:'21m',i:2}, {n:'Kubernetes Install',s:'warn',d:'-',i:1}, {n:'GitOps Reconcile',s:'warn',d:'-',i:0}, {n:'Validate',s:'warn',d:'-',i:0} ],
               issues:[
-                ['Configure','Region case mismatch (dfw3 vs DFW3)','Keystone catalog registers uppercase','Uppercased region in blueprint','Platform Engineer','Fixed'],
+                ['Configure','Region mismatch between target selector and blueprint','Keystone catalog region must match selected target','Wired selected region through metadata, cloud, DNS, and generated assets','Platform Engineer','Fixed'],
                 ['Configure','Invalid external network UUID','Placeholder left by renderer','Set real PUBLICNET router UUID','Platform Engineer','Fixed'],
                 ['Provision','Floating IP quota exceeded','Leftover unattached FIPs in tenant','Released unused FIPs','Cloud Ops','Fixed'],
                 ['Provision','3 nodes unreachable during cloud-init','Nodes still booting / possible SNAT issue','Pending re-run','Cloud Ops','Open'],
@@ -2408,7 +2445,7 @@ kubectl describe kustomization &lt;name&gt; -n flux-system</div>
         s.org = _slug(s.org) || 'my-org';
         s.cluster = _slug(s.cluster) || 'my-cluster';
         var configPath = '/home/dzoan/.config/opencenter/clusters/blueprints/'+s.org+'/'+s.cluster+'/'+s.cluster+'-config.yaml';
-        var _fqdn = s.cluster+'.'+(s.region||'dfw3').toLowerCase()+'.k8s.opencenter.cloud';
+        var _fqdn = s.cluster+'.'+ocqsCanonicalRegion(s.region, s.authUrl).toLowerCase()+'.k8s.opencenter.cloud';
         var _setUrl = function(id, prefix){ var el=g(id); if(el) el.textContent='https://'+prefix+'.'+_fqdn; };
         _setUrl('ocqs-url-keycloak','auth');
         _setUrl('ocqs-url-grafana','grafana');
@@ -2521,7 +2558,7 @@ var c9b=g('ocqs-cmd-9b');
           + "kubectl get helmreleases -A --no-headers 2>/dev/null | awk '{n++; a=a (n>1?\", \":\"\") $2} END{print \"HelmReleases:   \" n+0 \" installed (\" a \")\"}'\n"
           + "kubectl get pods -A --no-headers | awk '!/Running|Completed/{b++} END{print \"Pods:           \" NR \" total - \" b+0 \" not Running/Completed\"}'\n"
           + "echo \"API:            $(kubectl config view --minify -o jsonpath='{.clusters[0].cluster.server}')\"\n"
-          + "echo 'Dashboard:      https://dashboard." + s.cluster + "." + (s.region||'dfw3').toLowerCase() + ".k8s.opencenter.cloud'";
+          + "echo 'Dashboard:      https://dashboard." + s.cluster + "." + ocqsCanonicalRegion(s.region, s.authUrl).toLowerCase() + ".k8s.opencenter.cloud'";
 // YAML preview
         var yp=g('ocqs-yaml-preview');
         if(yp) yp.textContent=
@@ -2961,7 +2998,7 @@ var c9b=g('ocqs-cmd-9b');
           </select>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px;">
             <div><label class="ocqs-label">Auth URL</label><input class="ocqs-input" id="ocqp-authurl" type="password" data-ocqp-sensitive="1" value="https://keystone.api.iad3.rackspacecloud.com/v3/" oninput="ocqpUpdate()"></div>
-            <div><label class="ocqs-label">Target Region</label><select class="ocqs-input" id="ocqp-region" onchange="ocqpRegionSync();ocqpUpdate();ocqpReqCheck()" oninput="ocqpRegionSync();ocqpUpdate();ocqpReqCheck()"><option value="DFW3">DFW3</option><option value="SJC3">SJC3</option><option value="IAD3">IAD3</option></select></div>
+            <div><label class="ocqs-label">Target Region</label><select class="ocqs-input" id="ocqp-region" onchange="ocqpRegionSync();ocqpUpdate();ocqpReqCheck()" oninput="ocqpRegionSync();ocqpUpdate();ocqpReqCheck()"><option value="IAD3" selected>IAD3</option><option value="SJC3">SJC3</option><option value="DFW3">DFW3</option></select></div>
           </div>
           <div id="ocqp-pw-fields" style="margin-top:8px;">
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
@@ -3085,8 +3122,8 @@ var c9b=g('ocqs-cmd-9b');
           return {
             org:_v('ocqp-org')||'my-org', cluster:_v('ocqp-cluster')||'my-cluster',
             env:_v('ocqp-env')||'dev', provider:_v('ocqp-provider')||'openstack',
-            authUrl:_v('ocqp-authurl')||'https://keystone.api.iad3.rackspacecloud.com/v3/',
-            region:_v('ocqp-region')||'IAD3', authType:_v('ocqp-authtype')||'password',
+            authUrl:ocqsAuthUrlForRegion(_v('ocqp-authurl')||'https://keystone.api.iad3.rackspacecloud.com/v3/', _v('ocqp-region')),
+            region:ocqsCanonicalRegion(_v('ocqp-region'), _v('ocqp-authurl')), authType:_v('ocqp-authtype')||'password',
             username:_v('ocqp-username'), password:_v('ocqp-password'),
             userDomain:_v('ocqp-userdomain')||'rackspace_cloud_domain',
             projDomain:_v('ocqp-projdomain')||'rackspace_cloud_domain',
@@ -3121,6 +3158,10 @@ var c9b=g('ocqs-cmd-9b');
       window.ocqpApplyToConfig = function(btn, silent){
         if(typeof ocqpGetState!=='function') return;
         var s = ocqpGetState();
+        var region = ocqsCanonicalRegion(s.region, s.authUrl);
+        var regionSlug = region.toLowerCase();
+        var authUrl = ocqsAuthUrlForRegion(s.authUrl, region);
+        var fqdn = (s.cluster || 'my-cluster') + '.' + regionSlug + '.k8s.opencenter.cloud';
         if(silent && !s.password && !s.credSec) return;
         var st = silent ? null : document.getElementById('ocqp-apply-status');
         var cfgEl = document.getElementById('ocqp-configpath');
@@ -3133,8 +3174,14 @@ var c9b=g('ocqs-cmd-9b');
         var patch = {
           path: cfgPath,
           fields: {
-            'opencenter.infrastructure.cloud.openstack.auth_url': s.authUrl,
-            'opencenter.infrastructure.cloud.openstack.region': (s.region||'').toUpperCase(),
+            'opencenter.meta.region': region,
+            'opencenter.meta.status': 'configured',
+            'opencenter.cluster.cluster_fqdn': fqdn,
+            'opencenter.infrastructure.node_naming.suffix': regionSlug,
+            'opencenter.infrastructure.networking.dns_zone_name': fqdn,
+            'opencenter.infrastructure.networking.ntp_servers': ['time.' + regionSlug + '.rackspace.com', 'time2.' + regionSlug + '.rackspace.com'],
+            'opencenter.infrastructure.cloud.openstack.auth_url': authUrl,
+            'opencenter.infrastructure.cloud.openstack.region': region,
             'opencenter.infrastructure.cloud.openstack.user_domain_name': s.userDomain||'rackspace_cloud_domain',
             'opencenter.infrastructure.cloud.openstack.project_domain_name': s.projDomain||'rackspace_cloud_domain',
             'opencenter.infrastructure.cloud.openstack.project_id': s.projectId,
@@ -3142,8 +3189,16 @@ var c9b=g('ocqs-cmd-9b');
             'opencenter.infrastructure.cloud.openstack.subnet_id': s.subnetId,
             'opencenter.infrastructure.cloud.openstack.router_external_network_id': s.floatNet,
             'opencenter.infrastructure.cloud.openstack.floating_ip_pool': 'PUBLICNET',
+            'opencenter.infrastructure.cloud.openstack.dns_zone_name': fqdn,
+            'opencenter.infrastructure.cloud.openstack.networking.router_external_network_id': s.floatNet,
+            'opencenter.infrastructure.cloud.openstack.networking.floating_ip_pool': 'PUBLICNET',
+            'opencenter.infrastructure.cloud.openstack.networking.designate.dns_zone_name': fqdn,
             'opencenter.infrastructure.cloud.openstack.application_credential_id': s.credId,
-            'opencenter.infrastructure.cloud.openstack.application_credential_secret': s.credSec
+            'opencenter.infrastructure.cloud.openstack.application_credential_secret': s.credSec,
+            'opencenter.services.headlamp.hostname': 'dashboard.' + fqdn,
+            'opencenter.services.keycloak.hostname': 'auth.' + fqdn,
+            'opencenter.managed_services.alert-proxy.http_route_fqdn': 'alerts.' + fqdn,
+            'secrets.global.aws.application.region': regionSlug
           },
           disable_services: Object.keys(_qp.services).filter(function(k){ return !_qp.services[k]; }),
           enable_services: Object.keys(_qp.services).filter(function(k){ return !!_qp.services[k]; })
@@ -3174,7 +3229,7 @@ var c9b=g('ocqs-cmd-9b');
         if (!credOk && s.username && s.password){
           if(st){ st.textContent='Creating application credential from password auth...'; st.style.color='#0369a1'; }
           fetch('/api/openstack/ensure-appcred', {method:'POST', headers:{'Content-Type':'application/json'},
-            body: JSON.stringify({auth_url: s.authUrl, username: s.username, password: s.password,
+            body: JSON.stringify({auth_url: authUrl, region: region, username: s.username, password: s.password,
               user_domain_name: s.userDomain||'rackspace_cloud_domain', project_id: s.projectId, cluster: s.cluster})})
             .then(function(r){ return r.json(); })
             .then(function(d){
@@ -4158,7 +4213,7 @@ User Access
               generated_gitops_path:'~/.config/opencenter/clusters/gitops/opencentertest-from-mission-control',
               tool_versions:{ opencenter:'0.0.1-90992c1', kubespray:'2.31.0', opentofu:'1.12.3', fluxcd:'2.x', helm:'4.2.2' },
               image_manifest:'ubuntu-24.04 (6e3967a7) / calico v3.31.6 / cert-manager v1.18.2 / headlamp 0.35.0',
-              opencenter_config_snapshot:'opencenter:\n  cluster:\n    cluster_name: my1st-opencenter-cluster\n    kubernetes: 1.35.4 (3 cp + 2 wn)\n  infrastructure:\n    provider: openstack (DFW3)\n    application_credential_id: 3e27a1c8...\n    application_credential_secret: <secret-ref>\n  gitops:\n    url: ssh://git@github.com/Sherlock2019/opencenter-my-cluster-gitops.git\n    auth: ssh (~/.ssh/id_rsa)\nsecrets: SOPS age (refs only)',
+              opencenter_config_snapshot:'opencenter:\n  cluster:\n    cluster_name: my1st-opencenter-cluster\n    kubernetes: 1.35.4 (3 cp + 2 wn)\n  infrastructure:\n    provider: openstack (IAD3)\n    application_credential_id: 3e27a1c8...\n    application_credential_secret: <secret-ref>\n  gitops:\n    url: ssh://git@github.com/Sherlock2019/opencenter-my-cluster-gitops.git\n    auth: ssh (~/.ssh/id_rsa)\nsecrets: SOPS age (refs only)',
               phases:[ {n:'Configure',s:'ok',d:'12m',i:1}, {n:'Generate',s:'ok',d:'3m',i:1}, {n:'Provision',s:'ok',d:'11m',i:1}, {n:'Kubernetes Install',s:'ok',d:'28m',i:1}, {n:'GitOps Reconcile',s:'ok',d:'21m',i:3}, {n:'Validate',s:'ok',d:'4m',i:0} ],
               issues:[
                 ['Configure','Stub CHANGEME credentials','Blueprint created from template','Applied real app credential + project id','Platform Engineer','Fixed'],
@@ -4175,10 +4230,10 @@ User Access
               generated_gitops_path:'~/.config/opencenter/clusters/gitops/opencentertest-from-mission-control',
               tool_versions:{ opencenter:'0.0.1-90992c1', kubespray:'2.31.0', opentofu:'1.12.3', fluxcd:'2.x', helm:'4.2.2' },
               image_manifest:'ubuntu-24.04 (6e3967a7) / calico v3.31.6',
-              opencenter_config_snapshot:'opencenter:\n  cluster:\n    cluster_name: my2nd-opencenter-cluster\n  infrastructure:\n    provider: openstack (DFW3)\n    external_network: 82be3711...\n  gitops:\n    url: ssh://git@github.com/Sherlock2019/opencenter-my-cluster-gitops.git\nsecrets: SOPS age (refs only)',
+              opencenter_config_snapshot:'opencenter:\n  cluster:\n    cluster_name: my2nd-opencenter-cluster\n  infrastructure:\n    provider: openstack (IAD3)\n    external_network: 27f1ceeb...\n  gitops:\n    url: ssh://git@github.com/Sherlock2019/opencenter-my-cluster-gitops.git\nsecrets: SOPS age (refs only)',
               phases:[ {n:'Configure',s:'ok',d:'9m',i:3}, {n:'Generate',s:'ok',d:'3m',i:1}, {n:'Provision',s:'bad',d:'21m',i:2}, {n:'Kubernetes Install',s:'warn',d:'-',i:1}, {n:'GitOps Reconcile',s:'warn',d:'-',i:0}, {n:'Validate',s:'warn',d:'-',i:0} ],
               issues:[
-                ['Configure','Region case mismatch (dfw3 vs DFW3)','Keystone catalog registers uppercase','Uppercased region in blueprint','Platform Engineer','Fixed'],
+                ['Configure','Region mismatch between target selector and blueprint','Keystone catalog region must match selected target','Wired selected region through metadata, cloud, DNS, and generated assets','Platform Engineer','Fixed'],
                 ['Configure','Invalid external network UUID','Placeholder left by renderer','Set real PUBLICNET router UUID','Platform Engineer','Fixed'],
                 ['Provision','Floating IP quota exceeded','Leftover unattached FIPs in tenant','Released unused FIPs','Cloud Ops','Fixed'],
                 ['Provision','3 nodes unreachable during cloud-init','Nodes still booting / possible SNAT issue','Pending re-run','Cloud Ops','Open'],
@@ -4973,7 +5028,7 @@ kubectl describe kustomization &lt;name&gt; -n flux-system</div>
         s.org = _slug(s.org) || 'my-org';
         s.cluster = _slug(s.cluster) || 'my-cluster';
         var configPath = '/home/dzoan/.config/opencenter/clusters/blueprints/'+s.org+'/'+s.cluster+'/'+s.cluster+'-config.yaml';
-        var _fqdn = s.cluster+'.'+(s.region||'dfw3').toLowerCase()+'.k8s.opencenter.cloud';
+        var _fqdn = s.cluster+'.'+ocqsCanonicalRegion(s.region, s.authUrl).toLowerCase()+'.k8s.opencenter.cloud';
         var _setUrl = function(id, prefix){ var el=g(id); if(el) el.textContent='https://'+prefix+'.'+_fqdn; };
         _setUrl('ocqp-url-keycloak','auth');
         _setUrl('ocqp-url-grafana','grafana');
@@ -5086,7 +5141,7 @@ var c9b=g('ocqp-cmd-9b');
           + "kubectl get helmreleases -A --no-headers 2>/dev/null | awk '{n++; a=a (n>1?\", \":\"\") $2} END{print \"HelmReleases:   \" n+0 \" installed (\" a \")\"}'\n"
           + "kubectl get pods -A --no-headers | awk '!/Running|Completed/{b++} END{print \"Pods:           \" NR \" total - \" b+0 \" not Running/Completed\"}'\n"
           + "echo \"API:            $(kubectl config view --minify -o jsonpath='{.clusters[0].cluster.server}')\"\n"
-          + "echo 'Dashboard:      https://dashboard." + s.cluster + "." + (s.region||'dfw3').toLowerCase() + ".k8s.opencenter.cloud'";
+          + "echo 'Dashboard:      https://dashboard." + s.cluster + "." + ocqsCanonicalRegion(s.region, s.authUrl).toLowerCase() + ".k8s.opencenter.cloud'";
 // YAML preview
         var yp=g('ocqp-yaml-preview');
         if(yp) yp.textContent=
