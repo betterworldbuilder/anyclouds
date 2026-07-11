@@ -81,7 +81,38 @@ window.r6pRenderClassifyChart=function(){
     +'<pre style="background:#0f172a;color:#7dd3fc;padding:14px;border-radius:8px;font-size:11px;line-height:1.5;overflow-x:auto;margin-bottom:14px;">External users\n      |\n      v\nGateway / Load Balancer\n      |\n      +-- Web Frontend replicas\n      |\n      +-- API Server replicas\n                |\n                v\n       Core Backend replicas\n          |       |       |\n          |       |       +-- Queue / Event Stream\n          |       +----------- Cache / Session Store\n          +------------------- External Database\n\nWorkers -----------------> Queue\nUploads/Documents -------> Object or shared storage\nLogs/Metrics/Traces -----> Central observability platform\nSecrets ------------------> External secret manager</pre>'
     +'<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:12px 16px;font-size:12px;color:#1e40af;font-weight:600;line-height:1.6;">Package application execution in immutable containers, but keep configuration, credentials, sessions, databases, queues and persistent files outside those containers.</div>';
 };
-window.r6pInit=function(){r6pRenderProgress();r6pRenderStages();r6pGoTo(0);setTimeout(r6pLoadBiz,350);setTimeout(r6pLoadCredCache,200);setTimeout(r6pLoadCredsServer,250);r6pRenderClassifyChart();r6pRenderPipelineStepsTable();};
+var R6_DELTA_COMPARE=[['Primary goal','Convert suitable application components into containers','Rebuild the entire Business Apps System using the best mix of containers, VMs, Kubernetes services and external services'],['Input','FLEX applications and VMs mainly inspected for containerization','Complete FLEX Business Apps System: VMs, networks, volumes, IPs, ports, security groups, load balancers and dependencies'],['Output','Docker images, Kubernetes manifests and references to external components','A complete deployable Business Apps System blueprint containing containers, VMs, networks, storage and all connections'],['Business-system identity','Produced container artifacts from the source system','Creates a new version of the same logical system, such as BankMobile FLEX v1 to BankMobile Hybrid v2'],['VM treatment','Non-container components were normally kept external or handed off separately','VMs are first-class target components: retained, redeployed or newly provisioned through OpenCenter'],['OpenCenter responsibility','Mainly deploy Kubernetes and GitOps artifacts','Deploy and manage the complete hybrid system: containers, VMs, networking, volumes, aliases and connectivity'],['Container decision','Containerize, operator-manage, keep external or block','Containerized, partially containerized, Kubernetes-native, operator-managed, retained VM, redeployed VM, external or blocked'],['Network handling','Mostly remapped application endpoints to Kubernetes Services','Reconstructs full network topology, routing, DNS, security groups, internal load balancers and NetworkPolicies'],['Storage handling','PVCs and external data-migration plans','Handles Kubernetes PVCs plus FLEX/OpenStack VM volumes, attachments, mount definitions and object storage'],['Dependency mapping','Mainly container-to-container and container-to-external','Supports all four paths: container to container, container to VM, VM to container and component to external service'],['VM artifacts','Limited retained-VM references','Full VM deployment definitions: image, flavor, network, security group, volumes, cloud-init, backup and health tests'],['Deployment bundle','Kubernetes/OpenCenter GitOps bundle','Unified OpenCenter Business System bundle with Kubernetes and OpenStack VM sections'],['Staging deployment','Deploy containers and validate external dependencies','OpenCenter provisions infrastructure and VMs, deploys containers, reconnects all components and validates the whole system'],['Cutover','Focused on application containers and migrated data','Validates complete business flows across containers, VMs, databases, storage, queues and gateways'],['Day-2 operations','Mostly Flux and Kubernetes operations','Unified application status, scaling, VM lifecycle, backup, upgrade, drift detection and rollback through OpenCenter']];
+var R6_DELTA_STAGES=[['Select FLEX Business System','Import the complete application and infrastructure topology'],['Hydrate FLEX Inventory','Verify VMs, networks, volumes, endpoints and existing relationships'],['Runtime Inspection','Inspect application processes plus VM-specific runtime requirements'],['Component Detection','Build an application, infrastructure and network model'],['State Classification','Also assess portability, licensing, hardware and machine-identity requirements'],['Containerization Decision','Replaced by target-runtime selection for every component'],['Asset Extraction','Extract container assets and preserve complete VM deployment definitions'],['Readiness Assessment','Validate container readiness, VM deployability and hybrid connectivity'],['Target Architecture','Design the complete hybrid Business Apps System'],['Image Build','Build container images and prepare VM images, snapshots, cloud-init and volume definitions'],['GitOps Bundle','Generate a unified OpenCenter deployment blueprint'],['Staging Deployment','OpenCenter provisions VMs and infrastructure and deploys Kubernetes workloads'],['Cutover','Validate the entire container-and-VM business transaction path'],['Final Report','Register the system for OpenCenter day-2 management']];
+var R6_DELTA_SCOPE=[['Containers and Kubernetes services','FluxCD, Helm, Kustomize and Kubernetes APIs'],['FLEX/OpenStack VMs and infrastructure','Terraform/OpenTofu and OpenStack APIs'],['VM volumes','Cinder provisioning and attachment'],['Kubernetes storage','CSI, StorageClasses and PVCs'],['Container-to-VM access','Kubernetes Service aliases and EndpointSlices'],['VM-to-container access','Internal load balancer, Gateway and private DNS'],['Network security','OpenStack security groups and Kubernetes NetworkPolicies'],['System validation','Component, dependency and end-to-end business tests']];
+window.r6pRenderHybridDeltaChart=function(){
+  var host=document.getElementById('r6p-hybrid-delta-body');if(!host)return;
+  var cmpRows=R6_DELTA_COMPARE.map(function(r){
+    return '<tr><td style="font-weight:700;color:#0369a1;">'+r[0]+'</td><td style="font-size:11px;color:#64748b;">'+r[1]+'</td><td style="font-size:11px;color:#166534;font-weight:600;">'+r[2]+'</td></tr>';
+  }).join('');
+  var stgRows=R6_DELTA_STAGES.map(function(r){
+    return '<tr><td style="font-weight:600;">'+r[0]+'</td><td style="font-size:11px;color:#475569;">'+r[1]+'</td></tr>';
+  }).join('');
+  var scopeRows=R6_DELTA_SCOPE.map(function(r){
+    return '<tr><td style="font-weight:600;">'+r[0]+'</td><td style="font-size:11px;color:#0369a1;font-weight:600;">'+r[1]+'</td></tr>';
+  }).join('');
+  var tfRows=R6_TARGET_FORMS.map(function(r){
+    return '<tr><td style="font-weight:700;color:#0369a1;">'+r[0]+'</td><td style="font-size:11px;color:#475569;">'+r[1]+'</td><td style="font-size:11px;color:#64748b;">'+r[2]+'</td></tr>';
+  }).join('');
+  host.innerHTML='<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:12px 16px;font-size:12px;color:#1e40af;font-weight:700;line-height:1.6;margin-bottom:18px;">The previous pipeline containerized parts of a business system; the hybrid pipeline transforms, deploys and operates the entire business system as one OpenCenter-managed application composed of containers, Kubernetes services, VMs, networks, storage and reconstructed dependencies.</div>'
+    +'<div style="font-weight:800;font-size:13px;color:#0f172a;margin-bottom:8px;">Previous Pipeline vs. Hybrid Pipeline</div>'
+    +'<div style="overflow-x:auto;max-height:420px;overflow-y:auto;margin-bottom:18px;"><table class="r6p-table"><thead><tr><th>Area</th><th>Previous pipeline</th><th>Hybrid pipeline</th></tr></thead><tbody>'+cmpRows+'</tbody></table></div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:18px;">'
+    +'<div><div style="font-weight:800;font-size:12px;color:#64748b;margin-bottom:6px;">Previous model</div><pre style="background:#0f172a;color:#fca5a5;padding:12px;border-radius:8px;font-size:10.5px;line-height:1.5;overflow-x:auto;margin:0;">FLEX Business System\n        |\n        v\nContainerization Engine\n        |\n        v\nDocker images + Kubernetes manifests\n        |\n        v\nOpenCenter deploys containers\n        |\n        v\nVM components remain external</pre></div>'
+    +'<div><div style="font-weight:800;font-size:12px;color:#64748b;margin-bottom:6px;">Hybrid model</div><pre style="background:#0f172a;color:#7dd3fc;padding:12px;border-radius:8px;font-size:10.5px;line-height:1.5;overflow-x:auto;margin:0;">FLEX Business Apps System\n+-- VMs\n+-- Networks\n+-- Volumes\n+-- Load balancers\n+-- Dependencies\n        |\n        v\nR6 Hybrid Transformation Engine\n        |\n        v\nTarget Business Apps System\n+-- Containers\n+-- Kubernetes-native services\n+-- Operator-managed services\n+-- Retained or redeployed VMs\n+-- Networks and storage\n+-- Reconstructed connections\n        |\n        v\nOpenCenter deploys and manages everything</pre></div>'
+    +'</div>'
+    +'<div style="font-weight:800;font-size:13px;color:#0f172a;margin-bottom:8px;">Main Pipeline Stage Changes</div>'
+    +'<div style="overflow-x:auto;max-height:340px;overflow-y:auto;margin-bottom:18px;"><table class="r6p-table"><thead><tr><th>Previous stage</th><th>Hybrid change</th></tr></thead><tbody>'+stgRows+'</tbody></table></div>'
+    +'<div style="font-weight:800;font-size:13px;color:#0f172a;margin-bottom:8px;">New Component Target Options (used live in Step 8 - Transform)</div>'
+    +'<div style="overflow-x:auto;max-height:340px;overflow-y:auto;margin-bottom:18px;"><table class="r6p-table"><thead><tr><th>Target option</th><th>Meaning</th><th>Typical examples</th></tr></thead><tbody>'+tfRows+'</tbody></table></div>'
+    +'<div style="font-weight:800;font-size:13px;color:#0f172a;margin-bottom:8px;">New OpenCenter Deployment Scope</div>'
+    +'<div style="overflow-x:auto;"><table class="r6p-table"><thead><tr><th>Deployment area</th><th>OpenCenter mechanism</th></tr></thead><tbody>'+scopeRows+'</tbody></table></div>';
+};
+window.r6pInit=function(){r6pRenderProgress();r6pRenderStages();r6pGoTo(0);setTimeout(r6pLoadBiz,350);setTimeout(r6pLoadCredCache,200);setTimeout(r6pLoadCredsServer,250);r6pRenderClassifyChart();r6pRenderPipelineStepsTable();r6pRenderHybridDeltaChart();};
 
 /* Server-side credential persistence - survives incognito/browser reset/different browsers.
    localStorage stays as a fast local mirror; the server file is the source of truth. */
@@ -245,6 +276,55 @@ window.r6pDecideMigrationMode=function(c){
     reason:appFileCount+' files found under app paths - lightweight, no local DB detected.',
     method:'Containerize and deploy via OpenCenter GitOps'};
 };
+var R6_TARGET_FORMS=[['CONTAINERIZED','Converted into a tested Docker image and Kubernetes workload','Frontend, API, backend service'],['PARTIALLY_CONTAINERIZED','Application process becomes a container, but state stays outside','Reporting app with external reports'],['KUBERNETES_NATIVE','VM function is replaced by a native Kubernetes capability','Gateway API, CronJob, scheduler, platform monitoring'],['OPERATOR_MANAGED','Service is recreated through a Kubernetes operator','Redis, RabbitMQ, Kafka'],['RETAINED_FLEX_VM','Existing FLEX VM stays in service, unchanged','Oracle DB, legacy or commercial application'],['REDEPLOYED_FLEX_VM','Component remains a VM but can be recreated from its VM definition','Windows app, licensed software requiring a VM'],['EXTERNAL_SERVICE','Represented through a managed endpoint and logical service alias','Partner API, managed object storage, secrets manager'],['DATA_MIGRATION_REQUIRED','Persistent data is migrated independently of the application process','Upload volume, documents, object storage'],['MANUAL_REVIEW','Insufficient evidence for an automatic decision','Unknown legacy service'],['BLOCKED','Cannot currently be transformed or safely connected','Hardware-bound workload'],['EXCLUDED','Component is not required in the new system','Obsolete agent']];
+/* Real hybrid-transform decision engine (Stage 8 Transform table): assigns each real
+   selected component one of the 11 target forms above, using its state/portability
+   classification (r6pClassifyFor), name signals and the readiness engine's migration
+   mode. Every decision is overridable per component and persisted in R6P.targetForms. */
+window.r6pDecideTargetForm=function(c){
+  var name=(c.name||'').toLowerCase();
+  var cls=r6pClassifyFor(c.name)||{state:'Unknown / mixed',decision:''};
+  var mig=r6pDecideMigrationMode(c);
+  if(mig.status==='COMPATIBILITY_CONTAINER_ONLY'){
+    return {form:'REDEPLOYED_FLEX_VM',reason:'Legacy/Windows workload - not containerizable yet; recreate as a VM from its FLEX definition.'};
+  }
+  if(/database|(^|[^a-z])db([^a-z]|$)|mysql|postgres|mongo|oracle|mssql|nosql/.test(name)){
+    return {form:'RETAINED_FLEX_VM',reason:'Stateful database - keep the existing FLEX VM in service; do not bake into a container image.'};
+  }
+  if(/legacy|erp|commercial|mainframe/.test(name)){
+    return {form:'RETAINED_FLEX_VM',reason:'Legacy or commercial/licensed application - keep the existing FLEX VM in service.'};
+  }
+  if(/redis|rabbitmq|kafka|cache|queue|session store|event stream|search engine/.test(name)){
+    return {form:'OPERATOR_MANAGED',reason:'Stateful platform service - recreate through a Kubernetes operator instead of a plain container.'};
+  }
+  if(/gateway|load balancer|\bscheduler\b/.test(name)){
+    return {form:'KUBERNETES_NATIVE',reason:'VM function has a native Kubernetes equivalent (Gateway API, CronJob, etc).'};
+  }
+  if(/monitoring|tracing|metrics exporter|log processor/.test(name)){
+    return {form:'KUBERNETES_NATIVE',reason:'Platform capability - replace with the cluster-native equivalent (Prometheus/Grafana/OTel) rather than migrating the VM.'};
+  }
+  if(/object storage|file storage|upload|document|backup service/.test(name)){
+    return {form:'DATA_MIGRATION_REQUIRED',reason:'Persistent files/objects must be migrated independently of the application process.'};
+  }
+  if(/secrets manager/.test(name)){
+    return {form:'EXTERNAL_SERVICE',reason:'Represent through a managed endpoint and Secret reference rather than redeploying.'};
+  }
+  if(cls.state==='Stateless'){
+    if(mig.workloadType==='Complex monolith'){
+      return {form:'PARTIALLY_CONTAINERIZED',reason:'Large/complex codebase - containerize the process but keep verifying externalized state first.'};
+    }
+    return {form:'CONTAINERIZED',reason:'Stateless component - safe to containerize and run as a Kubernetes Deployment.'};
+  }
+  if(cls.state==='Stateful'){
+    return {form:'DATA_MIGRATION_REQUIRED',reason:'Stateful component without a specific operator match - plan an independent data migration.'};
+  }
+  return {form:'MANUAL_REVIEW',reason:'Insufficient evidence for an automatic decision - review manually before assigning a target form.'};
+};
+window.r6pSetTargetForm=function(name,val){
+  R6P.targetForms=R6P.targetForms||{};
+  R6P.targetForms[name]=val;
+  var b=document.getElementById('r6p-tf-badge-'+btoa(unescape(encodeURIComponent(name))).replace(/[^a-zA-Z0-9]/g,''));
+};
 function r6pCmd(id,cmd){var cid='r6p-cmd-'+id,oid='r6p-out-'+id;return '<div class="r6p-cmd-box" id="'+cid+'">'+cmd.replace(/</g,'&lt;').replace(/>/g,'&gt;')+'</div><div style="display:flex;gap:5px;margin-bottom:8px;"><button onclick="navigator.clipboard&&navigator.clipboard.writeText(document.getElementById(\''+cid+'\').textContent)" style="background:#f1f5f9;color:#475569;border:1px solid #e2e8f0;border-radius:4px;padding:3px 10px;font-size:10px;cursor:pointer;">Copy</button><button onclick="r6pRunCmd(\''+cid+'\',\''+oid+'\')" style="background:#eff6ff;color:#0369a1;border:1px solid #bfdbfe;border-radius:4px;padding:3px 10px;font-size:10px;font-weight:700;cursor:pointer;">Run</button><button onclick="var e=document.getElementById(\''+oid+'\');e.style.display=e.style.display===\'none\'?\'block\':\'none\'" style="background:#f1f5f9;color:#64748b;border:1px solid #e2e8f0;border-radius:4px;padding:3px 10px;font-size:10px;cursor:pointer;">Log</button></div><div id="'+oid+'" class="r6p-terminal" style="display:none;">$ waiting...</div>';}
 
 window.r6pContent=function(n){
@@ -313,6 +393,16 @@ window.r6pContent=function(n){
         return '<tr><td style="font-weight:600;">'+d.name+'</td><td style="font-size:11px;color:#64748b;">'+d.workloadType+'</td><td><span style="background:'+rc[0]+';color:'+rc[1]+';padding:2px 8px;border-radius:999px;font-size:10px;font-weight:700;">'+d.status.replace(/_/g,' ')+'</span></td><td style="font-size:11px;color:#64748b;max-width:220px;">'+d.reason+'</td><td style="font-size:11px;color:#0369a1;font-weight:700;">'+d.method+'</td><td><span style="background:'+(d.status==='BLOCKED'?'#fee2e2':'#dcfce7')+';color:'+(d.status==='BLOCKED'?'#dc2626':'#16a34a')+';padding:2px 8px;border-radius:999px;font-size:10px;font-weight:700;">'+(d.status==='BLOCKED'?'No':'Yes')+'</span></td></tr>';}).join('')
       +'</tbody></table></div>'
       +(allCanProceed?'':'<div class="r6p-warn-box" style="margin-top:10px;">One or more components are BLOCKED - resolve before approving.</div>')
+      +'<div style="font-weight:800;font-size:13px;color:#0f172a;margin:20px 0 8px;">Transform: Target Runtime Decision (Hybrid)</div>'
+      +'<div class="r6p-info-box">Assigns every real selected component one of 11 target forms - CONTAINERIZED, KUBERNETES_NATIVE, OPERATOR_MANAGED, RETAINED_FLEX_VM, REDEPLOYED_FLEX_VM, EXTERNAL_SERVICE, DATA_MIGRATION_REQUIRED, PARTIALLY_CONTAINERIZED, MANUAL_REVIEW, BLOCKED or EXCLUDED. Engineers can override any row - overrides are saved per component.</div>'
+      +'<div style="overflow-x:auto;"><table class="r6p-table"><thead><tr><th>Component</th><th>Default Target Form</th><th>Reason</th><th>Override</th></tr></thead><tbody>'
+      +comps8.map(function(c){
+        var tf=r6pDecideTargetForm(c);
+        var saved=(R6P.targetForms&&R6P.targetForms[c.name])||tf.form;
+        var opts=R6_TARGET_FORMS.map(function(r){return '<option value="'+r[0]+'"'+(r[0]===saved?' selected':'')+'>'+r[0]+'</option>';}).join('');
+        return '<tr><td style="font-weight:600;">'+c.name+'</td><td><span style="background:#eff6ff;color:#0369a1;padding:2px 8px;border-radius:999px;font-size:10px;font-weight:700;">'+tf.form+'</span></td><td style="font-size:11px;color:#64748b;max-width:280px;">'+tf.reason+'</td><td><select onchange="r6pSetTargetForm(\''+c.name.replace(/'/g,"\\'")+'\',this.value)" style="padding:4px 6px;border:1px solid #cbd5e1;border-radius:5px;font-size:11px;">'+opts+'</select></td></tr>';
+      }).join('')
+      +'</tbody></table></div>'
       +r6pFoot(8,'<button class="r6p-btn success" onclick="r6pMarkDone(8)"'+(allCanProceed?'':' disabled')+'>Approve Readiness Plan</button>');}
   if(n===9)return '<div class="r6p-info-box">Generates a real per-component Dockerfile, extract_assets.sh (pulls app files from the live FLEX VM), build_and_push.sh, and a SOPS-encrypted registry pull secret - the same engine used by Ship to OpenCenter.</div>'
     +'<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px;">'
