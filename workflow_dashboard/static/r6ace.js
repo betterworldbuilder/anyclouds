@@ -127,7 +127,7 @@ window.r6pGoTo=function(n){
     else{b.classList.remove('open');var st=R6P.status[s.n]||'ns';card.className='r6p-stage'+(st!=='ns'?' '+st:'');}
   });
   r6pRenderProgress();
-  if(n===1)setTimeout(r6pLoadBiz,200);
+  if(n===1){setTimeout(r6pLoadBiz,200);setTimeout(r6pLoadSa,200);}
 };
 
 function r6pFoot(n,extra){return '<div class="r6p-stage-footer">'+(extra||'')+'<button class="r6p-btn success" onclick="r6pMarkDone('+n+')">Mark Complete</button>'+(n<12?'<button class="r6p-btn primary" onclick="r6pGoTo('+(n+1)+')">Continue</button>':'')+'</div>';}
@@ -135,7 +135,9 @@ function r6pCmd(id,cmd){var cid='r6p-cmd-'+id,oid='r6p-out-'+id;return '<div cla
 
 window.r6pContent=function(n){
   if(n===0)return r6pStage0();
-  if(n===1)return '<div class="r6p-warn-box">Only FLEX workloads can be converted here. Complete migration to FLEX first.</div><div class="uat-s1-biz-grid"><div><div style="font-weight:800;font-size:15px;color:#0f172a;margin-bottom:12px;">Business Systems <span style="font-size:11px;color:#64748b;font-weight:400;">from FLEX Migration Log</span></div><div id="r6p-biz-list" style="min-height:180px;"></div></div><div class="uat-s1-arch-selector"><div class="uat-s1-arch-head"><div class="uat-s1-arch-title">Business System Templates</div><span class="uat-s1-arch-badge">10 Templates</span></div><p class="uat-s1-arch-desc">Templates define structure only. Conversion requires real FLEX VM/DB mapping.</p><div class="uat-s1-template-pane active"><div id="r6p-arch-grid" class="uat-s1-arch-grid"></div></div></div></div>'+r6pFoot(1,'<button class="r6p-btn secondary" onclick="r6pLoadBiz()">Refresh FLEX Inventory</button>');
+  if(n===1)return '<div class="r6p-warn-box">Only FLEX workloads can be converted here. Complete migration to FLEX first.</div><div class="uat-s1-biz-grid"><div><div style="font-weight:800;font-size:15px;color:#0f172a;margin-bottom:12px;">Business Systems <span style="font-size:11px;color:#64748b;font-weight:400;">from FLEX Migration Log</span></div><div id="r6p-biz-list" style="min-height:180px;"></div>'
+    +'<div style="font-weight:800;font-size:15px;color:#0f172a;margin:16px 0 12px;">Single FLEX VM / DB <span style="font-size:11px;color:#64748b;font-weight:400;">standalone items, from FLEX Migration Log</span></div><div id="r6p-sa-list" style="min-height:60px;"></div>'
+    +'</div><div class="uat-s1-arch-selector"><div class="uat-s1-arch-head"><div class="uat-s1-arch-title">Business System Templates</div><span class="uat-s1-arch-badge">10 Templates</span></div><p class="uat-s1-arch-desc">Templates define structure only. Conversion requires real FLEX VM/DB mapping.</p><div class="uat-s1-template-pane active"><div id="r6p-arch-grid" class="uat-s1-arch-grid"></div></div></div></div>'+r6pFoot(1,'<button class="r6p-btn secondary" onclick="r6pLoadBiz()">Refresh FLEX Inventory</button>');
   if(n===2||n===3||n===4||n===5){
     var skipMsg={2:'Discover FLEX Snapshots',3:'Select Snapshot / Volume Snapshot',4:'Map Snapshot to Business System Component',5:'Choose Capture and Conversion Method'}[n];
     return '<div class="r6p-info-box" style="background:#f0fdf4;border-color:#bbf7d0;">'
@@ -322,6 +324,39 @@ window.r6pConfirmCompat=function(){
 window.r6pLoadBiz=function(){var list=document.getElementById('r6p-biz-list');if(!list)return;try{var sys=JSON.parse(localStorage.getItem('uatS1_systems')||'[]');if(!sys.length){list.innerHTML='<div style="color:#94a3b8;font-size:13px;padding:20px;text-align:center;">No business systems. Create them in Migration Logs first.</div>';return;}list.innerHTML=sys.map(function(s){var comps=s.components||[];return '<div class="r6p-bs-card" id="r6p-bsc-'+s.id+'" onclick="r6pSelectBS(\''+s.id+'\')">'+'<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;">'+'<div style="display:flex;align-items:center;gap:8px;">'+'<div style="width:32px;height:32px;border-radius:8px;background:#eff6ff;color:#2563eb;font-weight:900;font-size:11px;display:grid;place-items:center;">'+s.name.slice(0,2).toUpperCase()+'</div>'+'<div><div style="font-weight:800;color:#0f172a;font-size:14px;">'+s.name+'</div><div style="font-size:11px;color:#64748b;">'+(s.type||'')+(s.criticality?' - '+s.criticality:'')+(s.migrationWave?' - Wave '+s.migrationWave:'')+'</div></div></div>'+'<span style="background:#dcfce7;color:#16a34a;padding:2px 8px;border-radius:999px;font-size:10px;font-weight:700;">Active</span></div>'+'<div style="display:flex;flex-wrap:wrap;gap:3px;margin-bottom:10px;">'+comps.slice(0,7).map(function(c){return '<span class="r6p-chip">'+c.name+'</span>';}).join('')+'</div>'+'<div style="display:flex;gap:6px;"><button onclick="event.stopPropagation();r6pSelectBS(\''+s.id+'\')" class="r6p-btn primary" style="padding:5px 12px;font-size:11px;">Select for Refactor</button><button onclick="event.stopPropagation();typeof uatS1OpenModal===\'function\'&&uatS1OpenModal(\''+s.id+'\')" class="r6p-btn secondary" style="padding:5px 12px;font-size:11px;">Inspect</button></div></div>';}).join('');var ag=document.getElementById('r6p-arch-grid'),lg=document.getElementById('uatS1ArchList');if(ag&&lg&&lg.innerHTML.trim()){ag.innerHTML=lg.innerHTML;ag.querySelectorAll('.uat-s1-arch-card').forEach(function(c){c.style.cursor='pointer';c.addEventListener('click',function(){ag.querySelectorAll('.uat-s1-arch-card').forEach(function(x){x.classList.remove('selected');});c.classList.add('selected');var k=c.getAttribute('data-arch-key');typeof window.uatS1OpenModal==='function'&&window.uatS1OpenModal(null,k);});});}}catch(e){if(list)list.innerHTML='<div style="color:#dc2626;padding:10px;">'+e.message+'</div>';}};
 
 window.r6pSelectBS=function(id){document.querySelectorAll('[id^="r6p-bsc-"]').forEach(function(el){el.classList.remove('selected');});var c=document.getElementById('r6p-bsc-'+id);if(c)c.classList.add('selected');try{var sys=JSON.parse(localStorage.getItem('uatS1_systems')||'[]');var bs=sys.find(function(s){return s.id===id;});if(!bs)return;R6P.bs=bs;R6P.components=bs.components||[];var si=document.getElementById('r6p-sum-input');if(si)si.textContent=bs.name;var sc=document.getElementById('r6p-sum-comps');if(sc)sc.textContent=(bs.components||[]).length+' components';R6P_RESCAN_GROUP.forEach(function(gn){R6P.status[gn]='done';});r6pMarkDone(1);}catch(e){}};
+window.r6pLoadSa=function(){
+  var list=document.getElementById('r6p-sa-list');if(!list)return;
+  try{
+    var sas=JSON.parse(localStorage.getItem('uatS1_standalones')||'[]');
+    if(!sas.length){list.innerHTML='<div style="color:#94a3b8;font-size:12px;padding:10px 0;">No standalone VMs/DBs. Create one in Migration Logs first.</div>';return;}
+    list.innerHTML=sas.map(function(s){
+      var isDb=s.itemType==='database';
+      return '<div class="r6p-bs-card" id="r6p-sac-'+s.id+'" onclick="r6pSelectSa(\''+s.id+'\')" style="margin-bottom:8px;">'
+        +'<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;">'
+        +'<div style="display:flex;align-items:center;gap:8px;"><div style="width:28px;height:28px;border-radius:8px;background:'+(isDb?'#faf5ff':'#eff6ff')+';color:'+(isDb?'#7c3aed':'#2563eb')+';font-weight:900;font-size:10px;display:grid;place-items:center;">'+(isDb?'DB':'VM')+'</div>'
+        +'<div><div style="font-weight:800;color:#0f172a;font-size:13px;">'+s.name+'</div><div style="font-size:10px;color:#64748b;">'+(s.componentRole||'')+(s.target?' - '+s.target:'')+'</div></div></div>'
+        +'<span style="background:#dcfce7;color:#16a34a;padding:2px 8px;border-radius:999px;font-size:10px;font-weight:700;">'+(s.status||'Active')+'</span></div>'
+        +'<button onclick="event.stopPropagation();r6pSelectSa(\''+s.id+'\')" class="r6p-btn primary" style="padding:4px 10px;font-size:10px;">Select for Refactor</button>'
+        +'</div>';
+    }).join('');
+  }catch(e){if(list)list.innerHTML='<div style="color:#dc2626;padding:10px;">'+e.message+'</div>';}
+};
+window.r6pSelectSa=function(id){
+  document.querySelectorAll('[id^="r6p-sac-"]').forEach(function(el){el.classList.remove('selected');});
+  var c=document.getElementById('r6p-sac-'+id);if(c)c.classList.add('selected');
+  try{
+    var sas=JSON.parse(localStorage.getItem('uatS1_standalones')||'[]');
+    var sa=sas.find(function(s){return s.id===id;});if(!sa)return;
+    var comp={name:sa.name,type:sa.componentRole||(sa.itemType==='database'?'Database':'Application'),
+      src:'',tgt:sa.target||'',path:sa.itemType==='database'?(sa.readQuery||'SELECT 1'):(sa.healthUrl||'/health')};
+    R6P.bs={id:sa.id,name:sa.name,components:[comp]};
+    R6P.components=[comp];
+    var si=document.getElementById('r6p-sum-input');if(si)si.textContent=sa.name+' (standalone)';
+    var sc=document.getElementById('r6p-sum-comps');if(sc)sc.textContent='1 component';
+    R6P_RESCAN_GROUP.forEach(function(gn){R6P.status[gn]='done';});
+    r6pMarkDone(1);
+  }catch(e){}
+};
 
 window.r6pRunCmd=function(cmdId,outId){var out=document.getElementById(outId),cEl=document.getElementById(cmdId);if(!out||!cEl)return;var cmd=cEl.textContent.trim();out.style.display='block';out.style.borderColor='#134e4a';out.textContent='$ '+cmd+'\n';var url='/api/stream/run-cmd?cmd='+encodeURIComponent(cmd);var es=new EventSource(url);es.onmessage=function(e){if(e.data!=='[DONE]'){out.textContent+=e.data+'\n';out.scrollTop=out.scrollHeight;if(e.data.indexOf('[EXIT 0]')>=0)out.style.borderColor='#166534';}else{es.close();if((out.textContent.indexOf('EXIT 127')>=0||out.textContent.indexOf('command not found')>=0)&&R6ACE_INSTALL&&R6ACE_INSTALL[cmd]){out.style.borderColor='#dc2626';var iid='inst-'+cmdId;if(!document.getElementById(iid)){var ic=R6ACE_INSTALL[cmd];var d=document.createElement('div');d.id=iid;d.style.cssText='margin-top:8px;background:#fff3cd;border:2px solid #f59e0b;border-radius:8px;padding:12px;';d.innerHTML='<strong style="color:#92400e;">Not installed</strong><pre style="background:#0f172a;color:#fbbf24;border-radius:4px;padding:6px;font-size:10px;white-space:pre-wrap;margin:6px 0;">'+ic+'</pre><button onclick="r6aceRunInstall(\''+iid+'\',\''+cmdId+'\',\''+outId+'\')" style="background:#16a34a;color:#fff;border:none;border-radius:6px;padding:6px 14px;font-size:11px;font-weight:800;cursor:pointer;">Install Now</button>';out.parentNode.insertBefore(d,out.nextSibling);}}}};es.onerror=function(){out.textContent+='[closed]\n';es.close();};};
 window.r6aceRun=window.r6pRunCmd;
@@ -1088,20 +1123,39 @@ window.r6pRunLiveScan=function(){
   var key=(document.getElementById('r6p-scan-key')||{}).value||'~/.ssh/id_rsa';
   var ip=comp.tgt;
   var sshBase='ssh -i '+key+' -o StrictHostKeyChecking=no -o ConnectTimeout=8 '+user+'@'+ip+' ';
-  var cmd='echo "== Live scan: '+comp.name+' ('+ip+') =="\n'
+  var cmd='echo "== Guest dependency scan: '+comp.name+' ('+ip+') =="\n'
     +'echo "-- hostnamectl / uname --"\n'+sshBase+'"hostnamectl 2>/dev/null; uname -a"\n'
     +'echo "-- open ports --"\n'+sshBase+'"ss -tulpn 2>/dev/null || netstat -tulpn 2>/dev/null"\n'
     +'echo "-- running services --"\n'+sshBase+'"systemctl --type=service --state=running 2>/dev/null | head -30"\n'
     +'echo "-- top processes --"\n'+sshBase+'"ps aux --sort=-%mem 2>/dev/null | head -30"\n'
+    +'echo "-- disk usage (df -h) --"\n'+sshBase+'"df -h 2>/dev/null"\n'
+    +'echo "-- block devices (lsblk) --"\n'+sshBase+'"lsblk 2>/dev/null"\n'
+    +'echo "-- mounts (/etc/fstab) --"\n'+sshBase+'"cat /etc/fstab 2>/dev/null"\n'
+    +'echo "-- cron jobs --"\n'+sshBase+'"crontab -l 2>/dev/null; ls /etc/cron.d/ 2>/dev/null"\n'
+    +'echo "-- known app/db config files --"\n'+sshBase+'"find /etc -maxdepth 3 -type f 2>/dev/null | grep -E \'nginx|apache|mysql|postgres|mongo|redis|env\' | head -30"\n'
     +'echo "-- app paths (non-system files) --"\n'+sshBase+'"find /opt /srv /var/www /home -maxdepth 4 -type f 2>/dev/null | grep -vE \'\\.cache|\\.log$\' | head -50"';
   if(out){out.style.display='block';out.textContent='';}
+  R6P.depScan=R6P.depScan||{};
+  R6P.depScan[comp.name]={ip:ip,startedAt:new Date().toISOString(),rawLog:''};
   var url='/api/stream/run-cmd?cmd='+encodeURIComponent(cmd);
   var es=new EventSource(url);
   es.onmessage=function(e){
     if(e.data==='[DONE]'||e.data.indexOf('[EXIT')===0){es.close();return;}
     if(out){out.textContent+=e.data+'\n';out.scrollTop=out.scrollHeight;}
+    R6P.depScan[comp.name].rawLog+=e.data+'\n';
   };
   es.onerror=function(){es.close();if(out)out.textContent+='[stream error]\n';};
+};
+window.r6pExportDepScan=function(){
+  var sel=document.getElementById('r6p-scan-comp');
+  var comps6=(R6P.components||[]).filter(function(c){return c.tgt;});
+  var comp=comps6[sel?sel.value:''];
+  if(!comp||!R6P.depScan||!R6P.depScan[comp.name]){alert('Run the live scan first.');return;}
+  var report={component:comp.name,ip:comp.tgt,scannedAt:R6P.depScan[comp.name].startedAt,raw:R6P.depScan[comp.name].rawLog};
+  var blob=new Blob([JSON.stringify(report,null,2)],{type:'application/json'});
+  var a=document.createElement('a');a.href=URL.createObjectURL(blob);
+  a.download='app_dependency_report_'+comp.name.replace(/\s+/g,'_')+'.json';
+  document.body.appendChild(a);a.click();document.body.removeChild(a);
 };
 
 window.r6pRunClassify=function(){
