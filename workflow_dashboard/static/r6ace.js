@@ -30,6 +30,29 @@ window.r6pClassifyFor=function(name){
   if(n.indexOf('queue')>=0)return{state:'Stateful',decision:'Deploy with operator or use a managed queue'};
   return{state:'Unknown / mixed',decision:'Run live assessment before deciding'};
 };
+window.r6pRenderPipelineStepsTable=function(){
+  var host=document.getElementById('r6p-pipeline-steps-body');if(!host)return;
+  var groupDesc='Offline-capture path (snapshot discovery, volume snapshot selection, mapping to component, capture method) - not needed for live FLEX VMs, since Step 1 already has target IP/volumes. Ends with the live SSH scan (OS, runtime, ports, services, files) for already-running VMs.';
+  var rows=[];
+  var groupHandled=false;
+  R6P_STEPS.forEach(function(st){
+    if(R6P_RESCAN_GROUP.indexOf(st.n)>=0){
+      if(groupHandled)return;
+      groupHandled=true;
+      var lo=Math.min.apply(null,R6P_RESCAN_GROUP), hi=Math.max.apply(null,R6P_RESCAN_GROUP);
+      var titles=R6P_STEPS.filter(function(s2){return R6P_RESCAN_GROUP.indexOf(s2.n)>=0;}).map(function(s2){return s2.label;}).join(' &rarr; ');
+      rows.push({num:lo+'&ndash;'+hi,stage:'Refresh FLEX VM / DB List (grouped, skip by default)',title:titles,desc:groupDesc});
+      return;
+    }
+    rows.push({num:st.n,stage:st.label,title:st.title,desc:st.desc});
+  });
+  var body=rows.map(function(r){
+    return '<tr><td style="font-weight:700;color:#0369a1;">'+r.num+'</td><td style="font-weight:600;">'+r.stage+'</td><td style="font-size:11px;color:#334155;">'+r.title+'</td><td style="font-size:11px;color:#475569;">'+r.desc+'</td></tr>';
+  }).join('');
+  host.innerHTML='<div style="font-weight:800;font-size:13px;color:#0f172a;margin-bottom:8px;">R6 Pipeline Steps</div>'
+    +'<div style="overflow-x:auto;max-height:420px;overflow-y:auto;margin-bottom:10px;"><table class="r6p-table"><thead><tr><th>#</th><th>Stage</th><th>Title</th><th>What it does</th></tr></thead><tbody>'+body+'</tbody></table></div>'
+    +'<div style="font-size:11px;color:#64748b;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:8px 12px;">Note: steps '+Math.min.apply(null,R6P_RESCAN_GROUP)+'&ndash;'+Math.max.apply(null,R6P_RESCAN_GROUP)+' are collapsed into one "Refresh FLEX VM / DB List" card and skipped by default (R6P_RESCAN_GROUP), since for live FLEX VMs the business system input in Step 1 already supplies everything the offline snapshot-capture path exists for.</div>';
+};
 window.r6pRenderClassifyChart=function(){
   var host=document.getElementById('r6p-classify-chart-body');if(!host)return;
   var stColor={'Stateless':'#16a34a','Stateful':'#dc2626','Unknown / mixed':'#d97706'};
@@ -58,7 +81,7 @@ window.r6pRenderClassifyChart=function(){
     +'<pre style="background:#0f172a;color:#7dd3fc;padding:14px;border-radius:8px;font-size:11px;line-height:1.5;overflow-x:auto;margin-bottom:14px;">External users\n      |\n      v\nGateway / Load Balancer\n      |\n      +-- Web Frontend replicas\n      |\n      +-- API Server replicas\n                |\n                v\n       Core Backend replicas\n          |       |       |\n          |       |       +-- Queue / Event Stream\n          |       +----------- Cache / Session Store\n          +------------------- External Database\n\nWorkers -----------------> Queue\nUploads/Documents -------> Object or shared storage\nLogs/Metrics/Traces -----> Central observability platform\nSecrets ------------------> External secret manager</pre>'
     +'<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:12px 16px;font-size:12px;color:#1e40af;font-weight:600;line-height:1.6;">Package application execution in immutable containers, but keep configuration, credentials, sessions, databases, queues and persistent files outside those containers.</div>';
 };
-window.r6pInit=function(){r6pRenderProgress();r6pRenderStages();r6pGoTo(0);setTimeout(r6pLoadBiz,350);setTimeout(r6pLoadCredCache,200);setTimeout(r6pLoadCredsServer,250);r6pRenderClassifyChart();};
+window.r6pInit=function(){r6pRenderProgress();r6pRenderStages();r6pGoTo(0);setTimeout(r6pLoadBiz,350);setTimeout(r6pLoadCredCache,200);setTimeout(r6pLoadCredsServer,250);r6pRenderClassifyChart();r6pRenderPipelineStepsTable();};
 
 /* Server-side credential persistence - survives incognito/browser reset/different browsers.
    localStorage stays as a fast local mirror; the server file is the source of truth. */
