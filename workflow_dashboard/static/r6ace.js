@@ -183,7 +183,17 @@ window.r6pContent=function(n){
       +'<div id="r6p-classify-out" class="r6p-terminal" style="display:none;max-height:220px;"></div>'
       +r6pFoot(7);}
   if(n===8){var comps8=R6P.components.length?R6P.components:[{name:'app',type:'frontend'},{name:'db',type:'database'}];return '<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:14px;">'+[['CLOUD_NATIVE_READY','#dcfce7','#16a34a'],['READY_WITH_EXTERNALIZATION','#fef3c7','#d97706'],['KEEP_ON_FLEX_VM_FOR_NOW','#dbeafe','#1d4ed8'],['COMPATIBILITY_CONTAINER_ONLY','#faf5ff','#7c3aed'],['BLOCKED','#fee2e2','#dc2626']].map(function(b){return '<div style="background:'+b[1]+';border-radius:8px;padding:10px;text-align:center;"><div style="font-size:16px;font-weight:900;color:'+b[2]+';">0</div><div style="font-size:9px;color:'+b[2]+';font-weight:700;margin-top:2px;">'+b[0].replace(/_/g,' ')+'</div></div>';}).join('')+'</div><div style="overflow-x:auto;"><table class="r6p-table"><thead><tr><th>Component</th><th>Capture Method</th><th>Readiness</th><th>Reason</th><th>Action</th><th>Can Proceed</th></tr></thead><tbody>'+comps8.map(function(c){var role=(c.type||c.role||'backend').toLowerCase();var isDb=role==='database'||role==='db';var r=isDb?'KEEP_ON_FLEX_VM_FOR_NOW':'CLOUD_NATIVE_READY';var rc=isDb?['#dbeafe','#1d4ed8']:['#dcfce7','#16a34a'];return '<tr><td style="font-weight:600;">'+c.name+'</td><td style="font-size:11px;">'+(R6P.captureMethod==='smart'?'Smart Snapshot':'Full Snapshot')+'</td><td><span style="background:'+rc[0]+';color:'+rc[1]+';padding:2px 8px;border-radius:999px;font-size:10px;font-weight:700;">'+r.replace(/_/g,' ')+'</span></td><td style="font-size:11px;color:#64748b;">'+(isDb?'Stateful DB':'Stateless app')+'</td><td style="font-size:11px;color:#64748b;">'+(isDb?'Use ExternalDB':'None required')+'</td><td><span style="background:#dcfce7;color:#16a34a;padding:2px 8px;border-radius:999px;font-size:10px;font-weight:700;">Yes</span></td></tr>';}).join('')+'</tbody></table></div>'+r6pFoot(8,'<button class="r6p-btn success" onclick="r6pMarkDone(8)">Approve Readiness Plan</button>');}
-  if(n===9)return '<pre style="background:#0f172a;color:#2dd4bf;border-radius:8px;padding:14px;font-size:11px;max-height:200px;overflow:auto;white-space:pre-wrap;margin-bottom:14px;">'+(R6P.captureMethod==='compat'?'FROM ubuntu:22.04\nCOPY rootfs/ /\nCOPY start-compat.sh /start-compat.sh\nRUN chmod +x /start-compat.sh\nEXPOSE 80\nCMD ["/start-compat.sh"]':'FROM node:20-alpine\nWORKDIR /app\nCOPY package*.json ./\nRUN npm ci --production\nCOPY . .\nEXPOSE 8080\nHEALTHCHECK --interval=30s CMD wget -qO- http://localhost:8080/health\nCMD ["npm","start"]')+'</pre>'+r6pFoot(9,'<button class="r6p-btn primary" onclick="r6pMarkDone(9)">Generate Dockerfiles</button>');
+  if(n===9)return '<div class="r6p-info-box">Generates a real per-component Dockerfile, extract_assets.sh (pulls app files from the live FLEX VM), build_and_push.sh, and a SOPS-encrypted registry pull secret - the same engine used by Ship to OpenCenter.</div>'
+    +'<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px;">'
+    +'<div><label style="font-size:11px;font-weight:700;color:#334155;display:block;margin-bottom:4px;">Registry</label><select id="r6p-build-regtype" style="padding:7px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;"><option value="harbor" selected>Harbor (in-cluster)</option><option value="dockerhub">Docker Hub</option><option value="ecr">AWS ECR</option><option value="gcp">GCP Artifact Registry</option><option value="custom">Custom URL</option></select></div>'
+    +'<div><label style="font-size:11px;font-weight:700;color:#334155;display:block;margin-bottom:4px;">Registry URL (optional)</label><input id="r6p-build-regurl" placeholder="registry.example.com" style="padding:7px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;width:200px;"></div>'
+    +'<div><label style="font-size:11px;font-weight:700;color:#334155;display:block;margin-bottom:4px;">Project</label><input id="r6p-build-project" value="flex-apps" style="padding:7px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;width:120px;"></div>'
+    +'<div><label style="font-size:11px;font-weight:700;color:#334155;display:block;margin-bottom:4px;">Registry User</label><input id="r6p-build-reguser" placeholder="admin" style="padding:7px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;width:100px;"></div>'
+    +'<div><label style="font-size:11px;font-weight:700;color:#334155;display:block;margin-bottom:4px;">Registry Password</label><input id="r6p-build-regpass" type="password" style="padding:7px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;width:120px;"></div>'
+    +'<button class="r6p-btn primary" onclick="r6pGenRealDockerfiles()" style="padding:8px 16px;font-size:12px;">&#9654; Generate Dockerfiles + Build Plan</button>'
+    +'</div>'
+    +'<div id="r6p-build-status" style="font-size:12px;font-weight:600;color:#64748b;margin-bottom:10px;line-height:1.7;"></div>'
+    +r6pFoot(9);
   if(n===10)return '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;"><button class="r6p-btn primary" onclick="r6pGenYAML()">Generate All YAML</button><button class="r6p-btn secondary" onclick="r6pGenHelm()">Helm Chart</button><button class="r6p-btn secondary" onclick="r6pGenKustomize()">Kustomize</button><button class="r6p-btn secondary" onclick="r6pGenFlux()">Flux</button></div><pre id="r6p-yaml-preview" style="background:#0f172a;color:#2dd4bf;border-radius:8px;padding:14px;font-size:11px;max-height:280px;overflow:auto;white-space:pre-wrap;min-height:60px;margin-bottom:14px;">-- Click Generate All YAML --</pre>'+r6pFoot(10);
   if(n===11)return '<div id="r6p-bundle-status" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px;margin-bottom:12px;font-size:12px;color:#64748b;">Generate bundle to see status.</div><pre id="r6p-bundle-preview" style="background:#0f172a;color:#c4b5fd;border-radius:8px;padding:14px;font-size:11px;max-height:220px;overflow:auto;white-space:pre-wrap;min-height:60px;margin-bottom:12px;">-- Generate bundle to see manifest --</pre>'+r6pFoot(11,'<button class="r6p-btn primary" onclick="r6pGenBundle()">Generate OpenCenter Bundle</button><button class="r6p-btn secondary" onclick="r6pDownloadBundle()">Download</button>');
   if(n===12){
@@ -321,6 +331,48 @@ window.r6pGenHelm=function(){var n=((R6P.bs&&R6P.bs.name)||'app').toLowerCase().
 window.r6pGenKustomize=function(){var el=document.getElementById('r6p-yaml-preview');if(el)el.textContent='# kustomization.yaml\napiVersion: kustomize.config.k8s.io/v1beta1\nkind: Kustomization\nresources:\n- namespace.yaml\n- deployment.yaml\n- service.yaml\n- configmap.yaml\n- ingress.yaml\noverlays: dev/ uat/ prod/\n';};
 window.r6pGenFlux=function(){var n=((R6P.bs&&R6P.bs.name)||'app').toLowerCase().replace(/\s+/g,'-');var el=document.getElementById('r6p-yaml-preview');if(el)el.textContent='apiVersion: kustomize.toolkit.fluxcd.io/v1\nkind: Kustomization\nmetadata:\n  name: '+n+'\n  namespace: flux-system\nspec:\n  interval: 5m\n  path: "./applications/overlays/'+n+'"\n  prune: true\n  sourceRef:\n    kind: GitRepository\n    name: opencenter-gitops\n';};
 
+window.r6pGenRealDockerfiles=function(){
+  var st=document.getElementById('r6p-build-status');
+  if(!R6P.components||!R6P.components.length){if(st){st.textContent='Select a Business System in Step 1 first.';st.style.color='#dc2626';}return;}
+  var clusterRef=(R6P.creds.opencenter.clusterRef||'rackspace-flex/flex-prod-k8s').split('/');
+  var org=clusterRef[0]||'rackspace-flex',cluster=clusterRef[1]||'flex-prod-k8s';
+  var comps=R6P.components.filter(function(c){return c.tgt;});
+  var srcComp=comps[0];
+  var workloads=comps.map(function(c){
+    var role=(c.type||c.role||'backend').toLowerCase();
+    var isDb=role==='database'||role==='db';
+    return {component:c.name,image:isDb?'postgres:16':'debian:stable-slim',replicas:1,
+      readiness:isDb?'KEEP_ON_VM_FOR_NOW':'READY',layer:isDb?'Database':'API',sourcePath:c.path||'/opt/app'};
+  });
+  var payload={org:org,cluster:cluster,region:'iad3',
+    registry:{type:(document.getElementById('r6p-build-regtype')||{}).value||'harbor',
+      url:(document.getElementById('r6p-build-regurl')||{}).value||'',
+      project:(document.getElementById('r6p-build-project')||{}).value||'flex-apps',
+      user:(document.getElementById('r6p-build-reguser')||{}).value||'',
+      password:(document.getElementById('r6p-build-regpass')||{}).value||''},
+    source_vm:{host:(srcComp&&srcComp.tgt)||'',user:'root'},
+    auto_commit:false,import_to_gitops:true,
+    bundle:{id:'r6p-'+Date.now(),businessSystemName:(R6P.bs&&R6P.bs.name)||'app',workloads:workloads}};
+  if(st){st.textContent='Generating real Dockerfiles + build plan...';st.style.color='#0369a1';}
+  fetch('/api/r6/generate-bundle',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
+    .then(function(r){return r.json();})
+    .then(function(d){
+      if(!d||!d.ok){if(st){st.textContent='✗ '+((d&&d.error)||'generation failed');st.style.color='#dc2626';}return;}
+      R6P._realBundle=d;
+      R6P.yaml='# Generated by /api/r6/generate-bundle\n'+d.bundle_dir;
+      R6P.artifacts=R6P.artifacts||{};
+      ['opencenter_import_manifest.json','k8s/','helm/','kustomize/','flux/','Dockerfile','image_build_plan.yaml',
+       'app_capture_manifest.json','externalization_plan.yaml','container_readiness_report.json','container_readiness_report.md'
+      ].forEach(function(k){R6P.artifacts[k]=true;});
+      if(st){st.innerHTML='&#10003; '+d.files.length+' files written to <code>'+d.bundle_dir+'</code>'
+        +(d.imported_to?'<br>&#10003; K8s manifests imported to GitOps overlay: <code>'+d.imported_to+'</code>':'<br>&#9888; GitOps repo not found - manifests not imported')
+        +'<br>Pull secret: '+d.pull_secret
+        +'<br>&#9654; Build+push (run when ready): <code>'+d.build_cmd+'</code>';
+        st.style.color='#15803d';}
+      r6pMarkDone(9);
+    })
+    .catch(function(e){if(st){st.textContent='✗ '+e;st.style.color='#dc2626';}});
+};
 window.r6pGenBundle=function(){
   if(!R6P.components.length&&!R6P.bs){alert('Select a FLEX input in Step 1 first.');return;}
   r6pGenYAML();r6pGenHelm();r6pGenFlux();
