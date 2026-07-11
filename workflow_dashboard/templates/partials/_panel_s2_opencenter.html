@@ -3096,23 +3096,7 @@ var c9b=g('ocqs-cmd-9b');
             </tbody>
           </table>
           <div style="margin-top:14px;border:2px solid #bae6fd;border-radius:10px;padding:14px;background:#f8fbff;">
-            <div style="font-size:12px;font-weight:800;color:#0369a1;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">B. R6 Refactor Deliverables &mdash; Automatic Import</div>
-            <div style="border:1px solid #fca5a5;background:#fef2f2;border-radius:10px;padding:14px;margin-bottom:12px;">
-              <div style="font-size:12px;font-weight:800;color:#b91c1c;margin-bottom:8px;">&#128230; Import the R6 containerization handoff &mdash; it auto-fills the cluster configuration below.</div>
-              <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
-                <button onclick="ocqpImportR6()" style="background:#b91c1c;color:#fff;border:none;border-radius:6px;padding:8px 16px;font-size:12px;font-weight:800;cursor:pointer;">&#11015; Import from R6 Containerization Stage</button>
-                <label style="background:#0369a1;color:#fff;border-radius:6px;padding:8px 16px;font-size:12px;font-weight:800;cursor:pointer;">&#128194; Upload R6 Bundle
-                  <input type="file" accept=".json,.yaml,.yml" style="display:none" onchange="ocqpUploadR6(this)"></label>
-                <button onclick="ocqpCopyQuickstartCreds()" style="background:#475569;color:#fff;border:none;border-radius:6px;padding:8px 16px;font-size:12px;font-weight:800;cursor:pointer;">&#128273; Reuse Quick Start credentials</button>
-                <span id="ocqp-r6-status" style="font-size:12px;font-weight:700;color:#64748b;">No R6 bundle imported yet.</span>
-              </div>
-              <table class="ocqs-req-table" style="margin-top:10px;">
-                <thead><tr><th>R6 Deliverable</th><th>Detected value</th><th>Status</th></tr></thead>
-                <tbody id="ocqp-r6-deliv"><tr><td colspan="3" style="color:#94a3b8;">Import a bundle to check deliverables.</td></tr></tbody>
-              </table>
-            </div>
-            <details style="margin-bottom:10px;">
-              <summary style="font-size:12px;font-weight:800;color:#0369a1;cursor:pointer;">Auto-filled configuration values (advanced override)</summary>
+            <div style="font-size:12px;font-weight:800;color:#0369a1;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">B. Credentials &amp; Inputs</div>
                     <!-- Inline Cluster Identity Inputs -->
           <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:14px;margin-top:12px;">
             <div style="font-size:11px;font-weight:800;color:#0369a1;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">🏷 Cluster Identity</div>
@@ -3263,11 +3247,11 @@ var c9b=g('ocqs-cmd-9b');
             <table class="ocqs-req-table">
               <thead><tr><th>Service</th><th>Role</th><th>Where (FLEX VM)</th><th>Installed in</th><th>Installed by</th><th>Enable</th></tr></thead>
               <tbody>
-              <tr><td><strong>Keycloak</strong></td><td>SSO &amp; identity provider (backs Headlamp OIDC login)</td><td style="font-size:11px;">Worker VMs <code>wn0/wn1</code> (K8s-scheduled pods)</td><td><code>keycloak</code> namespace</td><td rowspan="5" style="font-size:11px;line-height:1.6;vertical-align:middle;"><strong>FluxCD</strong> &mdash; kustomize-controller applies the GitOps manifests (SOPS-decrypted) &rarr; helm-controller installs the Helm chart. Fully automatic on git push.</td><td><div class="ocqs-toggle" id="tgp-keycloak" onclick="ocqpToggle('keycloak')"></div></td></tr>
-              <tr><td><strong>Loki</strong></td><td>Log aggregation &amp; storage</td><td style="font-size:11px;">Worker VMs <code>wn0/wn1</code></td><td><code>observability</code> namespace</td><td><div class="ocqs-toggle" id="tgp-loki" onclick="ocqpToggle('loki')"></div></td></tr>
-              <tr><td><strong>Tempo</strong></td><td>Distributed tracing backend</td><td style="font-size:11px;">Worker VMs <code>wn0/wn1</code></td><td><code>observability</code> namespace</td><td><div class="ocqs-toggle" id="tgp-tempo" onclick="ocqpToggle('tempo')"></div></td></tr>
-              <tr><td><strong>Velero</strong></td><td>Cluster &amp; volume backups</td><td style="font-size:11px;">Server on workers + node-agent DaemonSet on <strong>all 5 VMs</strong></td><td><code>velero</code> namespace</td><td><div class="ocqs-toggle" id="tgp-velero" onclick="ocqpToggle('velero')"></div></td></tr>
-              <tr><td><strong>kube-prometheus-stack</strong></td><td>Metrics, alerting &amp; Grafana dashboards</td><td style="font-size:11px;">Grafana/Prometheus on workers + node-exporter on <strong>all 5 VMs</strong></td><td><code>observability</code> namespace</td><td><div class="ocqs-toggle" id="tgp-monitoring" onclick="ocqpToggle('monitoring')"></div></td></tr>
+              <tr><td><strong>Keycloak</strong></td><td>SSO &amp; identity provider (backs Headlamp OIDC login)</td><td style="font-size:11px;">Worker VMs <code>wn0/wn1</code> (K8s-scheduled pods)</td><td><code>keycloak</code> namespace</td><td rowspan="5" style="font-size:11px;line-height:1.6;vertical-align:middle;"><strong>FluxCD</strong> &mdash; kustomize-controller applies the GitOps manifests (SOPS-decrypted) &rarr; helm-controller installs the Helm chart. Fully automatic on git push.</td><td><div class="ocqs-toggle" id="tog-keycloak" onclick="ocqpToggle('keycloak')"></div></td></tr>
+              <tr><td><strong>Loki</strong></td><td>Log aggregation &amp; storage</td><td style="font-size:11px;">Worker VMs <code>wn0/wn1</code></td><td><code>observability</code> namespace</td><td><div class="ocqs-toggle" id="tog-loki" onclick="ocqpToggle('loki')"></div></td></tr>
+              <tr><td><strong>Tempo</strong></td><td>Distributed tracing backend</td><td style="font-size:11px;">Worker VMs <code>wn0/wn1</code></td><td><code>observability</code> namespace</td><td><div class="ocqs-toggle" id="tog-tempo" onclick="ocqpToggle('tempo')"></div></td></tr>
+              <tr><td><strong>Velero</strong></td><td>Cluster &amp; volume backups</td><td style="font-size:11px;">Server on workers + node-agent DaemonSet on <strong>all 5 VMs</strong></td><td><code>velero</code> namespace</td><td><div class="ocqs-toggle" id="tog-velero" onclick="ocqpToggle('velero')"></div></td></tr>
+              <tr><td><strong>kube-prometheus-stack</strong></td><td>Metrics, alerting &amp; Grafana dashboards</td><td style="font-size:11px;">Grafana/Prometheus on workers + node-exporter on <strong>all 5 VMs</strong></td><td><code>observability</code> namespace</td><td><div class="ocqs-toggle" id="tog-monitoring" onclick="ocqpToggle('monitoring')"></div></td></tr>
               </tbody>
             </table>
           </div>
@@ -3300,7 +3284,6 @@ var c9b=g('ocqs-cmd-9b');
             <input class="ocqs-input" id="ocqp-gitopsfolder" placeholder="/home/dzoan/.config/opencenter/clusters/gitops/my-org" oninput="ocqpUpdate()" style="font-size:11px;">
             <div style="display:flex;gap:8px;margin-top:10px;align-items:center;"><button onclick="ocqpApplyGitops(this)" style="background:#15803d;color:#fff;border:none;border-radius:4px;padding:6px 16px;font-size:12px;font-weight:700;cursor:pointer;">&#128190; Apply to Config File</button><span id="ocqp-gitops-apply-status" style="font-size:11px;color:#64748b;"></span></div>
           </div>
-            </details>
           </div>
           <div style="margin-top:14px;display:flex;align-items:center;flex-wrap:wrap;gap:12px;padding:12px 14px;background:linear-gradient(135deg,#0f172a,#1e3a5f);border-radius:10px;">
             <button id="ocqp-autorun-btn" onclick="ocqpAutoRunAll()" style="border:none;border-radius:8px;padding:10px 22px;font-size:13px;font-weight:900;cursor:pointer;color:#fff;background:linear-gradient(135deg,#0284c7,#38bdf8);box-shadow:0 4px 12px rgba(2,132,199,.5);">&#9889; AutoRun All Steps (A &rarr; Z)</button>
@@ -3319,6 +3302,25 @@ var c9b=g('ocqs-cmd-9b');
 <script>
       // Global ocqpGetState shim - available before main script loads
       var _v=function(id){var el=document.getElementById(id);return el?el.value.trim():'';};
+      window.ocqpCanonicalRegion = function(region, authUrl){
+        var raw = (region || '').trim().toUpperCase();
+        if(!raw && authUrl){
+          var m = String(authUrl).match(/keystone\.api\.([a-z0-9-]+)\.rackspacecloud\.com/i);
+          if(m) raw = m[1].toUpperCase();
+        }
+        if(!raw) raw = 'IAD3';
+        var mm = raw.match(/^([A-Z]{3})(\d*)$/);
+        return mm ? (mm[1] + (mm[2] || '3')) : raw;
+      };
+      window.ocqpAuthUrlForRegion = function(authUrl, region){
+        var r = ocqpCanonicalRegion(region, authUrl).toLowerCase();
+        var raw = (authUrl || '').trim();
+        if(!raw || /^[A-Za-z]{3}\d*$/.test(raw)) return 'https://keystone.api.' + r + '.rackspacecloud.com/v3/';
+        if(/keystone\.api\.[a-z0-9-]+\.rackspacecloud\.com/i.test(raw)){
+          return raw.replace(/keystone\.api\.[a-z0-9-]+\./i, 'keystone.api.' + r + '.');
+        }
+        return raw;
+      };
       window._ocqpSensitiveMasked = true;
       window.ocqpToggleSensitiveMask = function(force){
         var masked = (typeof force === 'boolean') ? force : !window._ocqpSensitiveMasked;
@@ -3342,8 +3344,8 @@ var c9b=g('ocqs-cmd-9b');
           return {
             org:_v('ocqp-org')||'my-org', cluster:_v('ocqp-cluster')||'my-cluster',
             env:_v('ocqp-env')||'dev', provider:_v('ocqp-provider')||'openstack',
-            authUrl:ocqsAuthUrlForRegion(_v('ocqp-authurl')||'https://keystone.api.iad3.rackspacecloud.com/v3/', _v('ocqp-region')),
-            region:ocqsCanonicalRegion(_v('ocqp-region'), _v('ocqp-authurl')), authType:_v('ocqp-authtype')||'password',
+            authUrl:ocqpAuthUrlForRegion(_v('ocqp-authurl')||'https://keystone.api.iad3.rackspacecloud.com/v3/', _v('ocqp-region')),
+            region:ocqpCanonicalRegion(_v('ocqp-region'), _v('ocqp-authurl')), authType:_v('ocqp-authtype')||'password',
             username:_v('ocqp-username'), password:_v('ocqp-password'),
             userDomain:_v('ocqp-userdomain')||'rackspace_cloud_domain',
             projDomain:_v('ocqp-projdomain')||'rackspace_cloud_domain',
@@ -3379,9 +3381,9 @@ var c9b=g('ocqs-cmd-9b');
       window.ocqpApplyToConfig = function(btn, silent){
         if(typeof ocqpGetState!=='function') return;
         var s = ocqpGetState();
-        var region = ocqsCanonicalRegion(s.region, s.authUrl);
+        var region = ocqpCanonicalRegion(s.region, s.authUrl);
         var regionSlug = region.toLowerCase();
-        var authUrl = ocqsAuthUrlForRegion(s.authUrl, region);
+        var authUrl = ocqpAuthUrlForRegion(s.authUrl, region);
         var fqdn = (s.cluster || 'my-cluster') + '.' + regionSlug + '.k8s.opencenter.cloud';
         if(silent && !s.password && !s.credSec) return;
         var st = silent ? null : document.getElementById('ocqp-apply-status');
@@ -3532,7 +3534,7 @@ var c9b=g('ocqs-cmd-9b');
             es.onmessage = function(e){
               octAppend(out, e.data); if (window.octMirror) octMirror('ocqp-term', e.data); if (window.ocqpDeployStage) ocqpDeployStage(out.id, e.data);
               if (e.data.indexOf('[EXIT') === 0 || e.data.indexOf('[ERROR]') === 0){
-                es.close(); out.style.borderColor = e.data === '[EXIT 0]' ? '#16a34a' : '#dc2626'; if (window.ocqsSaveOut) ocqsSaveOut(out.id); res();
+                es.close(); out.style.borderColor = e.data === '[EXIT 0]' ? '#16a34a' : '#dc2626'; if (window.ocqpSaveOut) ocqpSaveOut(out.id); res();
               }
             };
             es.onerror = function(){ es.close(); res(); };
@@ -3573,7 +3575,7 @@ var c9b=g('ocqs-cmd-9b');
         es.onerror = function(){ es.close(); if (btn) btn.disabled = false; };
       };
       /* ── Quickstart step 6/7 wiring (were alert() stubs) ── */
-      var OCQP_CHECKS = {
+      var OCQS_CHECKS = {
         uat:      "echo '== UAT smoke: workloads =='; kubectl get pods -A -o wide 2>&1 | head -30",
         health:   "kubectl get nodes -o wide 2>&1; echo ---; echo 'Pods not Running:'; kubectl get pods -A --field-selector=status.phase!=Running 2>&1 | head -20",
         db:       "echo '== PVCs / StorageClasses =='; kubectl get pvc -A 2>&1 | head -20; echo ---; kubectl get sc 2>&1 | head -10",
@@ -3581,7 +3583,7 @@ var c9b=g('ocqs-cmd-9b');
         security: "echo '== NetworkPolicies =='; kubectl get networkpolicies -A 2>&1 | head -15; echo ---; kubectl version 2>&1 | head -3"
       };
       window.ocqpUatCheck = function(kind){
-        var cmd = OCQP_CHECKS[kind]; if (!cmd) return;
+        var cmd = OCQS_CHECKS[kind]; if (!cmd) return;
         var box = document.getElementById('ocqp-cmd-uatchecks');
         if (box) box.textContent = cmd;
         var st = JSON.parse(localStorage.getItem('ocqp_cutover_state')||'{}');
@@ -3632,6 +3634,39 @@ var c9b=g('ocqs-cmd-9b');
       window.ocqpFullBundle = function(){
         ['final_production_report.md','production_evidence.json','cutover_plan.md','rollback_plan.md'].forEach(function(n, i){ setTimeout(function(){ ocqpArtifact(n); }, i * 350); });
       };
+      // Persist terminal outputs across reloads: every finished command's
+      // output is saved to localStorage and restored on the next page load.
+      if (!window.ocqpSaveOut){
+        window.ocqpSaveOut = function(outId){
+          try{
+            var el = document.getElementById(outId); if (!el) return;
+            var m = JSON.parse(localStorage.getItem('ocqp_outlog_v1')||'{}');
+            var txt = el.textContent || '';
+            if (txt.length > 60000) txt = txt.slice(-60000);
+            m[outId] = { text: txt, border: el.style.borderColor || '', at: new Date().toLocaleString() };
+            var keys = Object.keys(m);
+            while (JSON.stringify(m).length > 3500000 && keys.length){ delete m[keys.shift()]; }
+            localStorage.setItem('ocqp_outlog_v1', JSON.stringify(m));
+          }catch(e){ try{ localStorage.removeItem('ocqp_outlog_v1'); }catch(_){} }
+        };
+        document.addEventListener('DOMContentLoaded', function(){
+          setTimeout(function(){
+            try{
+              var m = JSON.parse(localStorage.getItem('ocqp_outlog_v1')||'{}');
+              Object.keys(m).forEach(function(id){
+                var el = document.getElementById(id);
+                if (el && m[id] && m[id].text){
+                  el.textContent = '[restored from last session · ' + (m[id].at||'') + ']\n' + m[id].text;
+                  if (m[id].border) el.style.borderColor = m[id].border;
+                  if (id === 'ocqp-out-9' && window.ocqpDeployStage){
+                    m[id].text.split('\n').forEach(function(line){ try{ ocqpDeployStage(id, line); }catch(e){} });
+                  }
+                }
+              });
+            }catch(e){}
+          }, 400);
+        });
+      }
       window.ocqpRunCmd = function(cmdId, outId, btnId){
         var cmd = ((document.getElementById(cmdId)||{}).textContent||'').trim();
         var out = document.getElementById(outId);
@@ -3649,6 +3684,7 @@ var c9b=g('ocqs-cmd-9b');
             es.close();
             if (btn){ btn.disabled=false; btn.textContent='\u25b6 Run'; }
             out.style.borderColor = e.data === '[EXIT 0]' ? '#16a34a' : '#dc2626';
+            if (window.ocqpSaveOut){ ocqpSaveOut(outId); ocqpSaveOut('ocqp-term'); }
             if (window.ocqpMarkEvidence) ocqpMarkEvidence(cmd, e.data === '[EXIT 0]');
             if (e.data === '[EXIT 0]' && cmdId==='ocqp-cmd-2' && typeof ocqpApplyToConfig==='function') setTimeout(ocqpApplyToConfig, 800);
           }
@@ -4175,18 +4211,18 @@ git push -u origin main</div>
             text-transform:uppercase;
           }
           .ocqs-coffee-cup { position:relative; display:inline-block; font-size:34px; margin-right:14px; vertical-align:middle; }
-          .ocqs-steam { position:absolute; left:50%; bottom:88%; width:6px; height:16px; border-radius:50%; background:rgba(255,255,255,.8); filter:blur(2px); opacity:0; animation:ocqsSteamRise 2.2s ease-out infinite; }
+          .ocqs-steam { position:absolute; left:50%; bottom:88%; width:6px; height:16px; border-radius:50%; background:rgba(255,255,255,.8); filter:blur(2px); opacity:0; animation:ocqpSteamRise 2.2s ease-out infinite; }
           .ocqs-steam.s1 { margin-left:-10px; animation-delay:0s; }
           .ocqs-steam.s2 { margin-left:-2px;  animation-delay:.7s; }
           .ocqs-steam.s3 { margin-left:7px;   animation-delay:1.4s; }
-          @keyframes ocqsSteamRise {
+          @keyframes ocqpSteamRise {
             0%   { opacity:0; transform:translateY(5px) scaleX(1); }
             25%  { opacity:.95; }
             100% { opacity:0; transform:translateY(-20px) scaleX(1.7); }
           }
           .ocqs-coffee-warning code {
             background:rgba(255,255,255,.16);
-            color:#fff;
+            color:#fff !important;
             padding:2px 5px;
             border-radius:4px;
           }
@@ -4211,20 +4247,20 @@ git push -u origin main</div>
         <div class="ocqs-card" id="ocqp-checklist">
           <div class="chk-head"><span style="font-size:17px;">&#128737;&#65039;</span><div style="flex:1;"><div style="font-size:12.5px;font-weight:900;color:#0f172a;letter-spacing:1.6px;text-transform:uppercase;">Deploy Readiness</div><div style="font-size:10px;color:#64748b;margin-top:1px;">All checks must pass to unlock the cluster deploy</div></div><span id="ocqp-chk-chip" style="font-family:monospace;font-size:12.5px;font-weight:900;color:#0369a1;background:#e0f2fe;border:1px solid #7dd3fc;border-radius:999px;padding:4px 14px;">0/14</span></div>
           <div style="height:5px;background:#e2e8f0;"><div id="ocqp-chk-bar" style="height:100%;width:0%;background:linear-gradient(90deg,#0ea5e9,#22c55e);transition:width .45s ease;"></div></div>
-          <div class="ocqs-checklist-item"><input type="checkbox" id="chp-1" onchange="ocqpChecklistUpdate()"><label for="chp-1">OpenCenter CLI installed and works</label><span class="chk-st" id="chp-1-st">not installed</span></div>
-          <div class="ocqs-checklist-item"><input type="checkbox" id="chp-2" onchange="ocqpChecklistUpdate()"><label for="chp-2">Git installed</label><span class="chk-st" id="chp-2-st">not installed</span></div>
-          <div class="ocqs-checklist-item"><input type="checkbox" id="chp-3" onchange="ocqpChecklistUpdate()"><label for="chp-3">GitOps repository exists (GitHub/GitLab)</label><span class="chk-st" id="chp-3-st">not installed</span></div>
-          <div class="ocqs-checklist-item"><input type="checkbox" id="chp-4" onchange="ocqpChecklistUpdate()"><label for="chp-4">Git token configured at token file path</label><span class="chk-st" id="chp-4-st">not installed</span></div>
-          <div class="ocqs-checklist-item"><input type="checkbox" id="chp-5" onchange="ocqpChecklistUpdate()"><label for="chp-5">OpenStack application credential ID configured</label><span class="chk-st" id="chp-5-st">not installed</span></div>
-          <div class="ocqs-checklist-item"><input type="checkbox" id="chp-6" onchange="ocqpChecklistUpdate()"><label for="chp-6">OpenStack application credential secret configured</label><span class="chk-st" id="chp-6-st">not installed</span></div>
-          <div class="ocqs-checklist-item"><input type="checkbox" id="chp-7" onchange="ocqpChecklistUpdate()"><label for="chp-7">Region selected</label><span class="chk-st" id="chp-7-st">not installed</span></div>
-          <div class="ocqs-checklist-item"><input type="checkbox" id="chp-8" onchange="ocqpChecklistUpdate()"><label for="chp-8">Network / flavor / image values confirmed</label><span class="chk-st" id="chp-8-st">not installed</span></div>
-          <div class="ocqs-checklist-item"><input type="checkbox" id="chp-9" onchange="ocqpChecklistUpdate()"><label for="chp-9">Keycloak/Loki/Tempo disabled OR secrets configured</label><span class="chk-st" id="chp-9-st">not installed</span></div>
-          <div class="ocqs-checklist-item"><input type="checkbox" id="chp-10" onchange="ocqpChecklistUpdate()"><label for="chp-10"><code>opencenter cluster validate</code> passes with no blockers</label><span class="chk-st" id="chp-10-st">not installed</span></div>
-          <div class="ocqs-checklist-item"><input type="checkbox" id="chp-11" onchange="ocqpChecklistUpdate()"><label for="chp-11">No critical CHANGEME placeholders in GitOps manifests</label><span class="chk-st" id="chp-11-st">not installed</span></div>
-          <div class="ocqs-checklist-item"><input type="checkbox" id="chp-12" onchange="ocqpChecklistUpdate()"><label for="chp-12">GitOps repo committed and pushed</label><span class="chk-st" id="chp-12-st">not installed</span></div>
-          <div class="ocqs-checklist-item"><input type="checkbox" id="chp-14" onchange="ocqpChecklistUpdate()"><label for="chp-14">Target FLEX region has the resources OpenCenter needs (&ge;3 floating IPs free, &ge;22 vCPU, &ge;60 GB RAM, flavors/images available)</label><span class="chk-st" id="chp-14-st" style="cursor:pointer;" onclick="var c=document.getElementById('chp-14');c.checked=!c.checked;ocqpChecklistUpdate();">click to confirm</span></div>
-          <div class="ocqs-checklist-item"><input type="checkbox" id="chp-13" onchange="ocqpChecklistUpdate()"><label for="chp-13">I understand deployment will create cloud resources that may incur costs</label><span class="chk-st" id="chp-13-st" style="cursor:pointer;" onclick="var c=document.getElementById('chp-13');c.checked=!c.checked;ocqpChecklistUpdate();">click to acknowledge</span></div>
+          <div class="ocqs-checklist-item"><input type="checkbox" id="chk-1" onchange="ocqpChecklistUpdate()"><label for="chk-1">OpenCenter CLI installed and works</label><span class="chk-st" id="chk-1-st">not installed</span></div>
+          <div class="ocqs-checklist-item"><input type="checkbox" id="chk-2" onchange="ocqpChecklistUpdate()"><label for="chk-2">Git installed</label><span class="chk-st" id="chk-2-st">not installed</span></div>
+          <div class="ocqs-checklist-item"><input type="checkbox" id="chk-3" onchange="ocqpChecklistUpdate()"><label for="chk-3">GitOps repository exists (GitHub/GitLab)</label><span class="chk-st" id="chk-3-st">not installed</span></div>
+          <div class="ocqs-checklist-item"><input type="checkbox" id="chk-4" onchange="ocqpChecklistUpdate()"><label for="chk-4">Git token configured at token file path</label><span class="chk-st" id="chk-4-st">not installed</span></div>
+          <div class="ocqs-checklist-item"><input type="checkbox" id="chk-5" onchange="ocqpChecklistUpdate()"><label for="chk-5">OpenStack application credential ID configured</label><span class="chk-st" id="chk-5-st">not installed</span></div>
+          <div class="ocqs-checklist-item"><input type="checkbox" id="chk-6" onchange="ocqpChecklistUpdate()"><label for="chk-6">OpenStack application credential secret configured</label><span class="chk-st" id="chk-6-st">not installed</span></div>
+          <div class="ocqs-checklist-item"><input type="checkbox" id="chk-7" onchange="ocqpChecklistUpdate()"><label for="chk-7">Region selected</label><span class="chk-st" id="chk-7-st">not installed</span></div>
+          <div class="ocqs-checklist-item"><input type="checkbox" id="chk-8" onchange="ocqpChecklistUpdate()"><label for="chk-8">Network / flavor / image values confirmed</label><span class="chk-st" id="chk-8-st">not installed</span></div>
+          <div class="ocqs-checklist-item"><input type="checkbox" id="chk-9" onchange="ocqpChecklistUpdate()"><label for="chk-9">Keycloak/Loki/Tempo disabled OR secrets configured</label><span class="chk-st" id="chk-9-st">not installed</span></div>
+          <div class="ocqs-checklist-item"><input type="checkbox" id="chk-10" onchange="ocqpChecklistUpdate()"><label for="chk-10"><code>opencenter cluster validate</code> passes with no blockers</label><span class="chk-st" id="chk-10-st">not installed</span></div>
+          <div class="ocqs-checklist-item"><input type="checkbox" id="chk-11" onchange="ocqpChecklistUpdate()"><label for="chk-11">No critical CHANGEME placeholders in GitOps manifests</label><span class="chk-st" id="chk-11-st">not installed</span></div>
+          <div class="ocqs-checklist-item"><input type="checkbox" id="chk-12" onchange="ocqpChecklistUpdate()"><label for="chk-12">GitOps repo committed and pushed</label><span class="chk-st" id="chk-12-st">not installed</span></div>
+          <div class="ocqs-checklist-item"><input type="checkbox" id="chk-14" onchange="ocqpChecklistUpdate()"><label for="chk-14">Target FLEX region has the resources OpenCenter needs (&ge;3 floating IPs free, &ge;22 vCPU, &ge;60 GB RAM, flavors/images available)</label><span class="chk-st" id="chk-14-st" style="cursor:pointer;" onclick="var c=document.getElementById('chk-14');c.checked=!c.checked;ocqpChecklistUpdate();">click to confirm</span></div>
+          <div class="ocqs-checklist-item"><input type="checkbox" id="chk-13" onchange="ocqpChecklistUpdate()"><label for="chk-13">I understand deployment will create cloud resources that may incur costs</label><span class="chk-st" id="chk-13-st" style="cursor:pointer;" onclick="var c=document.getElementById('chk-13');c.checked=!c.checked;ocqpChecklistUpdate();">click to acknowledge</span></div>
           <div style="margin-top:14px;text-align:center;">
             <div style="text-align:center;margin:6px 0;"><button onclick="ocqpVerifyReadiness(this)" style="background:#0369a1;color:#fff;border:none;border-radius:6px;padding:7px 16px;font-size:11.5px;font-weight:800;cursor:pointer;">&#8635; Verify readiness</button> <span style="font-size:10.5px;color:#64748b;">checks validate / CHANGEME / git push server-side</span></div>
             <div style="text-align:center;margin:6px 0;"><button onclick="ocqpQuotaCheck(this)" style="background:#15803d;color:#fff;border:none;border-radius:6px;padding:7px 16px;font-size:11.5px;font-weight:800;cursor:pointer;">&#128269; Check FLEX region quotas</button> <button id="ocqp-freefip-btn" onclick="ocqpFreeFips(this)" style="display:none;background:#b45309;color:#fff;border:none;border-radius:6px;padding:7px 16px;font-size:11.5px;font-weight:800;cursor:pointer;margin-left:6px;">&#129529; Free orphaned floating IPs</button></div>
@@ -4411,72 +4447,72 @@ User Access
       </div>
 
       <!-- Deployment History & Replay -->
-      <div class="ocqs-section" id="ocqp-dhp">
+      <div class="ocqs-section" id="ocqp-dhr">
         <style>
-          #ocqp-dhp .dhp-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
-          #ocqp-dhp .dhp-card { background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:14px 16px; box-shadow:0 2px 8px rgba(15,23,42,.05); }
-          #ocqp-dhp .dhp-card h4 { margin:0 0 10px; font-size:11px; font-weight:900; text-transform:uppercase; letter-spacing:1px; color:#0369a1; }
-          #ocqp-dhp .dhp-kv { display:grid; grid-template-columns:auto 1fr; gap:2px 14px; font-size:12px; color:#334155; }
-          #ocqp-dhp .dhp-kv b { color:#64748b; font-weight:700; white-space:nowrap; }
-          #ocqp-dhp .dhp-badge { display:inline-flex; align-items:center; border-radius:999px; padding:3px 10px; font-size:10px; font-weight:900; letter-spacing:.5px; }
-          #ocqp-dhp .b-lkg { background:#dcfce7; color:#15803d; border:1px solid #86efac; }
-          #ocqp-dhp .b-failed { background:#fee2e2; color:#b91c1c; border:1px solid #fca5a5; }
-          #ocqp-dhp .b-fixed { background:#fef3c7; color:#b45309; border:1px solid #fcd34d; }
-          #ocqp-dhp .b-superseded { background:#e2e8f0; color:#475569; border:1px solid #cbd5e1; }
-          #ocqp-dhp .b-rollback { background:#dbeafe; color:#1d4ed8; border:1px solid #93c5fd; }
-          #ocqp-dhp .b-drift { background:#fae8ff; color:#a21caf; border:1px solid #e879f9; }
-          #ocqp-dhp .dhp-phase { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
-          #ocqp-dhp .dhp-ph { flex:1; min-width:110px; border-radius:10px; padding:8px 10px; font-size:10.5px; font-weight:800; border:1px solid #e2e8f0; background:#f8fafc; color:#334155; }
-          #ocqp-dhp .dhp-ph small { display:block; font-weight:600; color:#64748b; margin-top:2px; }
-          #ocqp-dhp .dhp-ph.ok { border-color:#86efac; background:#f0fdf4; }
-          #ocqp-dhp .dhp-ph.bad { border-color:#fca5a5; background:#fef2f2; }
-          #ocqp-dhp .dhp-ph.warn { border-color:#fcd34d; background:#fffbeb; }
-          #ocqp-dhp .dhp-btn { border:none; border-radius:7px; padding:8px 14px; font-size:11.5px; font-weight:800; cursor:pointer; }
-          #ocqp-dhp .dhp-btn.blue { background:#0284c7; color:#fff; }
-          #ocqp-dhp .dhp-btn.orange { background:#d97706; color:#fff; }
-          #ocqp-dhp .dhp-btn.grey { background:#e2e8f0; color:#334155; }
-          #ocqp-dhp .dhp-btn.red { background:#b91c1c; color:#fff; }
-          #ocqp-dhp select { width:100%; padding:9px 12px; border:1px solid #cbd5e1; border-radius:8px; font-size:12.5px; font-weight:700; color:#0f172a; background:#fff; }
-          #ocqp-dhp pre.dhp-snap { background:#0d1117; color:#a5d6ff; border-radius:8px; padding:10px 12px; font-size:10.5px; max-height:220px; overflow:auto; white-space:pre-wrap; }
-          #dhp-modal { position:fixed; inset:0; background:rgba(2,6,23,.55); z-index:99995; display:none; align-items:center; justify-content:center; }
-          #dhp-modal .dhp-modal-box { background:#fff; border-radius:14px; width:min(680px,92vw); max-height:86vh; overflow:auto; padding:20px 24px; box-shadow:0 30px 80px rgba(2,6,23,.5); }
-          @media(max-width:1100px){ #ocqp-dhp .dhp-grid { grid-template-columns:1fr; } }
+          #ocqp-dhr .dhr-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+          #ocqp-dhr .dhr-card { background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:14px 16px; box-shadow:0 2px 8px rgba(15,23,42,.05); }
+          #ocqp-dhr .dhr-card h4 { margin:0 0 10px; font-size:11px; font-weight:900; text-transform:uppercase; letter-spacing:1px; color:#0369a1; }
+          #ocqp-dhr .dhr-kv { display:grid; grid-template-columns:auto 1fr; gap:2px 14px; font-size:12px; color:#334155; }
+          #ocqp-dhr .dhr-kv b { color:#64748b; font-weight:700; white-space:nowrap; }
+          #ocqp-dhr .dhr-badge { display:inline-flex; align-items:center; border-radius:999px; padding:3px 10px; font-size:10px; font-weight:900; letter-spacing:.5px; }
+          #ocqp-dhr .b-lkg { background:#dcfce7; color:#15803d; border:1px solid #86efac; }
+          #ocqp-dhr .b-failed { background:#fee2e2; color:#b91c1c; border:1px solid #fca5a5; }
+          #ocqp-dhr .b-fixed { background:#fef3c7; color:#b45309; border:1px solid #fcd34d; }
+          #ocqp-dhr .b-superseded { background:#e2e8f0; color:#475569; border:1px solid #cbd5e1; }
+          #ocqp-dhr .b-rollback { background:#dbeafe; color:#1d4ed8; border:1px solid #93c5fd; }
+          #ocqp-dhr .b-drift { background:#fae8ff; color:#a21caf; border:1px solid #e879f9; }
+          #ocqp-dhr .dhr-phase { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+          #ocqp-dhr .dhr-ph { flex:1; min-width:110px; border-radius:10px; padding:8px 10px; font-size:10.5px; font-weight:800; border:1px solid #e2e8f0; background:#f8fafc; color:#334155; }
+          #ocqp-dhr .dhr-ph small { display:block; font-weight:600; color:#64748b; margin-top:2px; }
+          #ocqp-dhr .dhr-ph.ok { border-color:#86efac; background:#f0fdf4; }
+          #ocqp-dhr .dhr-ph.bad { border-color:#fca5a5; background:#fef2f2; }
+          #ocqp-dhr .dhr-ph.warn { border-color:#fcd34d; background:#fffbeb; }
+          #ocqp-dhr .dhr-btn { border:none; border-radius:7px; padding:8px 14px; font-size:11.5px; font-weight:800; cursor:pointer; }
+          #ocqp-dhr .dhr-btn.blue { background:#0284c7; color:#fff; }
+          #ocqp-dhr .dhr-btn.orange { background:#d97706; color:#fff; }
+          #ocqp-dhr .dhr-btn.grey { background:#e2e8f0; color:#334155; }
+          #ocqp-dhr .dhr-btn.red { background:#b91c1c; color:#fff; }
+          #ocqp-dhr select { width:100%; padding:9px 12px; border:1px solid #cbd5e1; border-radius:8px; font-size:12.5px; font-weight:700; color:#0f172a; background:#fff; }
+          #ocqp-dhr pre.dhr-snap { background:#0d1117; color:#a5d6ff; border-radius:8px; padding:10px 12px; font-size:10.5px; max-height:220px; overflow:auto; white-space:pre-wrap; }
+          #dhr-modal { position:fixed; inset:0; background:rgba(2,6,23,.55); z-index:99995; display:none; align-items:center; justify-content:center; }
+          #dhr-modal .dhr-modal-box { background:#fff; border-radius:14px; width:min(680px,92vw); max-height:86vh; overflow:auto; padding:20px 24px; box-shadow:0 30px 80px rgba(2,6,23,.5); }
+          @media(max-width:1100px){ #ocqp-dhr .dhr-grid { grid-template-columns:1fr; } }
         </style>
         <h2>&#128451;&#65039; Deployment History &amp; Replay</h2>
         <div class="ocqs-card">
           <p style="font-size:12.5px;color:#475569;">Track every OpenCenter deployment run, issues, fixes, current status, and safely redeploy from a past known-good configuration.</p>
-          <div id="dhp-empty" style="display:none;padding:22px;text-align:center;color:#64748b;font-size:13px;border:1px dashed #cbd5e1;border-radius:10px;">No deployment history yet. Run your first OpenCenter deployment to create a replayable configuration snapshot.</div>
-          <div id="dhp-body">
-            <div class="dhp-grid" style="margin-bottom:14px;">
-              <div class="dhp-card">
+          <div id="dhr-empty" style="display:none;padding:22px;text-align:center;color:#64748b;font-size:13px;border:1px dashed #cbd5e1;border-radius:10px;">No deployment history yet. Run your first OpenCenter deployment to create a replayable configuration snapshot.</div>
+          <div id="dhr-body">
+            <div class="dhr-grid" style="margin-bottom:14px;">
+              <div class="dhr-card">
                 <h4>Deployment History</h4>
-                <select id="dhp-select" onchange="dhpSelect(this.value)"></select>
+                <select id="dhr-select" onchange="dhrSelect(this.value)"></select>
                 <div style="margin-top:8px;font-size:10.5px;color:#94a3b8;">Runs are stored locally; each deploy adds a new run &mdash; nothing is overwritten.</div>
               </div>
-              <div class="dhp-card"><h4>Run Summary</h4><div class="dhp-kv" id="dhp-summary"></div></div>
+              <div class="dhr-card"><h4>Run Summary</h4><div class="dhr-kv" id="dhr-summary"></div></div>
             </div>
-            <div class="dhp-grid" style="margin-bottom:14px;">
-              <div class="dhp-card"><h4>Phase Timeline</h4><div class="dhp-phase" id="dhp-timeline"></div></div>
-              <div class="dhp-card"><h4>Current Status</h4><div class="dhp-kv" id="dhp-status"></div>
-                <button class="dhp-btn grey" style="margin-top:10px;" onclick="var b=document.getElementById('ocqp-run-chksum'); if(b) b.click(); var t=document.getElementById('ocqp-term-float'); if(t) t.style.display='flex';">&#8635; Refresh live (runs Full Cluster Details)</button>
+            <div class="dhr-grid" style="margin-bottom:14px;">
+              <div class="dhr-card"><h4>Phase Timeline</h4><div class="dhr-phase" id="dhr-timeline"></div></div>
+              <div class="dhr-card"><h4>Current Status</h4><div class="dhr-kv" id="dhr-status"></div>
+                <button class="dhr-btn grey" style="margin-top:10px;" onclick="var b=document.getElementById('ocqp-run-chksum'); if(b) b.click(); var t=document.getElementById('ocqp-term-float'); if(t) t.style.display='flex';">&#8635; Refresh live (runs Full Cluster Details)</button>
               </div>
             </div>
-            <div class="dhp-card" style="margin-bottom:14px;"><h4>Issues &amp; Fixes</h4>
-              <table class="ocqs-req-table"><thead><tr><th>Phase</th><th>Issue Encountered</th><th>Root Cause</th><th>Fix Applied</th><th>Owner</th><th>Current Status</th></tr></thead><tbody id="dhp-issues"></tbody></table>
+            <div class="dhr-card" style="margin-bottom:14px;"><h4>Issues &amp; Fixes</h4>
+              <table class="ocqs-req-table"><thead><tr><th>Phase</th><th>Issue Encountered</th><th>Root Cause</th><th>Fix Applied</th><th>Owner</th><th>Current Status</th></tr></thead><tbody id="dhr-issues"></tbody></table>
             </div>
-            <div class="dhp-grid" style="margin-bottom:14px;">
-              <div class="dhp-card"><h4>Configuration Snapshot</h4><div class="dhp-kv" id="dhp-snapmeta" style="margin-bottom:8px;"></div><pre class="dhp-snap" id="dhp-snap">select a run</pre><div style="font-size:10px;color:#94a3b8;margin-top:4px;">Secret values are never shown &mdash; references only.</div></div>
-              <div class="dhp-card"><h4>Replay Actions</h4>
+            <div class="dhr-grid" style="margin-bottom:14px;">
+              <div class="dhr-card"><h4>Configuration Snapshot</h4><div class="dhr-kv" id="dhr-snapmeta" style="margin-bottom:8px;"></div><pre class="dhr-snap" id="dhr-snap">select a run</pre><div style="font-size:10px;color:#94a3b8;margin-top:4px;">Secret values are never shown &mdash; references only.</div></div>
+              <div class="dhr-card"><h4>Replay Actions</h4>
                 <div style="display:flex;flex-wrap:wrap;gap:8px;">
-                  <button class="dhp-btn grey" onclick="dhpViewConfig()">&#128196; View Config</button>
-                  <button class="dhp-btn grey" onclick="dhpShowDiff()">&#128202; Show Diff vs Current</button>
-                  <button class="dhp-btn blue" onclick="dhpDryRun()">&#129514; Dry Run</button>
-                  <button class="dhp-btn orange" onclick="dhpRedeployModal()">&#128640; Redeploy from this Configuration</button>
-                  <button class="dhp-btn grey" onclick="dhpClone()">&#128203; Clone to New Cluster</button>
-                  <button class="dhp-btn grey" onclick="dhpExport()">&#128190; Export Evidence</button>
+                  <button class="dhr-btn grey" onclick="dhrViewConfig()">&#128196; View Config</button>
+                  <button class="dhr-btn grey" onclick="dhrShowDiff()">&#128202; Show Diff vs Current</button>
+                  <button class="dhr-btn blue" onclick="dhrDryRun()">&#129514; Dry Run</button>
+                  <button class="dhr-btn orange" onclick="dhrRedeployModal()">&#128640; Redeploy from this Configuration</button>
+                  <button class="dhr-btn grey" onclick="dhrClone()">&#128203; Clone to New Cluster</button>
+                  <button class="dhr-btn grey" onclick="dhrExport()">&#128190; Export Evidence</button>
                 </div>
-                <div id="dhp-action-note" style="margin-top:10px;font-size:11px;color:#64748b;"></div>
-                <pre id="dhp-term" style="background:#020817;border:1px solid #334155;border-radius:8px;padding:10px 12px;font-family:monospace;font-size:11px;color:#00ff41;white-space:pre-wrap;min-height:110px;max-height:260px;overflow-y:auto;margin-top:10px;">$ replay action output will appear here...</pre>
+                <div id="dhr-action-note" style="margin-top:10px;font-size:11px;color:#64748b;"></div>
+                <pre id="dhr-term" style="background:#020817;border:1px solid #334155;border-radius:8px;padding:10px 12px;font-family:monospace;font-size:11px;color:#00ff41;white-space:pre-wrap;min-height:110px;max-height:260px;overflow-y:auto;margin-top:10px;">$ replay action output will appear here...</pre>
               </div>
             </div>
           </div>
@@ -4484,18 +4520,18 @@ User Access
       </div>
 
       <!-- Redeploy safety modal -->
-      <div id="dhp-modal">
-        <div class="dhp-modal-box">
+      <div id="dhr-modal">
+        <div class="dhr-modal-box">
           <h3 style="margin:0 0 4px;">Redeploy Past Configuration</h3>
           <p style="font-size:12px;color:#64748b;margin:0 0 12px;">Redeploy creates a <strong>new deployment run</strong> from this historical configuration. Nothing is overwritten silently.</p>
-          <div class="dhp-kv" id="dhp-modal-kv" style="display:grid;grid-template-columns:auto 1fr;gap:2px 14px;font-size:12px;color:#334155;"></div>
-          <div id="dhp-modal-dry" style="margin-top:10px;font-size:11.5px;font-weight:800;color:#b45309;">Dry-run status: not run yet</div>
+          <div class="dhr-kv" id="dhr-modal-kv" style="display:grid;grid-template-columns:auto 1fr;gap:2px 14px;font-size:12px;color:#334155;"></div>
+          <div id="dhr-modal-dry" style="margin-top:10px;font-size:11.5px;font-weight:800;color:#b45309;">Dry-run status: not run yet</div>
           <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:16px;">
-            <button class="dhp-btn blue" onclick="dhpDryRun(true)">&#129514; Dry Run First</button>
-            <button class="dhp-btn grey" onclick="dhpShowDiff()">&#128202; Show Diff</button>
-            <button class="dhp-btn orange" onclick="dhpRedeployGo()">&#128640; Redeploy as New Run</button>
-            <button class="dhp-btn grey" onclick="dhpClone()">&#128203; Clone to New Cluster</button>
-            <button class="dhp-btn red" onclick="document.getElementById('dhp-modal').style.display='none'">Cancel</button>
+            <button class="dhr-btn blue" onclick="dhrDryRun(true)">&#129514; Dry Run First</button>
+            <button class="dhr-btn grey" onclick="dhrShowDiff()">&#128202; Show Diff</button>
+            <button class="dhr-btn orange" onclick="dhrRedeployGo()">&#128640; Redeploy as New Run</button>
+            <button class="dhr-btn grey" onclick="dhrClone()">&#128203; Clone to New Cluster</button>
+            <button class="dhr-btn red" onclick="document.getElementById('dhr-modal').style.display='none'">Cancel</button>
           </div>
         </div>
       </div>
@@ -4573,106 +4609,106 @@ User Access
               validation_report:{ nodes:'5/5 Ready (at the time)', kustomizations:'18/18', helmreleases:'6/6', pods:'58 total, 0 failing', drift:'superseded by my1st', last_validated:'2026-07-08 11:12' } }
           ];
         }
-        window.dhpRuns = function(){
+        window.dhrRuns = function(){
           try { var v = JSON.parse(localStorage.getItem(KEY) || 'null'); if (v && v.length) return v; } catch(e){}
           var m = seed(); localStorage.setItem(KEY, JSON.stringify(m)); return m;
         };
-        window.dhpSave = function(rs){ localStorage.setItem(KEY, JSON.stringify(rs)); };
+        window.dhrSave = function(rs){ localStorage.setItem(KEY, JSON.stringify(rs)); };
         var badgeCls = { 'Last Known Good':'b-lkg','Failed':'b-failed','Fixed':'b-fixed','Superseded':'b-superseded','Rollback Point':'b-rollback','Drift Detected':'b-drift' };
         var icons = { 'Success':'✅','Failed':'❌','Fixed':'🔧','Rolled Back':'↩','Superseded':'📦','Running':'⏳' };
         function kv(el, obj){ el.innerHTML = Object.keys(obj).map(function(k){ return '<b>' + k + '</b><span>' + obj[k] + '</span>'; }).join(''); }
-        window.dhpCurrent = function(){
-          var sel = document.getElementById('dhp-select');
-          var rs = dhpRuns();
+        window.dhrCurrent = function(){
+          var sel = document.getElementById('dhr-select');
+          var rs = dhrRuns();
           return rs.filter(function(r){ return r.deployment_id === sel.value; })[0] || rs[0];
         };
-        window.dhpSelect = function(){
-          var r = dhpCurrent(); if (!r) return;
-          var badge = '<span class="dhp-badge ' + (badgeCls[r.badge]||'b-superseded') + '">' + r.badge + '</span>';
-          kv(document.getElementById('dhp-summary'), { 'Deployment ID':r.deployment_id, 'Cluster':r.cluster_name, 'Provider':r.provider,
+        window.dhrSelect = function(){
+          var r = dhrCurrent(); if (!r) return;
+          var badge = '<span class="dhr-badge ' + (badgeCls[r.badge]||'b-superseded') + '">' + r.badge + '</span>';
+          kv(document.getElementById('dhr-summary'), { 'Deployment ID':r.deployment_id, 'Cluster':r.cluster_name, 'Provider':r.provider,
             'Status':(icons[r.status]||'') + ' ' + r.status + ' ' + badge, 'Started / Ended':r.started_at + ' &rarr; ' + r.ended_at,
             'Duration':r.duration, 'Operator':r.operator, 'GitOps commit':'<code>' + r.git_commit_sha + '</code>',
             'Config checksum':'<code>' + r.config_checksum + '</code>', 'Confidence':r.confidence_score + '%' });
-          var tl = document.getElementById('dhp-timeline');
+          var tl = document.getElementById('dhr-timeline');
           tl.innerHTML = r.phases.map(function(ph){
-            return '<div class="dhp-ph ' + ph.s + '">' + ph.n + '<small>' + (ph.s==='ok'?'✓ passed':ph.s==='bad'?'✗ failed':'⚠ partial') + ' &middot; ' + ph.d + ' &middot; ' + ph.i + ' issue(s)</small></div>';
+            return '<div class="dhr-ph ' + ph.s + '">' + ph.n + '<small>' + (ph.s==='ok'?'✓ passed':ph.s==='bad'?'✗ failed':'⚠ partial') + ' &middot; ' + ph.d + ' &middot; ' + ph.i + ' issue(s)</small></div>';
           }).join('<span style="color:#94a3b8;font-weight:900;">&rarr;</span>');
-          document.getElementById('dhp-issues').innerHTML = r.issues.map(function(row){
+          document.getElementById('dhr-issues').innerHTML = r.issues.map(function(row){
             var st = row[5];
             var col = st==='Fixed'||st==='Healthy' ? '#15803d' : st==='Open' ? '#b91c1c' : '#b45309';
             return '<tr>' + row.slice(0,5).map(function(c){ return '<td>' + c + '</td>'; }).join('') + '<td style="font-weight:800;color:' + col + ';">' + st + '</td></tr>';
           }).join('');
-          kv(document.getElementById('dhp-snapmeta'), { 'GitOps path':'<code>' + r.generated_gitops_path + '</code>', 'Commit':'<code>' + r.git_commit_sha + '</code>',
+          kv(document.getElementById('dhr-snapmeta'), { 'GitOps path':'<code>' + r.generated_gitops_path + '</code>', 'Commit':'<code>' + r.git_commit_sha + '</code>',
             'Images':r.image_manifest, 'Tools':Object.keys(r.tool_versions).map(function(k){ return k + ' ' + r.tool_versions[k]; }).join(' &middot; ') });
-          document.getElementById('dhp-snap').textContent = r.opencenter_config_snapshot;
+          document.getElementById('dhr-snap').textContent = r.opencenter_config_snapshot;
           var v = r.validation_report;
-          kv(document.getElementById('dhp-status'), { 'Cluster health':r.status==='Success'?'✅ healthy':(r.status==='Failed'?'❌ failed':'⚠ see notes'),
+          kv(document.getElementById('dhr-status'), { 'Cluster health':r.status==='Success'?'✅ healthy':(r.status==='Failed'?'❌ failed':'⚠ see notes'),
             'Nodes':v.nodes, 'Flux reconciliation':v.kustomizations, 'HelmReleases':v.helmreleases, 'Pods':v.pods, 'Drift':v.drift, 'Last validated':v.last_validated });
         };
-        window.dhpRender = function(){
-          var rs = dhpRuns();
-          var empty = document.getElementById('dhp-empty'), body = document.getElementById('dhp-body');
+        window.dhrRender = function(){
+          var rs = dhrRuns();
+          var empty = document.getElementById('dhr-empty'), body = document.getElementById('dhr-body');
           if (!rs.length){ empty.style.display='block'; body.style.display='none'; return; }
           empty.style.display='none'; body.style.display='block';
-          var sel = document.getElementById('dhp-select');
+          var sel = document.getElementById('dhr-select');
           sel.innerHTML = rs.map(function(r){
             return '<option value="' + r.deployment_id + '">' + (icons[r.status]||'') + ' ' + r.started_at + ' · ' + r.cluster_name + ' · ' + r.status + ' · ' + r.confidence_score + '%</option>';
           }).join('');
-          dhpSelect();
+          dhrSelect();
         };
-        function note(t){ var n = document.getElementById('dhp-action-note'); if (n) n.textContent = t; }
-        function tlog(txt){ var t = document.getElementById('dhp-term'); if (!t) return; octAppend(t, txt); if (window.octMirror) octMirror('ocqp-term', txt); }
+        function note(t){ var n = document.getElementById('dhr-action-note'); if (n) n.textContent = t; }
+        function tlog(txt){ var t = document.getElementById('dhr-term'); if (!t) return; octAppend(t, txt); if (window.octMirror) octMirror('ocqp-term', txt); }
         function stream(cmd, label){
-          var t = document.getElementById('dhp-term'); if (t){ t.textContent = ''; t.style.borderColor = '#334155'; }
+          var t = document.getElementById('dhr-term'); if (t){ t.textContent = ''; t.style.borderColor = '#334155'; }
           tlog('== ' + label + ' ==');
           cmd.split('\n').forEach(function(l){ tlog('$ ' + l); });
           var es = new EventSource('/api/stream/run-cmd?cmd=' + encodeURIComponent(cmd));
           es.onmessage = function(e){ tlog(e.data);
             if (e.data.indexOf('[EXIT') === 0 || e.data.indexOf('[ERROR]') === 0){ es.close();
               if (t) t.style.borderColor = e.data === '[EXIT 0]' ? '#16a34a' : '#dc2626';
-              if (window.ocqsSaveOut && t) ocqsSaveOut(t.id);
-              var d = document.getElementById('dhp-modal-dry');
+              if (window.ocqpSaveOut && t) ocqpSaveOut(t.id);
+              var d = document.getElementById('dhr-modal-dry');
               if (d && label.indexOf('DRY RUN') === 0) { d.textContent = 'Dry-run status: ' + (e.data === '[EXIT 0]' ? '\u2705 passed' : '\u274c failed (' + e.data + ')'); d.style.color = e.data === '[EXIT 0]' ? '#15803d' : '#b91c1c'; }
             } };
           es.onerror = function(){ es.close(); tlog('[stream error]'); };
         }
-        window.dhpViewConfig = function(){ var s = document.getElementById('dhp-snap'); if (s) s.scrollIntoView({behavior:'smooth', block:'center'}); note('Configuration snapshot shown below (secret refs only).'); };
-        window.dhpShowDiff = function(){ var r = dhpCurrent(); if (!r) return;
+        window.dhrViewConfig = function(){ var s = document.getElementById('dhr-snap'); if (s) s.scrollIntoView({behavior:'smooth', block:'center'}); note('Configuration snapshot shown below (secret refs only).'); };
+        window.dhrShowDiff = function(){ var r = dhrCurrent(); if (!r) return;
           stream('cfg=$(ls ~/.config/opencenter/clusters/blueprints/*/' + r.cluster_name + '/' + r.cluster_name + '-config.yaml 2>/dev/null | head -1); echo "run checksum:     ' + r.config_checksum + '"; if [ -n "$cfg" ]; then printf "current checksum: sha256:%s\n" "$(sha256sum "$cfg" | cut -c1-8)"; else echo "current config not found"; fi', 'DIFF vs CURRENT — ' + r.deployment_id);
           note('Checksum comparison in the log below.'); };
-        window.dhpDryRun = function(){ var r = dhpCurrent(); if (!r) return;
+        window.dhrDryRun = function(){ var r = dhrCurrent(); if (!r) return;
           stream('opencenter cluster validate ' + r.cluster_name + ' 2>&1 | tail -12; opencenter cluster deploy ' + r.cluster_name + ' --dry-run 2>&1 | tail -20', 'DRY RUN — ' + r.deployment_id);
           note('Dry run output in the log below. Nothing was changed.'); };
-        window.dhpRedeployModal = function(){ var r = dhpCurrent(); if (!r) return;
+        window.dhrRedeployModal = function(){ var r = dhrCurrent(); if (!r) return;
           if (!r.redeployable){ note('This run is marked not redeployable (' + r.badge + ').'); return; }
-          kv(document.getElementById('dhp-modal-kv'), { 'Deployment ID':r.deployment_id, 'Cluster':r.cluster_name, 'Config checksum':'<code>' + r.config_checksum + '</code>',
+          kv(document.getElementById('dhr-modal-kv'), { 'Deployment ID':r.deployment_id, 'Cluster':r.cluster_name, 'Config checksum':'<code>' + r.config_checksum + '</code>',
             'GitOps commit':'<code>' + r.git_commit_sha + '</code>', 'Images':r.image_manifest, 'Differences':'run "Show Diff" to compare with current',
             'Credential refresh':'uses current blueprint credentials' });
-          document.getElementById('dhp-modal-dry').textContent = 'Dry-run status: not run yet';
-          document.getElementById('dhp-modal').style.display = 'flex'; };
-        window.dhpRedeployGo = function(){ var r = dhpCurrent(); if (!r) return;
-          var rs = dhpRuns();
+          document.getElementById('dhr-modal-dry').textContent = 'Dry-run status: not run yet';
+          document.getElementById('dhr-modal').style.display = 'flex'; };
+        window.dhrRedeployGo = function(){ var r = dhrCurrent(); if (!r) return;
+          var rs = dhrRuns();
           var now = new Date();
           var id = 'deploy-' + now.toISOString().slice(0,10) + '-' + String(rs.length + 1).padStart(3,'0');
           var nr = JSON.parse(JSON.stringify(r));
           nr.deployment_id = id; nr.status = 'Running'; nr.badge = 'Rollback Point'; nr.started_at = now.toISOString().slice(0,16).replace('T',' ');
           nr.ended_at = '-'; nr.duration = '-'; nr.issues = []; nr.confidence_score = 0;
-          rs.unshift(nr); dhpSave(rs); dhpRender();
-          document.getElementById('dhp-modal').style.display = 'none';
+          rs.unshift(nr); dhrSave(rs); dhrRender();
+          document.getElementById('dhr-modal').style.display = 'none';
           stream('opencenter cluster deploy ' + r.cluster_name + ' --yes --break-lock --reinstall 2>&1 | tail -40', 'REDEPLOY AS NEW RUN — ' + id);
           note('New run ' + id + ' created from ' + r.deployment_id + ' and started. Original run untouched.'); };
-        window.dhpClone = function(){ var r = dhpCurrent(); if (!r) return;
+        window.dhrClone = function(){ var r = dhrCurrent(); if (!r) return;
           var name = prompt('New cluster name (cloned from ' + r.cluster_name + '):', r.cluster_name + '-clone');
           if (!name) return;
           var inp = document.getElementById('ocqp-cluster');
           if (inp){ inp.value = name; inp.dispatchEvent(new Event('input')); if (window.ocqpRecordClusterName) ocqpRecordClusterName(name); }
           note('Cluster name set to "' + name + '". Run Stage 2 init to create its blueprint from the same inputs.'); };
-        window.dhpExport = function(){ var r = dhpCurrent(); if (!r) return;
+        window.dhrExport = function(){ var r = dhrCurrent(); if (!r) return;
           var a = document.createElement('a');
           a.href = URL.createObjectURL(new Blob([JSON.stringify(r, null, 2)], {type:'application/json'}));
           a.download = r.deployment_id + '-evidence.json'; a.click();
           note('Evidence exported: ' + r.deployment_id + '-evidence.json'); };
-        document.addEventListener('DOMContentLoaded', function(){ setTimeout(dhpRender, 300); });
+        document.addEventListener('DOMContentLoaded', function(){ setTimeout(dhrRender, 300); });
       })();
       </script>
 
@@ -4790,7 +4826,7 @@ kubectl describe kustomization &lt;name&gt; -n flux-system</div>
         <button class="oct-mini" onclick="var t=document.getElementById('ocqp-term-float'); if(t) t.style.display = (t.style.display==='none'?'flex':'none');">Show / Hide</button>
       </div>
 
-      <div class="oct-term-wrap" id="ocqp-term-float" style="display:none;">
+      <div class="oct-term-wrap" id="ocqp-term-float">
         <div class="oct-term-hd">
           <i style="background:#ef4444;"></i><i style="background:#f59e0b;"></i><i style="background:#22c55e;"></i>
           <b>OpenCenter Output Terminal</b>
@@ -4824,6 +4860,29 @@ kubectl describe kustomization &lt;name&gt; -n flux-system</div>
 
     <script>
     (function(){
+      // Batched log appender: textContent+= on huge logs froze the tab (O(n^2) rewrites).
+      // Buffers lines and flushes as text nodes 4x/sec, capping total size.
+      window.octAppend = function(out, line){
+        if (!out) return;
+        if (!out._obuf){
+          out._obuf = [];
+          out._otimer = setInterval(function(){
+            if (!out._obuf.length) return;
+            out.appendChild(document.createTextNode(out._obuf.join('\n') + '\n'));
+            out._obuf.length = 0;
+            if (out.textContent.length > 400000){
+              var t = out.textContent;
+              out.textContent = '...[older output trimmed]...\n' + t.slice(-250000);
+            }
+            out.scrollTop = out.scrollHeight;
+          }, 250);
+        }
+        out._obuf.push(line);
+      };
+      window.octMirror = function(termId, line){
+        var t = document.getElementById(termId);
+        if (t) octAppend(t, line);
+      };
       window._ocqpVoMuted = false;
       window._ocqpEvidence = (function(){ try { return JSON.parse(localStorage.getItem('ocqp_evidence_v1')) || {validate:false, push:false}; } catch(e){ return {validate:false, push:false}; } })();
       window.ocqpMarkEvidence = function(cmd, ok){
@@ -4902,7 +4961,7 @@ kubectl describe kustomization &lt;name&gt; -n flux-system</div>
             box.innerHTML = h;
             var fb = document.getElementById('ocqp-freefip-btn');
             if (fb) fb.style.display = (d.orphaned_fips > 0) ? 'inline-block' : 'none';
-            var cb = document.getElementById('chp-14');
+            var cb = document.getElementById('chk-14');
             if (cb){ cb.checked = !!d.ok; if (typeof ocqpChecklistUpdate === 'function') ocqpChecklistUpdate(); }
           }).catch(function(e){ if (btn){ btn.disabled = false; btn.innerHTML = '&#128269; Check FLEX region quotas'; }
             if (box){ box.style.display = 'block'; box.innerHTML = '<div style="color:#b91c1c;font-size:11px;">\u2717 ' + e + '</div>'; } });
@@ -4938,22 +4997,75 @@ kubectl describe kustomization &lt;name&gt; -n flux-system</div>
         var ready = function(id){ var e = document.getElementById(id); return !!(e && /Ready/i.test(e.textContent)); };
         var val = function(id){ var e = document.getElementById(id); return !!(e && e.value.trim() !== ''); };
         var set = function(id, on){ var c = document.getElementById(id); if (c && on && !c.checked) c.checked = true; };
-        set('chp-1', ready('ocqp-req-cli'));
-        set('chp-2', ready('ocqp-req-git'));
-        set('chp-3', ready('ocqp-req-repo'));
-        set('chp-4', ready('ocqp-req-token'));
-        set('chp-5', ready('ocqp-req-credid'));
-        set('chp-6', ready('ocqp-req-credsec'));
-        set('chp-7', ready('ocqp-req-region'));
-        set('chp-8', val('ocqp-floatnet') && val('ocqp-networkid'));
-        set('chp-9', !!(window._qp && Object.keys(_qp.services).every(function(k){ return !_qp.services[k]; })));
-        set('chp-10', window._ocqpEvidence.validate);
-        set('chp-11', window._ocqpEvidence.changeme || window._ocqpEvidence.validate);
-        set('chp-12', window._ocqpEvidence.push);
+        set('chk-1', ready('ocqp-req-cli'));
+        set('chk-2', ready('ocqp-req-git'));
+        set('chk-3', ready('ocqp-req-repo'));
+        set('chk-4', ready('ocqp-req-token'));
+        set('chk-5', ready('ocqp-req-credid'));
+        set('chk-6', ready('ocqp-req-credsec'));
+        set('chk-7', ready('ocqp-req-region'));
+        set('chk-8', val('ocqp-floatnet') && val('ocqp-networkid'));
+        set('chk-9', !!(window._qp && Object.keys(_qp.services).every(function(k){ return !_qp.services[k]; })));
+        set('chk-10', window._ocqpEvidence.validate);
+        set('chk-11', window._ocqpEvidence.changeme || window._ocqpEvidence.validate);
+        set('chk-12', window._ocqpEvidence.push);
         if (typeof ocqpChecklistUpdate === 'function') ocqpChecklistUpdate();
       };
       
       window._ocqpAuto = { running:false, stop:false, es:null, abort:null };
+
+      // Floating terminals: draggable by header, resizable from bottom-right corner
+      function octFloatify(id){
+        var box = document.getElementById(id);
+        if (!box || box._octFloat) return;
+        box._octFloat = true;
+        box.style.resize = 'both';
+        box.style.minWidth = '300px';
+        box.style.minHeight = '160px';
+        var hd = box.querySelector('.oct-term-hd');
+        if (!hd) return;
+        hd.style.cursor = 'move';
+        hd.title = 'Drag to move';
+        hd.addEventListener('mousedown', function(e){
+          if (e.target.closest('button')) return;
+          e.preventDefault();
+          var r = box.getBoundingClientRect();
+          box.style.left = r.left + 'px'; box.style.top = r.top + 'px';
+          box.style.right = 'auto'; box.style.bottom = 'auto';
+          var dx = e.clientX - r.left, dy = e.clientY - r.top;
+          function mv(ev){
+            box.style.left = Math.max(0, Math.min(window.innerWidth - 90, ev.clientX - dx)) + 'px';
+            box.style.top = Math.max(0, Math.min(window.innerHeight - 40, ev.clientY - dy)) + 'px';
+          }
+          function up(){ document.removeEventListener('mousemove', mv); document.removeEventListener('mouseup', up); }
+          document.addEventListener('mousemove', mv);
+          document.addEventListener('mouseup', up);
+        });
+        // visible resize grip (native CSS grip is invisible on the dark theme)
+        var grip = document.createElement('div');
+        grip.innerHTML = '&#9698;';
+        grip.title = 'Drag to resize';
+        grip.style.cssText = 'position:absolute;right:1px;bottom:-2px;cursor:nwse-resize;color:#94a3b8;font-size:15px;line-height:1;z-index:6;user-select:none;padding:2px;';
+        box.appendChild(grip);
+        grip.addEventListener('mousedown', function(e){
+          e.preventDefault(); e.stopPropagation();
+          var r = box.getBoundingClientRect();
+          // pin to left/top so growing right/down does not push the window around
+          box.style.left = r.left + 'px'; box.style.top = r.top + 'px';
+          box.style.right = 'auto'; box.style.bottom = 'auto';
+          var sw = r.width, sh = r.height, sx = e.clientX, sy = e.clientY;
+          function mv(ev){
+            box.style.width = Math.max(300, sw + ev.clientX - sx) + 'px';
+            box.style.height = Math.max(160, sh + ev.clientY - sy) + 'px';
+          }
+          function up(){ document.removeEventListener('mousemove', mv); document.removeEventListener('mouseup', up); }
+          document.addEventListener('mousemove', mv);
+          document.addEventListener('mouseup', up);
+        });
+      }
+      document.addEventListener('DOMContentLoaded', function(){
+        setTimeout(function(){ octFloatify('ocqp-term-float'); octFloatify('ocqp-term-float'); }, 400);
+      });
 
       window.ocqpVoice = function(txt){
         var t = document.getElementById('ocqp-vo-text'); if (t) t.textContent = txt;
@@ -5272,11 +5384,44 @@ kubectl describe kustomization &lt;name&gt; -n flux-system</div>
       };
       window.ocqpToggle = function(svc){
         _qp.services[svc] = !_qp.services[svc];
-        var el=g('tgp-'+svc);
+        var el=g('tog-'+svc);
         if(el) el.classList.toggle('on', _qp.services[svc]);
         ocqpUpdate();
       };
 
+      // Persist terminal outputs across reloads: every finished command's
+      // output is saved to localStorage and restored on the next page load.
+      if (!window.ocqpSaveOut){
+        window.ocqpSaveOut = function(outId){
+          try{
+            var el = document.getElementById(outId); if (!el) return;
+            var m = JSON.parse(localStorage.getItem('ocqp_outlog_v1')||'{}');
+            var txt = el.textContent || '';
+            if (txt.length > 60000) txt = txt.slice(-60000);
+            m[outId] = { text: txt, border: el.style.borderColor || '', at: new Date().toLocaleString() };
+            var keys = Object.keys(m);
+            while (JSON.stringify(m).length > 3500000 && keys.length){ delete m[keys.shift()]; }
+            localStorage.setItem('ocqp_outlog_v1', JSON.stringify(m));
+          }catch(e){ try{ localStorage.removeItem('ocqp_outlog_v1'); }catch(_){} }
+        };
+        document.addEventListener('DOMContentLoaded', function(){
+          setTimeout(function(){
+            try{
+              var m = JSON.parse(localStorage.getItem('ocqp_outlog_v1')||'{}');
+              Object.keys(m).forEach(function(id){
+                var el = document.getElementById(id);
+                if (el && m[id] && m[id].text){
+                  el.textContent = '[restored from last session · ' + (m[id].at||'') + ']\n' + m[id].text;
+                  if (m[id].border) el.style.borderColor = m[id].border;
+                  if (id === 'ocqp-out-9' && window.ocqpDeployStage){
+                    m[id].text.split('\n').forEach(function(line){ try{ ocqpDeployStage(id, line); }catch(e){} });
+                  }
+                }
+              });
+            }catch(e){}
+          }, 400);
+        });
+      }
       window.ocqpRunCmd = function(cmdId, outId, btnId){
         var cmd = ((document.getElementById(cmdId)||{}).textContent||'').trim();
         if (!cmd) return;
@@ -5297,7 +5442,7 @@ kubectl describe kustomization &lt;name&gt; -n flux-system</div>
                 out.style.borderColor = ok ? '#16a34a' : '#dc2626';
             }
         };
-        es.onerror = function(){ es.close(); if(btn){btn.disabled=false;btn.textContent='▶ Run';} if (window.ocqsSaveOut) ocqsSaveOut(outId); };
+        es.onerror = function(){ es.close(); if(btn){btn.disabled=false;btn.textContent='▶ Run';} if (window.ocqpSaveOut) ocqpSaveOut(outId); };
       };
       window.ocqpToggleAuthType = function(){
             var t = (document.getElementById('ocqp-authtype')||{}).value;
@@ -5347,7 +5492,7 @@ kubectl describe kustomization &lt;name&gt; -n flux-system</div>
         s.org = _slug(s.org) || 'my-org';
         s.cluster = _slug(s.cluster) || 'my-cluster';
         var configPath = '/home/dzoan/.config/opencenter/clusters/blueprints/'+s.org+'/'+s.cluster+'/'+s.cluster+'-config.yaml';
-        var _fqdn = s.cluster+'.'+ocqsCanonicalRegion(s.region, s.authUrl).toLowerCase()+'.k8s.opencenter.cloud';
+        var _fqdn = s.cluster+'.'+ocqpCanonicalRegion(s.region, s.authUrl).toLowerCase()+'.k8s.opencenter.cloud';
         var _setUrl = function(id, prefix){ var el=g(id); if(el) el.textContent='https://'+prefix+'.'+_fqdn; };
         _setUrl('ocqp-url-keycloak','auth');
         _setUrl('ocqp-url-grafana','grafana');
@@ -5474,7 +5619,7 @@ var c9b=g('ocqp-cmd-9b');
           + "kubectl get helmreleases -A --no-headers 2>/dev/null | awk '{n++; a=a (n>1?\", \":\"\") $2} END{print \"HelmReleases:   \" n+0 \" installed (\" a \")\"}'\n"
           + "kubectl get pods -A --no-headers | awk '!/Running|Completed/{b++} END{print \"Pods:           \" NR \" total - \" b+0 \" not Running/Completed\"}'\n"
           + "echo \"API:            $(kubectl config view --minify -o jsonpath='{.clusters[0].cluster.server}')\"\n"
-          + "echo 'Dashboard:      https://dashboard." + s.cluster + "." + ocqsCanonicalRegion(s.region, s.authUrl).toLowerCase() + ".k8s.opencenter.cloud'";
+          + "echo 'Dashboard:      https://dashboard." + s.cluster + "." + ocqpCanonicalRegion(s.region, s.authUrl).toLowerCase() + ".k8s.opencenter.cloud'";
 // YAML preview
         var yp=g('ocqp-yaml-preview');
         if(yp) yp.textContent=
@@ -5618,11 +5763,11 @@ var c9b=g('ocqp-cmd-9b');
 
       window.ocqpChecklistUpdate = function(){
         var total=14, checked=0;
-        for(var i=1;i<=14;i++){ var cb=g('chp-'+i); if(cb&&cb.checked) checked++; }
+        for(var i=1;i<=14;i++){ var cb=g('chk-'+i); if(cb&&cb.checked) checked++; }
         var pct=Math.round(checked/total*100);
         var chip=g('ocqp-chk-chip'); if(chip) chip.textContent=checked+'/'+total;
         var bar=g('ocqp-chk-bar'); if(bar) bar.style.width=pct+'%';
-        for(var i=1;i<=14;i++){ var cb=g('chp-'+i), st=g('chp-'+i+'-st');
+        for(var i=1;i<=14;i++){ var cb=g('chk-'+i), st=g('chk-'+i+'-st');
           if(cb&&st){ var on=cb.checked;
             st.textContent = (i===13) ? (on?'\u2713 accepted':'click to acknowledge') : (i===14) ? (on?'\u2713 confirmed':'click to confirm') : (on?'\u2713 installed':'not installed');
             st.style.color=on?'#15803d':'#b91c1c'; st.style.background=on?'#dcfce7':'#fee2e2'; st.style.borderColor=on?'#86efac':'#fca5a5';
@@ -5688,7 +5833,7 @@ var c9b=g('ocqp-cmd-9b');
           if(saved.services){
             _qp.services=Object.assign(_qp.services,saved.services);
             ['keycloak','loki','tempo','velero','monitoring'].forEach(function(s){
-              var t=g('tgp-'+s); if(t) t.classList.toggle('on',!!_qp.services[s]);
+              var t=g('tog-'+s); if(t) t.classList.toggle('on',!!_qp.services[s]);
             });
           }
         }catch(e){}
@@ -5708,91 +5853,6 @@ var c9b=g('ocqp-cmd-9b');
     })();
     </script>
 
-    <script>
-    (function(){
-      var DELIV = [
-        ['Container image manifest', ['images','image_manifest','imageManifest','containers','image_tags']],
-        ['Kubernetes manifests / Helm values', ['manifests','k8s_manifests','helm','helm_values','charts','kustomize']],
-        ['Readiness report', ['readiness','readiness_report','report','assessment']],
-        ['Externalization & secrets plan', ['externalization','externalization_plan','secrets_plan','secretsPlan','external_services']],
-        ['Target sizing (nodes / flavors)', ['sizing','target_sizing','resources','capacity','nodes']],
-        ['Network / ingress requirements', ['network','ingress','routes','endpoints','dns']]
-      ];
-      function firstKey(obj, keys){
-        for (var i = 0; i < keys.length; i++){
-          if (obj && obj[keys[i]] !== undefined && obj[keys[i]] !== null && obj[keys[i]] !== '') return obj[keys[i]];
-        }
-        return null;
-      }
-      function summarize(v){
-        if (v === null) return '';
-        if (typeof v === 'string') return v.slice(0, 60);
-        if (Array.isArray(v)) return v.length + ' item(s)';
-        if (typeof v === 'object') return Object.keys(v).length + ' field(s)';
-        return String(v);
-      }
-      function setInput(id, val){
-        if (val === null || val === undefined || val === '') return;
-        var e = document.getElementById(id);
-        if (e){ e.value = val; e.dispatchEvent(new Event('input')); }
-      }
-      window.ocqpApplyR6Bundle = function(b, source){
-        var st = document.getElementById('ocqp-r6-status');
-        if (!b || typeof b !== 'object'){
-          if (st){ st.textContent = 'No usable R6 bundle found (' + source + ').'; st.style.color = '#b91c1c'; }
-          return;
-        }
-        var meta = b.meta || b.metadata || b;
-        setInput('ocqp-org', firstKey(meta, ['org','organization','customer','company']));
-        setInput('ocqp-cluster', firstKey(meta, ['cluster','cluster_name','target_cluster','clusterName']));
-        setInput('ocqp-env', firstKey(meta, ['env','environment']));
-        setInput('ocqp-region', firstKey(meta, ['region','target_region']));
-        var tb = document.getElementById('ocqp-r6-deliv');
-        var found = 0;
-        if (tb){
-          tb.innerHTML = DELIV.map(function(d){
-            var v = firstKey(b, d[1]) || firstKey(meta, d[1]);
-            if (v !== null) found++;
-            var badge = v !== null
-              ? '<span class="ocqs-badge-ready" style="background:#dcfce7;color:#15803d;border:1px solid #86efac;border-radius:999px;padding:2px 10px;font-size:10px;font-weight:900;">Found</span>'
-              : '<span class="ocqs-badge-missing" style="background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5;border-radius:999px;padding:2px 10px;font-size:10px;font-weight:900;">Missing</span>';
-            return '<tr><td><strong>' + d[0] + '</strong></td><td>' + (v !== null ? summarize(v) : '<span style="color:#94a3b8;">not in bundle</span>') + '</td><td>' + badge + '</td></tr>';
-          }).join('');
-          tb.innerHTML += '<tr><td><strong>Cloud credentials</strong></td><td>never shipped in R6 bundles</td><td><button onclick="ocqpCopyQuickstartCreds()" style="background:#475569;color:#fff;border:none;border-radius:5px;padding:3px 10px;font-size:10px;font-weight:800;cursor:pointer;">Reuse Quick Start</button></td></tr>';
-        }
-        if (st){
-          st.textContent = 'Imported from ' + source + ': ' + found + '/' + DELIV.length + ' deliverables found. Configuration auto-filled.';
-          st.style.color = found === DELIV.length ? '#15803d' : '#b45309';
-        }
-        if (typeof ocqpUpdate === 'function') ocqpUpdate();
-        if (typeof ocqpSave === 'function') ocqpSave();
-      };
-      window.ocqpImportR6 = function(){
-        var b = null;
-        try { b = JSON.parse(localStorage.getItem('r6OpenCenterHandoffBundle') || 'null'); } catch(e){}
-        ocqpApplyR6Bundle(b, 'R6 Containerization Stage handoff');
-      };
-      window.ocqpUploadR6 = function(inp){
-        var f = inp.files && inp.files[0];
-        if (!f) return;
-        var r = new FileReader();
-        r.onload = function(){
-          var b = null;
-          try { b = JSON.parse(r.result); } catch(e){}
-          ocqpApplyR6Bundle(b, 'uploaded file ' + f.name);
-        };
-        r.readAsText(f);
-      };
-      window.ocqpCopyQuickstartCreds = function(){
-        var src = localStorage.getItem('ocqs_creds_v2');
-        var st = document.getElementById('ocqp-r6-status');
-        if (!src){ if (st){ st.textContent = 'No saved Quick Start credentials found.'; st.style.color = '#b91c1c'; } return; }
-        localStorage.setItem('ocqp_creds_v2', src);
-        if (typeof ocqpRestoreCreds === 'function') ocqpRestoreCreds();
-        if (st){ st.textContent = 'Quick Start credentials copied into the production pipeline.'; st.style.color = '#15803d'; }
-      };
-    })();
-    </script>
         </div><!-- end inline body -->
       </div><!-- end quick start collapsed -->
       <!-- Clone FLEX Apps to Cluster Containers (hidden per request 2026-07-10; remove display:none to restore) -->
