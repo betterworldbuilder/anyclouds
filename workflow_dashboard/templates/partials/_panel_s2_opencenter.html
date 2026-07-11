@@ -128,7 +128,7 @@
         <div id="ocqs-inline-body" style="display:none;background:#f0f4f8;padding:0;">
     <div class="ocqs-body">
     <!-- LEFT COLUMN -->
-    <div class="ocqs-left">
+    <div class="ocqs-left" style="display:flex;gap:14px;align-items:flex-start;"><style>.ocqs-stepnav{position:sticky;top:12px;align-self:flex-start;display:flex;flex-direction:column;gap:2px;background:#0f172a;border-radius:10px;padding:10px 8px;min-width:172px;flex:none;max-height:calc(100vh - 40px);overflow-y:auto;}.ocqs-stepnav-hd{font-size:9px;font-weight:900;letter-spacing:1.5px;color:#64748b;padding:2px 8px 6px;}.ocqs-navlink{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:6px;text-decoration:none;font-size:11px;font-weight:700;color:#cbd5e1;transition:background .15s;}.ocqs-navlink:hover{background:#1e293b;color:#fff;}.ocqs-navlink.active{background:#0369a1;color:#fff;}.ocqs-navdot{width:8px;height:8px;border-radius:50%;background:#475569;flex:none;}.ocqs-navdot.pass{background:#16a34a;}.ocqs-navdot.fail{background:#dc2626;}.ocqs-navdot.run{background:#f59e0b;}@media (max-width:1100px){.ocqs-stepnav{position:static;flex-direction:row;flex-wrap:wrap;max-height:none;width:100%;}}</style><div class="ocqs-stepnav" id="ocqs-stepnav"><div class="ocqs-stepnav-hd">JUMP TO STAGE</div><a href="#ocqs-step-1" class="ocqs-navlink" data-step="1" onclick="ocqsNavJump(event,'ocqs-step-1')"><span class="ocqs-navdot" id="ocqs-navdot-1"></span><span class="ocqs-navlabel">1. Install &amp; Verify CLI</span></a><a href="#ocqs-step-2" class="ocqs-navlink" data-step="2" onclick="ocqsNavJump(event,'ocqs-step-2')"><span class="ocqs-navdot" id="ocqs-navdot-2"></span><span class="ocqs-navlabel">2. Initialize Cluster</span></a><a href="#ocqs-step-3" class="ocqs-navlink" data-step="3" onclick="ocqsNavJump(event,'ocqs-step-3')"><span class="ocqs-navdot" id="ocqs-navdot-3"></span><span class="ocqs-navlabel">3. Configure Credentials</span></a><a href="#ocqs-step-4" class="ocqs-navlink" data-step="4" onclick="ocqsNavJump(event,'ocqs-step-4')"><span class="ocqs-navdot" id="ocqs-navdot-4"></span><span class="ocqs-navlabel">4. Select Active Cluster</span></a><a href="#ocqs-step-5" class="ocqs-navlink" data-step="5" onclick="ocqsNavJump(event,'ocqs-step-5')"><span class="ocqs-navdot" id="ocqs-navdot-5"></span><span class="ocqs-navlabel">5. Optional Services</span></a><a href="#ocqs-step-7" class="ocqs-navlink" data-step="7" onclick="ocqsNavJump(event,'ocqs-step-7')"><span class="ocqs-navdot" id="ocqs-navdot-7"></span><span class="ocqs-navlabel">7. Setup GitOps Repo</span></a><a href="#ocqs-step-6" class="ocqs-navlink" data-step="6" onclick="ocqsNavJump(event,'ocqs-step-6')"><span class="ocqs-navdot" id="ocqs-navdot-6"></span><span class="ocqs-navlabel">6. Validate Config</span></a><a href="#ocqs-step-8" class="ocqs-navlink" data-step="8" onclick="ocqsNavJump(event,'ocqs-step-8')"><span class="ocqs-navdot" id="ocqs-navdot-8"></span><span class="ocqs-navlabel">8. Commit &amp; Push GitOps</span></a><a href="#ocqs-step-9" class="ocqs-navlink" data-step="9" onclick="ocqsNavJump(event,'ocqs-step-9')"><span class="ocqs-navdot" id="ocqs-navdot-9"></span><span class="ocqs-navlabel">9. Deploy Cluster</span></a></div><div class="ocqs-left-inner" style="flex:1;min-width:0;">
 
       <!-- Intro -->
       <div class="ocqs-section">
@@ -464,7 +464,7 @@
         }
       };
       setTimeout(function(){ if(window.ocqsToggleSensitiveMask) window.ocqsToggleSensitiveMask(true); }, 0);
-      window.ocqsGetState=function(){
+      window.ocqsNavJump = function(ev, id){ ev.preventDefault(); var el = document.getElementById(id); if (el) el.scrollIntoView({ behavior:'smooth', block:'start' }); };window.ocqsNavSync = function(){ var nav = document.getElementById('ocqs-stepnav'); if (!nav) return; nav.querySelectorAll('.ocqs-navlink').forEach(function(a){ var st = a.getAttribute('data-step'); var badge = document.getElementById('ocqs-st-' + st); var dot = document.getElementById('ocqs-navdot-' + st); if (!badge || !dot) return; var t = (badge.textContent || '').toLowerCase(); dot.className = 'ocqs-navdot' + (t.indexOf('pass') >= 0 || t.indexOf('done') >= 0 || t.indexOf('success') >= 0 ? ' pass' : t.indexOf('fail') >= 0 ? ' fail' : t.indexOf('run') >= 0 ? ' run' : ''); }); };setInterval(function(){ if (typeof ocqsNavSync === 'function') ocqsNavSync(); }, 2000);window.ocqsGetState=function(){
         try{
           var _svcs={keycloak:false,loki:false,tempo:false,velero:false,monitoring:false};
           try{_svcs=window._qs?window._qs.services:_svcs;}catch(e){}
@@ -1901,7 +1901,7 @@ kubectl describe kustomization &lt;name&gt; -n flux-system</div>
 
       </div>
 
-    </div><!-- end ocqs-left -->
+    </div></div><!-- end ocqs-left -->
 
     <!-- RIGHT COLUMN: Output Terminal + Voice Over + AutoRun progress -->
     <div class="ocqs-right" id="ocqs-right-panel">
@@ -3001,7 +3001,7 @@ var c9b=g('ocqs-cmd-9b');
         <div id="ocqp-inline-body" style="display:none;background:#f0f4f8;padding:0;">
     <div class="ocqs-body">
     <!-- LEFT COLUMN -->
-    <div class="ocqs-left">
+    <div class="ocqs-left" style="display:flex;gap:14px;align-items:flex-start;"><style>.ocqs-stepnav{position:sticky;top:12px;align-self:flex-start;display:flex;flex-direction:column;gap:2px;background:#0f172a;border-radius:10px;padding:10px 8px;min-width:172px;flex:none;max-height:calc(100vh - 40px);overflow-y:auto;}.ocqs-stepnav-hd{font-size:9px;font-weight:900;letter-spacing:1.5px;color:#64748b;padding:2px 8px 6px;}.ocqs-navlink{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:6px;text-decoration:none;font-size:11px;font-weight:700;color:#cbd5e1;transition:background .15s;}.ocqs-navlink:hover{background:#1e293b;color:#fff;}.ocqs-navlink.active{background:#0369a1;color:#fff;}.ocqs-navdot{width:8px;height:8px;border-radius:50%;background:#475569;flex:none;}.ocqs-navdot.pass{background:#16a34a;}.ocqs-navdot.fail{background:#dc2626;}.ocqs-navdot.run{background:#f59e0b;}@media (max-width:1100px){.ocqs-stepnav{position:static;flex-direction:row;flex-wrap:wrap;max-height:none;width:100%;}}</style><div class="ocqs-stepnav" id="ocqp-stepnav"><div class="ocqs-stepnav-hd">JUMP TO STAGE</div><a href="#ocqp-step-1" class="ocqs-navlink" data-step="1" onclick="ocqpNavJump(event,'ocqp-step-1')"><span class="ocqs-navdot" id="ocqp-navdot-1"></span><span class="ocqs-navlabel">1. Install &amp; Verify CLI</span></a><a href="#ocqp-step-2" class="ocqs-navlink" data-step="2" onclick="ocqpNavJump(event,'ocqp-step-2')"><span class="ocqs-navdot" id="ocqp-navdot-2"></span><span class="ocqs-navlabel">2. Initialize Cluster</span></a><a href="#ocqp-step-3" class="ocqs-navlink" data-step="3" onclick="ocqpNavJump(event,'ocqp-step-3')"><span class="ocqs-navdot" id="ocqp-navdot-3"></span><span class="ocqs-navlabel">3. Configure Credentials</span></a><a href="#ocqp-step-4" class="ocqs-navlink" data-step="4" onclick="ocqpNavJump(event,'ocqp-step-4')"><span class="ocqs-navdot" id="ocqp-navdot-4"></span><span class="ocqs-navlabel">4. Select Active Cluster</span></a><a href="#ocqp-step-5" class="ocqs-navlink" data-step="5" onclick="ocqpNavJump(event,'ocqp-step-5')"><span class="ocqs-navdot" id="ocqp-navdot-5"></span><span class="ocqs-navlabel">5. Optional Services</span></a><a href="#ocqp-step-7" class="ocqs-navlink" data-step="7" onclick="ocqpNavJump(event,'ocqp-step-7')"><span class="ocqs-navdot" id="ocqp-navdot-7"></span><span class="ocqs-navlabel">7. Setup GitOps Repo</span></a><a href="#ocqp-step-6" class="ocqs-navlink" data-step="6" onclick="ocqpNavJump(event,'ocqp-step-6')"><span class="ocqs-navdot" id="ocqp-navdot-6"></span><span class="ocqs-navlabel">6. Validate Config</span></a><a href="#ocqp-step-8" class="ocqs-navlink" data-step="8" onclick="ocqpNavJump(event,'ocqp-step-8')"><span class="ocqs-navdot" id="ocqp-navdot-8"></span><span class="ocqs-navlabel">8. Commit &amp; Push GitOps</span></a><a href="#ocqp-step-9" class="ocqs-navlink" data-step="9" onclick="ocqpNavJump(event,'ocqp-step-9')"><span class="ocqs-navdot" id="ocqp-navdot-9"></span><span class="ocqs-navlabel">9. Deploy Cluster</span></a></div><div class="ocqs-left-inner" style="flex:1;min-width:0;">
 
       <!-- Intro -->
       <div class="ocqs-section">
@@ -3337,7 +3337,7 @@ var c9b=g('ocqs-cmd-9b');
         }
       };
       setTimeout(function(){ if(window.ocqpToggleSensitiveMask) window.ocqpToggleSensitiveMask(true); }, 0);
-      window.ocqpGetState=function(){
+      window.ocqpNavJump = function(ev, id){ ev.preventDefault(); var el = document.getElementById(id); if (el) el.scrollIntoView({ behavior:'smooth', block:'start' }); };window.ocqpNavSync = function(){ var nav = document.getElementById('ocqp-stepnav'); if (!nav) return; nav.querySelectorAll('.ocqs-navlink').forEach(function(a){ var st = a.getAttribute('data-step'); var badge = document.getElementById('ocqp-st-' + st); var dot = document.getElementById('ocqp-navdot-' + st); if (!badge || !dot) return; var t = (badge.textContent || '').toLowerCase(); dot.className = 'ocqp-navdot' + (t.indexOf('pass') >= 0 || t.indexOf('done') >= 0 || t.indexOf('success') >= 0 ? ' pass' : t.indexOf('fail') >= 0 ? ' fail' : t.indexOf('run') >= 0 ? ' run' : ''); }); };setInterval(function(){ if (typeof ocqpNavSync === 'function') ocqpNavSync(); }, 2000);window.ocqpGetState=function(){
         try{
           var _svcs={keycloak:false,loki:false,tempo:false,velero:false,monitoring:false};
           try{_svcs=window._qp?window._qp.services:_svcs;}catch(e){}
@@ -4774,7 +4774,7 @@ kubectl describe kustomization &lt;name&gt; -n flux-system</div>
 
       </div>
 
-    </div><!-- end ocqp-left -->
+    </div></div><!-- end ocqp-left -->
 
     <!-- RIGHT COLUMN: Output Terminal + Voice Over + AutoRun progress -->
     <div class="ocqs-right" id="ocqp-right-panel">
