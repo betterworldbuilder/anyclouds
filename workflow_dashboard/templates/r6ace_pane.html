@@ -112,6 +112,16 @@
     &#9888; <strong>Full Snapshot Compatibility Mode active.</strong> Not fully cloud-native. Manual hardening required.
   </div>
 
+  <!-- COMPONENT CONTAINERIZATION CHART (collapsible, always visible at top) -->
+  <div class="r6p-stage" style="margin-bottom:14px;">
+    <div class="r6p-stage-hd" style="cursor:pointer;" onclick="var b=document.getElementById('r6p-classify-chart-body');if(b)b.style.display=b.style.display==='none'?'block':'none';var c=document.getElementById('r6p-classify-chevron');if(c)c.style.transform=c.style.transform?'':'rotate(90deg)';">
+      <div class="r6p-stage-num">&#128202;</div>
+      <div class="r6p-stage-info"><div class="r6p-stage-title">Component Containerization Chart</div><div class="r6p-stage-desc">Reference table: what state each component type usually has, and the default containerization decision. Component chips elsewhere auto-populate from this - engineers can still override per component.</div></div>
+      <span id="r6p-classify-chevron" style="margin-left:10px;font-size:14px;color:#94a3b8;">&#9654;</span>
+    </div>
+    <div id="r6p-classify-chart-body" style="display:none;padding:14px;border-top:1px solid #e2e8f0;"></div>
+  </div>
+
   <!-- STAGES -->
   <div class="r6p-stages" id="r6p-stages"></div>
 
@@ -134,4 +144,4 @@
   </div>
 
 </div>
-<script src="/static/r6ace.js?v=20260711t"></script>
+<script src="/static/r6ace.js?v=20260711u"></script>
