@@ -847,7 +847,7 @@ window.r6pStage0=function(){
     +'</div></div>'
 
 
-    /* 2. GitOps credentials (synced with OpenCenter quickstart state) */
+    /* 2. GitOps credentials (synced with OpenCenter Production panel state - ocqp, never Quickstart/ocqs) */
     +'<div style="border:1px solid #e2e8f0;border-radius:8px;padding:14px 16px;margin:12px 16px 16px;">'
     +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">'
     +'<div><div style="font-weight:700;font-size:13px;">2. GitOps Credentials</div>'
@@ -1613,7 +1613,9 @@ window.clfImportOpenRC=function(evt){
 var R6ACE_INSTALL={'opencenter version':'git clone https://github.com/opencenter-cloud/openCenter-cli.git && cd openCenter-cli && mise trust && mise install && mise run build && sudo cp ./bin/opencenter /usr/local/bin/opencenter && opencenter version','kubectl version --client':'curl -LO "https://dl.k8s.io/release/$(curl -sL https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" && sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl && kubectl version --client','opentofu version':'curl -sSLo /tmp/opentofu.zip https://github.com/opentofu/opentofu/releases/download/v1.8.0/tofu_1.8.0_linux_amd64.zip && cd /tmp && unzip -o opentofu.zip && sudo mv tofu /usr/local/bin/opentofu && opentofu version','flux --version || true':'curl -s https://fluxcd.io/install.sh | sudo bash && flux --version','git --version':'sudo apt-get update && sudo apt-get install -y git','curl --version':'sudo apt-get update && sudo apt-get install -y curl','jq --version':'sudo apt-get update && sudo apt-get install -y jq','helm version':'curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash','yq --version':'sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 && sudo chmod +x /usr/local/bin/yq && yq --version','kustomize version':'curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash && sudo mv kustomize /usr/local/bin/kustomize && kustomize version'};
 window.r6aceRunInstall=function(did,cmdId,outId){var d=document.getElementById(did);if(d)d.remove();var out=document.getElementById(outId),cEl=document.getElementById(cmdId);if(!out||!cEl)return;var cmd=cEl.textContent.trim();var ic=R6ACE_INSTALL[cmd];if(!ic)return;out.textContent='Installing...\n';out.style.borderColor='#134e4a';var url='/api/stream/run-cmd?cmd='+encodeURIComponent(ic);var es=new EventSource(url);es.onmessage=function(e){if(e.data!=='[DONE]'){out.textContent+=e.data+'\n';out.scrollTop=out.scrollHeight;}else{es.close();setTimeout(function(){r6pRunCmd(cmdId,outId);},500);}};es.onerror=function(){out.textContent+='[install error]\n';es.close();};};
 
-/* GitOps credentials card: two-way sync with the OpenCenter quickstart state */
+/* GitOps credentials card: two-way sync with the OpenCenter Production panel state (ocqp).
+   Must never read/write ocqs_state (Quickstart demo panel) - R6 deploys real business
+   systems and has to target the same GitOps repo/cluster as the real production cluster. */
 window.r6pGitAuthToggle = function(){
   var a = (document.getElementById('r6p-git-auth')||{}).value || 'ssh';
   var sr = document.getElementById('r6p-git-ssh-row'), tr = document.getElementById('r6p-git-token-row');
@@ -1628,7 +1630,7 @@ window.r6pLooksLikeGitDir = function(s){
 };
 window.r6pGitLoad = function(){
   try {
-    var st = JSON.parse(localStorage.getItem('ocqs_state') || '{}');
+    var st = JSON.parse(localStorage.getItem('ocqp_state') || '{}');
     var set = function(id, v){ var el = document.getElementById(id); if (el && v) el.value = v; };
     set('r6p-git-repo', st.gitRepo); set('r6p-git-branch', st.gitBranch);
     set('r6p-git-sshkey', st.sshKey); set('r6p-git-token', st.tokVal);
@@ -1636,7 +1638,7 @@ window.r6pGitLoad = function(){
       set('r6p-git-localdir', st.gitopsFolder);
       R6P.creds.opencenter.gitDir = st.gitopsFolder;
     } else {
-      if (st.gitopsFolder) { try { st.gitopsFolder = ''; localStorage.setItem('ocqs_state', JSON.stringify(st)); } catch(e){} }
+      if (st.gitopsFolder) { try { st.gitopsFolder = ''; localStorage.setItem('ocqp_state', JSON.stringify(st)); } catch(e){} }
       var badEl = document.getElementById('r6p-git-localdir'); if (badEl) badEl.value = '';
       if (typeof r6pAutoDetectGitDir === 'function') { r6pAutoDetectGitDir(); }
     }
@@ -1645,6 +1647,10 @@ window.r6pGitLoad = function(){
     r6pGitAuthToggle();
     var b = document.getElementById('r6p-git-badge');
     if (b && st.gitRepo){ b.textContent = 'Configured'; b.style.color = '#15803d'; }
+    /* The real production cluster's org/cluster (set in the ocqp panel) determines the
+       GitOps overlay path applications/overlays/<cluster>/managed-services/<slug> -
+       without this, R6 silently falls back to a hardcoded placeholder cluster ref. */
+    if (st.org && st.cluster) { R6P.creds.opencenter.clusterRef = st.org + '/' + st.cluster; }
   } catch(e){}
 };
 window.r6pAutoDetectGitDir = function(){
@@ -1672,17 +1678,18 @@ window.r6pGitSave = function(){
   if (typeof r6pSaveCredsServer === 'function') r6pSaveCredsServer();
   var v = function(id){ var el = document.getElementById(id); return el ? el.value.trim() : ''; };
   var st = {};
-  try { st = JSON.parse(localStorage.getItem('ocqs_state') || '{}'); } catch(e){}
+  try { st = JSON.parse(localStorage.getItem('ocqp_state') || '{}'); } catch(e){}
   st.gitRepo = v('r6p-git-repo'); st.gitBranch = v('r6p-git-branch') || 'main';
   st.gitAuth = v('r6p-git-auth') || 'ssh'; st.sshKey = v('r6p-git-sshkey') || '~/.ssh/id_rsa';
   if (v('r6p-git-token')) st.tokVal = v('r6p-git-token');
   var localDir = v('r6p-git-localdir');
   if (localDir) { st.gitopsFolder = localDir; R6P.creds.opencenter.gitDir = localDir; }
-  try { localStorage.setItem('ocqs_state', JSON.stringify(st)); } catch(e){}
+  try { localStorage.setItem('ocqp_state', JSON.stringify(st)); } catch(e){}
+  if (st.org && st.cluster) { R6P.creds.opencenter.clusterRef = st.org + '/' + st.cluster; }
   var stEl = document.getElementById('r6p-git-status');
   if (stEl){
     if (!st.gitRepo){ stEl.textContent = '\u2717 repository URL required'; stEl.style.color = '#dc2626'; return; }
-    stEl.textContent = '\u2713 saved - shared with OpenCenter quickstart (Stage 2)'; stEl.style.color = '#15803d';
+    stEl.textContent = '\u2713 saved - shared with OpenCenter Production (Stage 2)'; stEl.style.color = '#15803d';
   }
   var b = document.getElementById('r6p-git-badge');
   if (b){ b.textContent = st.gitRepo ? 'Configured' : 'Not Configured'; b.style.color = st.gitRepo ? '#15803d' : '#94a3b8'; }
