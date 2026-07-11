@@ -200,7 +200,7 @@ window.r6pContent=function(n){
   }
   if(n===6){
     var comps6=(R6P.components||[]).filter(function(c){return c.tgt;});
-    var opts6=comps6.length?comps6.map(function(c,i){return '<option value="'+i+'">'+c.name+' ('+c.tgt+')</option>';}).join(''):'<option value="">No components with a FLEX target IP - select a Business System in Step 1</option>';
+    var opts6=comps6.length?comps6.map(function(c,i){return '<option value="'+i+'">'+c.name+' ('+c.tgt+')</option>';}).join(''):'<option value="">No components have a FLEX Target IP yet - go to Step 1, click Inspect on the selected system, and fill in Target IP for each component</option>';
     return '<div class="r6p-info-box">Live scan over SSH against the FLEX VM already backing this component - no snapshot needed, it is already running with its real volumes attached.</div>'
       +'<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px;">'
       +'<div><label style="font-size:11px;font-weight:700;color:#334155;display:block;margin-bottom:4px;">Component</label><select id="r6p-scan-comp" style="padding:7px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;min-width:260px;">'+opts6+'</select></div>'
@@ -221,7 +221,7 @@ window.r6pContent=function(n){
       ['excluded_file','Excluded','Exclude','OS/system files, caches, temp files - not part of the application, always left out.']
     ];
     var comps7=(R6P.components||[]).filter(function(c){return c.tgt;});
-    var opts7=comps7.length?comps7.map(function(c,i){return '<option value="'+i+'">'+c.name+' ('+c.tgt+')</option>';}).join(''):'<option value="">No components with a FLEX target IP - select a Business System in Step 1</option>';
+    var opts7=comps7.length?comps7.map(function(c,i){return '<option value="'+i+'">'+c.name+' ('+c.tgt+')</option>';}).join(''):'<option value="">No components have a FLEX Target IP yet - go to Step 1, click Inspect on the selected system, and fill in Target IP for each component</option>';
     return '<div class="r6p-info-box">Identify real application content. Classify files into app content, config, secrets, logs, data, and excluded system files.</div>'
       +'<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px;">'
       +'<div><label style="font-size:11px;font-weight:700;color:#334155;display:block;margin-bottom:4px;">Component</label><select id="r6p-classify-comp" style="padding:7px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;min-width:260px;">'+opts7+'</select></div>'
@@ -351,7 +351,7 @@ window.r6pContent=function(n){
   }
   if(n===13){
     var comps13=(R6P.components||[]).filter(function(c){return c.tgt;});
-    if(!comps13.length)return '<div class="r6p-warn-box">No components with a FLEX target IP. Select a Business System or standalone VM/DB in Step 1.</div>'+r6pFoot(13);
+    if(!comps13.length)return '<div class="r6p-warn-box">No components have a FLEX Target IP yet - go to Step 1, click Inspect on the selected system, and fill in Target IP for each component.</div>'+r6pFoot(13);
     var rows13=comps13.map(function(c){
       var d=r6pDecideMigrationMode(c);
       var isDb=d.workloadType.toLowerCase().indexOf('database')>=0;
