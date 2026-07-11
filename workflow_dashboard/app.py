@@ -20920,6 +20920,74 @@ def openstack_networks():
         return jsonify({"error": str(e)}), 500
     return jsonify(result)
 
+@app.get("/api/opencenter/export-bundle")
+def opencenter_export_bundle():
+    """Zip all deployment input files (config blueprint, secrets, tokens, .sops.yaml) for org/cluster."""
+    import io as _io, zipfile as _zip
+    from flask import send_file
+    org = re.sub(r"[^A-Za-z0-9_.-]", "", str(request.args.get("org") or ""))
+    cluster = re.sub(r"[^A-Za-z0-9_.-]", "", str(request.args.get("cluster") or ""))
+    if not org or not cluster:
+        return jsonify({"ok": False, "error": "org and cluster required"}), 400
+    root = Path(os.path.expanduser("~")) / ".config" / "opencenter"
+    targets = [
+        root / "clusters" / "blueprints" / org / cluster,
+        root / "clusters" / "secrets" / org / cluster,
+        root / "tokens",
+    ]
+    sops = root / "clusters" / "gitops" / org / ".sops.yaml"
+    buf = _io.BytesIO()
+    count = 0
+    with _zip.ZipFile(buf, "w", _zip.ZIP_DEFLATED) as zf:
+        for t in targets:
+            if t.is_dir():
+                for f in sorted(t.rglob("*")):
+                    if f.is_file():
+                        zf.write(f, str(f.relative_to(root)))
+                        count += 1
+        if sops.is_file():
+            zf.write(sops, str(sops.relative_to(root)))
+            count += 1
+    if not count:
+        return jsonify({"ok": False, "error": "no files found for %s/%s" % (org, cluster)}), 404
+    buf.seek(0)
+    return send_file(buf, as_attachment=True,
+                     download_name="opencenter-bundle-%s-%s.zip" % (org, cluster),
+                     mimetype="application/zip")
+
+
+@app.post("/api/opencenter/restore-bundle")
+def opencenter_restore_bundle():
+    """Restore an exported bundle zip back under ~/.config/opencenter (paths validated)."""
+    import io as _io, zipfile as _zip
+    f = request.files.get("bundle")
+    if not f:
+        return jsonify({"ok": False, "error": "no bundle file uploaded"}), 400
+    root = Path(os.path.expanduser("~")) / ".config" / "opencenter"
+    try:
+        zf = _zip.ZipFile(_io.BytesIO(f.read()))
+    except _zip.BadZipFile:
+        return jsonify({"ok": False, "error": "not a valid zip"}), 400
+    restored = []
+    for m in zf.infolist():
+        if m.is_dir():
+            continue
+        name = m.filename.replace("\\", "/")
+        if name.startswith("/") or ".." in name.split("/"):
+            return jsonify({"ok": False, "error": "unsafe path in zip: %s" % name}), 400
+        dest = root / name
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        with zf.open(m) as srcf, open(dest, "wb") as out:
+            out.write(srcf.read())
+        if name.startswith(("clusters/secrets/", "tokens/")):
+            try:
+                os.chmod(dest, 0o600)
+            except Exception:
+                pass
+        restored.append(name)
+    return jsonify({"ok": True, "restored": len(restored), "files": restored[:50]})
+
+
 @app.route("/api/stream/run-cmd", methods=["GET"])
 def stream_run_cmd():
     import shlex as _shlex

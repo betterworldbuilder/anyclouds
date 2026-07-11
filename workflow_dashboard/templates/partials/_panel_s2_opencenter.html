@@ -11,7 +11,7 @@
         #s2opencenter-pane .ocm-title span { display:block; color:#0284c7; }
         #s2opencenter-pane .ocm-sub { margin:22px 0 0; max-width:660px; font-size:16px; line-height:1.75; color:#334155; }
         #s2opencenter-pane .ocm-strat { margin-top:30px; max-width:700px; border-radius:28px; border:1px solid #7dd3fc; background:rgba(255,255,255,.88); padding:24px 26px; box-shadow:0 20px 40px -20px rgba(14,165,233,.5); backdrop-filter:blur(12px); display:flex; gap:20px; }
-        #s2opencenter-pane .ocm-strat-ico { width:56px; height:56px; flex:none; display:flex; align-items:center; justify-content:center; border-radius:18px; background:linear-gradient(135deg,#0284c7,#38bdf8); color:#fff; font-size:24px; box-shadow:0 12px 22px -10px rgba(2,132,199,.85); }
+        #s2opencenter-pane .ocm-strat-ico { width:56px; height:56px; flex:none; display:flex; align-items:center; justify-content:center; border-radius:18px; background:linear-gradient(135deg,#0284c7,#38bdf8); color:#fff; font-size:24px !important; box-shadow:0 12px 22px -10px rgba(2,132,199,.85); }
         #s2opencenter-pane .ocm-strat small { display:block; font-size:11px; font-weight:900; text-transform:uppercase; letter-spacing:.18em; color:#0369a1; }
         #s2opencenter-pane .ocm-strat p { margin:10px 0 0; font-size:16px; font-weight:800; line-height:1.72; color:#020617; }
         #s2opencenter-pane .ocm-strat b { color:#0284c7; }
@@ -234,7 +234,7 @@
               </div>
               <div>
                 <label class="ocqs-label">Cluster Name</label>
-                <input class="ocqs-input" id="ocqs-cluster" value="my-cluster" list="ocqs-cluster-history" oninput="ocqsUpdate()" onchange="ocqsRecordClusterName(this.value)"><select id="ocqs-cluster-prev" onchange="if(this.value){var i=document.getElementById('ocqs-cluster');i.value=this.value;i.dispatchEvent(new Event('input'));ocqsUpdate();this.selectedIndex=0;}" style="margin-top:4px;width:100%;border:1px solid #cbd5e1;border-radius:6px;padding:5px 8px;font-size:11px;font-weight:700;color:#334155;background:#f8fafc;cursor:pointer;"><option value="">&#9662; previous clusters&hellip;</option></select>
+                <input class="ocqs-input" id="ocqs-cluster" value="my-cluster" list="ocqs-cluster-history" oninput="ocqsUpdate()" onchange="ocqsRecordClusterName(this.value)">
                 <datalist id="ocqs-cluster-history"></datalist>
               </div>
               <div>
@@ -300,6 +300,7 @@
 
             </div>
           </div>
+          <div style="font-size:11px;font-weight:800;color:#0369a1;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">&#9729;&#65039; Cloud Credentials</div>
           <div style="background:#eff6ff;border:1px dashed #93c5fd;border-radius:8px;padding:12px 14px;margin-bottom:12px;">
             <div style="font-size:12px;font-weight:700;color:#0369a1;margin-bottom:8px;">&#11014; Import OpenRC File <span style="font-weight:400;color:#64748b;">(auto-fills all fields below)</span></div>
             <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
@@ -393,15 +394,22 @@
             <input class="ocqs-input" id="ocqs-gitrepo" placeholder="https://github.com/YOUR_USER/opencenter-my-cluster-gitops.git" oninput="ocqsUpdate();ocqsReqCheck()">
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px;">
               <div><label class="ocqs-label">Git Branch</label><input class="ocqs-input" id="ocqs-gitbranch" value="main" oninput="ocqsUpdate()"></div>
-              <div><label class="ocqs-label">Token File Path</label><input class="ocqs-input" id="ocqs-tokfile" value="/home/dzoan/.config/opencenter/tokens/git-token.txt" oninput="ocqsUpdate()"></div>
+              <div><label class="ocqs-label">Git Auth Method</label><select class="ocqs-select" id="ocqs-gitauth" onchange="ocqsUpdate();ocqsReqCheck()"><option value="ssh" selected>SSH key (git@ push)</option><option value="token">HTTPS token</option></select></div>
             </div>
-            <label class="ocqs-label" style="margin-top:8px;">Git Token Value <span style="color:#64748b;font-size:10px;">(for HTTPS auth)</span></label>
-            <input class="ocqs-input" id="ocqs-tokval" type="password" placeholder="ghp_xxxxxxxxxxxxxxxxxxxxx" oninput="ocqsUpdate();ocqsReqCheck()">
-            <label class="ocqs-label" style="margin-top:8px;">SSH Key Path <span style="color:#64748b;font-size:10px;">(for SSH auth — used in git push)</span></label>
-            <input class="ocqs-input" id="ocqs-sshkey" value="~/.ssh/id_rsa" oninput="ocqsUpdate()">
-            <div style="font-size:11px;color:#64748b;margin-top:4px;">Ensure the corresponding public key is added to your GitHub account.</div>
-            <div class="ocqs-label" style="margin-top:10px;">GitOps Repo Path</div>
-            <div class="ocqs-path-badge" id="ocqs-gitopspath" style="font-size:10px;">/home/dzoan/.config/opencenter/clusters/gitops/my-org</div>
+            <div id="ocqs-auth-token-fields">
+              <label class="ocqs-label" style="margin-top:8px;">Token File Path</label>
+              <input class="ocqs-input" id="ocqs-tokfile" value="/home/dzoan/.config/opencenter/tokens/git-token.txt" oninput="ocqsUpdate()">
+              <label class="ocqs-label" style="margin-top:8px;">Git Token Value <span style="color:#64748b;font-size:10px;">(for HTTPS auth)</span></label>
+              <input class="ocqs-input" id="ocqs-tokval" type="password" placeholder="ghp_xxxxxxxxxxxxxxxxxxxxx" oninput="ocqsUpdate();ocqsReqCheck()">
+            </div>
+            <div id="ocqs-auth-ssh-fields">
+              <label class="ocqs-label" style="margin-top:8px;">SSH Key Path <span style="color:#64748b;font-size:10px;">(for SSH auth — used in git push)</span></label>
+              <input class="ocqs-input" id="ocqs-sshkey" value="~/.ssh/id_rsa" oninput="ocqsUpdate()">
+              <div style="font-size:11px;color:#64748b;margin-top:4px;">Ensure the corresponding public key is added to your GitHub account.</div>
+            </div>
+            <label class="ocqs-label" style="margin-top:10px;">GitOps Repo Folder <span style="color:#64748b;font-size:10px;">(local generated repo — leave blank for default)</span></label>
+            <input class="ocqs-input" id="ocqs-gitopsfolder" placeholder="/home/dzoan/.config/opencenter/clusters/gitops/my-org" oninput="ocqsUpdate()" style="font-size:11px;">
+            <div style="display:flex;gap:8px;margin-top:10px;align-items:center;"><button onclick="ocqsApplyGitops(this)" style="background:#15803d;color:#fff;border:none;border-radius:4px;padding:6px 16px;font-size:12px;font-weight:700;cursor:pointer;">&#128190; Apply to Config File</button><span id="ocqs-gitops-apply-status" style="font-size:11px;color:#64748b;"></span></div>
           </div>
           </div>
           <div style="margin-top:14px;display:flex;align-items:center;flex-wrap:wrap;gap:12px;padding:12px 14px;background:linear-gradient(135deg,#0f172a,#1e3a5f);border-radius:10px;">
@@ -471,6 +479,7 @@
             projectId:_v('ocqs-projectid'), credId:_v('ocqs-credid'), credSec:_v('ocqs-credsec'),
             floatNet:_v('ocqs-floatnet'), networkId:_v('ocqs-networkid'), subnetId:_v('ocqs-subnetid'),
             gitRepo:_v('ocqs-gitrepo'), gitBranch:_v('ocqs-gitbranch')||'main',
+            gitAuth:_v('ocqs-gitauth')||'ssh', gitopsFolder:_v('ocqs-gitopsfolder'),
             tokFile:_v('ocqs-tokfile')||'/home/dzoan/.config/opencenter/tokens/git-token.txt',
             tokVal:_v('ocqs-tokval'), sshKey:_v('ocqs-sshkey')||'~/.ssh/id_rsa', services:_svcs
           };
@@ -487,7 +496,7 @@
             userDomain:s.userDomain,projDomain:s.projDomain,projectId:s.projectId,
             credId:s.credId,credSec:s.credSec,
             floatNet:s.floatNet,networkId:s.networkId,subnetId:s.subnetId,
-            gitRepo:s.gitRepo,gitBranch:s.gitBranch,tokFile:s.tokFile,tokVal:s.tokVal,
+            gitRepo:s.gitRepo,gitBranch:s.gitBranch,gitAuth:s.gitAuth,gitopsFolder:s.gitopsFolder,tokFile:s.tokFile,tokVal:s.tokVal,
             services:(window._qs&&window._qs.services)||s.services||{}
           }));
         }catch(e){}
@@ -652,7 +661,7 @@
             es.onmessage = function(e){
               octAppend(out, e.data); if (window.octMirror) octMirror('ocqs-term', e.data); if (window.ocqsDeployStage) ocqsDeployStage(out.id, e.data);
               if (e.data.indexOf('[EXIT') === 0 || e.data.indexOf('[ERROR]') === 0){
-                es.close(); out.style.borderColor = e.data === '[EXIT 0]' ? '#16a34a' : '#dc2626'; res();
+                es.close(); out.style.borderColor = e.data === '[EXIT 0]' ? '#16a34a' : '#dc2626'; if (window.ocqsSaveOut) ocqsSaveOut(out.id); res();
               }
             };
             es.onerror = function(){ es.close(); res(); };
@@ -752,6 +761,39 @@
       window.ocqsFullBundle = function(){
         ['final_production_report.md','production_evidence.json','cutover_plan.md','rollback_plan.md'].forEach(function(n, i){ setTimeout(function(){ ocqsArtifact(n); }, i * 350); });
       };
+      // Persist terminal outputs across reloads: every finished command's
+      // output is saved to localStorage and restored on the next page load.
+      if (!window.ocqsSaveOut){
+        window.ocqsSaveOut = function(outId){
+          try{
+            var el = document.getElementById(outId); if (!el) return;
+            var m = JSON.parse(localStorage.getItem('ocqs_outlog_v1')||'{}');
+            var txt = el.textContent || '';
+            if (txt.length > 60000) txt = txt.slice(-60000);
+            m[outId] = { text: txt, border: el.style.borderColor || '', at: new Date().toLocaleString() };
+            var keys = Object.keys(m);
+            while (JSON.stringify(m).length > 3500000 && keys.length){ delete m[keys.shift()]; }
+            localStorage.setItem('ocqs_outlog_v1', JSON.stringify(m));
+          }catch(e){ try{ localStorage.removeItem('ocqs_outlog_v1'); }catch(_){} }
+        };
+        document.addEventListener('DOMContentLoaded', function(){
+          setTimeout(function(){
+            try{
+              var m = JSON.parse(localStorage.getItem('ocqs_outlog_v1')||'{}');
+              Object.keys(m).forEach(function(id){
+                var el = document.getElementById(id);
+                if (el && m[id] && m[id].text){
+                  el.textContent = '[restored from last session · ' + (m[id].at||'') + ']\n' + m[id].text;
+                  if (m[id].border) el.style.borderColor = m[id].border;
+                  if (id === 'ocqs-out-9' && window.ocqsDeployStage){
+                    m[id].text.split('\n').forEach(function(line){ try{ ocqsDeployStage(id, line); }catch(e){} });
+                  }
+                }
+              });
+            }catch(e){}
+          }, 400);
+        });
+      }
       window.ocqsRunCmd = function(cmdId, outId, btnId){
         var cmd = ((document.getElementById(cmdId)||{}).textContent||'').trim();
         var out = document.getElementById(outId);
@@ -769,6 +811,7 @@
             es.close();
             if (btn){ btn.disabled=false; btn.textContent='\u25b6 Run'; }
             out.style.borderColor = e.data === '[EXIT 0]' ? '#16a34a' : '#dc2626';
+            if (window.ocqsSaveOut){ ocqsSaveOut(outId); ocqsSaveOut('ocqs-term'); }
             if (window.ocqsMarkEvidence) ocqsMarkEvidence(cmd, e.data === '[EXIT 0]');
             if (e.data === '[EXIT 0]' && cmdId==='ocqs-cmd-2' && typeof ocqsApplyToConfig==='function') setTimeout(ocqsApplyToConfig, 800);
           }
@@ -823,7 +866,7 @@
             floatNet:_ocqsV('ocqs-floatnet'), networkId:_ocqsV('ocqs-networkid'), subnetId:_ocqsV('ocqs-subnetid'),
             gitRepo:_ocqsV('ocqs-gitrepo'), gitBranch:_ocqsV('ocqs-gitbranch'),
             tokFile:_ocqsV('ocqs-tokfile'), tokVal:_ocqsV('ocqs-tokval'),
-            sshKey:_ocqsV('ocqs-sshkey'), org:_ocqsV('ocqs-org'), cluster:_ocqsV('ocqs-cluster')
+            sshKey:_ocqsV('ocqs-sshkey'), gitAuth:_ocqsV('ocqs-gitauth'), gitopsFolder:_ocqsV('ocqs-gitopsfolder'), org:_ocqsV('ocqs-org'), cluster:_ocqsV('ocqs-cluster')
           };
           // Only save if at least one credential field is filled
           if(d.username||d.password||d.authUrl){
@@ -846,6 +889,7 @@
               credSec:'ocqs-credsec',floatNet:'ocqs-floatnet',networkId:'ocqs-networkid',
               subnetId:'ocqs-subnetid',gitRepo:'ocqs-gitrepo',gitBranch:'ocqs-gitbranch',
               tokFile:'ocqs-tokfile',tokVal:'ocqs-tokval',sshKey:'ocqs-sshkey',
+              gitAuth:'ocqs-gitauth',gitopsFolder:'ocqs-gitopsfolder',
               org:'ocqs-org',cluster:'ocqs-cluster'};
             if(map[k] && d[k]) _ocqsSv(map[k], d[k]);
           });
@@ -1229,6 +1273,48 @@ git push -u origin main</div>
         </div>
 
         <!-- Step 9 -->
+      <!-- Section F2: Files Created for Deployment -->
+      <div class="ocqs-section">
+        <h2>&#128193; Files Created for Deployment</h2>
+        <div style="font-size:12px;color:#475569;margin-bottom:10px;">Every file OpenCenter needs on disk before <code>cluster deploy</code>. Row 1 is the only file you author &mdash; the rest are generated by <code>cluster init</code> / <code>generate</code> / <code>secrets sync</code> and must exist, be committed, and pushed.</div>
+        <table class="ocqs-req-table">
+          <thead><tr><th>Input file</th><th>Path</th><th>Purpose</th><th>Created by</th></tr></thead>
+          <tbody>
+              <tr><td><strong>Cluster config YAML</strong></td><td style="font-size:11px;"><code>~/.config/opencenter/clusters/blueprints/&lt;org&gt;/&lt;cluster&gt;/&lt;cluster&gt;-config.yaml</code></td><td style="font-size:12px;">Master input: identity, region, network IDs, service toggles, gitops repo + auth, secret values</td><td style="font-size:11px;">You (Stage 2&ndash;5)</td></tr>
+              <tr><td><strong>OpenStack app credentials</strong></td><td style="font-size:11px;"><code>inside config yaml (application_credential_id / secret)</code></td><td style="font-size:12px;">Auth to OpenStack for Terraform/OpenTofu VM provisioning</td><td style="font-size:11px;">OpenRC import</td></tr>
+              <tr><td><strong>SOPS age private key</strong></td><td style="font-size:11px;"><code>~/.config/opencenter/clusters/secrets/&lt;org&gt;/&lt;cluster&gt;/age/keys/&lt;cluster&gt;-key.txt</code></td><td style="font-size:12px;">Encrypts/decrypts all service secrets (secrets sync, Flux SOPS)</td><td style="font-size:11px;">cluster init</td></tr>
+              <tr><td><strong>SOPS age public key</strong></td><td style="font-size:11px;"><code>same dir, &lt;cluster&gt;-key.pub</code></td><td style="font-size:12px;">Encryption recipient for new secrets</td><td style="font-size:11px;">cluster init</td></tr>
+              <tr><td><strong>Cluster node SSH keypair</strong></td><td style="font-size:11px;"><code>~/.config/opencenter/clusters/secrets/&lt;org&gt;/&lt;cluster&gt;/ssh/&lt;cluster&gt; + .pub</code></td><td style="font-size:12px;">Injected into VMs; kubespray/Ansible node access</td><td style="font-size:11px;">cluster init</td></tr>
+              <tr><td><strong>GitOps SSH key</strong></td><td style="font-size:11px;"><code>~/.ssh/id_rsa + id_rsa.pub (gitops.auth.ssh)</code></td><td style="font-size:12px;">Git push + Flux bootstrap deploy key (SSH auth mode)</td><td style="font-size:11px;">You</td></tr>
+              <tr><td><strong>SOPS config</strong></td><td style="font-size:11px;"><code>.sops.yaml in gitops repo</code></td><td style="font-size:12px;">Maps files to encryption keys</td><td style="font-size:11px;">cluster generate</td></tr>
+              <tr><td><strong>Generated GitOps repo</strong></td><td style="font-size:11px;"><code>~/.config/opencenter/clusters/gitops/&lt;org&gt;/ (infra .tf, Flux kustomizations, helm overrides)</code></td><td style="font-size:12px;">Desired state deploy reconciles from &mdash; must be committed &amp; pushed</td><td style="font-size:11px;">cluster generate</td></tr>
+              <tr><td><strong>Encrypted service secrets</strong></td><td style="font-size:11px;"><code>gitops repo: applications/overlays/&lt;cluster&gt;/services/*/secret.yaml</code></td><td style="font-size:12px;">Per-service credentials, SOPS-encrypted, applied by Flux</td><td style="font-size:11px;">secrets sync</td></tr>
+              <tr><td><strong>Git token file (token auth only)</strong></td><td style="font-size:11px;"><code>~/.config/opencenter/tokens/git-token.txt</code></td><td style="font-size:12px;">HTTPS-token alternative; ignored while ssh auth block is active</td><td style="font-size:11px;">You (Stage 4)</td></tr>
+              </tbody>
+        </table>
+        <div style="display:flex;gap:8px;margin-top:12px;align-items:center;flex-wrap:wrap;">
+          <button onclick="ocqsExportBundle()" style="background:#0369a1;color:#fff;border:none;border-radius:6px;padding:8px 18px;font-size:12px;font-weight:800;cursor:pointer;">&#128230; Export Bundle (.zip)</button>
+          <label style="background:#15803d;color:#fff;border-radius:6px;padding:8px 18px;font-size:12px;font-weight:800;cursor:pointer;display:inline-block;">&#9851; Restore Config Files<input type="file" accept=".zip" style="display:none;" onchange="ocqsRestoreBundle(this)"></label>
+          <span id="ocqs-bundle-status" style="font-size:12px;font-weight:700;color:#64748b;"></span>
+        </div>
+        <script>
+        window.ocqsExportBundle = function(){
+          var s = (typeof ocqsGetState==='function') ? ocqsGetState() : {};
+          window.open('/api/opencenter/export-bundle?org='+encodeURIComponent(s.org||'my-org')+'&cluster='+encodeURIComponent(s.cluster||'my-cluster'), '_blank');
+        };
+        window.ocqsRestoreBundle = function(inp){
+          var st = document.getElementById('ocqs-bundle-status');
+          var f = inp.files && inp.files[0]; if(!f) return;
+          var fd = new FormData(); fd.append('bundle', f);
+          if(st){ st.textContent = 'Restoring '+f.name+'...'; st.style.color='#0369a1'; }
+          fetch('/api/opencenter/restore-bundle', {method:'POST', body:fd})
+            .then(function(r){ return r.json(); })
+            .then(function(d){ if(st){ if(d.ok){ st.textContent='✓ restored '+d.restored+' files under ~/.config/opencenter'; st.style.color='#15803d'; } else { st.textContent='✗ '+(d.error||'restore failed'); st.style.color='#dc2626'; } } inp.value=''; })
+            .catch(function(e){ if(st){ st.textContent='✗ '+e; st.style.color='#dc2626'; } inp.value=''; });
+        };
+        </script>
+      </div>
+
       <!-- Section G: Safety Checklist -->
       <div class="ocqs-section">
         <style>
@@ -1236,17 +1322,30 @@ git push -u origin main</div>
             0%, 100% { background:#000000; box-shadow:0 0 0 rgba(220,38,38,0); }
             50% { background:#111827; box-shadow:0 0 22px rgba(220,38,38,.55); }
           }
-          .ocqs-coffee-warning {
+          .ocqs-section h2.ocqs-coffee-warning, .ocqs-coffee-warning {
             animation:ocqsCoffeeWarningBlink 1.15s ease-in-out infinite;
             border:2px solid #475569;
-            border-radius:8px;
-            color:#fff !important;
-            font-size:16px;
+            border-radius:10px;
+            color:#ffffff !important;
+            font-size:24px !important;
             font-weight:900;
+            letter-spacing:1.5px !important;
             margin:0 0 10px;
-            padding:12px 16px;
+            padding:20px 22px;
             text-align:center;
             text-shadow:0 1px 2px rgba(0,0,0,.45);
+            border-bottom:2px solid #475569 !important;
+            text-transform:uppercase;
+          }
+          .ocqs-coffee-cup { position:relative; display:inline-block; font-size:34px; margin-right:14px; vertical-align:middle; }
+          .ocqs-steam { position:absolute; left:50%; bottom:88%; width:6px; height:16px; border-radius:50%; background:rgba(255,255,255,.8); filter:blur(2px); opacity:0; animation:ocqsSteamRise 2.2s ease-out infinite; }
+          .ocqs-steam.s1 { margin-left:-10px; animation-delay:0s; }
+          .ocqs-steam.s2 { margin-left:-2px;  animation-delay:.7s; }
+          .ocqs-steam.s3 { margin-left:7px;   animation-delay:1.4s; }
+          @keyframes ocqsSteamRise {
+            0%   { opacity:0; transform:translateY(5px) scaleX(1); }
+            25%  { opacity:.95; }
+            100% { opacity:0; transform:translateY(-20px) scaleX(1.7); }
           }
           .ocqs-coffee-warning code {
             background:rgba(255,255,255,.16);
@@ -1255,7 +1354,7 @@ git push -u origin main</div>
             border-radius:4px;
           }
         </style>
-        <h2 class="ocqs-coffee-warning">Coffee Break Warning : Safety Checklist Before Deploy</h2>
+        <h2 class="ocqs-coffee-warning"><span class="ocqs-coffee-cup">&#9749;<span class="ocqs-steam s1"></span><span class="ocqs-steam s2"></span><span class="ocqs-steam s3"></span></span> COFFEE BREAK WARNING : SAFETY CHECKLIST BEFORE DEPLOY</h2>
         <div style="font-size:14px;background:#dc2626;border:2px solid #fecaca;border-radius:8px;color:#fff;font-weight:900;margin:0 0 10px;padding:11px 16px;text-align:center;">
           ⛔ Never run <code>opencenter cluster deploy</code> until all checkpoints pass
         </div>
@@ -1407,7 +1506,7 @@ tail -f /home/dzoan/.local/state/opencenter/logs/bootstrap/my-org/my-cluster/*.l
           <div id="ocqs-out-chksum" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:12px 14px;font-family:monospace;font-size:12px;color:#00ff41;white-space:pre-wrap;min-height:150px;max-height:280px;overflow-y:auto;">$ waiting...
 </div>
           <div style="margin-top:14px;padding:14px;background:#0f172a;border-radius:10px;overflow-x:auto;">
-            <div style="font-size:10px;font-weight:800;color:#38bdf8;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:10px;">Cluster Topology</div>
+            <div style="font-size:10px;font-weight:800;color:#38bdf8;letter-spacing:1.5px !important;text-transform:uppercase;margin-bottom:10px;">Cluster Topology</div>
             <div style="display:flex;align-items:center;gap:8px;font-size:11px;font-weight:700;white-space:nowrap;">
               <span style="display:inline-flex;align-items:center;border-radius:999px;border:1px solid #7dd3fc;color:#7dd3fc;padding:4px 10px;">OpenStack VMs 3cp+2wn</span><span style="color:#475569;">&rarr;</span><span style="display:inline-flex;align-items:center;border-radius:999px;border:1px solid #4ade80;color:#4ade80;padding:4px 10px;">Calico CNI</span><span style="color:#475569;">&rarr;</span><span style="display:inline-flex;align-items:center;border-radius:999px;border:1px solid #a78bfa;color:#a78bfa;padding:4px 10px;">FluxCD</span><span style="color:#475569;">&rarr;</span><span style="display:inline-flex;align-items:center;border-radius:999px;border:1px solid #fbbf24;color:#fbbf24;padding:4px 10px;">GitOps Repo</span><span style="color:#475569;">&rarr;</span><span style="display:inline-flex;align-items:center;border-radius:999px;border:1px solid #a78bfa;color:#a78bfa;padding:4px 10px;">Kustomizations</span><span style="color:#475569;">&rarr;</span><span style="display:inline-flex;align-items:center;border-radius:999px;border:1px solid #f472b6;color:#f472b6;padding:4px 10px;">HelmReleases</span><span style="color:#475569;">&rarr;</span><span style="display:inline-flex;align-items:center;border-radius:999px;border:1px solid #4ade80;color:#4ade80;padding:4px 10px;">Platform Services</span><span style="color:#475569;">&rarr;</span><span style="display:inline-flex;align-items:center;border-radius:999px;border:1px solid #7dd3fc;color:#7dd3fc;padding:4px 10px;">Envoy Gateway</span><span style="color:#475569;">&rarr;</span><span style="display:inline-flex;align-items:center;border-radius:999px;border:1px solid #fbbf24;color:#fbbf24;padding:4px 10px;">dashboard.&lt;cluster&gt;</span>
             </div>
@@ -1426,6 +1525,26 @@ Kubernetes Cluster
 
 User Access
   └─ dashboard.&lt;cluster&gt;      → Headlamp / OpenCenter dashboard endpoint</pre>
+            <div style="margin-top:12px;display:flex;flex-wrap:wrap;gap:14px;font-size:11px;font-weight:700;background:#020817;border:1px solid #1e3a5f;border-radius:8px;padding:10px 14px;">
+              <span style="color:#94a3b8;">Cluster: <span style="color:#4ade80;">my5th-opencenter-cluster</span></span>
+              <span style="color:#94a3b8;">Deployed: <span style="color:#7dd3fc;">2026-07-10 22:17 ICT</span></span>
+              <span style="color:#94a3b8;">Target region: <span style="color:#fbbf24;">FLEX IAD3</span></span>
+              <span style="color:#94a3b8;">API endpoint: <span style="color:#a78bfa;">https://146.20.63.50:443</span></span>
+              <span style="color:#94a3b8;">Kubernetes: <span style="color:#7dd3fc;">v1.35.4</span></span>
+            </div>
+            <table class="ocqs-req-table" style="font-size:11px;margin-top:10px;">
+              <thead><tr><th>Component</th><th>Role</th><th>Status</th><th>Internal IP</th><th>External IP</th><th>OS / Runtime</th></tr></thead>
+              <tbody>
+                <tr><td><code>my5th-opencenter-cluster-cp0</code></td><td>control-plane</td><td style="color:#15803d;font-weight:800;">Ready</td><td><code>10.2.128.94</code></td><td>&mdash;</td><td>Ubuntu 24.04.4 LTS &middot; containerd 2.2.3</td></tr>
+                <tr><td><code>my5th-opencenter-cluster-cp1</code></td><td>control-plane</td><td style="color:#15803d;font-weight:800;">Ready</td><td><code>10.2.131.175</code></td><td>&mdash;</td><td>Ubuntu 24.04.4 LTS &middot; containerd 2.2.3</td></tr>
+                <tr><td><code>my5th-opencenter-cluster-cp2</code></td><td>control-plane</td><td style="color:#15803d;font-weight:800;">Ready</td><td><code>10.2.131.108</code></td><td>&mdash;</td><td>Ubuntu 24.04.4 LTS &middot; containerd 2.2.3</td></tr>
+                <tr><td><code>my5th-opencenter-cluster-wn0</code></td><td>worker</td><td style="color:#15803d;font-weight:800;">Ready</td><td><code>10.2.129.83</code></td><td>&mdash;</td><td>Ubuntu 24.04.4 LTS &middot; containerd 2.2.3</td></tr>
+                <tr><td><code>my5th-opencenter-cluster-wn1</code></td><td>worker</td><td style="color:#15803d;font-weight:800;">Ready</td><td><code>10.2.128.26</code></td><td>&mdash;</td><td>Ubuntu 24.04.4 LTS &middot; containerd 2.2.3</td></tr>
+                <tr><td><code>my5th-opencenter-cluster-bastion</code></td><td>bastion / admin</td><td style="color:#15803d;font-weight:800;">Active</td><td><code>10.2.128.62</code></td><td><code>146.20.62.51</code></td><td>Ubuntu 24.04 &middot; kubeconfig + GitOps bootstrap</td></tr>
+                <tr><td><code>kube-apiserver VIP</code></td><td>API endpoint</td><td style="color:#15803d;font-weight:800;">Ready</td><td>&mdash;</td><td><code>146.20.63.50:443</code></td><td>HA VIP fronting cp0/cp1/cp2</td></tr>
+              </tbody>
+            </table>
+            <div style="font-size:10px;color:#64748b;margin-top:6px;">Live check: <code>kubectl --kubeconfig ~/.config/opencenter/clusters/state/opencentertest-from-mission-control/my5th-opencenter-cluster/kubeconfig.yaml get nodes -o wide</code></div>
           </div>
           <div style="font-size:11px;font-weight:800;color:#334155;margin:14px 0 6px;">What gets created, where it lives, and which tool makes it</div>
           <table class="ocqs-req-table" style="font-size:11px;">
@@ -1546,9 +1665,27 @@ User Access
 
       <script>
       (function(){
-        var KEY = 'ocqs_deploy_history_v1';
+        var KEY = 'ocqs_deploy_history_v2';
         function seed(){
           return [
+            { deployment_id:'deploy-2026-07-10-005', cluster_name:'my5th-opencenter-cluster', provider:'OpenStack / FLEX (IAD3)', status:'Success',
+              started_at:'2026-07-10 16:57', ended_at:'2026-07-10 22:17', duration:'5h20m (incl. 6 root-cause fixes)', operator:'dzoan',
+              git_commit_sha:'6116ccc', config_checksum:'sha256:my5th-iad3', confidence_score:97, badge:'Last Known Good', redeployable:true,
+              generated_gitops_path:'~/.config/opencenter/clusters/gitops/opencentertest-from-mission-control',
+              tool_versions:{ opencenter:'dev (calico pin + force-conflicts + reinstall guardrail)', kubespray:'2.31.0', opentofu:'1.12.3', fluxcd:'2.9.0', helm:'4.2.2' },
+              image_manifest:'ubuntu-24.04 / calico v3.31.6 / cert-manager v1.18.2 / headlamp 0.35.0',
+              opencenter_config_snapshot:'opencenter:\n  cluster:\n    cluster_name: my5th-opencenter-cluster\n    kubernetes: 1.35.4 (3 cp + 2 wn)\n    endpoint: https://146.20.63.50:443\n  infrastructure:\n    provider: openstack (IAD3)\n    application_credential_id: <from blueprint>\n    application_credential_secret: <secret-ref>\n  gitops:\n    url: ssh://git@github.com/Sherlock2019/opencenter-my-cluster-gitops.git\n    auth: ssh (~/.ssh/id_rsa)\n\nconfig files for redeploy (all committed at 6116ccc):\n  blueprint: ~/.config/opencenter/clusters/blueprints/opencentertest-from-mission-control/my5th-opencenter-cluster/my5th-opencenter-cluster-config.yaml\n  calico values: applications/overlays/my5th-opencenter-cluster/services/calico/helm-values/override_values.yaml (no windowsDataplane)\n  flux entrypoint: clusters/my5th-opencenter-cluster/apps.yaml\n  overlay placeholder: applications/overlays/my5th-opencenter-cluster/flux-system/kustomization.yaml\n  sources (quoted tags): applications/overlays/my5th-opencenter-cluster/services/sources/*.yaml\n  kubeconfig: ~/.config/opencenter/clusters/state/opencentertest-from-mission-control/my5th-opencenter-cluster/kubeconfig.yaml\n  sops key: ~/.config/opencenter/clusters/secrets/opencentertest-from-mission-control/my5th-opencenter-cluster/age/keys/\nsecrets: SOPS age (refs only)',
+              phases:[ {n:'Configure',s:'ok',d:'25m',i:3}, {n:'Generate',s:'ok',d:'4m',i:1}, {n:'Provision',s:'ok',d:'54m',i:2}, {n:'Kubernetes Install',s:'ok',d:'40m',i:3}, {n:'GitOps Reconcile',s:'ok',d:'55m',i:4}, {n:'Validate',s:'ok',d:'5m',i:0} ],
+              issues:[
+                ['Configure','DFW3 secgroup quota / flavor / image not found','Region switch DFW3 to IAD3 left stale flavor + image IDs','Set IAD3 Ubuntu image + gp flavors in blueprint','Platform Engineer','Fixed'],
+                ['Provision','Tofu state lock held after SSH drop','Run died mid-apply, lock not released','--break-lock after verifying owner dead','Cloud Ops','Fixed'],
+                ['Kubernetes Install','Calico CRDs missing (v3.32.1 pulled)','helm upgrade had no --version pin; v3.32 chart drops bundled CRDs','Pinned --version v3.31.6 in openstack_network_plugin.go','Platform Engineer','Fixed'],
+                ['Kubernetes Install','Installation rejects windowsDataplane','Field removed in Calico v3.31; Helm 4 SSA hard-rejects','Removed field from values + generator template','Platform Engineer','Fixed'],
+                ['Kubernetes Install','SSA conflict on rerun (ipPools owned by operator)','Tigera operator takes ownership of Installation defaults','Added --force-conflicts to calico helm upgrade','Platform Engineer','Fixed'],
+                ['GitOps Reconcile','flux create secret git --silent unknown flag','Flag only exists on flux bootstrap','Removed --silent in openstack_flux_bootstrap.go','Platform Engineer','Fixed'],
+                ['GitOps Reconcile','apps Kustomization missing / invalid cluster: field / unquoted 2026.01 tags','Generator gaps vs known-good my1st','Added apps.yaml + flux-system placeholder, stripped cluster: blocks, quoted tags; sops-age + ccm override secrets created','Platform Engineer','Fixed'],
+                ['Validate','All checks green','-','-','Ops','Healthy'] ],
+              validation_report:{ nodes:'5/5 Ready', kustomizations:'20/20 Ready', helmreleases:'7/7 installed', pods:'63 total, 0 failing', drift:'none', last_validated:'2026-07-10 22:30' } },
             { deployment_id:'deploy-2026-07-09-001', cluster_name:'my1st-opencenter-cluster', provider:'OpenStack / FLEX', status:'Success',
               started_at:'2026-07-09 21:26', ended_at:'2026-07-09 23:59', duration:'82 min', operator:'dzoan',
               git_commit_sha:'68266d5', config_checksum:'sha256:91ac07e2', confidence_score:98, badge:'Last Known Good', redeployable:true,
@@ -1656,6 +1793,7 @@ User Access
           es.onmessage = function(e){ tlog(e.data);
             if (e.data.indexOf('[EXIT') === 0 || e.data.indexOf('[ERROR]') === 0){ es.close();
               if (t) t.style.borderColor = e.data === '[EXIT 0]' ? '#16a34a' : '#dc2626';
+              if (window.ocqsSaveOut && t) ocqsSaveOut(t.id);
               var d = document.getElementById('dhr-modal-dry');
               if (d && label.indexOf('DRY RUN') === 0) { d.textContent = 'Dry-run status: ' + (e.data === '[EXIT 0]' ? '\u2705 passed' : '\u274c failed (' + e.data + ')'); d.style.color = e.data === '[EXIT 0]' ? '#15803d' : '#b91c1c'; }
             } };
@@ -1684,7 +1822,7 @@ User Access
           nr.ended_at = '-'; nr.duration = '-'; nr.issues = []; nr.confidence_score = 0;
           rs.unshift(nr); dhrSave(rs); dhrRender();
           document.getElementById('dhr-modal').style.display = 'none';
-          stream('opencenter cluster deploy ' + r.cluster_name + ' --yes --break-lock 2>&1 | tail -40', 'REDEPLOY AS NEW RUN — ' + id);
+          stream('opencenter cluster deploy ' + r.cluster_name + ' --yes --break-lock --reinstall 2>&1 | tail -40', 'REDEPLOY AS NEW RUN — ' + id);
           note('New run ' + id + ' created from ' + r.deployment_id + ' and started. Original run untouched.'); };
         window.dhrClone = function(){ var r = dhrCurrent(); if (!r) return;
           var name = prompt('New cluster name (cloned from ' + r.cluster_name + '):', r.cluster_name + '-clone');
@@ -1770,7 +1908,7 @@ kubectl describe kustomization &lt;name&gt; -n flux-system</div>
       <style>
         #ocqs-right-panel .oct-vo { border:1px solid #7dd3fc; border-radius:12px; background:linear-gradient(135deg,#f0f9ff,#e0f2fe); padding:12px 14px; }
         #ocqs-right-panel .oct-vo-hd { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:8px; }
-        #ocqs-right-panel .oct-vo-hd b { font-size:11px; font-weight:900; text-transform:uppercase; letter-spacing:1.5px; color:#0369a1; }
+        #ocqs-right-panel .oct-vo-hd b { font-size:11px; font-weight:900; text-transform:uppercase; letter-spacing:1.5px !important; color:#0369a1; }
         #ocqs-right-panel .oct-vo-txt { font-size:12px; line-height:1.6; color:#0f172a; min-height:34px; font-weight:600; }
         #ocqs-right-panel .oct-mini { border:1px solid #cbd5e1; background:#fff; color:#334155; border-radius:6px; padding:4px 10px; font-size:11px; font-weight:800; cursor:pointer; }
         #ocqs-right-panel .oct-steps { border:1px solid #e2e8f0; border-radius:12px; background:#fff; padding:10px 12px; max-height:220px; overflow-y:auto; }
@@ -2271,6 +2409,8 @@ kubectl describe kustomization &lt;name&gt; -n flux-system</div>
           subnetId: v('ocqs-subnetid'),
           gitRepo:v('ocqs-gitrepo'),
           gitBranch:v('ocqs-gitbranch')||'main',
+          gitAuth:v('ocqs-gitauth')||'ssh',
+          gitopsFolder:v('ocqs-gitopsfolder'),
           tokFile:v('ocqs-tokfile')||'/home/dzoan/.config/opencenter/tokens/git-token.txt',
           tokVal: v('ocqs-tokval'),
           sshKey: v('ocqs-sshkey')||'~/.ssh/id_rsa',
@@ -2376,6 +2516,39 @@ kubectl describe kustomization &lt;name&gt; -n flux-system</div>
         ocqsUpdate();
       };
 
+      // Persist terminal outputs across reloads: every finished command's
+      // output is saved to localStorage and restored on the next page load.
+      if (!window.ocqsSaveOut){
+        window.ocqsSaveOut = function(outId){
+          try{
+            var el = document.getElementById(outId); if (!el) return;
+            var m = JSON.parse(localStorage.getItem('ocqs_outlog_v1')||'{}');
+            var txt = el.textContent || '';
+            if (txt.length > 60000) txt = txt.slice(-60000);
+            m[outId] = { text: txt, border: el.style.borderColor || '', at: new Date().toLocaleString() };
+            var keys = Object.keys(m);
+            while (JSON.stringify(m).length > 3500000 && keys.length){ delete m[keys.shift()]; }
+            localStorage.setItem('ocqs_outlog_v1', JSON.stringify(m));
+          }catch(e){ try{ localStorage.removeItem('ocqs_outlog_v1'); }catch(_){} }
+        };
+        document.addEventListener('DOMContentLoaded', function(){
+          setTimeout(function(){
+            try{
+              var m = JSON.parse(localStorage.getItem('ocqs_outlog_v1')||'{}');
+              Object.keys(m).forEach(function(id){
+                var el = document.getElementById(id);
+                if (el && m[id] && m[id].text){
+                  el.textContent = '[restored from last session · ' + (m[id].at||'') + ']\n' + m[id].text;
+                  if (m[id].border) el.style.borderColor = m[id].border;
+                  if (id === 'ocqs-out-9' && window.ocqsDeployStage){
+                    m[id].text.split('\n').forEach(function(line){ try{ ocqsDeployStage(id, line); }catch(e){} });
+                  }
+                }
+              });
+            }catch(e){}
+          }, 400);
+        });
+      }
       window.ocqsRunCmd = function(cmdId, outId, btnId){
         var cmd = ((document.getElementById(cmdId)||{}).textContent||'').trim();
         if (!cmd) return;
@@ -2396,7 +2569,7 @@ kubectl describe kustomization &lt;name&gt; -n flux-system</div>
                 out.style.borderColor = ok ? '#16a34a' : '#dc2626';
             }
         };
-        es.onerror = function(){ es.close(); if(btn){btn.disabled=false;btn.textContent='▶ Run';} };
+        es.onerror = function(){ es.close(); if(btn){btn.disabled=false;btn.textContent='▶ Run';} if (window.ocqsSaveOut) ocqsSaveOut(outId); };
       };
       window.ocqsToggleAuthType = function(){
             var t = (document.getElementById('ocqs-authtype')||{}).value;
@@ -2462,12 +2635,15 @@ kubectl describe kustomization &lt;name&gt; -n flux-system</div>
         _setLive('ocqs-live-keycloak','auth','ocqs-svc-keycloak-url');
         _setLive('ocqs-live-grafana','grafana','ocqs-svc-grafana-url');
         if (window.ocqsAutoChecklist) ocqsAutoChecklist();
-        var gitopsPath = '/home/dzoan/.config/opencenter/clusters/gitops/'+s.org;
+        var gitopsDefault = '/home/dzoan/.config/opencenter/clusters/gitops/'+s.org;
+        var gitopsPath = s.gitopsFolder || gitopsDefault;
         var logPath    = '/home/dzoan/.local/state/opencenter/logs/bootstrap/'+s.org+'/'+s.cluster+'/';
 
         // Paths
         var cp=g('ocqs-configpath'); if(cp) cp.textContent=configPath;
-var gp=g('ocqs-gitopspath'); if(gp) gp.textContent=gitopsPath;
+var gf=g('ocqs-gitopsfolder'); if(gf) gf.placeholder=gitopsDefault;
+        var tokBox=g('ocqs-auth-token-fields'); if(tokBox) tokBox.style.display=(s.gitAuth==='token')?'':'none';
+        var sshBox=g('ocqs-auth-ssh-fields'); if(sshBox) sshBox.style.display=(s.gitAuth==='token')?'none':'';
         var lp=g('ocqs-logpath');    if(lp) lp.textContent=logPath;
         var gp2=g('ocqs-gitopspath2'); if(gp2) gp2.textContent=gitopsPath;
 
@@ -2515,10 +2691,17 @@ var c2b=g('ocqs-cmd-2b');
                 var c3e=g('ocqs-cmd-3env');
         if(c3e) c3e.textContent='export OPENSTACK_APP_CRED_ID="'+(s.credId||'YOUR_OPENSTACK_APP_CRED_ID')+'"\nexport OPENSTACK_APP_CRED_SECRET="'+(s.credSec?'••••••••••••':'YOUR_OPENSTACK_APP_CRED_SECRET')+'"';
 // Step 4
+        var _gitHostM=(s.gitRepo||'').match(/^https?:\/\/([^\/]+)\//);
+        var _gitHost=_gitHostM?_gitHostM[1]:'github.com';
+        var _sshRemote=(s.gitRepo||'YOUR_GIT_REPO_URL').replace(/^https:\/\/([^\/]+)\//,'ssh://git@$1/');
         var c4=g('ocqs-cmd-4');
-        if(c4) c4.textContent='mkdir -p /home/dzoan/.config/opencenter/tokens\n# Write your token:\necho "'+( s.tokVal?'••••••••••••':'YOUR_GIT_TOKEN' )+'" > '+s.tokFile+'\nchmod 600 '+s.tokFile;
+        if(c4) c4.textContent = (s.gitAuth==='token')
+          ? 'mkdir -p /home/dzoan/.config/opencenter/tokens\n# Write your token:\necho "'+( s.tokVal?'••••••••••••':'YOUR_GIT_TOKEN' )+'" > '+s.tokFile+'\nchmod 600 '+s.tokFile
+          : '# SSH auth selected — verify the key exists and '+_gitHost+' accepts it\nls -l '+(s.sshKey||'~/.ssh/id_rsa')+'\nssh -T -i '+(s.sshKey||'~/.ssh/id_rsa')+' -o StrictHostKeyChecking=no git@'+_gitHost+' 2>&1 | head -2';
 var y4=g('ocqs-yaml-4');
-        if(y4) y4.textContent='opencenter:\n  gitops:\n    repository:\n      url: "'+(s.gitRepo||'https://github.com/YOUR_USER/opencenter-my-cluster-gitops.git')+'"\n    auth:\n      token:\n        token_file: "'+s.tokFile+'"';
+        if(y4) y4.textContent = (s.gitAuth==='token')
+          ? 'opencenter:\n  gitops:\n    repository:\n      url: "'+(s.gitRepo||'https://github.com/YOUR_USER/opencenter-my-cluster-gitops.git')+'"\n    auth:\n      token:\n        token_file: "'+s.tokFile+'"'
+          : 'opencenter:\n  gitops:\n    repository:\n      url: "'+_sshRemote+'"\n    auth:\n      ssh:\n        private_key: "'+(s.sshKey||'~/.ssh/id_rsa')+'"';
 
         // Step 5
         var c5=g('ocqs-cmd-5');
@@ -2536,7 +2719,11 @@ var c7b=g('ocqs-cmd-7b');
         if(c7b) c7b.textContent='grep -R "CHANGEME" '+gitopsPath+' || true';
 // Step 8
         var c8=g('ocqs-cmd-8');
-        if(c8) c8.textContent='cd '+gitopsPath+'\ngit status\ngit add .\ngit commit -m "Initial OpenCenter GitOps generation for '+s.cluster+'"\ngit remote set-url origin '+(s.gitRepo||'YOUR_GIT_REPO_URL').replace('https://github.com/','git@github.com:')+'\nexport GIT_SSH_COMMAND="ssh -i '+(s.sshKey||'~/.ssh/id_rsa')+' -o StrictHostKeyChecking=no"\ngit branch -M '+s.gitBranch+'\ngit push -u origin '+s.gitBranch;
+        var _c8Head='cd '+gitopsPath+'\ngit status\ngit add .\ngit commit -m "Initial OpenCenter GitOps generation for '+s.cluster+'" || true\n';
+        var _c8Tail='\ngit branch -M '+s.gitBranch+'\ngit push -u origin '+s.gitBranch;
+        if(c8) c8.textContent = (s.gitAuth==='token')
+          ? _c8Head+'TOKEN=$(cat '+s.tokFile+')\ngit remote set-url origin '+(s.gitRepo||'YOUR_GIT_REPO_URL').replace(/^https:\/\//,'https://oauth2:${TOKEN}@')+_c8Tail
+          : _c8Head+'git remote set-url origin '+_sshRemote+'\nexport GIT_SSH_COMMAND="ssh -i '+(s.sshKey||'~/.ssh/id_rsa')+' -o StrictHostKeyChecking=no"'+_c8Tail;
 // Step 9
         var c9=g('ocqs-cmd-9');
         if(c9) c9.textContent='opencenter cluster validate '+s.cluster+'\nopencenter cluster deploy --break-lock --yes '+s.cluster;
@@ -2589,15 +2776,19 @@ var c9b=g('ocqs-cmd-9b');
           else hints.push('<span style="color:#15803d;font-weight:700;">✓ credential secret set</span>');
           if(!s.gitRepo) hints.push('<span style="color:#dc2626;font-weight:700;">✗ GitOps repository URL missing</span>');
           else hints.push('<span style="color:#15803d;font-weight:700;">✓ GitOps repo set</span>');
-          if(!s.tokVal) hints.push('<span style="color:#d97706;font-weight:700;">⚠ Git token not entered</span>');
-          else hints.push('<span style="color:#15803d;font-weight:700;">✓ Git token entered</span>');
+          if(s.gitAuth==='token'){
+            if(!s.tokVal) hints.push('<span style="color:#d97706;font-weight:700;">⚠ Git token not entered</span>');
+            else hints.push('<span style="color:#15803d;font-weight:700;">✓ Git token entered</span>');
+          } else {
+            hints.push('<span style="color:#15803d;font-weight:700;">✓ SSH auth ('+(s.sshKey||'~/.ssh/id_rsa')+')</span>');
+          }
           if(!s.region) hints.push('<span style="color:#dc2626;font-weight:700;">✗ Region missing</span>');
           else hints.push('<span style="color:#15803d;font-weight:700;">✓ Region: '+s.region+'</span>');
           vs.innerHTML=hints.join('<br>');
         }
 
         // Persist state
-        try{ localStorage.setItem('ocqs_state',JSON.stringify({org:s.org,cluster:s.cluster,env:s.env,provider:s.provider,authType:s.authType,authUrl:s.authUrl,region:s.region,username:s.username,password:s.password,userDomain:s.userDomain,projDomain:s.projDomain,projectId:s.projectId,credId:s.credId,credSec:s.credSec,floatNet:s.floatNet,networkId:s.networkId,subnetId:s.subnetId,gitRepo:s.gitRepo,gitBranch:s.gitBranch,tokFile:s.tokFile,tokVal:s.tokVal,services:_qs.services})); }catch(e){}
+        try{ localStorage.setItem('ocqs_state',JSON.stringify({org:s.org,cluster:s.cluster,env:s.env,provider:s.provider,authType:s.authType,authUrl:s.authUrl,region:s.region,username:s.username,password:s.password,userDomain:s.userDomain,projDomain:s.projDomain,projectId:s.projectId,credId:s.credId,credSec:s.credSec,floatNet:s.floatNet,networkId:s.networkId,subnetId:s.subnetId,gitRepo:s.gitRepo,gitBranch:s.gitBranch,gitAuth:s.gitAuth,gitopsFolder:s.gitopsFolder,tokFile:s.tokFile,tokVal:s.tokVal,services:_qs.services})); }catch(e){}
       };
 
       window.ocqsReqCheck = function(){
@@ -2612,7 +2803,25 @@ var c9b=g('ocqs-cmd-9b');
         set('ocqs-req-credid',  !!(s.credId  || s.username));
         set('ocqs-req-credsec', !!(s.credSec || s.password));
         set('ocqs-req-repo',    !!s.gitRepo);
-        set('ocqs-req-token',   !!(s.tokVal || s.tokFile));
+      window.ocqsApplyGitops = function(btn){
+        var s = typeof ocqsGetState==='function' ? ocqsGetState() : {};
+        var st = g('ocqs-gitops-apply-status');
+        var cfgEl = g('ocqs-configpath');
+        var cfgPath = cfgEl ? cfgEl.textContent.trim() : '';
+        if(!cfgPath){ if(st){st.textContent='No config path — fill Stage 2 inputs.';st.style.color='#dc2626';} return; }
+        var fields = {'opencenter.gitops.repository.url': (s.gitAuth==='token') ? s.gitRepo : (s.gitRepo||'').replace(/^https:\/\/([^\/]+)\//,'ssh://git@$1/'),
+          'opencenter.gitops.repository.branch': s.gitBranch};
+        var _prov=(g('ocqs-gitprovider')||{}).value||'github'; if(_prov!=='github'&&_prov!=='gitlab'&&_prov!=='gitea') _prov='github';
+        if(s.gitAuth==='token'){ fields['opencenter.gitops.auth.token.token_file'] = s.tokFile; fields['opencenter.gitops.auth.token.provider'] = _prov; }
+        else { fields['opencenter.gitops.auth.ssh.private_key'] = s.sshKey; fields['opencenter.gitops.auth.ssh.public_key'] = s.sshKey+'.pub'; }
+        if(st){ st.textContent='Applying...'; st.style.color='#0369a1'; }
+        if(btn) btn.disabled=true;
+        fetch('/api/openrc/patch-config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({path:cfgPath,fields:fields})})
+          .then(function(r){return r.json();})
+          .then(function(d){ if(btn) btn.disabled=false; if(st){ if(d && d.ok!==false){ st.textContent='✓ GitOps settings applied to '+cfgPath; st.style.color='#15803d'; } else { st.textContent='✗ '+((d&&d.error)||'apply failed'); st.style.color='#dc2626'; } } })
+          .catch(function(e){ if(btn) btn.disabled=false; if(st){ st.textContent='✗ '+e; st.style.color='#dc2626'; } });
+      };
+        set('ocqs-req-token',   s.gitAuth==='ssh' ? !!s.sshKey : !!(s.tokVal || s.tokFile));
         set('ocqs-req-region',  !!s.region);
         // CLI and Git — check via streaming endpoint once on page load
         if(!window._ocqsCliChecked){
@@ -2746,6 +2955,8 @@ var c9b=g('ocqs-cmd-9b');
           sv2('ocqs-networkid',saved.networkId); sv2('ocqs-subnetid',saved.subnetId);
           sv2('ocqs-gitrepo',saved.gitRepo); sv2('ocqs-gitbranch',saved.gitBranch);
           sv2('ocqs-tokfile',saved.tokFile); sv2('ocqs-tokval',saved.tokVal);
+          sv2('ocqs-gitopsfolder',saved.gitopsFolder);
+          if(saved.gitAuth){ var ga=g('ocqs-gitauth'); if(ga) ga.value=saved.gitAuth; }
           if(saved.services){
             _qs.services=Object.assign(_qs.services,saved.services);
             ['keycloak','loki','tempo','velero','monitoring'].forEach(function(s){
@@ -2763,7 +2974,7 @@ var c9b=g('ocqs-cmd-9b');
         setTimeout(_ocqsRestore,150);
       }
       window.addEventListener('beforeunload',function(){
-        try{ if(typeof ocqsGetState==='function'){ var s=ocqsGetState(); localStorage.setItem('ocqs_state',JSON.stringify({org:s.org,cluster:s.cluster,env:s.env,provider:s.provider,authType:s.authType,authUrl:s.authUrl,region:s.region,username:s.username,password:s.password,userDomain:s.userDomain,projDomain:s.projDomain,projectId:s.projectId,credId:s.credId,credSec:s.credSec,floatNet:s.floatNet,networkId:s.networkId,subnetId:s.subnetId,gitRepo:s.gitRepo,gitBranch:s.gitBranch,tokFile:s.tokFile,tokVal:s.tokVal,services:_qs.services,optionalServicesDefaultVersion:'all-off-v2'})); } }catch(e){}
+        try{ if(typeof ocqsGetState==='function'){ var s=ocqsGetState(); localStorage.setItem('ocqs_state',JSON.stringify({org:s.org,cluster:s.cluster,env:s.env,provider:s.provider,authType:s.authType,authUrl:s.authUrl,region:s.region,username:s.username,password:s.password,userDomain:s.userDomain,projDomain:s.projDomain,projectId:s.projectId,credId:s.credId,credSec:s.credSec,floatNet:s.floatNet,networkId:s.networkId,subnetId:s.subnetId,gitRepo:s.gitRepo,gitBranch:s.gitBranch,gitAuth:s.gitAuth,gitopsFolder:s.gitopsFolder,tokFile:s.tokFile,tokVal:s.tokVal,services:_qs.services,optionalServicesDefaultVersion:'all-off-v2'})); } }catch(e){}
       });
 
     })();
@@ -2912,7 +3123,7 @@ var c9b=g('ocqs-cmd-9b');
               </div>
               <div>
                 <label class="ocqs-label">Cluster Name</label>
-                <input class="ocqs-input" id="ocqp-cluster" value="my-cluster" list="ocqp-cluster-history" oninput="ocqpUpdate()" onchange="ocqpRecordClusterName(this.value)"><select id="ocqp-cluster-prev" onchange="if(this.value){var i=document.getElementById('ocqp-cluster');i.value=this.value;i.dispatchEvent(new Event('input'));ocqpUpdate();this.selectedIndex=0;}" style="margin-top:4px;width:100%;border:1px solid #cbd5e1;border-radius:6px;padding:5px 8px;font-size:11px;font-weight:700;color:#334155;background:#f8fafc;cursor:pointer;"><option value="">&#9662; previous clusters&hellip;</option></select>
+                <input class="ocqs-input" id="ocqp-cluster" value="my-cluster" list="ocqp-cluster-history" oninput="ocqpUpdate()" onchange="ocqpRecordClusterName(this.value)">
                 <datalist id="ocqp-cluster-history"></datalist>
               </div>
               <div>
@@ -2978,6 +3189,7 @@ var c9b=g('ocqs-cmd-9b');
 
             </div>
           </div>
+          <div style="font-size:11px;font-weight:800;color:#0369a1;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">&#9729;&#65039; Cloud Credentials</div>
           <div style="background:#eff6ff;border:1px dashed #93c5fd;border-radius:8px;padding:12px 14px;margin-bottom:12px;">
             <div style="font-size:12px;font-weight:700;color:#0369a1;margin-bottom:8px;">&#11014; Import OpenRC File <span style="font-weight:400;color:#64748b;">(auto-fills all fields below)</span></div>
             <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
@@ -3071,15 +3283,22 @@ var c9b=g('ocqs-cmd-9b');
             <input class="ocqs-input" id="ocqp-gitrepo" placeholder="https://github.com/YOUR_USER/opencenter-my-cluster-gitops.git" oninput="ocqpUpdate();ocqpReqCheck()">
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px;">
               <div><label class="ocqs-label">Git Branch</label><input class="ocqs-input" id="ocqp-gitbranch" value="main" oninput="ocqpUpdate()"></div>
-              <div><label class="ocqs-label">Token File Path</label><input class="ocqs-input" id="ocqp-tokfile" value="/home/dzoan/.config/opencenter/tokens/git-token.txt" oninput="ocqpUpdate()"></div>
+              <div><label class="ocqs-label">Git Auth Method</label><select class="ocqs-select" id="ocqp-gitauth" onchange="ocqpUpdate();ocqpReqCheck()"><option value="ssh" selected>SSH key (git@ push)</option><option value="token">HTTPS token</option></select></div>
             </div>
-            <label class="ocqs-label" style="margin-top:8px;">Git Token Value <span style="color:#64748b;font-size:10px;">(for HTTPS auth)</span></label>
-            <input class="ocqs-input" id="ocqp-tokval" type="password" placeholder="ghp_xxxxxxxxxxxxxxxxxxxxx" oninput="ocqpUpdate();ocqpReqCheck()">
-            <label class="ocqs-label" style="margin-top:8px;">SSH Key Path <span style="color:#64748b;font-size:10px;">(for SSH auth — used in git push)</span></label>
-            <input class="ocqs-input" id="ocqp-sshkey" value="~/.ssh/id_rsa" oninput="ocqpUpdate()">
-            <div style="font-size:11px;color:#64748b;margin-top:4px;">Ensure the corresponding public key is added to your GitHub account.</div>
-            <div class="ocqs-label" style="margin-top:10px;">GitOps Repo Path</div>
-            <div class="ocqs-path-badge" id="ocqp-gitopspath" style="font-size:10px;">/home/dzoan/.config/opencenter/clusters/gitops/my-org</div>
+            <div id="ocqp-auth-token-fields">
+              <label class="ocqs-label" style="margin-top:8px;">Token File Path</label>
+              <input class="ocqs-input" id="ocqp-tokfile" value="/home/dzoan/.config/opencenter/tokens/git-token.txt" oninput="ocqpUpdate()">
+              <label class="ocqs-label" style="margin-top:8px;">Git Token Value <span style="color:#64748b;font-size:10px;">(for HTTPS auth)</span></label>
+              <input class="ocqs-input" id="ocqp-tokval" type="password" placeholder="ghp_xxxxxxxxxxxxxxxxxxxxx" oninput="ocqpUpdate();ocqpReqCheck()">
+            </div>
+            <div id="ocqp-auth-ssh-fields">
+              <label class="ocqs-label" style="margin-top:8px;">SSH Key Path <span style="color:#64748b;font-size:10px;">(for SSH auth — used in git push)</span></label>
+              <input class="ocqs-input" id="ocqp-sshkey" value="~/.ssh/id_rsa" oninput="ocqpUpdate()">
+              <div style="font-size:11px;color:#64748b;margin-top:4px;">Ensure the corresponding public key is added to your GitHub account.</div>
+            </div>
+            <label class="ocqs-label" style="margin-top:10px;">GitOps Repo Folder <span style="color:#64748b;font-size:10px;">(local generated repo — leave blank for default)</span></label>
+            <input class="ocqs-input" id="ocqp-gitopsfolder" placeholder="/home/dzoan/.config/opencenter/clusters/gitops/my-org" oninput="ocqpUpdate()" style="font-size:11px;">
+            <div style="display:flex;gap:8px;margin-top:10px;align-items:center;"><button onclick="ocqpApplyGitops(this)" style="background:#15803d;color:#fff;border:none;border-radius:4px;padding:6px 16px;font-size:12px;font-weight:700;cursor:pointer;">&#128190; Apply to Config File</button><span id="ocqp-gitops-apply-status" style="font-size:11px;color:#64748b;"></span></div>
           </div>
             </details>
           </div>
@@ -3131,6 +3350,7 @@ var c9b=g('ocqs-cmd-9b');
             projectId:_v('ocqp-projectid'), credId:_v('ocqp-credid'), credSec:_v('ocqp-credsec'),
             floatNet:_v('ocqp-floatnet'), networkId:_v('ocqp-networkid'), subnetId:_v('ocqp-subnetid'),
             gitRepo:_v('ocqp-gitrepo'), gitBranch:_v('ocqp-gitbranch')||'main',
+            gitAuth:_v('ocqp-gitauth')||'ssh', gitopsFolder:_v('ocqp-gitopsfolder'),
             tokFile:_v('ocqp-tokfile')||'/home/dzoan/.config/opencenter/tokens/git-token.txt',
             tokVal:_v('ocqp-tokval'), sshKey:_v('ocqp-sshkey')||'~/.ssh/id_rsa', services:_svcs
           };
@@ -3147,7 +3367,7 @@ var c9b=g('ocqs-cmd-9b');
             userDomain:s.userDomain,projDomain:s.projDomain,projectId:s.projectId,
             credId:s.credId,credSec:s.credSec,
             floatNet:s.floatNet,networkId:s.networkId,subnetId:s.subnetId,
-            gitRepo:s.gitRepo,gitBranch:s.gitBranch,tokFile:s.tokFile,tokVal:s.tokVal,
+            gitRepo:s.gitRepo,gitBranch:s.gitBranch,gitAuth:s.gitAuth,gitopsFolder:s.gitopsFolder,tokFile:s.tokFile,tokVal:s.tokVal,
             services:(window._qp&&window._qp.services)||s.services||{}
           }));
         }catch(e){}
@@ -3312,7 +3532,7 @@ var c9b=g('ocqs-cmd-9b');
             es.onmessage = function(e){
               octAppend(out, e.data); if (window.octMirror) octMirror('ocqp-term', e.data); if (window.ocqpDeployStage) ocqpDeployStage(out.id, e.data);
               if (e.data.indexOf('[EXIT') === 0 || e.data.indexOf('[ERROR]') === 0){
-                es.close(); out.style.borderColor = e.data === '[EXIT 0]' ? '#16a34a' : '#dc2626'; res();
+                es.close(); out.style.borderColor = e.data === '[EXIT 0]' ? '#16a34a' : '#dc2626'; if (window.ocqsSaveOut) ocqsSaveOut(out.id); res();
               }
             };
             es.onerror = function(){ es.close(); res(); };
@@ -3483,7 +3703,7 @@ var c9b=g('ocqs-cmd-9b');
             floatNet:_ocqpV('ocqp-floatnet'), networkId:_ocqpV('ocqp-networkid'), subnetId:_ocqpV('ocqp-subnetid'),
             gitRepo:_ocqpV('ocqp-gitrepo'), gitBranch:_ocqpV('ocqp-gitbranch'),
             tokFile:_ocqpV('ocqp-tokfile'), tokVal:_ocqpV('ocqp-tokval'),
-            sshKey:_ocqpV('ocqp-sshkey'), org:_ocqpV('ocqp-org'), cluster:_ocqpV('ocqp-cluster')
+            sshKey:_ocqpV('ocqp-sshkey'), gitAuth:_ocqpV('ocqp-gitauth'), gitopsFolder:_ocqpV('ocqp-gitopsfolder'), org:_ocqpV('ocqp-org'), cluster:_ocqpV('ocqp-cluster')
           };
           // Only save if at least one credential field is filled
           if(d.username||d.password||d.authUrl){
@@ -3506,6 +3726,7 @@ var c9b=g('ocqs-cmd-9b');
               credSec:'ocqp-credsec',floatNet:'ocqp-floatnet',networkId:'ocqp-networkid',
               subnetId:'ocqp-subnetid',gitRepo:'ocqp-gitrepo',gitBranch:'ocqp-gitbranch',
               tokFile:'ocqp-tokfile',tokVal:'ocqp-tokval',sshKey:'ocqp-sshkey',
+              gitAuth:'ocqp-gitauth',gitopsFolder:'ocqp-gitopsfolder',
               org:'ocqp-org',cluster:'ocqp-cluster'};
             if(map[k] && d[k]) _ocqpSv(map[k], d[k]);
           });
@@ -3889,6 +4110,48 @@ git push -u origin main</div>
         </div>
 
         <!-- Step 9 -->
+      <!-- Section F2: Files Created for Deployment -->
+      <div class="ocqs-section">
+        <h2>&#128193; Files Created for Deployment</h2>
+        <div style="font-size:12px;color:#475569;margin-bottom:10px;">Every file OpenCenter needs on disk before <code>cluster deploy</code>. Row 1 is the only file you author &mdash; the rest are generated by <code>cluster init</code> / <code>generate</code> / <code>secrets sync</code> and must exist, be committed, and pushed.</div>
+        <table class="ocqs-req-table">
+          <thead><tr><th>Input file</th><th>Path</th><th>Purpose</th><th>Created by</th></tr></thead>
+          <tbody>
+              <tr><td><strong>Cluster config YAML</strong></td><td style="font-size:11px;"><code>~/.config/opencenter/clusters/blueprints/&lt;org&gt;/&lt;cluster&gt;/&lt;cluster&gt;-config.yaml</code></td><td style="font-size:12px;">Master input: identity, region, network IDs, service toggles, gitops repo + auth, secret values</td><td style="font-size:11px;">You (Stage 2&ndash;5)</td></tr>
+              <tr><td><strong>OpenStack app credentials</strong></td><td style="font-size:11px;"><code>inside config yaml (application_credential_id / secret)</code></td><td style="font-size:12px;">Auth to OpenStack for Terraform/OpenTofu VM provisioning</td><td style="font-size:11px;">OpenRC import</td></tr>
+              <tr><td><strong>SOPS age private key</strong></td><td style="font-size:11px;"><code>~/.config/opencenter/clusters/secrets/&lt;org&gt;/&lt;cluster&gt;/age/keys/&lt;cluster&gt;-key.txt</code></td><td style="font-size:12px;">Encrypts/decrypts all service secrets (secrets sync, Flux SOPS)</td><td style="font-size:11px;">cluster init</td></tr>
+              <tr><td><strong>SOPS age public key</strong></td><td style="font-size:11px;"><code>same dir, &lt;cluster&gt;-key.pub</code></td><td style="font-size:12px;">Encryption recipient for new secrets</td><td style="font-size:11px;">cluster init</td></tr>
+              <tr><td><strong>Cluster node SSH keypair</strong></td><td style="font-size:11px;"><code>~/.config/opencenter/clusters/secrets/&lt;org&gt;/&lt;cluster&gt;/ssh/&lt;cluster&gt; + .pub</code></td><td style="font-size:12px;">Injected into VMs; kubespray/Ansible node access</td><td style="font-size:11px;">cluster init</td></tr>
+              <tr><td><strong>GitOps SSH key</strong></td><td style="font-size:11px;"><code>~/.ssh/id_rsa + id_rsa.pub (gitops.auth.ssh)</code></td><td style="font-size:12px;">Git push + Flux bootstrap deploy key (SSH auth mode)</td><td style="font-size:11px;">You</td></tr>
+              <tr><td><strong>SOPS config</strong></td><td style="font-size:11px;"><code>.sops.yaml in gitops repo</code></td><td style="font-size:12px;">Maps files to encryption keys</td><td style="font-size:11px;">cluster generate</td></tr>
+              <tr><td><strong>Generated GitOps repo</strong></td><td style="font-size:11px;"><code>~/.config/opencenter/clusters/gitops/&lt;org&gt;/ (infra .tf, Flux kustomizations, helm overrides)</code></td><td style="font-size:12px;">Desired state deploy reconciles from &mdash; must be committed &amp; pushed</td><td style="font-size:11px;">cluster generate</td></tr>
+              <tr><td><strong>Encrypted service secrets</strong></td><td style="font-size:11px;"><code>gitops repo: applications/overlays/&lt;cluster&gt;/services/*/secret.yaml</code></td><td style="font-size:12px;">Per-service credentials, SOPS-encrypted, applied by Flux</td><td style="font-size:11px;">secrets sync</td></tr>
+              <tr><td><strong>Git token file (token auth only)</strong></td><td style="font-size:11px;"><code>~/.config/opencenter/tokens/git-token.txt</code></td><td style="font-size:12px;">HTTPS-token alternative; ignored while ssh auth block is active</td><td style="font-size:11px;">You (Stage 4)</td></tr>
+              </tbody>
+        </table>
+        <div style="display:flex;gap:8px;margin-top:12px;align-items:center;flex-wrap:wrap;">
+          <button onclick="ocqpExportBundle()" style="background:#0369a1;color:#fff;border:none;border-radius:6px;padding:8px 18px;font-size:12px;font-weight:800;cursor:pointer;">&#128230; Export Bundle (.zip)</button>
+          <label style="background:#15803d;color:#fff;border-radius:6px;padding:8px 18px;font-size:12px;font-weight:800;cursor:pointer;display:inline-block;">&#9851; Restore Config Files<input type="file" accept=".zip" style="display:none;" onchange="ocqpRestoreBundle(this)"></label>
+          <span id="ocqp-bundle-status" style="font-size:12px;font-weight:700;color:#64748b;"></span>
+        </div>
+        <script>
+        window.ocqpExportBundle = function(){
+          var s = (typeof ocqpGetState==='function') ? ocqpGetState() : {};
+          window.open('/api/opencenter/export-bundle?org='+encodeURIComponent(s.org||'my-org')+'&cluster='+encodeURIComponent(s.cluster||'my-cluster'), '_blank');
+        };
+        window.ocqpRestoreBundle = function(inp){
+          var st = document.getElementById('ocqp-bundle-status');
+          var f = inp.files && inp.files[0]; if(!f) return;
+          var fd = new FormData(); fd.append('bundle', f);
+          if(st){ st.textContent = 'Restoring '+f.name+'...'; st.style.color='#0369a1'; }
+          fetch('/api/opencenter/restore-bundle', {method:'POST', body:fd})
+            .then(function(r){ return r.json(); })
+            .then(function(d){ if(st){ if(d.ok){ st.textContent='✓ restored '+d.restored+' files under ~/.config/opencenter'; st.style.color='#15803d'; } else { st.textContent='✗ '+(d.error||'restore failed'); st.style.color='#dc2626'; } } inp.value=''; })
+            .catch(function(e){ if(st){ st.textContent='✗ '+e; st.style.color='#dc2626'; } inp.value=''; });
+        };
+        </script>
+      </div>
+
       <!-- Section G: Safety Checklist -->
       <div class="ocqs-section">
         <style>
@@ -3896,17 +4159,30 @@ git push -u origin main</div>
             0%, 100% { background:#000000; box-shadow:0 0 0 rgba(220,38,38,0); }
             50% { background:#111827; box-shadow:0 0 22px rgba(220,38,38,.55); }
           }
-          .ocqs-coffee-warning {
+          .ocqs-section h2.ocqs-coffee-warning, .ocqs-coffee-warning {
             animation:ocqpCoffeeWarningBlink 1.15s ease-in-out infinite;
             border:2px solid #475569;
-            border-radius:8px;
-            color:#fff;
-            font-size:16px;
+            border-radius:10px;
+            color:#ffffff !important;
+            font-size:24px !important;
             font-weight:900;
+            letter-spacing:1.5px !important;
             margin:0 0 10px;
-            padding:12px 16px;
+            padding:20px 22px;
             text-align:center;
             text-shadow:0 1px 2px rgba(0,0,0,.45);
+            border-bottom:2px solid #475569 !important;
+            text-transform:uppercase;
+          }
+          .ocqs-coffee-cup { position:relative; display:inline-block; font-size:34px; margin-right:14px; vertical-align:middle; }
+          .ocqs-steam { position:absolute; left:50%; bottom:88%; width:6px; height:16px; border-radius:50%; background:rgba(255,255,255,.8); filter:blur(2px); opacity:0; animation:ocqsSteamRise 2.2s ease-out infinite; }
+          .ocqs-steam.s1 { margin-left:-10px; animation-delay:0s; }
+          .ocqs-steam.s2 { margin-left:-2px;  animation-delay:.7s; }
+          .ocqs-steam.s3 { margin-left:7px;   animation-delay:1.4s; }
+          @keyframes ocqsSteamRise {
+            0%   { opacity:0; transform:translateY(5px) scaleX(1); }
+            25%  { opacity:.95; }
+            100% { opacity:0; transform:translateY(-20px) scaleX(1.7); }
           }
           .ocqs-coffee-warning code {
             background:rgba(255,255,255,.16);
@@ -3915,7 +4191,7 @@ git push -u origin main</div>
             border-radius:4px;
           }
         </style>
-        <h2 class="ocqs-coffee-warning">Coffee Break Warning : Safety Checklist Before Deploy</h2>
+        <h2 class="ocqs-coffee-warning"><span class="ocqs-coffee-cup">&#9749;<span class="ocqs-steam s1"></span><span class="ocqs-steam s2"></span><span class="ocqs-steam s3"></span></span> COFFEE BREAK WARNING : SAFETY CHECKLIST BEFORE DEPLOY</h2>
         <div style="font-size:14px;background:#dc2626;border:2px solid #fecaca;border-radius:8px;color:#fff;font-weight:900;margin:0 0 10px;padding:11px 16px;text-align:center;">
           ⛔ Never run <code>opencenter cluster deploy</code> until all checkpoints pass
         </div>
@@ -4067,7 +4343,7 @@ tail -f /home/dzoan/.local/state/opencenter/logs/bootstrap/my-org/my-cluster/*.l
           <div id="ocqp-out-chksum" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:12px 14px;font-family:monospace;font-size:12px;color:#00ff41;white-space:pre-wrap;min-height:150px;max-height:280px;overflow-y:auto;">$ waiting...
 </div>
           <div style="margin-top:14px;padding:14px;background:#0f172a;border-radius:10px;overflow-x:auto;">
-            <div style="font-size:10px;font-weight:800;color:#38bdf8;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:10px;">Cluster Topology</div>
+            <div style="font-size:10px;font-weight:800;color:#38bdf8;letter-spacing:1.5px !important;text-transform:uppercase;margin-bottom:10px;">Cluster Topology</div>
             <div style="display:flex;align-items:center;gap:8px;font-size:11px;font-weight:700;white-space:nowrap;">
               <span style="display:inline-flex;align-items:center;border-radius:999px;border:1px solid #7dd3fc;color:#7dd3fc;padding:4px 10px;">OpenStack VMs 3cp+2wn</span><span style="color:#475569;">&rarr;</span><span style="display:inline-flex;align-items:center;border-radius:999px;border:1px solid #4ade80;color:#4ade80;padding:4px 10px;">Calico CNI</span><span style="color:#475569;">&rarr;</span><span style="display:inline-flex;align-items:center;border-radius:999px;border:1px solid #a78bfa;color:#a78bfa;padding:4px 10px;">FluxCD</span><span style="color:#475569;">&rarr;</span><span style="display:inline-flex;align-items:center;border-radius:999px;border:1px solid #fbbf24;color:#fbbf24;padding:4px 10px;">GitOps Repo</span><span style="color:#475569;">&rarr;</span><span style="display:inline-flex;align-items:center;border-radius:999px;border:1px solid #a78bfa;color:#a78bfa;padding:4px 10px;">Kustomizations</span><span style="color:#475569;">&rarr;</span><span style="display:inline-flex;align-items:center;border-radius:999px;border:1px solid #f472b6;color:#f472b6;padding:4px 10px;">HelmReleases</span><span style="color:#475569;">&rarr;</span><span style="display:inline-flex;align-items:center;border-radius:999px;border:1px solid #4ade80;color:#4ade80;padding:4px 10px;">Platform Services</span><span style="color:#475569;">&rarr;</span><span style="display:inline-flex;align-items:center;border-radius:999px;border:1px solid #7dd3fc;color:#7dd3fc;padding:4px 10px;">Envoy Gateway</span><span style="color:#475569;">&rarr;</span><span style="display:inline-flex;align-items:center;border-radius:999px;border:1px solid #fbbf24;color:#fbbf24;padding:4px 10px;">dashboard.&lt;cluster&gt;</span>
             </div>
@@ -4086,6 +4362,26 @@ Kubernetes Cluster
 
 User Access
   └─ dashboard.&lt;cluster&gt;      → Headlamp / OpenCenter dashboard endpoint</pre>
+            <div style="margin-top:12px;display:flex;flex-wrap:wrap;gap:14px;font-size:11px;font-weight:700;background:#020817;border:1px solid #1e3a5f;border-radius:8px;padding:10px 14px;">
+              <span style="color:#94a3b8;">Cluster: <span style="color:#4ade80;">my5th-opencenter-cluster</span></span>
+              <span style="color:#94a3b8;">Deployed: <span style="color:#7dd3fc;">2026-07-10 22:17 ICT</span></span>
+              <span style="color:#94a3b8;">Target region: <span style="color:#fbbf24;">FLEX IAD3</span></span>
+              <span style="color:#94a3b8;">API endpoint: <span style="color:#a78bfa;">https://146.20.63.50:443</span></span>
+              <span style="color:#94a3b8;">Kubernetes: <span style="color:#7dd3fc;">v1.35.4</span></span>
+            </div>
+            <table class="ocqs-req-table" style="font-size:11px;margin-top:10px;">
+              <thead><tr><th>Component</th><th>Role</th><th>Status</th><th>Internal IP</th><th>External IP</th><th>OS / Runtime</th></tr></thead>
+              <tbody>
+                <tr><td><code>my5th-opencenter-cluster-cp0</code></td><td>control-plane</td><td style="color:#15803d;font-weight:800;">Ready</td><td><code>10.2.128.94</code></td><td>&mdash;</td><td>Ubuntu 24.04.4 LTS &middot; containerd 2.2.3</td></tr>
+                <tr><td><code>my5th-opencenter-cluster-cp1</code></td><td>control-plane</td><td style="color:#15803d;font-weight:800;">Ready</td><td><code>10.2.131.175</code></td><td>&mdash;</td><td>Ubuntu 24.04.4 LTS &middot; containerd 2.2.3</td></tr>
+                <tr><td><code>my5th-opencenter-cluster-cp2</code></td><td>control-plane</td><td style="color:#15803d;font-weight:800;">Ready</td><td><code>10.2.131.108</code></td><td>&mdash;</td><td>Ubuntu 24.04.4 LTS &middot; containerd 2.2.3</td></tr>
+                <tr><td><code>my5th-opencenter-cluster-wn0</code></td><td>worker</td><td style="color:#15803d;font-weight:800;">Ready</td><td><code>10.2.129.83</code></td><td>&mdash;</td><td>Ubuntu 24.04.4 LTS &middot; containerd 2.2.3</td></tr>
+                <tr><td><code>my5th-opencenter-cluster-wn1</code></td><td>worker</td><td style="color:#15803d;font-weight:800;">Ready</td><td><code>10.2.128.26</code></td><td>&mdash;</td><td>Ubuntu 24.04.4 LTS &middot; containerd 2.2.3</td></tr>
+                <tr><td><code>my5th-opencenter-cluster-bastion</code></td><td>bastion / admin</td><td style="color:#15803d;font-weight:800;">Active</td><td><code>10.2.128.62</code></td><td><code>146.20.62.51</code></td><td>Ubuntu 24.04 &middot; kubeconfig + GitOps bootstrap</td></tr>
+                <tr><td><code>kube-apiserver VIP</code></td><td>API endpoint</td><td style="color:#15803d;font-weight:800;">Ready</td><td>&mdash;</td><td><code>146.20.63.50:443</code></td><td>HA VIP fronting cp0/cp1/cp2</td></tr>
+              </tbody>
+            </table>
+            <div style="font-size:10px;color:#64748b;margin-top:6px;">Live check: <code>kubectl --kubeconfig ~/.config/opencenter/clusters/state/opencentertest-from-mission-control/my5th-opencenter-cluster/kubeconfig.yaml get nodes -o wide</code></div>
           </div>
           <div style="font-size:11px;font-weight:800;color:#334155;margin:14px 0 6px;">What gets created, where it lives, and which tool makes it</div>
           <table class="ocqs-req-table" style="font-size:11px;">
@@ -4206,9 +4502,27 @@ User Access
 
       <script>
       (function(){
-        var KEY = 'ocqp_deploy_history_v1';
+        var KEY = 'ocqp_deploy_history_v2';
         function seed(){
           return [
+            { deployment_id:'deploy-2026-07-10-005', cluster_name:'my5th-opencenter-cluster', provider:'OpenStack / FLEX (IAD3)', status:'Success',
+              started_at:'2026-07-10 16:57', ended_at:'2026-07-10 22:17', duration:'5h20m (incl. 6 root-cause fixes)', operator:'dzoan',
+              git_commit_sha:'6116ccc', config_checksum:'sha256:my5th-iad3', confidence_score:97, badge:'Last Known Good', redeployable:true,
+              generated_gitops_path:'~/.config/opencenter/clusters/gitops/opencentertest-from-mission-control',
+              tool_versions:{ opencenter:'dev (calico pin + force-conflicts + reinstall guardrail)', kubespray:'2.31.0', opentofu:'1.12.3', fluxcd:'2.9.0', helm:'4.2.2' },
+              image_manifest:'ubuntu-24.04 / calico v3.31.6 / cert-manager v1.18.2 / headlamp 0.35.0',
+              opencenter_config_snapshot:'opencenter:\n  cluster:\n    cluster_name: my5th-opencenter-cluster\n    kubernetes: 1.35.4 (3 cp + 2 wn)\n    endpoint: https://146.20.63.50:443\n  infrastructure:\n    provider: openstack (IAD3)\n    application_credential_id: <from blueprint>\n    application_credential_secret: <secret-ref>\n  gitops:\n    url: ssh://git@github.com/Sherlock2019/opencenter-my-cluster-gitops.git\n    auth: ssh (~/.ssh/id_rsa)\n\nconfig files for redeploy (all committed at 6116ccc):\n  blueprint: ~/.config/opencenter/clusters/blueprints/opencentertest-from-mission-control/my5th-opencenter-cluster/my5th-opencenter-cluster-config.yaml\n  calico values: applications/overlays/my5th-opencenter-cluster/services/calico/helm-values/override_values.yaml (no windowsDataplane)\n  flux entrypoint: clusters/my5th-opencenter-cluster/apps.yaml\n  overlay placeholder: applications/overlays/my5th-opencenter-cluster/flux-system/kustomization.yaml\n  sources (quoted tags): applications/overlays/my5th-opencenter-cluster/services/sources/*.yaml\n  kubeconfig: ~/.config/opencenter/clusters/state/opencentertest-from-mission-control/my5th-opencenter-cluster/kubeconfig.yaml\n  sops key: ~/.config/opencenter/clusters/secrets/opencentertest-from-mission-control/my5th-opencenter-cluster/age/keys/\nsecrets: SOPS age (refs only)',
+              phases:[ {n:'Configure',s:'ok',d:'25m',i:3}, {n:'Generate',s:'ok',d:'4m',i:1}, {n:'Provision',s:'ok',d:'54m',i:2}, {n:'Kubernetes Install',s:'ok',d:'40m',i:3}, {n:'GitOps Reconcile',s:'ok',d:'55m',i:4}, {n:'Validate',s:'ok',d:'5m',i:0} ],
+              issues:[
+                ['Configure','DFW3 secgroup quota / flavor / image not found','Region switch DFW3 to IAD3 left stale flavor + image IDs','Set IAD3 Ubuntu image + gp flavors in blueprint','Platform Engineer','Fixed'],
+                ['Provision','Tofu state lock held after SSH drop','Run died mid-apply, lock not released','--break-lock after verifying owner dead','Cloud Ops','Fixed'],
+                ['Kubernetes Install','Calico CRDs missing (v3.32.1 pulled)','helm upgrade had no --version pin; v3.32 chart drops bundled CRDs','Pinned --version v3.31.6 in openstack_network_plugin.go','Platform Engineer','Fixed'],
+                ['Kubernetes Install','Installation rejects windowsDataplane','Field removed in Calico v3.31; Helm 4 SSA hard-rejects','Removed field from values + generator template','Platform Engineer','Fixed'],
+                ['Kubernetes Install','SSA conflict on rerun (ipPools owned by operator)','Tigera operator takes ownership of Installation defaults','Added --force-conflicts to calico helm upgrade','Platform Engineer','Fixed'],
+                ['GitOps Reconcile','flux create secret git --silent unknown flag','Flag only exists on flux bootstrap','Removed --silent in openstack_flux_bootstrap.go','Platform Engineer','Fixed'],
+                ['GitOps Reconcile','apps Kustomization missing / invalid cluster: field / unquoted 2026.01 tags','Generator gaps vs known-good my1st','Added apps.yaml + flux-system placeholder, stripped cluster: blocks, quoted tags; sops-age + ccm override secrets created','Platform Engineer','Fixed'],
+                ['Validate','All checks green','-','-','Ops','Healthy'] ],
+              validation_report:{ nodes:'5/5 Ready', kustomizations:'20/20 Ready', helmreleases:'7/7 installed', pods:'63 total, 0 failing', drift:'none', last_validated:'2026-07-10 22:30' } },
             { deployment_id:'deploy-2026-07-09-001', cluster_name:'my1st-opencenter-cluster', provider:'OpenStack / FLEX', status:'Success',
               started_at:'2026-07-09 21:26', ended_at:'2026-07-09 23:59', duration:'82 min', operator:'dzoan',
               git_commit_sha:'68266d5', config_checksum:'sha256:91ac07e2', confidence_score:98, badge:'Last Known Good', redeployable:true,
@@ -4316,6 +4630,7 @@ User Access
           es.onmessage = function(e){ tlog(e.data);
             if (e.data.indexOf('[EXIT') === 0 || e.data.indexOf('[ERROR]') === 0){ es.close();
               if (t) t.style.borderColor = e.data === '[EXIT 0]' ? '#16a34a' : '#dc2626';
+              if (window.ocqsSaveOut && t) ocqsSaveOut(t.id);
               var d = document.getElementById('dhp-modal-dry');
               if (d && label.indexOf('DRY RUN') === 0) { d.textContent = 'Dry-run status: ' + (e.data === '[EXIT 0]' ? '\u2705 passed' : '\u274c failed (' + e.data + ')'); d.style.color = e.data === '[EXIT 0]' ? '#15803d' : '#b91c1c'; }
             } };
@@ -4344,7 +4659,7 @@ User Access
           nr.ended_at = '-'; nr.duration = '-'; nr.issues = []; nr.confidence_score = 0;
           rs.unshift(nr); dhpSave(rs); dhpRender();
           document.getElementById('dhp-modal').style.display = 'none';
-          stream('opencenter cluster deploy ' + r.cluster_name + ' --yes --break-lock 2>&1 | tail -40', 'REDEPLOY AS NEW RUN — ' + id);
+          stream('opencenter cluster deploy ' + r.cluster_name + ' --yes --break-lock --reinstall 2>&1 | tail -40', 'REDEPLOY AS NEW RUN — ' + id);
           note('New run ' + id + ' created from ' + r.deployment_id + ' and started. Original run untouched.'); };
         window.dhpClone = function(){ var r = dhpCurrent(); if (!r) return;
           var name = prompt('New cluster name (cloned from ' + r.cluster_name + '):', r.cluster_name + '-clone');
@@ -4430,7 +4745,7 @@ kubectl describe kustomization &lt;name&gt; -n flux-system</div>
       <style>
         #ocqp-right-panel .oct-vo { border:1px solid #7dd3fc; border-radius:12px; background:linear-gradient(135deg,#f0f9ff,#e0f2fe); padding:12px 14px; }
         #ocqp-right-panel .oct-vo-hd { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:8px; }
-        #ocqp-right-panel .oct-vo-hd b { font-size:11px; font-weight:900; text-transform:uppercase; letter-spacing:1.5px; color:#0369a1; }
+        #ocqp-right-panel .oct-vo-hd b { font-size:11px; font-weight:900; text-transform:uppercase; letter-spacing:1.5px !important; color:#0369a1; }
         #ocqp-right-panel .oct-vo-txt { font-size:12px; line-height:1.6; color:#0f172a; min-height:34px; font-weight:600; }
         #ocqp-right-panel .oct-mini { border:1px solid #cbd5e1; background:#fff; color:#334155; border-radius:6px; padding:4px 10px; font-size:11px; font-weight:800; cursor:pointer; }
         #ocqp-right-panel .oct-steps { border:1px solid #e2e8f0; border-radius:12px; background:#fff; padding:10px 12px; max-height:220px; overflow-y:auto; }
@@ -4855,6 +5170,8 @@ kubectl describe kustomization &lt;name&gt; -n flux-system</div>
           subnetId: v('ocqp-subnetid'),
           gitRepo:v('ocqp-gitrepo'),
           gitBranch:v('ocqp-gitbranch')||'main',
+          gitAuth:v('ocqp-gitauth')||'ssh',
+          gitopsFolder:v('ocqp-gitopsfolder'),
           tokFile:v('ocqp-tokfile')||'/home/dzoan/.config/opencenter/tokens/git-token.txt',
           tokVal: v('ocqp-tokval'),
           sshKey: v('ocqp-sshkey')||'~/.ssh/id_rsa',
@@ -4980,7 +5297,7 @@ kubectl describe kustomization &lt;name&gt; -n flux-system</div>
                 out.style.borderColor = ok ? '#16a34a' : '#dc2626';
             }
         };
-        es.onerror = function(){ es.close(); if(btn){btn.disabled=false;btn.textContent='▶ Run';} };
+        es.onerror = function(){ es.close(); if(btn){btn.disabled=false;btn.textContent='▶ Run';} if (window.ocqsSaveOut) ocqsSaveOut(outId); };
       };
       window.ocqpToggleAuthType = function(){
             var t = (document.getElementById('ocqp-authtype')||{}).value;
@@ -5046,12 +5363,15 @@ kubectl describe kustomization &lt;name&gt; -n flux-system</div>
         _setLive('ocqp-live-keycloak','auth','ocqp-svc-keycloak-url');
         _setLive('ocqp-live-grafana','grafana','ocqp-svc-grafana-url');
         if (window.ocqpAutoChecklist) ocqpAutoChecklist();
-        var gitopsPath = '/home/dzoan/.config/opencenter/clusters/gitops/'+s.org;
+        var gitopsDefault = '/home/dzoan/.config/opencenter/clusters/gitops/'+s.org;
+        var gitopsPath = s.gitopsFolder || gitopsDefault;
         var logPath    = '/home/dzoan/.local/state/opencenter/logs/bootstrap/'+s.org+'/'+s.cluster+'/';
 
         // Paths
         var cp=g('ocqp-configpath'); if(cp) cp.textContent=configPath;
-var gp=g('ocqp-gitopspath'); if(gp) gp.textContent=gitopsPath;
+var gf=g('ocqp-gitopsfolder'); if(gf) gf.placeholder=gitopsDefault;
+        var tokBox=g('ocqp-auth-token-fields'); if(tokBox) tokBox.style.display=(s.gitAuth==='token')?'':'none';
+        var sshBox=g('ocqp-auth-ssh-fields'); if(sshBox) sshBox.style.display=(s.gitAuth==='token')?'none':'';
         var lp=g('ocqp-logpath');    if(lp) lp.textContent=logPath;
         var gp2=g('ocqp-gitopspath2'); if(gp2) gp2.textContent=gitopsPath;
 
@@ -5099,10 +5419,17 @@ var c2b=g('ocqp-cmd-2b');
                 var c3e=g('ocqp-cmd-3env');
         if(c3e) c3e.textContent='export OPENSTACK_APP_CRED_ID="'+(s.credId||'YOUR_OPENSTACK_APP_CRED_ID')+'"\nexport OPENSTACK_APP_CRED_SECRET="'+(s.credSec?'••••••••••••':'YOUR_OPENSTACK_APP_CRED_SECRET')+'"';
 // Step 4
+        var _gitHostM=(s.gitRepo||'').match(/^https?:\/\/([^\/]+)\//);
+        var _gitHost=_gitHostM?_gitHostM[1]:'github.com';
+        var _sshRemote=(s.gitRepo||'YOUR_GIT_REPO_URL').replace(/^https:\/\/([^\/]+)\//,'ssh://git@$1/');
         var c4=g('ocqp-cmd-4');
-        if(c4) c4.textContent='mkdir -p /home/dzoan/.config/opencenter/tokens\n# Write your token:\necho "'+( s.tokVal?'••••••••••••':'YOUR_GIT_TOKEN' )+'" > '+s.tokFile+'\nchmod 600 '+s.tokFile;
+        if(c4) c4.textContent = (s.gitAuth==='token')
+          ? 'mkdir -p /home/dzoan/.config/opencenter/tokens\n# Write your token:\necho "'+( s.tokVal?'••••••••••••':'YOUR_GIT_TOKEN' )+'" > '+s.tokFile+'\nchmod 600 '+s.tokFile
+          : '# SSH auth selected — verify the key exists and '+_gitHost+' accepts it\nls -l '+(s.sshKey||'~/.ssh/id_rsa')+'\nssh -T -i '+(s.sshKey||'~/.ssh/id_rsa')+' -o StrictHostKeyChecking=no git@'+_gitHost+' 2>&1 | head -2';
 var y4=g('ocqp-yaml-4');
-        if(y4) y4.textContent='opencenter:\n  gitops:\n    repository:\n      url: "'+(s.gitRepo||'https://github.com/YOUR_USER/opencenter-my-cluster-gitops.git')+'"\n    auth:\n      token:\n        token_file: "'+s.tokFile+'"';
+        if(y4) y4.textContent = (s.gitAuth==='token')
+          ? 'opencenter:\n  gitops:\n    repository:\n      url: "'+(s.gitRepo||'https://github.com/YOUR_USER/opencenter-my-cluster-gitops.git')+'"\n    auth:\n      token:\n        token_file: "'+s.tokFile+'"'
+          : 'opencenter:\n  gitops:\n    repository:\n      url: "'+_sshRemote+'"\n    auth:\n      ssh:\n        private_key: "'+(s.sshKey||'~/.ssh/id_rsa')+'"';
 
         // Step 5
         var c5=g('ocqp-cmd-5');
@@ -5120,7 +5447,11 @@ var c7b=g('ocqp-cmd-7b');
         if(c7b) c7b.textContent='grep -R "CHANGEME" '+gitopsPath+' || true';
 // Step 8
         var c8=g('ocqp-cmd-8');
-        if(c8) c8.textContent='cd '+gitopsPath+'\ngit status\ngit add .\ngit commit -m "Initial OpenCenter GitOps generation for '+s.cluster+'"\ngit remote set-url origin '+(s.gitRepo||'YOUR_GIT_REPO_URL').replace('https://github.com/','git@github.com:')+'\nexport GIT_SSH_COMMAND="ssh -i '+(s.sshKey||'~/.ssh/id_rsa')+' -o StrictHostKeyChecking=no"\ngit branch -M '+s.gitBranch+'\ngit push -u origin '+s.gitBranch;
+        var _c8Head='cd '+gitopsPath+'\ngit status\ngit add .\ngit commit -m "Initial OpenCenter GitOps generation for '+s.cluster+'" || true\n';
+        var _c8Tail='\ngit branch -M '+s.gitBranch+'\ngit push -u origin '+s.gitBranch;
+        if(c8) c8.textContent = (s.gitAuth==='token')
+          ? _c8Head+'TOKEN=$(cat '+s.tokFile+')\ngit remote set-url origin '+(s.gitRepo||'YOUR_GIT_REPO_URL').replace(/^https:\/\//,'https://oauth2:${TOKEN}@')+_c8Tail
+          : _c8Head+'git remote set-url origin '+_sshRemote+'\nexport GIT_SSH_COMMAND="ssh -i '+(s.sshKey||'~/.ssh/id_rsa')+' -o StrictHostKeyChecking=no"'+_c8Tail;
 // Step 9
         var c9=g('ocqp-cmd-9');
         if(c9) c9.textContent='opencenter cluster validate '+s.cluster+'\nopencenter cluster deploy --break-lock --yes '+s.cluster;
@@ -5173,15 +5504,19 @@ var c9b=g('ocqp-cmd-9b');
           else hints.push('<span style="color:#15803d;font-weight:700;">✓ credential secret set</span>');
           if(!s.gitRepo) hints.push('<span style="color:#dc2626;font-weight:700;">✗ GitOps repository URL missing</span>');
           else hints.push('<span style="color:#15803d;font-weight:700;">✓ GitOps repo set</span>');
-          if(!s.tokVal) hints.push('<span style="color:#d97706;font-weight:700;">⚠ Git token not entered</span>');
-          else hints.push('<span style="color:#15803d;font-weight:700;">✓ Git token entered</span>');
+          if(s.gitAuth==='token'){
+            if(!s.tokVal) hints.push('<span style="color:#d97706;font-weight:700;">⚠ Git token not entered</span>');
+            else hints.push('<span style="color:#15803d;font-weight:700;">✓ Git token entered</span>');
+          } else {
+            hints.push('<span style="color:#15803d;font-weight:700;">✓ SSH auth ('+(s.sshKey||'~/.ssh/id_rsa')+')</span>');
+          }
           if(!s.region) hints.push('<span style="color:#dc2626;font-weight:700;">✗ Region missing</span>');
           else hints.push('<span style="color:#15803d;font-weight:700;">✓ Region: '+s.region+'</span>');
           vs.innerHTML=hints.join('<br>');
         }
 
         // Persist state
-        try{ localStorage.setItem('ocqp_state',JSON.stringify({org:s.org,cluster:s.cluster,env:s.env,provider:s.provider,authType:s.authType,authUrl:s.authUrl,region:s.region,username:s.username,password:s.password,userDomain:s.userDomain,projDomain:s.projDomain,projectId:s.projectId,credId:s.credId,credSec:s.credSec,floatNet:s.floatNet,networkId:s.networkId,subnetId:s.subnetId,gitRepo:s.gitRepo,gitBranch:s.gitBranch,tokFile:s.tokFile,tokVal:s.tokVal,services:_qp.services})); }catch(e){}
+        try{ localStorage.setItem('ocqp_state',JSON.stringify({org:s.org,cluster:s.cluster,env:s.env,provider:s.provider,authType:s.authType,authUrl:s.authUrl,region:s.region,username:s.username,password:s.password,userDomain:s.userDomain,projDomain:s.projDomain,projectId:s.projectId,credId:s.credId,credSec:s.credSec,floatNet:s.floatNet,networkId:s.networkId,subnetId:s.subnetId,gitRepo:s.gitRepo,gitBranch:s.gitBranch,gitAuth:s.gitAuth,gitopsFolder:s.gitopsFolder,tokFile:s.tokFile,tokVal:s.tokVal,services:_qp.services})); }catch(e){}
       };
 
       window.ocqpReqCheck = function(){
@@ -5196,7 +5531,25 @@ var c9b=g('ocqp-cmd-9b');
         set('ocqp-req-credid',  !!(s.credId  || s.username));
         set('ocqp-req-credsec', !!(s.credSec || s.password));
         set('ocqp-req-repo',    !!s.gitRepo);
-        set('ocqp-req-token',   !!(s.tokVal || s.tokFile));
+      window.ocqpApplyGitops = function(btn){
+        var s = typeof ocqpGetState==='function' ? ocqpGetState() : {};
+        var st = g('ocqp-gitops-apply-status');
+        var cfgEl = g('ocqp-configpath');
+        var cfgPath = cfgEl ? cfgEl.textContent.trim() : '';
+        if(!cfgPath){ if(st){st.textContent='No config path — fill Stage 2 inputs.';st.style.color='#dc2626';} return; }
+        var fields = {'opencenter.gitops.repository.url': (s.gitAuth==='token') ? s.gitRepo : (s.gitRepo||'').replace(/^https:\/\/([^\/]+)\//,'ssh://git@$1/'),
+          'opencenter.gitops.repository.branch': s.gitBranch};
+        var _prov=(g('ocqp-gitprovider')||{}).value||'github'; if(_prov!=='github'&&_prov!=='gitlab'&&_prov!=='gitea') _prov='github';
+        if(s.gitAuth==='token'){ fields['opencenter.gitops.auth.token.token_file'] = s.tokFile; fields['opencenter.gitops.auth.token.provider'] = _prov; }
+        else { fields['opencenter.gitops.auth.ssh.private_key'] = s.sshKey; fields['opencenter.gitops.auth.ssh.public_key'] = s.sshKey+'.pub'; }
+        if(st){ st.textContent='Applying...'; st.style.color='#0369a1'; }
+        if(btn) btn.disabled=true;
+        fetch('/api/openrc/patch-config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({path:cfgPath,fields:fields})})
+          .then(function(r){return r.json();})
+          .then(function(d){ if(btn) btn.disabled=false; if(st){ if(d && d.ok!==false){ st.textContent='✓ GitOps settings applied to '+cfgPath; st.style.color='#15803d'; } else { st.textContent='✗ '+((d&&d.error)||'apply failed'); st.style.color='#dc2626'; } } })
+          .catch(function(e){ if(btn) btn.disabled=false; if(st){ st.textContent='✗ '+e; st.style.color='#dc2626'; } });
+      };
+        set('ocqp-req-token',   s.gitAuth==='ssh' ? !!s.sshKey : !!(s.tokVal || s.tokFile));
         set('ocqp-req-region',  !!s.region);
         // CLI and Git — check via streaming endpoint once on page load
         if(!window._ocqpCliChecked){
@@ -5330,6 +5683,8 @@ var c9b=g('ocqp-cmd-9b');
           sv2('ocqp-networkid',saved.networkId); sv2('ocqp-subnetid',saved.subnetId);
           sv2('ocqp-gitrepo',saved.gitRepo); sv2('ocqp-gitbranch',saved.gitBranch);
           sv2('ocqp-tokfile',saved.tokFile); sv2('ocqp-tokval',saved.tokVal);
+          sv2('ocqp-gitopsfolder',saved.gitopsFolder);
+          if(saved.gitAuth){ var ga=g('ocqp-gitauth'); if(ga) ga.value=saved.gitAuth; }
           if(saved.services){
             _qp.services=Object.assign(_qp.services,saved.services);
             ['keycloak','loki','tempo','velero','monitoring'].forEach(function(s){
@@ -5347,7 +5702,7 @@ var c9b=g('ocqp-cmd-9b');
         setTimeout(_ocqpRestore,150);
       }
       window.addEventListener('beforeunload',function(){
-        try{ if(typeof ocqpGetState==='function'){ var s=ocqpGetState(); localStorage.setItem('ocqp_state',JSON.stringify({org:s.org,cluster:s.cluster,env:s.env,provider:s.provider,authType:s.authType,authUrl:s.authUrl,region:s.region,username:s.username,password:s.password,userDomain:s.userDomain,projDomain:s.projDomain,projectId:s.projectId,credId:s.credId,credSec:s.credSec,floatNet:s.floatNet,networkId:s.networkId,subnetId:s.subnetId,gitRepo:s.gitRepo,gitBranch:s.gitBranch,tokFile:s.tokFile,tokVal:s.tokVal,services:_qp.services,optionalServicesDefaultVersion:'all-off-v2'})); } }catch(e){}
+        try{ if(typeof ocqpGetState==='function'){ var s=ocqpGetState(); localStorage.setItem('ocqp_state',JSON.stringify({org:s.org,cluster:s.cluster,env:s.env,provider:s.provider,authType:s.authType,authUrl:s.authUrl,region:s.region,username:s.username,password:s.password,userDomain:s.userDomain,projDomain:s.projDomain,projectId:s.projectId,credId:s.credId,credSec:s.credSec,floatNet:s.floatNet,networkId:s.networkId,subnetId:s.subnetId,gitRepo:s.gitRepo,gitBranch:s.gitBranch,gitAuth:s.gitAuth,gitopsFolder:s.gitopsFolder,tokFile:s.tokFile,tokVal:s.tokVal,services:_qp.services,optionalServicesDefaultVersion:'all-off-v2'})); } }catch(e){}
       });
 
     })();
