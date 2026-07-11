@@ -541,28 +541,63 @@ window.r6pComponentProfile=function(c){
     targetForm:saved
   };
 };
+window.r6pFilterContainerReady=function(filter){
+  var host=document.getElementById('r6p-container-ready-body');if(!host)return;
+  R6P._containerReadyFilter=filter;
+  host.querySelectorAll('.r6p-cr-card').forEach(function(card){
+    var show=(filter==='all')
+      ||(card.getAttribute('data-badge')===filter)
+      ||(card.getAttribute('data-state')===filter)
+      ||(filter==='highrisk'&&card.getAttribute('data-risk')==='High');
+    card.style.display=show?'':'none';
+  });
+  host.querySelectorAll('.r6p-cr-filter-btn').forEach(function(btn){
+    btn.style.background=(btn.getAttribute('data-filter')===filter)?'#0369a1':'#f1f5f9';
+    btn.style.color=(btn.getAttribute('data-filter')===filter)?'#fff':'#334155';
+  });
+};
 window.r6pRenderContainerReadyForm=function(){
   var host=document.getElementById('r6p-container-ready-body');if(!host)return;
   var comps=R6P.components||[];
   if(!comps.length){host.innerHTML='<div class="r6p-warn-box">No Business System selected yet. Select one in Step 1 to auto-populate this form.</div>';return;}
   var stColor={'Stateless':'#16a34a','Stateful':'#dc2626','Unknown / mixed':'#d97706'};
   var riskColor=function(r){return /Low/.test(r)?'#16a34a':/High/.test(r)?'#dc2626':/Medium/.test(r)?'#d97706':'#64748b';};
-  host.innerHTML='<div style="font-size:12px;color:#64748b;margin-bottom:14px;">Auto-populated for every component in <strong>'+((R6P.bs&&R6P.bs.name)||'the selected system')+'</strong>. Distinguishes application processes that should become containers from stateful infrastructure that should be rebuilt, operator-managed, externally retained, or migrated separately.</div>'
+  var profiles=comps.map(function(c){return {c:c,p:r6pComponentProfile(c)};});
+  var badgeCounts={};
+  profiles.forEach(function(x){var b=r6pBadgeForTargetForm(x.p.targetForm)[0];badgeCounts[b]=(badgeCounts[b]||0)+1;});
+  var riskHighCount=profiles.filter(function(x){return /High/.test(x.p.migrationRisk);}).length;
+  var filter=R6P._containerReadyFilter||'all';
+  var filterDefs=[['all','All'],['Stateless','Stateless'],['Stateful','Stateful'],['Unknown / mixed','Unknown'],
+    ['Containerize','Containerize'],['Replace with Kubernetes','Kubernetes-native'],['Deploy with Operator','Operator-managed'],
+    ['Keep on FLEX','Retained/Redeployed VM'],['Migrate Data Separately','External/Data-migration'],['Blocked','Blocked'],['highrisk','High risk']];
+  var filterBtns=filterDefs.map(function(f){
+    return '<button class="r6p-cr-filter-btn" data-filter="'+f[0]+'" onclick="r6pFilterContainerReady(\''+f[0]+'\')" style="background:'+(filter===f[0]?'#0369a1':'#f1f5f9')+';color:'+(filter===f[0]?'#fff':'#334155')+';border:none;border-radius:999px;padding:4px 12px;font-size:11px;font-weight:700;cursor:pointer;margin:2px;">'+f[1]+'</button>';
+  }).join('');
+  var counterDefs=[['Components',comps.length,'#0f172a'],['Containerized',badgeCounts['Containerize']||0,'#16a34a'],
+    ['Operator-managed',badgeCounts['Deploy with Operator']||0,'#0369a1'],['Kept on FLEX',badgeCounts['Keep on FLEX']||0,'#1d4ed8'],
+    ['Data migration',badgeCounts['Migrate Data Separately']||0,'#d97706'],['High risk',riskHighCount,'#dc2626']];
+  var counters=counterDefs.map(function(c){
+    return '<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:8px 12px;text-align:center;min-width:90px;"><div style="font-size:18px;font-weight:900;color:'+c[2]+';">'+c[1]+'</div><div style="font-size:9px;font-weight:700;color:#64748b;text-transform:uppercase;">'+c[0]+'</div></div>';
+  }).join('');
+  host.innerHTML='<div style="font-size:12px;color:#64748b;margin-bottom:10px;">Auto-populated for every component in <strong>'+((R6P.bs&&R6P.bs.name)||'the selected system')+'</strong>. Distinguishes application processes that should become containers from stateful infrastructure that should be rebuilt, operator-managed, externally retained, or migrated separately.</div>'
+  +'<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;">'+counters+'</div>'
+  +'<div style="margin-bottom:14px;">'+filterBtns+'</div>'
   +'<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:12px;">'
-  +comps.map(function(c){
-    var p=r6pComponentProfile(c);
+  +profiles.map(function(x){
+    var c=x.c,p=x.p;
     var badge=r6pBadgeForTargetForm(p.targetForm);
     var dot=stColor[p.state]||'#64748b';
     var rc=riskColor(p.migrationRisk);
+    var riskLevel=/Low/.test(p.migrationRisk)?'Low':/High/.test(p.migrationRisk)?'High':/Medium/.test(p.migrationRisk)?'Medium':'Unknown';
     var row=function(label,val){return '<div style="display:flex;justify-content:space-between;gap:10px;padding:4px 0;border-bottom:1px solid #f1f5f9;font-size:11px;"><span style="color:#94a3b8;font-weight:700;flex-shrink:0;">'+label+'</span><span style="color:#334155;text-align:right;">'+val+'</span></div>';};
-    return '<div style="border:1.5px solid #e2e8f0;border-radius:10px;padding:14px;background:#fff;">'
+    return '<div class="r6p-cr-card" data-badge="'+badge[0]+'" data-state="'+p.state+'" data-risk="'+riskLevel+'" style="border:1.5px solid #e2e8f0;border-radius:10px;padding:14px;background:#fff;'+(filter==='all'?'':'display:none;')+'">'
       +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;"><div style="font-weight:800;font-size:13px;color:#0f172a;">'+p.name+'</div><span style="background:'+badge[1]+'22;color:'+badge[1]+';padding:2px 8px;border-radius:999px;font-size:10px;font-weight:700;">'+badge[0]+'</span></div>'
       +row('Component category',p.category)
       +row('Current FLEX endpoint','<span style="font-family:monospace;">'+p.endpoint+'</span>')
       +row('Runtime or product',p.runtime)
       +row('State','<span style="background:'+dot+'22;color:'+dot+';padding:1px 7px;border-radius:999px;font-weight:700;">'+p.state+'</span>')
       +row('Containerization decision',p.decision)
-      +row('Target Kubernetes resource',p.targetK8sResource)
+      +row('Target Runtime Resource',p.targetK8sResource)
       +row('Persistent data path',p.persistentPath)
       +row('Dependencies',p.dependencies)
       +row('Health test','<span style="font-family:monospace;">'+p.healthTest+'</span>')
