@@ -12,7 +12,10 @@ var R6P_TOOLS=[
   {name:'yq',         req:false, note:'YAML processing',         manual:false},
   {name:'kustomize',  req:false, note:'Kustomize validation',    manual:false}
 ];
-var R6P_STEPS=[{n:0,label:'Preflight',title:'Preflight Requirements Check',desc:'Verify CLI tools, credentials, and GitOps access before running the refactor workflow.'},{n:1,label:'Input',title:'Select FLEX Business System / App Input',desc:'Select a migrated FLEX Business System or a single FLEX VM / DB. Only FLEX workloads are accepted.'},{n:2,label:'Discovery',title:'Discover FLEX Snapshots (offline components only)',desc:'Not needed for live FLEX VMs - their target IP and volumes are already known from Step 1. Only used to capture an offline/stopped component.'},{n:3,label:'Snapshot',title:'Select Snapshot / Volume Snapshot (offline components only)',desc:'Select snapshots for Smart Snapshot or Full Snapshot capture. Skip for live FLEX VMs.'},{n:4,label:'Mapping',title:'Map Snapshot to Business System Component (offline components only)',desc:'Link selected snapshots to business system components. Skip for live FLEX VMs.'},{n:5,label:'Method',title:'Choose Capture and Conversion Method (offline components only)',desc:'Smart Snapshot (recommended) or Full Snapshot Compatibility (legacy fallback). Skip for live FLEX VMs.'},{n:6,label:'Scan',title:'Live Scan (FLEX VM already running)',desc:'Scan the already-running FLEX VM directly over SSH using its known target IP - OS, runtime, ports, services, files.'},{n:7,label:'Classify',title:'App Detection and File Classification',desc:'Identify real application content and classify all files.'},{n:8,label:'Readiness',title:'Container Readiness Assessment',desc:'Score each component: CLOUD_NATIVE_READY, READY_WITH_EXTERNALIZATION, KEEP_ON_FLEX, BLOCKED.'},{n:9,label:'Build',title:'Container Build Plan',desc:'Generate Dockerfile, image plan, base image, build/start command, health check, CPU/memory.'},{n:10,label:'GitOps',title:'Kubernetes YAML / Helm / Kustomize / Flux',desc:'Generate all Kubernetes and GitOps artifacts.'},{n:11,label:'Bundle',title:'OpenCenter Import Bundle',desc:'Assemble the final OpenCenter-ready application bundle.'},{n:12,label:'OpenCenter',title:'Send to OpenCenter GitOps',desc:'Import bundle, generate commit commands, trigger Flux reconciliation.'}];
+var R6P_STEPS=[{n:0,label:'Preflight',title:'Preflight Requirements Check',desc:'Verify CLI tools, credentials, and GitOps access before running the refactor workflow.'},{n:1,label:'Input',title:'Select FLEX Business System / App Input',desc:'Select a migrated FLEX Business System or a single FLEX VM / DB. Only FLEX workloads are accepted.'},{n:2,label:'Discovery',title:'Discover FLEX Snapshots (offline components only)',desc:'Not needed for live FLEX VMs - their target IP and volumes are already known from Step 1. Only used to capture an offline/stopped component.'},{n:3,label:'Snapshot',title:'Select Snapshot / Volume Snapshot (offline components only)',desc:'Select snapshots for Smart Snapshot or Full Snapshot capture. Skip for live FLEX VMs.'},{n:4,label:'Mapping',title:'Map Snapshot to Business System Component (offline components only)',desc:'Link selected snapshots to business system components. Skip for live FLEX VMs.'},{n:5,label:'Method',title:'Choose Capture and Conversion Method (offline components only)',desc:'Smart Snapshot (recommended) or Full Snapshot Compatibility (legacy fallback). Skip for live FLEX VMs.'},{n:6,label:'Scan',title:'Live Scan (FLEX VM already running)',desc:'Scan the already-running FLEX VM directly over SSH using its known target IP - OS, runtime, ports, services, files.'},{n:7,label:'Classify',title:'App Detection and File Classification',desc:'Identify real application content and classify all files.'},{n:8,label:'Readiness',title:'Container Readiness Assessment',desc:'Score each component: CLOUD_NATIVE_READY, READY_WITH_EXTERNALIZATION, KEEP_ON_FLEX, BLOCKED.'},{n:9,label:'Build',title:'Container Build Plan',desc:'Generate Dockerfile, image plan, base image, build/start command, health check, CPU/memory.'},{n:10,label:'GitOps',title:'Kubernetes YAML / Helm / Kustomize / Flux',desc:'Generate all Kubernetes and GitOps artifacts.'},{n:11,label:'Bundle',title:'OpenCenter Import Bundle',desc:'Assemble the final OpenCenter-ready application bundle.'},{n:12,label:'OpenCenter',title:'Send to OpenCenter GitOps',desc:'Import bundle, generate commit commands, trigger Flux reconciliation.'},
+{n:13,label:'Data+Validate',title:'Data Migration, App Validation & Cutover',desc:'Per-component data migration commands, live app-level validation (HTTP/DB), and a cutover checklist with real DNS/LB commands.'},
+{n:14,label:'Report',title:'Post-Migration Report',desc:'Generate the customer migration evidence report: source/target mapping, decisions, validation results, downloadable as JSON/Markdown.'}];
+var R6P_MAX_STEP=Math.max.apply(null,R6P_STEPS.map(function(s){return s.n;}));
 
 window.r6pInit=function(){r6pRenderProgress();r6pRenderStages();r6pGoTo(0);setTimeout(r6pLoadBiz,350);setTimeout(r6pLoadCredCache,200);setTimeout(r6pLoadCredsServer,250);};
 
@@ -130,7 +133,54 @@ window.r6pGoTo=function(n){
   if(n===1){setTimeout(r6pLoadBiz,200);setTimeout(r6pLoadSa,200);}
 };
 
-function r6pFoot(n,extra){return '<div class="r6p-stage-footer">'+(extra||'')+'<button class="r6p-btn success" onclick="r6pMarkDone('+n+')">Mark Complete</button>'+(n<12?'<button class="r6p-btn primary" onclick="r6pGoTo('+(n+1)+')">Continue</button>':'')+'</div>';}
+function r6pFoot(n,extra){return '<div class="r6p-stage-footer">'+(extra||'')+'<button class="r6p-btn success" onclick="r6pMarkDone('+n+')">Mark Complete</button>'+(n<R6P_MAX_STEP?'<button class="r6p-btn primary" onclick="r6pGoTo('+(n+1)+')">Continue</button>':'')+'</div>';}
+
+/* Real migration-mode decision engine (Stage 4-5): evaluates each component against
+   name/type signals and, if available, the Step 2-6 live scan output. */
+window.r6pDecideMigrationMode=function(c){
+  var name=(c.name||'').toLowerCase();
+  var type=(c.type||c.role||'').toLowerCase();
+  var isDb=type==='database'||type==='db'||/\b(db|database|sql|mysql|postgres|mongo|redis)\b/.test(name);
+  var isWindows=/win|windows/.test(name)||/win|windows/.test(type);
+  var scan=R6P.depScan&&R6P.depScan[c.name];
+  var appFileCount=0;
+  if(scan&&scan.rawLog){var m=scan.rawLog.split('\n').filter(function(l){return l.indexOf('/')===0;});appFileCount=m.length;}
+  var siblingHasDb=(R6P.components||[]).some(function(x){var t=(x.type||x.role||'').toLowerCase();return x.name!==c.name&&(t==='database'||t==='db');});
+
+  if(isWindows){
+    return {name:c.name,workloadType:'Legacy Windows app',status:'COMPATIBILITY_CONTAINER_ONLY',
+      reason:'Windows workloads are not cloud-native containerizable by this engine yet.',
+      method:'Rehost VM first, containerize later only if possible'};
+  }
+  if(isDb){
+    return {name:c.name,workloadType:'Database',status:'KEEP_ON_FLEX_VM_FOR_NOW',
+      reason:'Stateful database - keep external, do not bake into a container image.',
+      method:'Split app and DB, migrate DB separately (dump/restore or replication)'};
+  }
+  if(!scan){
+    return {name:c.name,workloadType:'Unscanned application',status:'READY_WITH_EXTERNALIZATION',
+      reason:'No live scan run yet (Step 2-6) - assuming stateless until scanned.',
+      method:'Containerize and deploy via OpenCenter GitOps (run live scan to confirm)'};
+  }
+  if(appFileCount>200){
+    return {name:c.name,workloadType:'Complex monolith',status:'READY_WITH_EXTERNALIZATION',
+      reason:appFileCount+' files found under app paths - large/complex codebase.',
+      method:'Smart snapshot/app capture, then staged refactor'};
+  }
+  if(appFileCount>20){
+    return {name:c.name,workloadType:'App with local files',status:'READY_WITH_EXTERNALIZATION',
+      reason:appFileCount+' files found under app paths - needs persistent storage.',
+      method:'Containerize + migrate data to PVC/object storage'};
+  }
+  if(siblingHasDb){
+    return {name:c.name,workloadType:'App tier (DB is a sibling component)',status:'CLOUD_NATIVE_READY',
+      reason:'Stateless app tier; database is handled as a separate component.',
+      method:'Containerize and deploy via OpenCenter GitOps'};
+  }
+  return {name:c.name,workloadType:'Simple stateless web app',status:'CLOUD_NATIVE_READY',
+    reason:appFileCount+' files found under app paths - lightweight, no local DB detected.',
+    method:'Containerize and deploy via OpenCenter GitOps'};
+};
 function r6pCmd(id,cmd){var cid='r6p-cmd-'+id,oid='r6p-out-'+id;return '<div class="r6p-cmd-box" id="'+cid+'">'+cmd.replace(/</g,'&lt;').replace(/>/g,'&gt;')+'</div><div style="display:flex;gap:5px;margin-bottom:8px;"><button onclick="navigator.clipboard&&navigator.clipboard.writeText(document.getElementById(\''+cid+'\').textContent)" style="background:#f1f5f9;color:#475569;border:1px solid #e2e8f0;border-radius:4px;padding:3px 10px;font-size:10px;cursor:pointer;">Copy</button><button onclick="r6pRunCmd(\''+cid+'\',\''+oid+'\')" style="background:#eff6ff;color:#0369a1;border:1px solid #bfdbfe;border-radius:4px;padding:3px 10px;font-size:10px;font-weight:700;cursor:pointer;">Run</button><button onclick="var e=document.getElementById(\''+oid+'\');e.style.display=e.style.display===\'none\'?\'block\':\'none\'" style="background:#f1f5f9;color:#64748b;border:1px solid #e2e8f0;border-radius:4px;padding:3px 10px;font-size:10px;cursor:pointer;">Log</button></div><div id="'+oid+'" class="r6p-terminal" style="display:none;">$ waiting...</div>';}
 
 window.r6pContent=function(n){
@@ -158,6 +208,7 @@ window.r6pContent=function(n){
       +'<div><label style="font-size:11px;font-weight:700;color:#334155;display:block;margin-bottom:4px;">SSH User</label><input id="r6p-scan-user" value="root" style="padding:7px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;width:100px;"></div>'
       +'<div><label style="font-size:11px;font-weight:700;color:#334155;display:block;margin-bottom:4px;">SSH Key Path</label><input id="r6p-scan-key" value="~/.ssh/id_rsa" style="padding:7px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;width:160px;"></div>'
       +'<button class="r6p-btn primary" onclick="r6pRunLiveScan()" style="padding:8px 16px;font-size:12px;">&#9654; Run Live Scan</button>'
+      +'<button class="r6p-btn secondary" onclick="r6pExportDepScan()" style="padding:8px 16px;font-size:12px;">&#11015; Export app_dependency_report.json</button>'
       +'</div>'
       +'<div id="r6p-scan-out" class="r6p-terminal" style="display:none;max-height:260px;"></div>'
       +r6pFoot(6);
@@ -184,7 +235,22 @@ window.r6pContent=function(n){
       +'</tbody></table></div>'
       +'<div id="r6p-classify-out" class="r6p-terminal" style="display:none;max-height:220px;"></div>'
       +r6pFoot(7);}
-  if(n===8){var comps8=R6P.components.length?R6P.components:[{name:'app',type:'frontend'},{name:'db',type:'database'}];return '<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:14px;">'+[['CLOUD_NATIVE_READY','#dcfce7','#16a34a'],['READY_WITH_EXTERNALIZATION','#fef3c7','#d97706'],['KEEP_ON_FLEX_VM_FOR_NOW','#dbeafe','#1d4ed8'],['COMPATIBILITY_CONTAINER_ONLY','#faf5ff','#7c3aed'],['BLOCKED','#fee2e2','#dc2626']].map(function(b){return '<div style="background:'+b[1]+';border-radius:8px;padding:10px;text-align:center;"><div style="font-size:16px;font-weight:900;color:'+b[2]+';">0</div><div style="font-size:9px;color:'+b[2]+';font-weight:700;margin-top:2px;">'+b[0].replace(/_/g,' ')+'</div></div>';}).join('')+'</div><div style="overflow-x:auto;"><table class="r6p-table"><thead><tr><th>Component</th><th>Capture Method</th><th>Readiness</th><th>Reason</th><th>Action</th><th>Can Proceed</th></tr></thead><tbody>'+comps8.map(function(c){var role=(c.type||c.role||'backend').toLowerCase();var isDb=role==='database'||role==='db';var r=isDb?'KEEP_ON_FLEX_VM_FOR_NOW':'CLOUD_NATIVE_READY';var rc=isDb?['#dbeafe','#1d4ed8']:['#dcfce7','#16a34a'];return '<tr><td style="font-weight:600;">'+c.name+'</td><td style="font-size:11px;">'+(R6P.captureMethod==='smart'?'Smart Snapshot':'Full Snapshot')+'</td><td><span style="background:'+rc[0]+';color:'+rc[1]+';padding:2px 8px;border-radius:999px;font-size:10px;font-weight:700;">'+r.replace(/_/g,' ')+'</span></td><td style="font-size:11px;color:#64748b;">'+(isDb?'Stateful DB':'Stateless app')+'</td><td style="font-size:11px;color:#64748b;">'+(isDb?'Use ExternalDB':'None required')+'</td><td><span style="background:#dcfce7;color:#16a34a;padding:2px 8px;border-radius:999px;font-size:10px;font-weight:700;">Yes</span></td></tr>';}).join('')+'</tbody></table></div>'+r6pFoot(8,'<button class="r6p-btn success" onclick="r6pMarkDone(8)">Approve Readiness Plan</button>');}
+  if(n===8){var comps8=R6P.components&&R6P.components.length?R6P.components:[];
+    if(!comps8.length)return '<div class="r6p-warn-box">No components selected. Go back to Step 1 and select a Business System or standalone VM/DB.</div>'+r6pFoot(8);
+    var decisions=comps8.map(function(c){return r6pDecideMigrationMode(c);});
+    var counts={CLOUD_NATIVE_READY:0,READY_WITH_EXTERNALIZATION:0,KEEP_ON_FLEX_VM_FOR_NOW:0,COMPATIBILITY_CONTAINER_ONLY:0,BLOCKED:0};
+    decisions.forEach(function(d){counts[d.status]=(counts[d.status]||0)+1;});
+    var tiles=[['CLOUD_NATIVE_READY','#dcfce7','#16a34a'],['READY_WITH_EXTERNALIZATION','#fef3c7','#d97706'],['KEEP_ON_FLEX_VM_FOR_NOW','#dbeafe','#1d4ed8'],['COMPATIBILITY_CONTAINER_ONLY','#faf5ff','#7c3aed'],['BLOCKED','#fee2e2','#dc2626']];
+    var allCanProceed=decisions.every(function(d){return d.status!=='BLOCKED';});
+    return '<div class="r6p-info-box">Migration mode decision engine - evaluates each component'+"'"+'s type, OS, and (if run) Step 2-6 live scan results to recommend rehost vs. containerize.</div>'
+      +'<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:14px;">'
+      +tiles.map(function(b){return '<div style="background:'+b[1]+';border-radius:8px;padding:10px;text-align:center;"><div style="font-size:16px;font-weight:900;color:'+b[2]+';">'+(counts[b[0]]||0)+'</div><div style="font-size:9px;color:'+b[2]+';font-weight:700;margin-top:2px;">'+b[0].replace(/_/g,' ')+'</div></div>';}).join('')
+      +'</div><div style="overflow-x:auto;"><table class="r6p-table"><thead><tr><th>Component</th><th>Workload Type</th><th>Readiness</th><th>Reason</th><th>Recommended Method</th><th>Can Proceed</th></tr></thead><tbody>'
+      +decisions.map(function(d){var rc={CLOUD_NATIVE_READY:['#dcfce7','#16a34a'],READY_WITH_EXTERNALIZATION:['#fef3c7','#d97706'],KEEP_ON_FLEX_VM_FOR_NOW:['#dbeafe','#1d4ed8'],COMPATIBILITY_CONTAINER_ONLY:['#faf5ff','#7c3aed'],BLOCKED:['#fee2e2','#dc2626']}[d.status];
+        return '<tr><td style="font-weight:600;">'+d.name+'</td><td style="font-size:11px;color:#64748b;">'+d.workloadType+'</td><td><span style="background:'+rc[0]+';color:'+rc[1]+';padding:2px 8px;border-radius:999px;font-size:10px;font-weight:700;">'+d.status.replace(/_/g,' ')+'</span></td><td style="font-size:11px;color:#64748b;max-width:220px;">'+d.reason+'</td><td style="font-size:11px;color:#0369a1;font-weight:700;">'+d.method+'</td><td><span style="background:'+(d.status==='BLOCKED'?'#fee2e2':'#dcfce7')+';color:'+(d.status==='BLOCKED'?'#dc2626':'#16a34a')+';padding:2px 8px;border-radius:999px;font-size:10px;font-weight:700;">'+(d.status==='BLOCKED'?'No':'Yes')+'</span></td></tr>';}).join('')
+      +'</tbody></table></div>'
+      +(allCanProceed?'':'<div class="r6p-warn-box" style="margin-top:10px;">One or more components are BLOCKED - resolve before approving.</div>')
+      +r6pFoot(8,'<button class="r6p-btn success" onclick="r6pMarkDone(8)"'+(allCanProceed?'':' disabled')+'>Approve Readiness Plan</button>');}
   if(n===9)return '<div class="r6p-info-box">Generates a real per-component Dockerfile, extract_assets.sh (pulls app files from the live FLEX VM), build_and_push.sh, and a SOPS-encrypted registry pull secret - the same engine used by Ship to OpenCenter.</div>'
     +'<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px;">'
     +'<div><label style="font-size:11px;font-weight:700;color:#334155;display:block;margin-bottom:4px;">Registry</label><select id="r6p-build-regtype" style="padding:7px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;"><option value="harbor" selected>Harbor (in-cluster)</option><option value="dockerhub">Docker Hub</option><option value="ecr">AWS ECR</option><option value="gcp">GCP Artifact Registry</option><option value="custom">Custom URL</option></select></div>'
@@ -284,12 +350,79 @@ window.r6pContent=function(n){
     +r6pCmd('12-git-adv','BS_NAME="'+bsSlug+'"\n\n# Verify opencenter CLI\nif ! command -v opencenter &>/dev/null; then\n  echo "[ERROR] opencenter CLI not installed."\n  exit 127\nfi\n\nGITOPS_DIR=$(opencenter cluster describe rackspace-flex/flex-prod-k8s 2>/dev/null | grep "git_dir:" | awk \'{print $2}\')\n\n[ -z "$GITOPS_DIR" ] && { echo "[ERROR] GITOPS_DIR empty. Run: opencenter cluster list"; exit 1; }\n\ngit -C "$GITOPS_DIR" add "applications/workloads/$BS_NAME"\ngit -C "$GITOPS_DIR" commit -m "Import R6 app bundle: $BS_NAME"\ngit -C "$GITOPS_DIR" push\ncommand -v flux &>/dev/null && flux reconcile kustomization flux-system --with-source || echo "[WARN] flux not installed"')
     +'</div></div>';
   }
+  if(n===13){
+    var comps13=(R6P.components||[]).filter(function(c){return c.tgt;});
+    if(!comps13.length)return '<div class="r6p-warn-box">No components with a FLEX target IP. Select a Business System or standalone VM/DB in Step 1.</div>'+r6pFoot(13);
+    var rows13=comps13.map(function(c){
+      var d=r6pDecideMigrationMode(c);
+      var isDb=d.workloadType.toLowerCase().indexOf('database')>=0;
+      var dataCmd=isDb
+        ?('# DB dump/restore\nssh -i ~/.ssh/id_rsa root@'+c.tgt+' "pg_dump -Fc '+ (c.name||'app').toLowerCase().replace(/\s+/g,'_')+' > /tmp/dbdump.dump || mysqldump --all-databases > /tmp/dbdump.sql"\nscp -i ~/.ssh/id_rsa root@'+c.tgt+':/tmp/dbdump.* ./\n# restore into target (Kubernetes DB / operator / managed DB) once provisioned')
+        :('# App file / volume sync (rsync final delta before cutover)\nrsync -az --delete -e "ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no" root@'+c.tgt+':/opt/ /opt/app/ ./final-sync/'+(c.name||'app').toLowerCase().replace(/\s+/g,'_')+'/');
+      var validateCmd='# App-level validation\n'
+        +'ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no root@'+c.tgt+' "curl -s -o /dev/null -w \'HTTP %{http_code}\\n\' http://localhost'+(c.path&&c.path.indexOf('/')===0?c.path:'/health')+'"\n'
+        +(isDb?'ssh -i ~/.ssh/id_rsa root@'+c.tgt+' "echo \''+(c.path||'SELECT 1')+'\' | psql -U postgres || mysql -e \''+(c.path||'SELECT 1')+'\'"':'echo "compare response time / error rate against source VM baseline"');
+      return '<div style="border:1px solid #e2e8f0;border-radius:8px;padding:12px;margin-bottom:10px;">'
+        +'<div style="font-weight:800;font-size:13px;color:#0f172a;margin-bottom:2px;">'+c.name+' <span style="font-size:10px;font-weight:400;color:#64748b;">('+d.method+')</span></div>'
+        +'<div style="font-size:10px;font-weight:700;color:#64748b;margin:8px 0 4px;">DATA MIGRATION</div>'+r6pCmd('13-data-'+c.name.replace(/\W+/g,''),dataCmd)
+        +'<div style="font-size:10px;font-weight:700;color:#64748b;margin:8px 0 4px;">APP-LEVEL VALIDATION</div>'+r6pCmd('13-val-'+c.name.replace(/\W+/g,''),validateCmd)
+        +'</div>';
+    }).join('');
+    var cutover='# Cutover checklist (run in order)\n'
+      +'# 1. Lower DNS TTL to 60s, at least 24h before cutover\n'
+      +'# 2. Freeze writes on source FLEX VM(s)\n'
+      +'openstack security group rule create --protocol tcp --dst-port 1-65535 --ingress SOURCE_SG --remote-ip 0.0.0.0/0 --disable  # example freeze pattern, adjust to real SG\n'
+      +'# 3. Final data sync (re-run the rsync/dump commands above)\n'
+      +'# 4. Confirm target app pods healthy: kubectl get pods -n '+((R6P.bs&&R6P.bs.name)||'app').toLowerCase().replace(/\s+/g,'-')+'\n'
+      +'# 5. Run smoke tests (re-run the validation commands above against the target)\n'
+      +'# 6. Switch DNS/Octavia LB/Gateway to target\n'
+      +'openstack loadbalancer member create --address <TARGET_POD_IP> --protocol-port 80 <LISTENER_POOL_ID>\n'
+      +'# 7. Monitor 24-48h\n'
+      +'# 8. Rollback path: revert DNS/LB to source VM if error rate/latency regress';
+    return '<div class="r6p-info-box">Real per-component data migration and validation commands, plus a cutover checklist with real OpenStack/Kubernetes commands (edit IDs/SGs for your environment).</div>'
+      +rows13
+      +'<div style="font-weight:800;font-size:13px;color:#0f172a;margin:14px 0 4px;">Cutover</div>'+r6pCmd('13-cutover',cutover)
+      +r6pFoot(13);
+  }
+  if(n===14){
+    var comps14=R6P.components||[];
+    var decisions14=comps14.map(function(c){return r6pDecideMigrationMode(c);});
+    return '<div class="r6p-info-box">Generates the customer migration evidence report from everything captured in this session: source/target mapping, decisions, validation commands, artifacts.</div>'
+      +'<button class="r6p-btn primary" onclick="r6pGenReport()" style="padding:8px 16px;font-size:12px;margin-bottom:12px;">&#9654; Generate Report</button>'
+      +'<pre id="r6p-report-preview" style="background:#0f172a;color:#2dd4bf;border-radius:8px;padding:14px;font-size:11px;max-height:320px;overflow:auto;white-space:pre-wrap;">-- Click Generate Report --</pre>'
+      +r6pFoot(14);
+  }
   return '<p style="color:#94a3b8;">Stage '+n+'</p>';
 };
+window.r6pGenReport=function(){
+  var comps=R6P.components||[];
+  var decisions=comps.map(function(c){return r6pDecideMigrationMode(c);});
+  var report={
+    generatedAt:new Date().toISOString(),
+    businessSystem:(R6P.bs&&R6P.bs.name)||'',
+    sourcePlatform:'flex',
+    targetCluster:R6P.creds.opencenter.clusterRef||'',
+    componentMapping:comps.map(function(c){return {name:c.name,sourceIp:c.src||'',targetIp:c.tgt||'',healthOrQueryPath:c.path||''};}),
+    migrationDecisions:decisions,
+    captureMethod:R6P.captureMethod||'smart',
+    bundle:R6P.bundle?{status:R6P.bundle.status,bundlePath:R6P.bundle.bundlePath,packageContents:R6P.bundle.packageContents}:null,
+    realBundle:R6P._realBundle?{bundle_dir:R6P._realBundle.bundle_dir,imported_to:R6P._realBundle.imported_to,pull_secret:R6P._realBundle.pull_secret}:null,
+    dependencyScans:R6P.depScan?Object.keys(R6P.depScan):[],
+    warnings:(R6P.bundle&&R6P.bundle.warnings)||[],
+    blockers:(R6P.bundle&&R6P.bundle.blockers)||[]
+  };
+  var pre=document.getElementById('r6p-report-preview');
+  if(pre)pre.textContent=JSON.stringify(report,null,2);
+  var blob=new Blob([JSON.stringify(report,null,2)],{type:'application/json'});
+  var a=document.createElement('a');a.href=URL.createObjectURL(blob);
+  a.download='migration_report_'+(report.businessSystem||'app').replace(/\s+/g,'_')+'.json';
+  document.body.appendChild(a);a.click();document.body.removeChild(a);
+  r6pMarkDone(14);
+};
 
-window.r6pMarkDone=function(n){R6P.status[n]='done';var badge=document.getElementById('r6p-stage-badge-'+n);if(badge){badge.textContent='Complete';badge.style.cssText='background:#dcfce7;color:#16a34a;padding:3px 12px;border-radius:999px;font-size:11px;font-weight:700;';}var card=document.getElementById('r6p-stage-'+n);if(card)card.className='r6p-stage done';var done=Object.values(R6P.status).filter(function(s){return s==='done';}).length;var pct=Math.round(done/12*100);var fill=document.getElementById('r6p-fill');if(fill)fill.style.width=pct+'%';var pEl=document.getElementById('r6p-pct');if(pEl)pEl.textContent=pct+'%';r6pRenderProgress();if(n===1)r6pGoTo(7);else if(n<12&&R6P_RESCAN_GROUP.indexOf(n)<0)r6pGoTo(n+1);};
+window.r6pMarkDone=function(n){R6P.status[n]='done';var badge=document.getElementById('r6p-stage-badge-'+n);if(badge){badge.textContent='Complete';badge.style.cssText='background:#dcfce7;color:#16a34a;padding:3px 12px;border-radius:999px;font-size:11px;font-weight:700;';}var card=document.getElementById('r6p-stage-'+n);if(card)card.className='r6p-stage done';var done=Object.values(R6P.status).filter(function(s){return s==='done';}).length;var pct=Math.round(done/(R6P_MAX_STEP+1)*100);var fill=document.getElementById('r6p-fill');if(fill)fill.style.width=pct+'%';var pEl=document.getElementById('r6p-pct');if(pEl)pEl.textContent=pct+'%';r6pRenderProgress();if(n===1)r6pGoTo(7);else if(n<R6P_MAX_STEP&&R6P_RESCAN_GROUP.indexOf(n)<0)r6pGoTo(n+1);};
 
-window.r6pNext=function(){if(R6P.current<12)r6pGoTo(R6P.current+1);};
+window.r6pNext=function(){if(R6P.current<R6P_MAX_STEP)r6pGoTo(R6P.current+1);};
 window.r6pPrev=function(){if(R6P.current>1)r6pGoTo(R6P.current-1);};
 window.r6pRunCurrent=function(){r6pMarkDone(R6P.current);};
 
