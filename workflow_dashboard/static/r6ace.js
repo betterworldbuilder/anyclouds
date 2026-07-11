@@ -778,7 +778,7 @@ window.r6pTestCloud=function(){
   var tokenUrl=authUrl+'/auth/tokens';
   var body,authDesc;
 
-  if(authType==='appcred'||credId){
+  if(authType==='appcred'){
     if(!credId||!secret){if(res){res.style.color='#dc2626';res.textContent='Fill Application Credential ID and Secret.';}return;}
     authDesc='v3 Application Credential';
     body={auth:{identity:{methods:['application_credential'],application_credential:{id:credId,secret:secret}}}};
