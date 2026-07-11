@@ -9463,6 +9463,7 @@ ${certContent}
         <h4>Component Configuration</h4>
         <div class="uat-s1-form-grid">
           <div class="uat-s1-field"><label>Environment</label><select id="uatS1Env"><option>UAT</option><option>Production</option><option>Staging</option><option>Dev</option></select></div>
+          <div class="uat-s1-field"><label>FLEX Region</label><select id="uatS1Region"><option value="">-- Select Region --</option><option value="IAD">us IAD3 &mdash; Northern Virginia Legacy (US)</option><option value="IAD3">us IAD3 &mdash; Northern Virginia (US)</option><option value="DFW">us DFW1 &mdash; Dallas/Fort Worth Legacy (US)</option><option value="DFW3">us DFW3 &mdash; Dallas/Fort Worth Legacy (US)</option><option value="ORD">us ORD1 &mdash; Chicago Legacy (US)</option><option value="SYD">ap SYD2 &mdash; Sydney (AU)</option><option value="LON">eu LON3 &mdash; London (UK)</option><option value="HKG">ap HKG1 &mdash; Hong Kong</option></select></div>
           <div class="uat-s1-field"><label>Cutover Wave</label><input id="uatS1Wave" value="Wave 1" /></div>
           <div class="uat-s1-field"><label>Risk Level</label><select id="uatS1Risk"><option>Medium</option><option>Low</option><option>High</option><option>Critical</option></select></div>
           <div class="uat-s1-field"><label>Description</label><input id="uatS1Desc" value="" placeholder="e.g. Customer-facing digital banking portal" /></div>
@@ -9764,6 +9765,7 @@ ${certContent}
         _sv('uatS1Name', sys.name); _sv('uatS1Crit', sys.criticality||'Critical');
         _sv('uatS1BOwner', sys.bowner||''); _sv('uatS1TOwner', sys.towner||'');
         _sv('uatS1Wave', sys.wave||'Wave 1'); _sv('uatS1Risk', sys.risk||'Medium');
+        _sv('uatS1Region', sys.region||'');
         _sv('uatS1Desc', sys.desc||'');
         _activeComps = (sys.components||[]).map(function(c){ return c.name; });
         _rebuildEditor(sys.components||[]);
@@ -10089,6 +10091,7 @@ ${certContent}
       _sv('uatS1Wave', tpl.wave || 'Wave 1');
       _sv('uatS1Risk', tpl.risk || 'Medium');
       _sv('uatS1Desc', tpl.desc || 'custom business system');
+      _sv('uatS1Region', tpl.region || '');
       _activeComps = (tpl.components || []).map(function(c){ return c.name; }).filter(Boolean);
       _rebuildEditor(tpl.components || []);
       _rebuildPreview();
@@ -10109,6 +10112,7 @@ ${certContent}
       risk: _gv('uatS1Risk')||'Medium',
       desc: _gv('uatS1Desc')||'custom business system',
       env: _gv('uatS1Env')||'UAT',
+      region: _gv('uatS1Region')||'',
       status: 'Template',
       components: _collectModalComponents(),
       updatedAt: new Date().toLocaleString()
@@ -10143,6 +10147,7 @@ ${certContent}
       risk:        _gv('uatS1Risk')||'Medium',
       desc:        _gv('uatS1Desc')||'',
       env:         _gv('uatS1Env')||'UAT',
+      region:      _gv('uatS1Region')||'',
       status:      draft ? 'Draft' : 'Active',
       components:  comps,
       createdAt:   new Date().toLocaleString()
@@ -10311,6 +10316,7 @@ ${certContent}
     _sv('uatS1TOwner', sys.towner || '');
     _sv('uatS1Wave', sys.wave || 'Wave 1');
     _sv('uatS1Risk', sys.risk || 'Medium');
+    _sv('uatS1Region', sys.region || '');
     _sv('uatS1Desc', sys.desc || 'custom business system');
     _activeComps = (sys.components || []).map(function(c){ return c.name; }).filter(Boolean);
     _rebuildEditor(sys.components || []);
