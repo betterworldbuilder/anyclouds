@@ -130,7 +130,7 @@ window.r6pGoTo=function(n){
     else{b.classList.remove('open');var st=R6P.status[s.n]||'ns';card.className='r6p-stage'+(st!=='ns'?' '+st:'');}
   });
   r6pRenderProgress();
-  if(n===1){setTimeout(r6pLoadBiz,200);setTimeout(r6pLoadSa,200);}
+  if(n===1){setTimeout(r6pLoadBiz,200);}
 };
 
 function r6pFoot(n,extra){var nextN=(n===1)?7:n+1;return '<div class="r6p-stage-footer">'+(extra||'')+'<button class="r6p-btn success" onclick="r6pMarkDone('+n+')">Mark Complete</button>'+(n<R6P_MAX_STEP?'<button class="r6p-btn primary" onclick="r6pGoTo('+nextN+')">Continue</button>':'')+'</div>';}
@@ -186,7 +186,6 @@ function r6pCmd(id,cmd){var cid='r6p-cmd-'+id,oid='r6p-out-'+id;return '<div cla
 window.r6pContent=function(n){
   if(n===0)return r6pStage0();
   if(n===1)return '<div class="r6p-warn-box">Only FLEX workloads can be converted here. Complete migration to FLEX first.</div><div class="uat-s1-biz-grid"><div><div style="font-weight:800;font-size:15px;color:#0f172a;margin-bottom:12px;">Business Systems <span style="font-size:11px;color:#64748b;font-weight:400;">from FLEX Migration Log</span></div><div id="r6p-biz-list" style="min-height:180px;"></div>'
-    +'<div style="font-weight:800;font-size:15px;color:#0f172a;margin:16px 0 12px;">Single FLEX VM / DB <span style="font-size:11px;color:#64748b;font-weight:400;">standalone items, from FLEX Migration Log</span></div><div id="r6p-sa-list" style="min-height:60px;"></div>'
     +'</div><div class="uat-s1-arch-selector"><div class="uat-s1-arch-head"><div class="uat-s1-arch-title">Business System Templates</div><span class="uat-s1-arch-badge">10 Templates</span></div><p class="uat-s1-arch-desc">Templates define structure only. Conversion requires real FLEX VM/DB mapping.</p><div class="uat-s1-template-pane active"><div id="r6p-arch-grid" class="uat-s1-arch-grid"></div></div></div></div>'+r6pFoot(1,'<button class="r6p-btn secondary" onclick="r6pLoadBiz()">Refresh FLEX Inventory</button>');
   if(n===2||n===3||n===4||n===5){
     var skipMsg={2:'Discover FLEX Snapshots',3:'Select Snapshot / Volume Snapshot',4:'Map Snapshot to Business System Component',5:'Choose Capture and Conversion Method'}[n];
@@ -467,42 +466,6 @@ window.r6pMarkStep1Selected=function(){
   r6pRenderProgress();
 };
 window.r6pSelectBS=function(id){document.querySelectorAll('[id^="r6p-bsc-"]').forEach(function(el){el.classList.remove('selected');});var c=document.getElementById('r6p-bsc-'+id);if(c)c.classList.add('selected');try{var sys=JSON.parse(localStorage.getItem('uatS1_systems')||'[]');var bs=sys.find(function(s){return s.id===id;});if(!bs)return;R6P.bs=bs;R6P.components=bs.components||[];var si=document.getElementById('r6p-sum-input');if(si)si.textContent=bs.name;var sc=document.getElementById('r6p-sum-comps');if(sc)sc.textContent=(bs.components||[]).length+' components';R6P_RESCAN_GROUP.forEach(function(gn){R6P.status[gn]='done';});r6pMarkStep1Selected();r6pLoadBiz();}catch(e){}};
-window.r6pLoadSa=function(){
-  var list=document.getElementById('r6p-sa-list');if(!list)return;
-  try{
-    var sas=JSON.parse(localStorage.getItem('uatS1_standalones')||'[]');
-    if(!sas.length){list.innerHTML='<div style="color:#94a3b8;font-size:12px;padding:10px 0;">No standalone VMs/DBs. Create one in Migration Logs first.</div>';return;}
-    list.innerHTML=sas.map(function(s){
-      var isDb=s.itemType==='database';
-      var isSel=R6P.bs&&R6P.bs.id===s.id;
-      var selBtn=isSel?'<button onclick="event.stopPropagation();" class="r6p-btn" style="padding:4px 10px;font-size:10px;background:#16a34a;color:#fff;border:1px solid #15803d;cursor:default;">&#10003; Selected</button>':'<button onclick="event.stopPropagation();r6pSelectSa(\''+s.id+'\')" class="r6p-btn primary" style="padding:4px 10px;font-size:10px;">Select for Refactor</button>';
-      return '<div class="r6p-bs-card" id="r6p-sac-'+s.id+'" onclick="r6pSelectSa(\''+s.id+'\')" style="margin-bottom:8px;">'
-        +'<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;">'
-        +'<div style="display:flex;align-items:center;gap:8px;"><div style="width:28px;height:28px;border-radius:8px;background:'+(isDb?'#faf5ff':'#eff6ff')+';color:'+(isDb?'#7c3aed':'#2563eb')+';font-weight:900;font-size:10px;display:grid;place-items:center;">'+(isDb?'DB':'VM')+'</div>'
-        +'<div><div style="font-weight:800;color:#0f172a;font-size:13px;">'+s.name+'</div><div style="font-size:10px;color:#64748b;">'+(s.componentRole||'')+(s.target?' - '+s.target:'')+'</div></div></div>'
-        +'<span style="background:#dcfce7;color:#16a34a;padding:2px 8px;border-radius:999px;font-size:10px;font-weight:700;">'+(s.status||'Active')+'</span></div>'
-        +'<div style="display:flex;gap:6px;">'+selBtn
-        +'<button onclick="event.stopPropagation();r6pDeleteSa(\''+s.id+'\',\''+s.name.replace(/'/g,"\\'")+'\')" style="background:#fee2e2;color:#dc2626;border:1px solid #fecaca;border-radius:6px;padding:4px 10px;font-size:10px;font-weight:700;cursor:pointer;margin-left:auto;">&#128465; Delete</button></div>'
-        +'</div>';
-    }).join('');
-  }catch(e){if(list)list.innerHTML='<div style="color:#dc2626;padding:10px;">'+e.message+'</div>';}
-};
-window.r6pSelectSa=function(id){
-  document.querySelectorAll('[id^="r6p-sac-"]').forEach(function(el){el.classList.remove('selected');});
-  var c=document.getElementById('r6p-sac-'+id);if(c)c.classList.add('selected');
-  try{
-    var sas=JSON.parse(localStorage.getItem('uatS1_standalones')||'[]');
-    var sa=sas.find(function(s){return s.id===id;});if(!sa)return;
-    var comp={name:sa.name,type:sa.componentRole||(sa.itemType==='database'?'Database':'Application'),
-      src:'',tgt:sa.target||'',path:sa.itemType==='database'?(sa.readQuery||'SELECT 1'):(sa.healthUrl||'/health')};
-    R6P.bs={id:sa.id,name:sa.name,components:[comp]};
-    R6P.components=[comp];
-    var si=document.getElementById('r6p-sum-input');if(si)si.textContent=sa.name+' (standalone)';
-    var sc=document.getElementById('r6p-sum-comps');if(sc)sc.textContent='1 component';
-    R6P_RESCAN_GROUP.forEach(function(gn){R6P.status[gn]='done';});
-    r6pMarkStep1Selected();r6pLoadSa();
-  }catch(e){}
-};
 window.r6pDeleteBS=function(id,name){
   if(!confirm('Delete business system "'+name+'"? This removes it from Migration Logs everywhere, not just here.'))return;
   try{
@@ -512,17 +475,6 @@ window.r6pDeleteBS=function(id,name){
     if(window.UAT)window.UAT.businessSystems=sys;
     if(R6P.bs&&R6P.bs.id===id){R6P.bs=null;R6P.components=[];}
     r6pLoadBiz();
-  }catch(e){alert('Delete failed: '+e.message);}
-};
-window.r6pDeleteSa=function(id,name){
-  if(!confirm('Delete standalone item "'+name+'"? This removes it from Migration Logs everywhere, not just here.'))return;
-  try{
-    var sas=JSON.parse(localStorage.getItem('uatS1_standalones')||'[]');
-    sas=sas.filter(function(s){return s.id!==id;});
-    localStorage.setItem('uatS1_standalones',JSON.stringify(sas));
-    if(window.UAT)window.UAT.standaloneItems=sas;
-    if(R6P.bs&&R6P.bs.id===id){R6P.bs=null;R6P.components=[];}
-    r6pLoadSa();
   }catch(e){alert('Delete failed: '+e.message);}
 };
 
