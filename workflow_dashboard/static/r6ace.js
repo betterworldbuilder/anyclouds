@@ -473,6 +473,8 @@ window.r6pStage0=function(){
     +'</div>'
     +'<div id="r6p-git-ssh-row" style="margin-top:8px;"><label style="font-size:11px;font-weight:700;color:#334155;display:block;">SSH Key Path</label>'
     +'<input id="r6p-git-sshkey" value="~/.ssh/id_rsa" style="width:100%;padding:6px;border:1px solid #cbd5e1;border-radius:5px;font-size:12px;"></div>'
+    +'<div style="margin-top:8px;"><label style="font-size:11px;font-weight:700;color:#334155;display:block;">Local GitOps Directory <span style="font-weight:400;color:#94a3b8;">(used by GitOps Preflight below)</span></label>'
+    +'<input id="r6p-git-localdir" placeholder="/home/dzoan/.config/opencenter/clusters/gitops/my-org" style="width:100%;padding:6px;border:1px solid #cbd5e1;border-radius:5px;font-size:12px;"></div>'
     +'<div id="r6p-git-token-row" style="margin-top:8px;display:none;"><label style="font-size:11px;font-weight:700;color:#334155;display:block;">Git Token (stored session-only)</label>'
     +'<input id="r6p-git-token" type="password" style="width:100%;padding:6px;border:1px solid #cbd5e1;border-radius:5px;font-size:12px;" placeholder="ghp_..."></div>'
     +'<div style="display:flex;gap:8px;margin-top:10px;align-items:center;">'
@@ -1090,6 +1092,8 @@ window.r6pGitLoad = function(){
     var set = function(id, v){ var el = document.getElementById(id); if (el && v) el.value = v; };
     set('r6p-git-repo', st.gitRepo); set('r6p-git-branch', st.gitBranch);
     set('r6p-git-sshkey', st.sshKey); set('r6p-git-token', st.tokVal);
+    set('r6p-git-localdir', st.gitopsFolder);
+    if (st.gitopsFolder) { R6P.creds.opencenter.gitDir = st.gitopsFolder; }
     var sel = document.getElementById('r6p-git-auth');
     if (sel && st.gitAuth) sel.value = st.gitAuth;
     r6pGitAuthToggle();
@@ -1104,6 +1108,8 @@ window.r6pGitSave = function(){
   st.gitRepo = v('r6p-git-repo'); st.gitBranch = v('r6p-git-branch') || 'main';
   st.gitAuth = v('r6p-git-auth') || 'ssh'; st.sshKey = v('r6p-git-sshkey') || '~/.ssh/id_rsa';
   if (v('r6p-git-token')) st.tokVal = v('r6p-git-token');
+  var localDir = v('r6p-git-localdir');
+  if (localDir) { st.gitopsFolder = localDir; R6P.creds.opencenter.gitDir = localDir; }
   try { localStorage.setItem('ocqs_state', JSON.stringify(st)); } catch(e){}
   var stEl = document.getElementById('r6p-git-status');
   if (stEl){
