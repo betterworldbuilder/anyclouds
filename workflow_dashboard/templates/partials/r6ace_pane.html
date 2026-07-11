@@ -112,6 +112,16 @@
     &#9888; <strong>Full Snapshot Compatibility Mode active.</strong> Not fully cloud-native. Manual hardening required.
   </div>
 
+  <!-- CONTAINER-READY BUSINESS APPS SYSTEM FORM (collapsible, auto-populates from selected Business System) -->
+  <div class="r6p-stage" style="margin-bottom:14px;">
+    <div class="r6p-stage-hd" style="cursor:pointer;" onclick="var b=document.getElementById('r6p-container-ready-body');if(b)b.style.display=b.style.display==='none'?'block':'none';var c=document.getElementById('r6p-container-ready-chevron');if(c)c.style.transform=c.style.transform?'':'rotate(90deg)';if(typeof r6pRenderContainerReadyForm==='function')r6pRenderContainerReadyForm();">
+      <div class="r6p-stage-num">&#128196;</div>
+      <div class="r6p-stage-info"><div class="r6p-stage-title">Container-Ready Business Apps System Form</div><div class="r6p-stage-desc">Auto-populated per component: category, endpoint, runtime, state, containerization decision, target Kubernetes resource, persistent data path, dependencies, health test, readiness, migration risk, recommended action. R6-only - does not touch the shared Add Business System modal.</div></div>
+      <span id="r6p-container-ready-chevron" style="margin-left:10px;font-size:14px;color:#94a3b8;">&#9654;</span>
+    </div>
+    <div id="r6p-container-ready-body" style="display:none;padding:14px;border-top:1px solid #e2e8f0;"></div>
+  </div>
+
   <!-- HYBRID PIPELINE: WHAT CHANGED (collapsible, always visible at top) -->
   <div class="r6p-stage" style="margin-bottom:14px;">
     <div class="r6p-stage-hd" style="cursor:pointer;" onclick="var b=document.getElementById('r6p-hybrid-delta-body');if(b)b.style.display=b.style.display==='none'?'block':'none';var c=document.getElementById('r6p-hybrid-delta-chevron');if(c)c.style.transform=c.style.transform?'':'rotate(90deg)';">
@@ -164,7 +174,7 @@
   </div>
 
 </div>
-<script src="/static/r6ace.js?v=20260712b"></script>
+<script src="/static/r6ace.js?v=20260712c"></script>
 <script>
 /* Hero buttons — were alert() placeholders; now real import/export/help. */
 window.r6pHeroExport = function(){

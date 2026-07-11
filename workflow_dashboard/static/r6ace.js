@@ -112,7 +112,7 @@ window.r6pRenderHybridDeltaChart=function(){
     +'<div style="font-weight:800;font-size:13px;color:#0f172a;margin-bottom:8px;">New OpenCenter Deployment Scope</div>'
     +'<div style="overflow-x:auto;"><table class="r6p-table"><thead><tr><th>Deployment area</th><th>OpenCenter mechanism</th></tr></thead><tbody>'+scopeRows+'</tbody></table></div>';
 };
-window.r6pInit=function(){r6pRenderProgress();r6pRenderStages();r6pGoTo(0);setTimeout(r6pLoadBiz,350);setTimeout(r6pLoadCredCache,200);setTimeout(r6pLoadCredsServer,250);r6pRenderClassifyChart();r6pRenderPipelineStepsTable();r6pRenderHybridDeltaChart();};
+window.r6pInit=function(){r6pRenderProgress();r6pRenderStages();r6pGoTo(0);setTimeout(r6pLoadBiz,350);setTimeout(r6pLoadCredCache,200);setTimeout(r6pLoadCredsServer,250);r6pRenderClassifyChart();r6pRenderPipelineStepsTable();r6pRenderHybridDeltaChart();setTimeout(r6pRenderContainerReadyForm,400);};
 
 /* Server-side credential persistence - survives incognito/browser reset/different browsers.
    localStorage stays as a fast local mirror; the server file is the source of truth. */
@@ -356,6 +356,7 @@ window.r6pSetTargetForm=function(name,val){
   R6P.targetForms=R6P.targetForms||{};
   R6P.targetForms[name]=val;
   var b=document.getElementById('r6p-tf-badge-'+btoa(unescape(encodeURIComponent(name))).replace(/[^a-zA-Z0-9]/g,''));
+  if(typeof r6pRenderContainerReadyForm==='function')r6pRenderContainerReadyForm();
 };
 /* State/portability override (Step 7 Classify table) - takes priority over the static
    reference classification and also feeds Step 8's Transform decision engine, so an
@@ -371,6 +372,7 @@ window.r6pClassifyForComponent=function(c){
 window.r6pSetClassifyOverride=function(name,val){
   R6P.classifyOverride=R6P.classifyOverride||{};
   R6P.classifyOverride[name]=val;
+  if(typeof r6pRenderContainerReadyForm==='function')r6pRenderContainerReadyForm();
 };
 /* Per-component lifecycle status. The pipeline currently checkpoints at the
    business-system level (one Mark Complete/Approve per step, not per component),
@@ -397,6 +399,138 @@ window.r6pLifecycleFor=function(c){
   if(R6P.targetForms&&R6P.targetForms[c.name])return 'DECISION_APPROVED';
   if(st[7]==='done'||R6P.classifyOverride&&R6P.classifyOverride[c.name])return 'CLASSIFIED';
   return 'DISCOVERED';
+};
+/* Container-Ready Business Apps System Form (R6 only - does NOT touch the shared
+   Add Business System modal used by Migration Log/Stage 2). Real per-component
+   12-field profile, derived entirely from real component data (c.name/c.type/
+   c.src/c.tgt/c.path, exactly the fields _uatS1SaveSystem actually saves) plus the
+   existing real classify/transform/readiness engines. Auto-refreshes whenever a
+   Business System is selected or a Classify/Transform override changes. */
+window.r6pGuessRuntime=function(c){
+  var n=(c.name||'').toLowerCase(), t=(c.type||'').toLowerCase();
+  var hay=n+' '+t;
+  if(/mysql/.test(hay))return 'MySQL';
+  if(/postgres/.test(hay))return 'PostgreSQL';
+  if(/mongo/.test(hay))return 'MongoDB';
+  if(/redis/.test(hay))return 'Redis';
+  if(/rabbitmq/.test(hay))return 'RabbitMQ';
+  if(/kafka|event stream/.test(hay))return 'Kafka';
+  if(/oracle/.test(hay))return 'Oracle Database';
+  if(/nosql/.test(hay))return 'NoSQL Database (product TBD)';
+  if(/windows/.test(hay))return 'Windows Server application';
+  if(/frontend|web /.test(hay))return 'Node.js/Nginx (typical) - inspect to confirm';
+  if(/gateway/.test(hay))return 'API Gateway / Envoy (typical) - inspect to confirm';
+  if(/database|\bdb\b/.test(hay))return 'Relational database (product TBD)';
+  if(/cache/.test(hay))return 'Cache service (product TBD)';
+  if(/queue/.test(hay))return 'Message queue (product TBD)';
+  if(/search/.test(hay))return 'Search engine (product TBD)';
+  if(/object storage|file storage|upload/.test(hay))return 'Object/file storage service';
+  var scan=R6P.depScan&&R6P.depScan[c.name];
+  if(scan)return 'Detected from live scan - see Step 7';
+  return 'Unknown - run Live Scan (Step 6) to confirm';
+};
+var R6_K8S_RESOURCE_FOR_FORM={
+  CONTAINERIZED:'Deployment + Service',
+  PARTIALLY_CONTAINERIZED:'Deployment + Service (state externalized to PVC/DB/ConfigMap)',
+  KUBERNETES_NATIVE:'Native Kubernetes capability (Gateway API, CronJob, etc)',
+  OPERATOR_MANAGED:'Custom Resource via Operator',
+  RETAINED_FLEX_VM:'None in-cluster - Service alias + EndpointSlice to the FLEX VM',
+  REDEPLOYED_FLEX_VM:'None in-cluster - Service alias + EndpointSlice to the redeployed VM',
+  EXTERNAL_SERVICE:'ExternalName Service',
+  DATA_MIGRATION_REQUIRED:'PVC or object storage (data only, no compute resource)',
+  MANUAL_REVIEW:'TBD - manual review required',
+  BLOCKED:'None - blocked',
+  EXCLUDED:'None - excluded from target system'
+};
+window.r6pTargetK8sResourceFor=function(form){
+  return R6_K8S_RESOURCE_FOR_FORM[form]||'TBD';
+};
+window.r6pPersistentPathFor=function(c){
+  var hay=((c.name||'')+' '+(c.type||'')).toLowerCase();
+  if(/mysql/.test(hay))return '/var/lib/mysql';
+  if(/postgres/.test(hay))return '/var/lib/postgresql/data';
+  if(/mongo/.test(hay))return '/data/db';
+  if(/database|\bdb\b/.test(hay))return '/var/lib/ (database engine data directory)';
+  if(/redis|cache/.test(hay))return 'None required - disposable, rebuilds on restart';
+  if(/rabbitmq|queue/.test(hay))return '/var/lib/rabbitmq';
+  if(/kafka|event stream/.test(hay))return '/var/lib/kafka';
+  if(/object storage|upload|file storage|document/.test(hay))return '/srv/ (move to object storage/PVC)';
+  if(/frontend/.test(hay))return 'None - stateless';
+  if(/api|backend|gateway|worker|service/.test(hay))return 'None expected - verify no local writes during Step 6 scan';
+  return 'Unknown - run Live Scan (Step 6) to confirm';
+};
+var R6_MIGRATION_RISK_FOR_STATUS={
+  CLOUD_NATIVE_READY:'Low',
+  READY_WITH_EXTERNALIZATION:'Medium - requires externalizing local state first',
+  KEEP_ON_FLEX_VM_FOR_NOW:'Medium - stateful, requires a planned data migration',
+  COMPATIBILITY_CONTAINER_ONLY:'High - legacy/Windows workload, not yet containerizable'
+};
+window.r6pMigrationRiskFor=function(status){
+  return R6_MIGRATION_RISK_FOR_STATUS[status]||'Unknown';
+};
+window.r6pDependenciesFor=function(c){
+  var scan=R6P.depScan&&R6P.depScan[c.name];
+  if(scan&&scan.rawLog){
+    var ports=(scan.rawLog.match(/LISTEN\s+\S+:(\d+)/g)||[]).slice(0,5).join(', ');
+    if(ports)return 'Detected from live scan - listening ports: '+ports;
+  }
+  var siblings=(R6P.components||[]).filter(function(x){return x.name!==c.name;}).map(function(x){return x.name;});
+  if(!siblings.length)return 'No other components in this Business System';
+  return 'Not yet scanned - other components in this system: '+siblings.join(', ');
+};
+window.r6pComponentProfile=function(c){
+  var cls=r6pClassifyForComponent(c);
+  var mig=r6pDecideMigrationMode(c);
+  var saved=(R6P.targetForms&&R6P.targetForms[c.name])||r6pDecideTargetForm(c).form;
+  var tf=r6pDecideTargetForm(c);
+  return {
+    name:c.name||'(unnamed component)',
+    category:(c.type||'').replace(/^Component Type:\s*/i,'')||'Application',
+    endpoint:c.tgt||'Not set - fill in Target IP/URL in Step 1 Inspect',
+    runtime:r6pGuessRuntime(c),
+    state:cls.state,
+    decision:cls.decision,
+    targetK8sResource:r6pTargetK8sResourceFor(saved),
+    persistentPath:r6pPersistentPathFor(c),
+    dependencies:r6pDependenciesFor(c),
+    healthTest:c.path||'Not set - fill in Health/Test Path in Step 1 Inspect',
+    readiness:mig.status,
+    migrationRisk:r6pMigrationRiskFor(mig.status),
+    recommendedAction:tf.reason,
+    targetForm:saved
+  };
+};
+window.r6pRenderContainerReadyForm=function(){
+  var host=document.getElementById('r6p-container-ready-body');if(!host)return;
+  var comps=R6P.components||[];
+  if(!comps.length){host.innerHTML='<div class="r6p-warn-box">No Business System selected yet. Select one in Step 1 to auto-populate this form.</div>';return;}
+  var stColor={'Stateless':'#16a34a','Stateful':'#dc2626','Unknown / mixed':'#d97706'};
+  var riskColor=function(r){return /Low/.test(r)?'#16a34a':/High/.test(r)?'#dc2626':/Medium/.test(r)?'#d97706':'#64748b';};
+  host.innerHTML='<div style="font-size:12px;color:#64748b;margin-bottom:14px;">Auto-populated for every component in <strong>'+((R6P.bs&&R6P.bs.name)||'the selected system')+'</strong>. Distinguishes application processes that should become containers from stateful infrastructure that should be rebuilt, operator-managed, externally retained, or migrated separately.</div>'
+  +'<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:12px;">'
+  +comps.map(function(c){
+    var p=r6pComponentProfile(c);
+    var badge=r6pBadgeForTargetForm(p.targetForm);
+    var dot=stColor[p.state]||'#64748b';
+    var rc=riskColor(p.migrationRisk);
+    var row=function(label,val){return '<div style="display:flex;justify-content:space-between;gap:10px;padding:4px 0;border-bottom:1px solid #f1f5f9;font-size:11px;"><span style="color:#94a3b8;font-weight:700;flex-shrink:0;">'+label+'</span><span style="color:#334155;text-align:right;">'+val+'</span></div>';};
+    return '<div style="border:1.5px solid #e2e8f0;border-radius:10px;padding:14px;background:#fff;">'
+      +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;"><div style="font-weight:800;font-size:13px;color:#0f172a;">'+p.name+'</div><span style="background:'+badge[1]+'22;color:'+badge[1]+';padding:2px 8px;border-radius:999px;font-size:10px;font-weight:700;">'+badge[0]+'</span></div>'
+      +row('Component category',p.category)
+      +row('Current FLEX endpoint','<span style="font-family:monospace;">'+p.endpoint+'</span>')
+      +row('Runtime or product',p.runtime)
+      +row('State','<span style="background:'+dot+'22;color:'+dot+';padding:1px 7px;border-radius:999px;font-weight:700;">'+p.state+'</span>')
+      +row('Containerization decision',p.decision)
+      +row('Target Kubernetes resource',p.targetK8sResource)
+      +row('Persistent data path',p.persistentPath)
+      +row('Dependencies',p.dependencies)
+      +row('Health test','<span style="font-family:monospace;">'+p.healthTest+'</span>')
+      +row('Readiness status',p.readiness.replace(/_/g,' '))
+      +row('Migration risk','<span style="color:'+rc+';font-weight:700;">'+p.migrationRisk+'</span>')
+      +row('Recommended action',p.recommendedAction)
+      +'</div>';
+  }).join('')
+  +'</div>';
 };
 function r6pCmd(id,cmd){var cid='r6p-cmd-'+id,oid='r6p-out-'+id;return '<div class="r6p-cmd-box" id="'+cid+'">'+cmd.replace(/</g,'&lt;').replace(/>/g,'&gt;')+'</div><div style="display:flex;gap:5px;margin-bottom:8px;"><button onclick="navigator.clipboard&&navigator.clipboard.writeText(document.getElementById(\''+cid+'\').textContent)" style="background:#f1f5f9;color:#475569;border:1px solid #e2e8f0;border-radius:4px;padding:3px 10px;font-size:10px;cursor:pointer;">Copy</button><button onclick="r6pRunCmd(\''+cid+'\',\''+oid+'\')" style="background:#eff6ff;color:#0369a1;border:1px solid #bfdbfe;border-radius:4px;padding:3px 10px;font-size:10px;font-weight:700;cursor:pointer;">Run</button><button onclick="var e=document.getElementById(\''+oid+'\');e.style.display=e.style.display===\'none\'?\'block\':\'none\'" style="background:#f1f5f9;color:#64748b;border:1px solid #e2e8f0;border-radius:4px;padding:3px 10px;font-size:10px;cursor:pointer;">Log</button></div><div id="'+oid+'" class="r6p-terminal" style="display:none;">$ waiting...</div>';}
 
@@ -721,7 +855,7 @@ window.r6pMarkStep1Selected=function(){
   var pEl=document.getElementById('r6p-pct');if(pEl)pEl.textContent=pct+'%';
   r6pRenderProgress();
 };
-window.r6pSelectBS=function(id){document.querySelectorAll('[id^="r6p-bsc-"]').forEach(function(el){el.classList.remove('selected');});var c=document.getElementById('r6p-bsc-'+id);if(c)c.classList.add('selected');try{var sys=JSON.parse(localStorage.getItem('uatS1_systems')||'[]');var bs=sys.find(function(s){return s.id===id;});if(!bs)return;R6P.bs=bs;R6P.components=bs.components||[];var si=document.getElementById('r6p-sum-input');if(si)si.textContent=bs.name;var sc=document.getElementById('r6p-sum-comps');if(sc)sc.textContent=(bs.components||[]).length+' components';R6P_RESCAN_GROUP.forEach(function(gn){R6P.status[gn]='done';});r6pMarkStep1Selected();r6pLoadBiz();}catch(e){}};
+window.r6pSelectBS=function(id){document.querySelectorAll('[id^="r6p-bsc-"]').forEach(function(el){el.classList.remove('selected');});var c=document.getElementById('r6p-bsc-'+id);if(c)c.classList.add('selected');try{var sys=JSON.parse(localStorage.getItem('uatS1_systems')||'[]');var bs=sys.find(function(s){return s.id===id;});if(!bs)return;R6P.bs=bs;R6P.components=bs.components||[];var si=document.getElementById('r6p-sum-input');if(si)si.textContent=bs.name;var sc=document.getElementById('r6p-sum-comps');if(sc)sc.textContent=(bs.components||[]).length+' components';R6P_RESCAN_GROUP.forEach(function(gn){R6P.status[gn]='done';});r6pMarkStep1Selected();r6pLoadBiz();if(typeof r6pRenderContainerReadyForm==='function')r6pRenderContainerReadyForm();}catch(e){}};
 window.r6pDeleteBS=function(id,name){
   if(!confirm('Delete business system "'+name+'"? This removes it from Migration Logs everywhere, not just here.'))return;
   try{
