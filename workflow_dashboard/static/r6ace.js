@@ -342,6 +342,25 @@ window.r6pDecideTargetForm=function(c){
   if(mig.status==='COMPATIBILITY_CONTAINER_ONLY'){
     return {form:'REDEPLOYED_FLEX_VM',reason:'Legacy/Windows workload - not containerizable yet; recreate as a VM from its FLEX definition.'};
   }
+  /* Exact-name overrides checked before the broader substring regexes below, so a name
+     that CONTAINS a keyword (e.g. "Database Proxy" contains "database") does not get
+     misclassified by the keyword's generic rule - the proxy/app layer is stateless and
+     containerizable even though the word "database" appears in its name. */
+  if(/\bdatabase proxy\b/.test(name)){
+    return {form:'CONTAINERIZED',reason:'Stateless proxy layer in front of the database - containerize; the database itself stays external.'};
+  }
+  if(/\bauth\b.*\bsso\b|\bsso\b.*\bauth\b|^auth\b/.test(name)){
+    return {form:'PARTIALLY_CONTAINERIZED',reason:'Containerize the auth/SSO service; keep its user/session/identity store on an external database.'};
+  }
+  if(/core banking backend/.test(name)){
+    return {form:'PARTIALLY_CONTAINERIZED',reason:'Containerize after assessment - core business logic, externalize database/sessions/files/secrets first.'};
+  }
+  if(/backup/.test(name)){
+    return {form:'KUBERNETES_NATIVE',reason:'Platform capability - use the cluster backup service (e.g. Velero) with external backup storage rather than a custom container.'};
+  }
+  if(/reporting app/.test(name)){
+    return {form:'CONTAINERIZED',reason:'Containerize the reporting application; store generated reports externally, not in the image.'};
+  }
   if(/database|(^|[^a-z])db([^a-z]|$)|mysql|postgres|mongo|oracle|mssql|nosql/.test(name)){
     return {form:'RETAINED_FLEX_VM',reason:'Stateful database - keep the existing FLEX VM in service; do not bake into a container image.'};
   }
@@ -354,10 +373,10 @@ window.r6pDecideTargetForm=function(c){
   if(/gateway|load balancer|\bscheduler\b/.test(name)){
     return {form:'KUBERNETES_NATIVE',reason:'VM function has a native Kubernetes equivalent (Gateway API, CronJob, etc).'};
   }
-  if(/monitoring|tracing|metrics exporter|log processor/.test(name)){
+  if(/monitoring|tracing|metrics exporter|log processor|\blogging\b/.test(name)){
     return {form:'KUBERNETES_NATIVE',reason:'Platform capability - replace with the cluster-native equivalent (Prometheus/Grafana/OTel) rather than migrating the VM.'};
   }
-  if(/object storage|file storage|upload|document|backup service/.test(name)){
+  if(/object storage|file storage|upload|document/.test(name)){
     return {form:'DATA_MIGRATION_REQUIRED',reason:'Persistent files/objects must be migrated independently of the application process.'};
   }
   if(/secrets manager/.test(name)){

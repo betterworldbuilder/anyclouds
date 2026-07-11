@@ -9568,7 +9568,7 @@ ${certContent}
 (function() {
   /* ── data ── */
   var _arch = {
-    banking:   ['Web Frontend','API Gateway','API Server','Core Banking Backend','Database','Cache','Queue','Worker','Reporting','Auth / SSO','Monitoring'],
+    banking:   ['Web Frontend','API Gateway','API Server','Auth / SSO','Core Banking Backend','Worker','Database','Database Proxy','Cache','Queue','Scheduler','Payment Connector','Reporting App','Batch Worker','File Storage','Object Storage','Audit Service','Monitoring','Log Processor','Backup Service'],
     ecommerce: ['Web Frontend','API Gateway','API Server','Product Catalog Backend','Database','Cache','Queue','Payment Connector','Order Worker','Search Service','Monitoring'],
     crm:       ['Web Frontend','API Server','Backend App Server','Database','Cache','File Storage','Reporting','Integration API','Monitoring'],
     erp:       ['Web Frontend','API Server','ERP Backend','Database','Batch Worker','Queue','File Storage','Reporting','Monitoring'],
@@ -9933,50 +9933,58 @@ ${certContent}
     if(n.includes('Queue'))    return 'queue depth';
     return '/health';
   }
-  /* Container-readiness profile: real, deterministic heuristics from the component
-     name/category - same intent as R6's classify/transform engines, kept local here
-     since this modal is shared across Migration Log/Stage 2/R6 and must not depend
-     on r6ace.js being loaded on the page. */
-  function _sState(n) {
-    if(n.includes('Database')) return 'Stateful';
-    if(n.includes('Queue'))    return 'Stateful';
-    if(n.includes('Cache'))    return 'Unknown / mixed';
-    if(n.includes('Monitoring')||n.includes('Gateway')) return 'Unknown / mixed';
-    return 'Stateless';
+  /* Container-readiness profile: real, deterministic decision table from the component
+     name/category - same intent as R6's classify/transform engines (kept local here
+     since this modal is shared across Migration Log/Stage 2/R6 and must not depend on
+     r6ace.js being loaded on the page). Exact-name entries take precedence over the
+     substring fallback so overlapping names (e.g. "Database Proxy" vs "Database") never
+     collide with the wrong rule. */
+  var _COMP_DECISION_TABLE = {
+    'Web Frontend':          {state:'Stateless',       decision:'Containerize',                                   k8s:'Deployment + Service',                        path:'None - stateless',                                    risk:'Low'},
+    'API Gateway':           {state:'Unknown / mixed',  decision:'Replace with Gateway API',                       k8s:'Gateway API',                                 path:'None - stateless',                                    risk:'Low'},
+    'API Server':            {state:'Stateless',        decision:'Containerize',                                   k8s:'Deployment + Service',                        path:'None - stateless',                                    risk:'Low'},
+    'Auth / SSO':            {state:'Unknown / mixed',  decision:'Containerize with external database',            k8s:'Deployment + Service + external DB',          path:'None in image - session/identity data stays external', risk:'Medium - identity data is sensitive'},
+    'Core Banking Backend':  {state:'Unknown / mixed',  decision:'Containerize after assessment',                  k8s:'Deployment + Service (after assessment)',     path:'Verify no local writes during Live Scan',             risk:'Medium - core business logic, assess before cutover'},
+    'Backend Worker':        {state:'Stateless',        decision:'Containerize',                                   k8s:'Deployment (worker)',                         path:'None - stateless',                                    risk:'Low'},
+    'Worker':                {state:'Stateless',        decision:'Containerize',                                   k8s:'Deployment (worker)',                         path:'None - stateless',                                    risk:'Low'},
+    'Database':              {state:'Stateful',         decision:'Keep external initially',                        k8s:'None in-cluster - Service alias to external/VM DB', path:'/var/lib/ (database engine data directory)',     risk:'Medium - stateful, requires a planned data migration'},
+    'Database Proxy':        {state:'Stateless',        decision:'Containerize',                                   k8s:'Deployment + Service',                        path:'None - stateless, proxies to external DB',            risk:'Low'},
+    'Cache':                 {state:'Unknown / mixed',  decision:'Deploy with operator',                           k8s:'Custom Resource via operator',                path:'None required - disposable, rebuilds on restart',     risk:'Low - typically disposable'},
+    'Queue':                 {state:'Stateful',         decision:'Deploy with operator',                           k8s:'Custom Resource via operator',                path:'/var/lib/rabbitmq',                                    risk:'Medium - may hold in-flight business messages'},
+    'Scheduler':             {state:'Stateless',        decision:'Convert to CronJob',                             k8s:'CronJob',                                     path:'None - stateless',                                    risk:'Low'},
+    'Payment Connector':     {state:'Stateless',        decision:'Containerize',                                   k8s:'Deployment + Service',                        path:'None - stateless',                                    risk:'Low'},
+    'Reporting App':         {state:'Unknown / mixed',  decision:'Containerize',                                   k8s:'Deployment + Service',                        path:'Reports stored externally, not in image',              risk:'Low'},
+    'Reporting Worker':      {state:'Stateless',        decision:'Containerize',                                   k8s:'Deployment (worker)',                         path:'None - stateless',                                    risk:'Low'},
+    'Batch Worker':          {state:'Stateless',        decision:'Containerize',                                   k8s:'Kubernetes Job',                              path:'None - stateless',                                    risk:'Low'},
+    'File Storage':          {state:'Stateful',         decision:'Migrate separately',                             k8s:'PVC, NFS, CephFS or Manila (data only)',      path:'/srv/ - migrate to PVC/shared storage',                risk:'Medium - persistent files require a data-migration plan'},
+    'Object Storage':        {state:'Stateful',         decision:'Connect as external storage',                    k8s:'ExternalName Service to Swift/S3-compatible', path:'External object storage endpoint',                     risk:'Low - already external'},
+    'Audit Service':         {state:'Stateless',        decision:'Containerize',                                   k8s:'Deployment + Service',                        path:'Audit data written to external immutable storage',    risk:'Low'},
+    'Monitoring':            {state:'Unknown / mixed',  decision:'Use platform monitoring',                        k8s:'Platform monitoring stack (Prometheus/Grafana)', path:'None - platform-managed',                            risk:'Low'},
+    'Logging':                {state:'Unknown / mixed',  decision:'Use platform logging',                          k8s:'Platform logging stack (DaemonSet)',          path:'None - platform-managed',                             risk:'Low'},
+    'Log Processor':          {state:'Unknown / mixed',  decision:'Use platform logging',                          k8s:'Platform logging stack (DaemonSet)',          path:'None - platform-managed',                             risk:'Low'},
+    'Backup':                 {state:'Unknown / mixed',  decision:'Use platform backup service',                   k8s:'Platform backup service (Velero) + external storage', path:'None - platform-managed',                        risk:'Low'},
+    'Backup Service':         {state:'Unknown / mixed',  decision:'Use platform backup service',                   k8s:'Platform backup service (Velero) + external storage', path:'None - platform-managed',                        risk:'Low'}
+  };
+  function _compEntry(n) {
+    if (_COMP_DECISION_TABLE[n]) return _COMP_DECISION_TABLE[n];
+    if (n.includes('Database')) return _COMP_DECISION_TABLE['Database'];
+    if (n.includes('Cache'))    return {state:'Unknown / mixed',decision:'Deploy with operator',k8s:'Custom Resource via operator',path:'None required - disposable',risk:'Low'};
+    if (n.includes('Queue'))    return {state:'Stateful',decision:'Deploy with operator',k8s:'Custom Resource via operator',path:'/var/lib/queue-data',risk:'Medium'};
+    if (n.includes('Gateway'))  return {state:'Unknown / mixed',decision:'Replace with Gateway API',k8s:'Gateway API',path:'None - stateless',risk:'Low'};
+    if (n.includes('Monitoring')) return _COMP_DECISION_TABLE['Monitoring'];
+    return {state:'Stateless',decision:'Containerize',k8s:'Deployment + Service',path:'None expected - verify no local writes during Live Scan',risk:'Low'};
   }
+  function _sState(n)      { return _compEntry(n).state; }
+  function _sDecision(n)   { return _compEntry(n).decision; }
+  function _sK8sResource(n){ return _compEntry(n).k8s; }
+  function _sDataPath(n)   { return _compEntry(n).path; }
+  function _sRisk(n)       { return _compEntry(n).risk; }
   function _sRuntime(n) {
     if(n.includes('Database')) return 'Relational database (product TBD)';
     if(n.includes('Cache'))    return 'Redis-compatible cache';
     if(n.includes('Queue'))    return 'AMQP-compatible queue';
     if(n.includes('Gateway'))  return 'API Gateway / reverse proxy';
     return 'Unknown - run Live Scan to confirm';
-  }
-  function _sDecision(n) {
-    if(n.includes('Database')) return 'Keep external initially or migrate later with a database operator';
-    if(n.includes('Cache'))    return 'Deploy with operator; rebuild if data is disposable';
-    if(n.includes('Queue'))    return 'Deploy with operator or use a managed queue';
-    if(n.includes('Gateway'))  return 'Replace with Gateway API or containerize custom logic';
-    if(n.includes('Monitoring')) return 'Replace with platform monitoring (Prometheus/Grafana)';
-    return 'Containerize as Deployment + Service';
-  }
-  function _sK8sResource(n) {
-    if(n.includes('Database')) return 'None in-cluster - Service alias to external/VM database';
-    if(n.includes('Cache')||n.includes('Queue')) return 'Custom Resource via operator';
-    if(n.includes('Gateway')) return 'Gateway API';
-    if(n.includes('Monitoring')) return 'Platform monitoring stack (no app resource)';
-    return 'Deployment + Service';
-  }
-  function _sDataPath(n) {
-    if(n.includes('Database')) return '/var/lib/ (database engine data directory)';
-    if(n.includes('Cache'))    return 'None required - disposable, rebuilds on restart';
-    if(n.includes('Queue'))    return '/var/lib/rabbitmq';
-    return 'None expected - verify no local writes during Live Scan';
-  }
-  function _sRisk(n) {
-    if(n.includes('Database')) return 'Medium - stateful, requires a planned data migration';
-    if(n.includes('Queue'))    return 'Medium - may hold in-flight business messages';
-    if(n.includes('Cache'))    return 'Low - typically disposable';
-    return 'Low';
   }
   function _sReadiness(saved) {
     var t=(saved&&saved.tgt)||'', p=(saved&&saved.path)||'';
