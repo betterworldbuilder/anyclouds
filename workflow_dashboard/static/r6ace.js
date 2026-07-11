@@ -80,10 +80,11 @@ window.r6pRenderStages=function(){
           +r6pContent(gn)+'</div>';
       }).join('');
       return '<div id="r6p-stage-'+R6P_RESCAN_GROUP[0]+'" class="r6p-stage'+(grpOpen?' current':'')+'">'
-        +'<div class="r6p-stage-hd" onclick="r6pGoTo('+R6P_RESCAN_GROUP[0]+')">'
+        +'<div class="r6p-stage-hd" onclick="r6pToggleRescanGroup()" style="cursor:pointer;">'
         +'<div class="r6p-stage-num">&#8635;</div>'
         +'<div class="r6p-stage-info"><div class="r6p-stage-title">Refresh FLEX VM / DB List</div><div class="r6p-stage-desc">Snapshot discovery + live scan, steps 2-6. Not needed by default - the target IP/volume is already known from the selected Business System. Expand only to refresh a component’s data.</div></div>'
         +'<span class="r6p-stage-badge" style="background:#f1f5f9;color:#64748b;">SKIP by Default</span>'
+        +'<span id="r6p-rescan-chevron" style="margin-left:10px;font-size:14px;color:#94a3b8;transition:transform .15s;'+(grpOpen?'transform:rotate(90deg);':'')+'">&#9654;</span>'
         +'</div>'
         +'<div class="r6p-stage-body'+(grpOpen?' open':'')+'" id="r6p-body-'+R6P_RESCAN_GROUP[0]+'"><div class="r6p-stage-body-inner">'+grpBody+'</div></div>'
         +'</div>';
@@ -103,6 +104,20 @@ window.r6pRenderStages=function(){
   }).join('');
 };
 
+window.r6pToggleRescanGroup=function(){
+  var b=document.getElementById('r6p-body-'+R6P_RESCAN_GROUP[0]);
+  var card=document.getElementById('r6p-stage-'+R6P_RESCAN_GROUP[0]);
+  var chev=document.getElementById('r6p-rescan-chevron');
+  if(!b||!card)return;
+  var willOpen=!b.classList.contains('open');
+  if(willOpen){
+    b.classList.add('open');card.className='r6p-stage current';
+    if(chev)chev.style.transform='rotate(90deg)';
+  } else {
+    b.classList.remove('open');card.className='r6p-stage';
+    if(chev)chev.style.transform='';
+  }
+};
 window.r6pGoTo=function(n){
   R6P.current=n;
   R6P_STEPS.forEach(function(s){
@@ -145,7 +160,28 @@ window.r6pContent=function(n){
       +'<div id="r6p-scan-out" class="r6p-terminal" style="display:none;max-height:260px;"></div>'
       +r6pFoot(6);
   }
-  if(n===7){var rows7=[['app_code','Container image','Include'],['config_template','ConfigMap','Include'],['secret_candidate','SOPS Secret','Include'],['log_file','stdout/stderr','Exclude'],['database_data','ExternalDB','Exclude'],['excluded_file','Excluded','Exclude']];return '<div class="r6p-info-box">Identify real application content. Classify files into app content, config, secrets, logs, data, and excluded system files.</div><div style="overflow-x:auto;margin-bottom:14px;"><table class="r6p-table"><thead><tr><th>Classification</th><th>K8s Target</th><th>Include/Exclude</th></tr></thead><tbody>'+rows7.map(function(r){return '<tr><td style="font-weight:600;">'+r[0]+'</td><td style="color:#7c3aed;font-size:11px;">'+r[1]+'</td><td><span style="background:'+(r[2]==='Include'?'#dcfce7':'#fee2e2')+';color:'+(r[2]==='Include'?'#16a34a':'#dc2626')+';padding:2px 8px;border-radius:999px;font-size:10px;font-weight:700;">'+r[2]+'</span></td></tr>';}).join('')+'</tbody></table></div>'+r6pFoot(7);}
+  if(n===7){var rows7=[
+      ['app_code','Container image','Include','Your actual application code (binaries, scripts, compiled assets). This is what gets COPYed into the Dockerfile.'],
+      ['config_template','ConfigMap','Include','Non-secret config files (*.conf, *.yaml, *.ini, env templates). Becomes a Kubernetes ConfigMap, mounted into the pod.'],
+      ['secret_candidate','SOPS Secret','Include','Files that look like they hold credentials (passwords, API keys, certs). SOPS-encrypted and turned into a Kubernetes Secret - never baked into the image.'],
+      ['log_file','stdout/stderr','Exclude','Application log files. Containers should log to stdout/stderr instead - these are left behind, not copied.'],
+      ['database_data','ExternalDB','Exclude','Actual database files/data directories. Databases stay external (RDS/managed DB) - never baked into a container image.'],
+      ['excluded_file','Excluded','Exclude','OS/system files, caches, temp files - not part of the application, always left out.']
+    ];
+    var comps7=(R6P.components||[]).filter(function(c){return c.tgt;});
+    var opts7=comps7.length?comps7.map(function(c,i){return '<option value="'+i+'">'+c.name+' ('+c.tgt+')</option>';}).join(''):'<option value="">No components with a FLEX target IP - select a Business System in Step 1</option>';
+    return '<div class="r6p-info-box">Identify real application content. Classify files into app content, config, secrets, logs, data, and excluded system files.</div>'
+      +'<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px;">'
+      +'<div><label style="font-size:11px;font-weight:700;color:#334155;display:block;margin-bottom:4px;">Component</label><select id="r6p-classify-comp" style="padding:7px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;min-width:260px;">'+opts7+'</select></div>'
+      +'<div><label style="font-size:11px;font-weight:700;color:#334155;display:block;margin-bottom:4px;">SSH User</label><input id="r6p-classify-user" value="root" style="padding:7px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;width:100px;"></div>'
+      +'<div><label style="font-size:11px;font-weight:700;color:#334155;display:block;margin-bottom:4px;">SSH Key Path</label><input id="r6p-classify-key" value="~/.ssh/id_rsa" style="padding:7px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;width:160px;"></div>'
+      +'<button class="r6p-btn primary" onclick="r6pRunClassify()" style="padding:8px 16px;font-size:12px;">&#9654; Check</button>'
+      +'</div>'
+      +'<div style="overflow-x:auto;margin-bottom:14px;"><table class="r6p-table"><thead><tr><th>Classification</th><th>K8s Target</th><th>What This Means</th><th>Include/Exclude</th><th>Files Found</th></tr></thead><tbody>'
+      +rows7.map(function(r){return '<tr><td style="font-weight:600;">'+r[0]+'</td><td style="color:#7c3aed;font-size:11px;">'+r[1]+'</td><td style="color:#64748b;font-size:11px;max-width:280px;">'+r[3]+'</td><td><span style="background:'+(r[2]==='Include'?'#dcfce7':'#fee2e2')+';color:'+(r[2]==='Include'?'#16a34a':'#dc2626')+';padding:2px 8px;border-radius:999px;font-size:10px;font-weight:700;">'+r[2]+'</span></td><td id="r6p-classify-count-'+r[0]+'" style="font-size:11px;color:#94a3b8;">Not checked</td></tr>';}).join('')
+      +'</tbody></table></div>'
+      +'<div id="r6p-classify-out" class="r6p-terminal" style="display:none;max-height:220px;"></div>'
+      +r6pFoot(7);}
   if(n===8){var comps8=R6P.components.length?R6P.components:[{name:'app',type:'frontend'},{name:'db',type:'database'}];return '<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:14px;">'+[['CLOUD_NATIVE_READY','#dcfce7','#16a34a'],['READY_WITH_EXTERNALIZATION','#fef3c7','#d97706'],['KEEP_ON_FLEX_VM_FOR_NOW','#dbeafe','#1d4ed8'],['COMPATIBILITY_CONTAINER_ONLY','#faf5ff','#7c3aed'],['BLOCKED','#fee2e2','#dc2626']].map(function(b){return '<div style="background:'+b[1]+';border-radius:8px;padding:10px;text-align:center;"><div style="font-size:16px;font-weight:900;color:'+b[2]+';">0</div><div style="font-size:9px;color:'+b[2]+';font-weight:700;margin-top:2px;">'+b[0].replace(/_/g,' ')+'</div></div>';}).join('')+'</div><div style="overflow-x:auto;"><table class="r6p-table"><thead><tr><th>Component</th><th>Capture Method</th><th>Readiness</th><th>Reason</th><th>Action</th><th>Can Proceed</th></tr></thead><tbody>'+comps8.map(function(c){var role=(c.type||c.role||'backend').toLowerCase();var isDb=role==='database'||role==='db';var r=isDb?'KEEP_ON_FLEX_VM_FOR_NOW':'CLOUD_NATIVE_READY';var rc=isDb?['#dbeafe','#1d4ed8']:['#dcfce7','#16a34a'];return '<tr><td style="font-weight:600;">'+c.name+'</td><td style="font-size:11px;">'+(R6P.captureMethod==='smart'?'Smart Snapshot':'Full Snapshot')+'</td><td><span style="background:'+rc[0]+';color:'+rc[1]+';padding:2px 8px;border-radius:999px;font-size:10px;font-weight:700;">'+r.replace(/_/g,' ')+'</span></td><td style="font-size:11px;color:#64748b;">'+(isDb?'Stateful DB':'Stateless app')+'</td><td style="font-size:11px;color:#64748b;">'+(isDb?'Use ExternalDB':'None required')+'</td><td><span style="background:#dcfce7;color:#16a34a;padding:2px 8px;border-radius:999px;font-size:10px;font-weight:700;">Yes</span></td></tr>';}).join('')+'</tbody></table></div>'+r6pFoot(8,'<button class="r6p-btn success" onclick="r6pMarkDone(8)">Approve Readiness Plan</button>');}
   if(n===9)return '<pre style="background:#0f172a;color:#2dd4bf;border-radius:8px;padding:14px;font-size:11px;max-height:200px;overflow:auto;white-space:pre-wrap;margin-bottom:14px;">'+(R6P.captureMethod==='compat'?'FROM ubuntu:22.04\nCOPY rootfs/ /\nCOPY start-compat.sh /start-compat.sh\nRUN chmod +x /start-compat.sh\nEXPOSE 80\nCMD ["/start-compat.sh"]':'FROM node:20-alpine\nWORKDIR /app\nCOPY package*.json ./\nRUN npm ci --production\nCOPY . .\nEXPOSE 8080\nHEALTHCHECK --interval=30s CMD wget -qO- http://localhost:8080/health\nCMD ["npm","start"]')+'</pre>'+r6pFoot(9,'<button class="r6p-btn primary" onclick="r6pMarkDone(9)">Generate Dockerfiles</button>');
   if(n===10)return '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;"><button class="r6p-btn primary" onclick="r6pGenYAML()">Generate All YAML</button><button class="r6p-btn secondary" onclick="r6pGenHelm()">Helm Chart</button><button class="r6p-btn secondary" onclick="r6pGenKustomize()">Kustomize</button><button class="r6p-btn secondary" onclick="r6pGenFlux()">Flux</button></div><pre id="r6p-yaml-preview" style="background:#0f172a;color:#2dd4bf;border-radius:8px;padding:14px;font-size:11px;max-height:280px;overflow:auto;white-space:pre-wrap;min-height:60px;margin-bottom:14px;">-- Click Generate All YAML --</pre>'+r6pFoot(10);
@@ -1008,6 +1044,51 @@ window.r6pRunLiveScan=function(){
   es.onmessage=function(e){
     if(e.data==='[DONE]'||e.data.indexOf('[EXIT')===0){es.close();return;}
     if(out){out.textContent+=e.data+'\n';out.scrollTop=out.scrollHeight;}
+  };
+  es.onerror=function(){es.close();if(out)out.textContent+='[stream error]\n';};
+};
+
+window.r6pRunClassify=function(){
+  var sel=document.getElementById('r6p-classify-comp');
+  var idx=sel?sel.value:'';
+  var comps7=(R6P.components||[]).filter(function(c){return c.tgt;});
+  var comp=comps7[idx];
+  var out=document.getElementById('r6p-classify-out');
+  if(!comp){if(out){out.style.display='block';out.textContent='Select a component with a FLEX target IP first (choose a Business System in Step 1).';}return;}
+  var user=(document.getElementById('r6p-classify-user')||{}).value||'root';
+  var key=(document.getElementById('r6p-classify-key')||{}).value||'~/.ssh/id_rsa';
+  var ip=comp.tgt;
+  ['app_code','config_template','secret_candidate','log_file','database_data','excluded_file'].forEach(function(k){
+    var el=document.getElementById('r6p-classify-count-'+k);if(el){el.textContent='Checking...';el.style.color='#0369a1';}
+  });
+  var tmpf='/tmp/r6_classify_'+Date.now()+'.txt';
+  var cmd='ssh -i '+key+' -o StrictHostKeyChecking=no -o ConnectTimeout=8 '+user+'@'+ip+' "find /opt /srv /var/www /home -maxdepth 6 -type f 2>/dev/null" > '+tmpf+' 2>&1\n'
+    +'app=0; cfg=0; sec=0; log=0; db=0; exc=0\n'
+    +'while IFS= read -r f; do\n'
+    +'  case "$f" in\n'
+    +'    *.log|*/log/*) log=$((log+1));;\n'
+    +'    *.pem|*.key|*id_rsa*|*.crt|*secret*|*.env) sec=$((sec+1));;\n'
+    +'    *.conf|*.yaml|*.yml|*.ini|*.cfg|*.properties) cfg=$((cfg+1));;\n'
+    +'    */var/lib/mysql/*|*/var/lib/postgresql/*|*.sql|*.sqlite|*.db) db=$((db+1));;\n'
+    +'    *.tmp|*.cache|*~|*.bak) exc=$((exc+1));;\n'
+    +'    *) app=$((app+1));;\n'
+    +'  esac\n'
+    +'done < '+tmpf+'\n'
+    +'echo "CLASSIFY:app_code:$app"\n'
+    +'echo "CLASSIFY:config_template:$cfg"\n'
+    +'echo "CLASSIFY:secret_candidate:$sec"\n'
+    +'echo "CLASSIFY:log_file:$log"\n'
+    +'echo "CLASSIFY:database_data:$db"\n'
+    +'echo "CLASSIFY:excluded_file:$exc"\n'
+    +'rm -f '+tmpf;
+  if(out){out.style.display='block';out.textContent='$ Checking '+comp.name+' ('+ip+')...\n';}
+  var url='/api/stream/run-cmd?cmd='+encodeURIComponent(cmd);
+  var es=new EventSource(url);
+  es.onmessage=function(e){
+    if(e.data==='[DONE]'||e.data.indexOf('[EXIT')===0){es.close();return;}
+    if(out){out.textContent+=e.data+'\n';out.scrollTop=out.scrollHeight;}
+    var m=e.data.match(/^CLASSIFY:([a-z_]+):(\d+)$/);
+    if(m){var el=document.getElementById('r6p-classify-count-'+m[1]);if(el){el.textContent=m[2]+' file'+(m[2]==='1'?'':'s');el.style.color=m[2]==='0'?'#94a3b8':'#0f172a';el.style.fontWeight='700';}}
   };
   es.onerror=function(){es.close();if(out)out.textContent+='[stream error]\n';};
 };
