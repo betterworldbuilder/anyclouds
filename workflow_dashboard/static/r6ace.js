@@ -409,7 +409,7 @@ window.r6pStage0=function(){
     +'<div onclick="r6pToggleCred(\'cloud\')" style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:#f8fafc;cursor:pointer;">'
     +'<div><div style="font-weight:700;font-size:13px;">1. FLEX / OpenStack Cloud Credentials</div>'
     +'<div style="font-size:11px;color:#64748b;">Application Credential recommended for automation</div></div>'
-    +statusBadge(csStatus)+'</div>'
+    +'<span id="r6p-cloud-badge">'+statusBadge(csStatus)+'</span></div>'
     +'<div id="r6p-cred-cloud" style="display:block;padding:16px;">'
     +'<div style="font-size:13px;font-weight:800;color:#0f172a;margin-bottom:12px;">V3 FLEX Cloud Credentials <span style="font-size:11px;font-weight:400;color:#64748b;">(FLEX v3 auth)</span></div>'
     +'<div style="margin-bottom:10px;"><label style="font-size:12px;font-weight:600;color:#334155;display:block;margin-bottom:4px;">Auth URL</label><input id="r6p-c-authurl" placeholder="https://keystone.api.iad3.rackspacecloud.com/v3/" style="width:100%;padding:8px 10px;border:1px solid #e2e8f0;border-radius:5px;font-size:13px;box-sizing:border-box;" oninput="r6pSaveCredCache()" onchange="r6pSaveCred(\'cloud\',\'authUrl\',this.value)"></div>'
@@ -420,7 +420,7 @@ window.r6pStage0=function(){
     +'</select></div>'
     /* Username/Password fields */
     +'<div id="r6p-c-pw-fields">'
-    +'<div style="margin-bottom:10px;"><label style="font-size:12px;font-weight:600;color:#334155;display:block;margin-bottom:4px;">Username</label><input id="r6p-c-username" style="width:100%;padding:8px 10px;border:1px solid #e2e8f0;border-radius:5px;font-size:13px;box-sizing:border-box;"></div>'
+    +'<div style="margin-bottom:10px;"><label style="font-size:12px;font-weight:600;color:#334155;display:block;margin-bottom:4px;">Username</label><input id="r6p-c-username" style="width:100%;padding:8px 10px;border:1px solid #e2e8f0;border-radius:5px;font-size:13px;box-sizing:border-box;" oninput="r6pSaveCredCache()" onchange="r6pSaveCred(\'cloud\',\'username\',this.value)"></div>'
     +'<div style="margin-bottom:10px;"><label style="font-size:12px;font-weight:600;color:#334155;display:block;margin-bottom:4px;">Password</label><input id="r6p-c-password" type="password" style="width:100%;padding:8px 10px;border:1px solid #e2e8f0;border-radius:5px;font-size:13px;box-sizing:border-box;"></div>'
     +'</div>'
     /* App Credential fields */
@@ -464,19 +464,19 @@ window.r6pStage0=function(){
     +'<span id="r6p-git-badge" style="font-size:10px;font-weight:800;color:#94a3b8;">Not Configured</span></div>'
     +'<div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:10px;">'
     +'<div><label style="font-size:11px;font-weight:700;color:#334155;display:block;">GitOps Repository URL</label>'
-    +'<input id="r6p-git-repo" style="width:100%;padding:6px;border:1px solid #cbd5e1;border-radius:5px;font-size:12px;" placeholder="https://github.com/USER/repo.git"></div>'
+    +'<input id="r6p-git-repo" style="width:100%;padding:6px;border:1px solid #cbd5e1;border-radius:5px;font-size:12px;" placeholder="https://github.com/USER/repo.git" oninput="r6pGitSave()"></div>'
     +'<div><label style="font-size:11px;font-weight:700;color:#334155;display:block;">Branch</label>'
-    +'<input id="r6p-git-branch" value="main" style="width:100%;padding:6px;border:1px solid #cbd5e1;border-radius:5px;font-size:12px;"></div>'
+    +'<input id="r6p-git-branch" value="main" style="width:100%;padding:6px;border:1px solid #cbd5e1;border-radius:5px;font-size:12px;" oninput="r6pGitSave()"></div>'
     +'<div><label style="font-size:11px;font-weight:700;color:#334155;display:block;">Auth Method</label>'
-    +'<select id="r6p-git-auth" onchange="r6pGitAuthToggle()" style="width:100%;padding:6px;border:1px solid #cbd5e1;border-radius:5px;font-size:12px;">'
+    +'<select id="r6p-git-auth" onchange="r6pGitAuthToggle();r6pGitSave();" style="width:100%;padding:6px;border:1px solid #cbd5e1;border-radius:5px;font-size:12px;">'
     +'<option value="ssh" selected>SSH key</option><option value="token">HTTPS token</option></select></div>'
     +'</div>'
     +'<div id="r6p-git-ssh-row" style="margin-top:8px;"><label style="font-size:11px;font-weight:700;color:#334155;display:block;">SSH Key Path</label>'
-    +'<input id="r6p-git-sshkey" value="~/.ssh/id_rsa" style="width:100%;padding:6px;border:1px solid #cbd5e1;border-radius:5px;font-size:12px;"></div>'
+    +'<input id="r6p-git-sshkey" value="~/.ssh/id_rsa" style="width:100%;padding:6px;border:1px solid #cbd5e1;border-radius:5px;font-size:12px;" oninput="r6pGitSave()"></div>'
     +'<div style="margin-top:8px;"><label style="font-size:11px;font-weight:700;color:#334155;display:block;">Local GitOps Directory <span style="font-weight:400;color:#94a3b8;">(used by GitOps Preflight below)</span></label>'
-    +'<input id="r6p-git-localdir" placeholder="/home/dzoan/.config/opencenter/clusters/gitops/my-org" style="width:100%;padding:6px;border:1px solid #cbd5e1;border-radius:5px;font-size:12px;"></div>'
+    +'<input id="r6p-git-localdir" placeholder="/home/dzoan/.config/opencenter/clusters/gitops/my-org" style="width:100%;padding:6px;border:1px solid #cbd5e1;border-radius:5px;font-size:12px;" oninput="r6pGitSave()"></div>'
     +'<div id="r6p-git-token-row" style="margin-top:8px;display:none;"><label style="font-size:11px;font-weight:700;color:#334155;display:block;">Git Token (stored session-only)</label>'
-    +'<input id="r6p-git-token" type="password" style="width:100%;padding:6px;border:1px solid #cbd5e1;border-radius:5px;font-size:12px;" placeholder="ghp_..."></div>'
+    +'<input id="r6p-git-token" type="password" style="width:100%;padding:6px;border:1px solid #cbd5e1;border-radius:5px;font-size:12px;" placeholder="ghp_..." oninput="r6pGitSave()"></div>'
     +'<div style="display:flex;gap:8px;margin-top:10px;align-items:center;">'
     +'<button onclick="r6pGitSave()" style="background:#0f172a;color:#fff;border:none;border-radius:5px;padding:7px 16px;font-size:12px;font-weight:700;cursor:pointer;">Save GitOps Credentials</button>'
     +'<span id="r6p-git-status" style="font-size:12px;color:#64748b;"></span></div>'
@@ -654,7 +654,17 @@ window.r6pDoInstall=function(){
 var R6P_CACHE_KEY='r6p_cred_cache';
 var R6P_SECRET_FIELDS=['secret','password']; /* never cached */
 
+window.r6pRefreshCloudBadge=function(){
+  var b=document.getElementById('r6p-cloud-badge'); if(!b) return;
+  var st=R6P.creds.cloud.status;
+  var hasCreds=!!((document.getElementById('r6p-c-username')||{}).value||(document.getElementById('r6p-c-credid')||{}).value);
+  b.innerHTML = (st==='connected') ? '<span style="background:#dcfce7;color:#16a34a;padding:2px 10px;border-radius:999px;font-size:10px;font-weight:700;">Connected</span>'
+    : (st==='failed') ? '<span style="background:#fee2e2;color:#dc2626;padding:2px 10px;border-radius:999px;font-size:10px;font-weight:700;">Failed</span>'
+    : hasCreds ? '<span style="background:#fef3c7;color:#d97706;padding:2px 10px;border-radius:999px;font-size:10px;font-weight:700;">Configured</span>'
+    : '<span style="background:#f1f5f9;color:#94a3b8;padding:2px 10px;border-radius:999px;font-size:10px;font-weight:700;">Not Configured</span>';
+};
 window.r6pSaveCredCache=function(){
+  setTimeout(r6pRefreshCloudBadge,0);
   var cache={
     authUrl:   (document.getElementById('r6p-c-authurl')||{}).value||'',
     authType:  (document.getElementById('r6p-c-authtype')||{}).value||'appcred',
@@ -665,6 +675,7 @@ window.r6pSaveCredCache=function(){
     region:    (document.getElementById('r6p-c-region')||{}).value||''
   };
   try{localStorage.setItem(R6P_CACHE_KEY,JSON.stringify(cache));}catch(e){}
+  r6pRefreshCloudBadge();
 };
 
 window.r6pLoadCredCache=function(){
@@ -693,6 +704,7 @@ window.r6pLoadCredCache=function(){
   R6P.creds.cloud.credId=c.credId||'';
   R6P.creds.cloud.projectId=c.proj||'';
   R6P.creds.cloud.region=c.region||'';
+  setTimeout(r6pRefreshCloudBadge,0);
 };
 
 /* Credential helpers */
@@ -755,7 +767,7 @@ window.r6pTestCloud=function(){
   .then(function(r){return r.json();})
   .then(function(d){
     var ok=d.status===201||d.status===200||(d.ok&&d.body&&d.body.indexOf('token')>=0);
-    R6P.creds.cloud.status=ok?'connected':'failed';
+    R6P.creds.cloud.status=ok?'connected':'failed';r6pRefreshCloudBadge();
     if(res){
       res.style.color=ok?'#16a34a':'#dc2626';
       if(ok){
@@ -1117,6 +1129,6 @@ window.r6pGitSave = function(){
     stEl.textContent = '\u2713 saved - shared with OpenCenter quickstart (Stage 2)'; stEl.style.color = '#15803d';
   }
   var b = document.getElementById('r6p-git-badge');
-  if (b){ b.textContent = 'Configured'; b.style.color = '#15803d'; }
+  if (b){ b.textContent = st.gitRepo ? 'Configured' : 'Not Configured'; b.style.color = st.gitRepo ? '#15803d' : '#94a3b8'; }
 };
 setTimeout(function(){ if (document.getElementById('r6p-git-repo')) r6pGitLoad(); }, 400);
