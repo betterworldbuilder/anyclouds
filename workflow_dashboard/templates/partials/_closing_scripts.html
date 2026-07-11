@@ -13474,8 +13474,13 @@ ${certContent}
     var badge = document.getElementById('s2fullmig-status');
     if (badge) { badge.textContent = 'Business Systems Refreshed'; badge.className = 'gov-status-badge status-done'; }
   }
-  function fsmMountBusinessSystemEngine() {
-    var host = document.getElementById('fsm-uat-engine-host');
+  function fsmMountBusinessSystemEngine() { fsmMountBusinessSystemEngineTo('fsm-uat-engine-host'); }
+  /* Generalized mount: #uatS1SystemsView is a single shared live element (the real
+     Add Business System UI) that gets re-parented into whichever host container last
+     requested it - safe to call from multiple panels (Stage 2 Full Migration,
+     OpenCenter deploy) since only one panel is visible/active at a time. */
+  function fsmMountBusinessSystemEngineTo(hostId) {
+    var host = document.getElementById(hostId);
     var engine = document.getElementById('uatS1SystemsView');
     if (!host || !engine) return;
     if (!window._fsmUatEnginePlaceholder) {
@@ -13488,6 +13493,12 @@ ${certContent}
     fsmSetStandaloneVisible(false);
     fsmEnhanceMountedBusinessCards();
   }
+  window.ocqsMountBusinessSystems = function(){ fsmMountBusinessSystemEngineTo('ocqs-fsm-uat-engine-host'); };
+  window.ocqpMountBusinessSystems = function(){ fsmMountBusinessSystemEngineTo('ocqp-fsm-uat-engine-host'); };
+  setTimeout(function(){
+    if (document.getElementById('ocqs-fsm-uat-engine-host')) window.ocqsMountBusinessSystems();
+    else if (document.getElementById('ocqp-fsm-uat-engine-host')) window.ocqpMountBusinessSystems();
+  }, 500);
   function fsmRestoreBusinessSystemEngine() {
     var engine = document.getElementById('uatS1SystemsView');
     var ph = window._fsmUatEnginePlaceholder;
@@ -13614,6 +13625,11 @@ ${certContent}
     } catch(e) { fsmLoadDemo(); }
     fsmInitEngines();
   }
+  /* Bug fix: fsmSeedIfEmpty existed but was never called anywhere, so the Business
+     System Scope Engine section stayed blank until the user manually clicked
+     "Load Banking Demo". Auto-run once on page load - real data (if present) is
+     rendered as-is via fsmRefresh(); demo only seeds when uatS1_systems is empty. */
+  setTimeout(function(){ if (typeof fsmSeedIfEmpty === 'function') fsmSeedIfEmpty(); }, 300);
 
   function fsmMarkAllMigrated() {
     if (!_fsmSelId) return;
