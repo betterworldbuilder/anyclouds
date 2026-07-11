@@ -186,8 +186,7 @@
 
       <!-- OSPC Scanned Infra Detail TCO -->
       <div style="background:#fff;border:1.5px solid #e2e8f0;border-radius:14px;padding:22px;">
-        <div style="font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#3b82f6;margin-bottom:4px;">OSPC Scanned Infra Detail TCO</div>
-        <div style="font-size:18px;font-weight:900;color:#1e293b;margin-bottom:16px;">Current OSPC infrastructure monthly baseline</div>
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;flex-wrap:wrap;"><div><div style="font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#3b82f6;margin-bottom:4px;">OSPC Scanned Infra Detail TCO</div><div style="font-size:18px;font-weight:900;color:#1e293b;margin-bottom:16px;">Current OSPC infrastructure monthly baseline</div></div><button onclick="tcoExportTableCsv('tco-infra-tbody','ospc_infra_baseline')" style="background:#7c2d12;color:#fff;border:none;border-radius:6px;padding:7px 16px;font-size:12px;font-weight:800;cursor:pointer;white-space:nowrap;">&#11015; Export CSV</button></div>
         <div style="font-size:11px;color:#64748b;margin-bottom:16px;">Calculated from scanned servers, DB-like instances, volumes, and load balancers.</div>
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:20px;">
           <div style="background:#fef2f2;border:1.5px solid #fecaca;border-radius:10px;padding:14px;">
@@ -228,7 +227,7 @@
               <tr><td colspan="5" style="padding:16px;text-align:center;color:#94a3b8;font-size:12px;font-style:italic;">Load from UAT to see scanned infra breakdown.</td></tr>
             </tbody>
           </table>
-        </div><div style="display:flex;justify-content:flex-end;margin-top:10px;"><button onclick="tcoExportCsv('tco-infra-tbody','ospc_infra_baseline')" style="background:#7c2d12;color:#fff;border:none;border-radius:6px;padding:6px 14px;font-size:11px;font-weight:800;cursor:pointer;">&#11015; Export CSV</button></div>
+        </div>
       </div>
 
       <!-- Detailed per-component OSPC TCO table -->
@@ -389,7 +388,7 @@
       <div style="background:#fff;border:1.5px solid #e2e8f0;border-radius:14px;padding:22px;">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
           <div style="font-size:15px;font-weight:900;color:#1e293b;">TCO Comparison &amp; Projected Savings</div>
-          <div id="tco-savings-badge" style="background:#dcfce7;color:#16a34a;border:1px solid #bbf7d0;border-radius:999px;padding:4px 14px;font-size:12px;font-weight:800;">— Cost Reduction</div>
+          <div style="display:flex;align-items:center;gap:10px;"><button onclick="tcoExportTableCsv('tco-comparison-tbody','tco_comparison_savings')" style="background:#7c2d12;color:#fff;border:none;border-radius:6px;padding:6px 14px;font-size:11px;font-weight:800;cursor:pointer;white-space:nowrap;">&#11015; Export CSV</button><div id="tco-savings-badge" style="background:#dcfce7;color:#16a34a;border:1px solid #bbf7d0;border-radius:999px;padding:4px 14px;font-size:12px;font-weight:800;">— Cost Reduction</div></div>
         </div>
         <div style="overflow-x:auto;">
           <table style="width:100%;border-collapse:collapse;min-width:560px;">
@@ -403,13 +402,12 @@
               <tr><td colspan="4" style="padding:16px;text-align:center;color:#94a3b8;font-size:12px;font-style:italic;">Load from UAT to see comparison.</td></tr>
             </tbody>
           </table>
-        </div><div style="display:flex;justify-content:flex-end;margin-top:10px;"><button onclick="tcoExportCsv('tco-comparison-tbody','tco_comparison_savings')" style="background:#7c2d12;color:#fff;border:none;border-radius:6px;padding:6px 14px;font-size:11px;font-weight:800;cursor:pointer;">&#11015; Export CSV</button></div>
+        </div>
       </div>
 
       <!-- Component-Level OSPC → FLEX TCO -->
       <div style="background:#fff;border:1.5px solid #e2e8f0;border-radius:14px;padding:22px;">
-        <div style="font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#3b82f6;margin-bottom:4px;">Component-Level OSPC → FLEX TCO</div>
-        <div style="font-size:16px;font-weight:900;color:#1e293b;margin-bottom:16px;">Detailed OSPC versus FLEX comparison for each scanned component</div>
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;flex-wrap:wrap;"><div><div style="font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#3b82f6;margin-bottom:4px;">Component-Level OSPC → FLEX TCO</div><div style="font-size:16px;font-weight:900;color:#1e293b;margin-bottom:16px;">Detailed OSPC versus FLEX comparison for each scanned component</div></div><button onclick="tcoExportTableCsv('tco-comp-tbody','ospc_vs_flex_component_detail')" style="background:#7c2d12;color:#fff;border:none;border-radius:6px;padding:7px 16px;font-size:12px;font-weight:800;cursor:pointer;white-space:nowrap;">&#11015; Export CSV</button></div>
         <div style="overflow-x:auto;">
           <table style="width:100%;border-collapse:collapse;min-width:760px;">
             <thead><tr style="background:#f8fafc;">
@@ -426,12 +424,12 @@
               <tr><td colspan="8" style="padding:16px;text-align:center;color:#94a3b8;font-size:12px;font-style:italic;">Load from UAT to see per-component cost comparison.</td></tr>
             </tbody>
           </table>
-        </div><div style="display:flex;justify-content:flex-end;margin-top:10px;"><button onclick="tcoExportCsv('tco-comp-tbody','ospc_vs_flex_component_detail')" style="background:#7c2d12;color:#fff;border:none;border-radius:6px;padding:6px 14px;font-size:11px;font-weight:800;cursor:pointer;">&#11015; Export CSV</button></div>
+        </div>
       </div>
 
       
       <script>
-      window.tcoExportCsv = function(tbodyId, filename){
+      window.tcoExportTableCsv = function(tbodyId, filename){
         var tbody = document.getElementById(tbodyId);
         if (!tbody) return;
         var table = tbody.closest('table');
