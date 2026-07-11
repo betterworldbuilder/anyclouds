@@ -40,9 +40,11 @@ window.r6pLoadCredsServer=function(){
     if(c.authType){var dt=document.getElementById('r6p-c-authtype');if(dt){dt.value=c.authType;r6pAuthTypeChange(c.authType);}}
     if(c.region){var rs=document.getElementById('r6p-c-region');if(rs)rs.value=c.region;}
     set('r6p-git-repo',g.repo);set('r6p-git-branch',g.branch);set('r6p-git-sshkey',g.sshkey);
-    set('r6p-git-localdir',g.localdir);set('r6p-git-token',g.token);
+    set('r6p-git-token',g.token);
     if(g.auth){var ga=document.getElementById('r6p-git-auth');if(ga){ga.value=g.auth;if(typeof r6pGitAuthToggle==='function')r6pGitAuthToggle();}}
-    if(g.localdir)R6P.creds.opencenter.gitDir=g.localdir;
+    if(g.localdir&&typeof r6pLooksLikeGitDir==='function'&&r6pLooksLikeGitDir(g.localdir)){
+      set('r6p-git-localdir',g.localdir);R6P.creds.opencenter.gitDir=g.localdir;
+    } else if(typeof r6pAutoDetectGitDir==='function'){ r6pAutoDetectGitDir(); }
     if(typeof r6pRefreshCloudBadge==='function')setTimeout(r6pRefreshCloudBadge,0);
     var b=document.getElementById('r6p-git-badge');
     if(b&&g.repo){b.textContent='Configured';b.style.color='#15803d';}
@@ -1144,15 +1146,26 @@ window.r6pGitAuthToggle = function(){
   if (sr) sr.style.display = (a === 'ssh') ? '' : 'none';
   if (tr) tr.style.display = (a === 'token') ? '' : 'none';
 };
+window.r6pLooksLikeGitDir = function(s){
+  if (!s || s.indexOf('/') !== 0) return false;
+  /* reject bare UUIDs / non-path values that have leaked into this field before */
+  if (/^\/?[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s)) return false;
+  return true;
+};
 window.r6pGitLoad = function(){
   try {
     var st = JSON.parse(localStorage.getItem('ocqs_state') || '{}');
     var set = function(id, v){ var el = document.getElementById(id); if (el && v) el.value = v; };
     set('r6p-git-repo', st.gitRepo); set('r6p-git-branch', st.gitBranch);
     set('r6p-git-sshkey', st.sshKey); set('r6p-git-token', st.tokVal);
-    set('r6p-git-localdir', st.gitopsFolder);
-    if (st.gitopsFolder) { R6P.creds.opencenter.gitDir = st.gitopsFolder; }
-    else if (typeof r6pAutoDetectGitDir === 'function') { r6pAutoDetectGitDir(); }
+    if (st.gitopsFolder && r6pLooksLikeGitDir(st.gitopsFolder)) {
+      set('r6p-git-localdir', st.gitopsFolder);
+      R6P.creds.opencenter.gitDir = st.gitopsFolder;
+    } else {
+      if (st.gitopsFolder) { try { st.gitopsFolder = ''; localStorage.setItem('ocqs_state', JSON.stringify(st)); } catch(e){} }
+      var badEl = document.getElementById('r6p-git-localdir'); if (badEl) badEl.value = '';
+      if (typeof r6pAutoDetectGitDir === 'function') { r6pAutoDetectGitDir(); }
+    }
     var sel = document.getElementById('r6p-git-auth');
     if (sel && st.gitAuth) sel.value = st.gitAuth;
     r6pGitAuthToggle();
@@ -1168,9 +1181,10 @@ window.r6pAutoDetectGitDir = function(){
     if (e.data === '[DONE]' || e.data.indexOf('[EXIT') === 0){
       es.close();
       var dir = out.trim();
-      if (dir && dir.indexOf('/') === 0){
+      if (dir && typeof r6pLooksLikeGitDir === 'function' && r6pLooksLikeGitDir(dir)){
         var el = document.getElementById('r6p-git-localdir');
-        if (el && !el.value) el.value = dir;
+        /* CLI-detected value is authoritative - overwrite any stale/bad cached value */
+        if (el) el.value = dir;
         R6P.creds.opencenter.gitDir = dir;
         if (typeof r6pGitSave === 'function') r6pGitSave();
       }
