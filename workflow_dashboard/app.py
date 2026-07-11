@@ -21135,7 +21135,7 @@ def r6_generate_bundle():
                 if r2.returncode != 0 and c[1] != "commit":
                     break
             commit_status = " | ".join(outs)
-    return jsonify({
+    resp = {
         "ok": True, "bundle_dir": str(out_dir),
         "files": sorted(str(f.relative_to(out_dir)) for f in out_dir.rglob("*") if f.is_file()),
         "imported_to": imported,
@@ -21143,7 +21143,30 @@ def r6_generate_bundle():
         "pull_secret": sops_status, "gitops_commit": commit_status,
         "build_cmd": "cd %s && bash build_and_push.sh" % out_dir,
         "push_cmd": "cd %s && git add applications/overlays/%s/apps/%s && git commit -m 'R6 import: %s' && git push" % (gitops, cluster, slug, slug),
-    })
+        "system": bundle.get("businessSystemName"), "org": org, "cluster": cluster,
+        "registry": {"type": rtype, "host": reg_host, "project": project},
+        "generated_at": stamp,
+    }
+    # Single source of truth: persist latest pipeline state server-side (no secrets)
+    try:
+        (home / ".config" / "opencenter" / "bundles" / "r6" / "latest.json").write_text(
+            _json.dumps(resp, indent=2), encoding="utf-8")
+    except Exception:
+        pass
+    return jsonify(resp)
+
+
+@app.get("/api/r6/state")
+def r6_state():
+    """Latest R6 pipeline state (server-side single source of truth)."""
+    import json as _json
+    p = Path(os.path.expanduser("~")) / ".config" / "opencenter" / "bundles" / "r6" / "latest.json"
+    if not p.is_file():
+        return jsonify({"ok": False, "error": "no bundle generated yet"}), 404
+    try:
+        return jsonify(_json.loads(p.read_text(encoding="utf-8")))
+    except Exception as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 500
 
 
 @app.get("/api/opencenter/export-bundle")

@@ -147,9 +147,28 @@
           <button onclick="r6RunProd('extract_cmd')" style="background:#7c3aed;color:#fff;border:none;border-radius:6px;padding:6px 14px;font-size:12px;font-weight:800;cursor:pointer;">&#128229; Run Extract Assets</button>
           <button onclick="r6RunProd('build_cmd')" style="background:#0369a1;color:#fff;border:none;border-radius:6px;padding:6px 14px;font-size:12px;font-weight:800;cursor:pointer;">&#128296; Run Build + Push</button>
           <button onclick="r6RunProd('push_cmd')" style="background:#15803d;color:#fff;border:none;border-radius:6px;padding:6px 14px;font-size:12px;font-weight:800;cursor:pointer;">&#128640; Commit to Pipeline</button>
+          <button onclick="r6ShipToOpenCenter()" style="background:linear-gradient(135deg,#b45309,#f59e0b);color:#fff;border:none;border-radius:6px;padding:6px 16px;font-size:12px;font-weight:900;cursor:pointer;">&#128640; Ship to OpenCenter (E+F+G)</button>
         </div>
         <pre id="r6-prod-out" style="display:none;background:#0f172a;color:#86efac;border-radius:8px;padding:10px;font-size:11px;max-height:260px;overflow:auto;"></pre>
         <script>
+        window.r6MarkStepsDone = function(){
+          document.querySelectorAll('[id^="r6-step-"]').forEach(function(el){
+            el.textContent = 'Done \u2713'; el.style.color = '#15803d'; el.style.fontWeight = '800';
+          });
+        };
+        window.r6ShipToOpenCenter = function(){
+          if (typeof r6GenerateOpenCenterBundle === 'function'){ r6GenerateOpenCenterBundle(); }
+          else { var o = document.getElementById('r6-prod-out'); if (o){ o.style.display='block'; o.textContent = 'Select an architecture template in step A first.'; } }
+        };
+        // Hydrate pipeline state from the server-side single source of truth
+        fetch('/api/r6/state').then(function(r){ return r.ok ? r.json() : null; }).then(function(d){
+          if (d && d.ok){
+            try { localStorage.setItem('r6ProdBundle', JSON.stringify(d)); } catch(e){}
+            var st = document.getElementById('r6-prod-status');
+            if (st && !st.textContent) st.innerHTML = 'Last bundle: <code>' + d.bundle_dir + '</code> (' + (d.system || '') + ', ' + d.generated_at + ')';
+            if (window.r6MarkStepsDone) r6MarkStepsDone();
+          }
+        }).catch(function(){});
         window.r6RunProd = function(key){
           var d=null; try{ d=JSON.parse(localStorage.getItem('r6ProdBundle')||'null'); }catch(e){}
           var out=document.getElementById('r6-prod-out');

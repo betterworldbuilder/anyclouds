@@ -6384,6 +6384,7 @@ mise run build
                     +'<br>pull secret: '+(d.pull_secret||'')+' | gitops: '+(d.gitops_commit||'');
                   st2.style.color='#15803d';
                   try{ localStorage.setItem('r6ProdBundle', JSON.stringify(d)); }catch(e){}
+                  if(window.r6MarkStepsDone) r6MarkStepsDone();
                 } else { st2.textContent='✗ '+(d.error||'bundle generation failed'); st2.style.color='#dc2626'; }
               })
               .catch(function(e){ if(st2){ st2.textContent='✗ '+e; st2.style.color='#dc2626'; } });
