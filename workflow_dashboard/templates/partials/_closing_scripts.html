@@ -10192,6 +10192,7 @@ ${certContent}
         +'<div class="uat-s1-sys-avatar">'+sys.name.slice(0,2).toUpperCase()+'</div>'
         +'<div><h4>'+sys.name+'</h4><p>'+(sys.archetype||'')+' &bull; '+(sys.criticality||'')+' &bull; '+(sys.towner||'')+' &bull; '+(sys.wave||'')+'</p></div>'
         +'</div>'
+        +(sys.region?'<span style="background:#eff6ff;color:#2563eb;border:1px solid #bfdbfe;border-radius:999px;padding:2px 10px;font-size:11px;font-weight:700;margin-right:8px;">&#127760; '+sys.region+'</span>':'')
         +'<span class="uat-s1-pill '+scol+'">'+sys.status+'</span>'
         +'</div>'
         +'<div class="uat-s1-comp-map">'+(sys.components||[]).slice(0,6).map(function(c){ return '<span class="uat-s1-comp-chip">'+c.name+'</span>'; }).join('')+'</div>'
