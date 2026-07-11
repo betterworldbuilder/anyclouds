@@ -52,9 +52,15 @@ window.r6pLoadCredsServer=function(){
 };
 window.r6aceInit=window.r6pInit;
 
+var R6P_RESCAN_GROUP=[2,3,4,5,6];
 window.r6pRenderProgress=function(){
   var el=document.getElementById('r6p-progress-inner');if(!el)return;
-  el.innerHTML=R6P_STEPS.map(function(s,i){
+  var shown=R6P_STEPS.filter(function(s){return R6P_RESCAN_GROUP.indexOf(s.n)<0||s.n===R6P_RESCAN_GROUP[0];});
+  el.innerHTML=shown.map(function(s,i){
+    if(s.n===R6P_RESCAN_GROUP[0]){
+      var grpCur=R6P_RESCAN_GROUP.indexOf(R6P.current)>=0;
+      return (i>0?'<span class="r6p-arrow">&gt;</span>':'')+'<span class="r6p-step'+(grpCur?' current':'')+'" onclick="r6pGoTo(2)">2-6. Refresh (skip)</span>';
+    }
     var st=R6P.status[s.n]||'ns',isCur=R6P.current===s.n,cls=isCur?'current':st;
     return (i>0?'<span class="r6p-arrow">&gt;</span>':'')+'<span class="r6p-step '+cls+'" onclick="r6pGoTo('+s.n+')">'+s.n+'. '+s.label+'</span>';
   }).join('');
@@ -63,6 +69,25 @@ window.r6pRenderProgress=function(){
 window.r6pRenderStages=function(){
   var el=document.getElementById('r6p-stages');if(!el)return;
   el.innerHTML=R6P_STEPS.map(function(s){
+    if(R6P_RESCAN_GROUP.indexOf(s.n)>=0&&s.n!==R6P_RESCAN_GROUP[0])return '';
+    if(s.n===R6P_RESCAN_GROUP[0]){
+      var grpOpen=R6P_RESCAN_GROUP.indexOf(R6P.current)>=0;
+      var grpBody=R6P_RESCAN_GROUP.map(function(gn){
+        var gs=R6P_STEPS.filter(function(x){return x.n===gn;})[0];
+        return '<div style="border-top:1px solid #e2e8f0;padding-top:12px;margin-top:12px;">'
+          +'<div style="font-weight:800;font-size:12px;color:#334155;margin-bottom:2px;">'+gn+'. '+gs.title+'</div>'
+          +'<div style="font-size:11px;color:#94a3b8;margin-bottom:8px;">'+gs.desc+'</div>'
+          +r6pContent(gn)+'</div>';
+      }).join('');
+      return '<div id="r6p-stage-'+R6P_RESCAN_GROUP[0]+'" class="r6p-stage'+(grpOpen?' current':'')+'">'
+        +'<div class="r6p-stage-hd" onclick="r6pGoTo('+R6P_RESCAN_GROUP[0]+')">'
+        +'<div class="r6p-stage-num">&#8635;</div>'
+        +'<div class="r6p-stage-info"><div class="r6p-stage-title">Refresh FLEX VM / DB List</div><div class="r6p-stage-desc">Snapshot discovery + live scan, steps 2-6. Not needed by default - the target IP/volume is already known from the selected Business System. Expand only to refresh a component’s data.</div></div>'
+        +'<span class="r6p-stage-badge" style="background:#f1f5f9;color:#64748b;">SKIP by Default</span>'
+        +'</div>'
+        +'<div class="r6p-stage-body'+(grpOpen?' open':'')+'" id="r6p-body-'+R6P_RESCAN_GROUP[0]+'"><div class="r6p-stage-body-inner">'+grpBody+'</div></div>'
+        +'</div>';
+    }
     var st=R6P.status[s.n]||'ns',isCur=R6P.current===s.n;
     var bstyle=isCur?'background:#eff6ff;color:#0369a1;':st==='done'?'background:#dcfce7;color:#16a34a;':st==='warn'?'background:#fef3c7;color:#d97706;':st==='blocked'?'background:#fee2e2;color:#dc2626;':'background:#f1f5f9;color:#94a3b8;';
     var btxt=isCur?'Current':st==='done'?'Complete':st==='warn'?'Warning':st==='blocked'?'Blocked':'Not Started';
@@ -214,7 +239,7 @@ window.r6pContent=function(n){
   return '<p style="color:#94a3b8;">Stage '+n+'</p>';
 };
 
-window.r6pMarkDone=function(n){R6P.status[n]='done';var badge=document.getElementById('r6p-stage-badge-'+n);if(badge){badge.textContent='Complete';badge.style.cssText='background:#dcfce7;color:#16a34a;padding:3px 12px;border-radius:999px;font-size:11px;font-weight:700;';}var card=document.getElementById('r6p-stage-'+n);if(card)card.className='r6p-stage done';var done=Object.values(R6P.status).filter(function(s){return s==='done';}).length;var pct=Math.round(done/12*100);var fill=document.getElementById('r6p-fill');if(fill)fill.style.width=pct+'%';var pEl=document.getElementById('r6p-pct');if(pEl)pEl.textContent=pct+'%';r6pRenderProgress();if(n<12)r6pGoTo(n+1);};
+window.r6pMarkDone=function(n){R6P.status[n]='done';var badge=document.getElementById('r6p-stage-badge-'+n);if(badge){badge.textContent='Complete';badge.style.cssText='background:#dcfce7;color:#16a34a;padding:3px 12px;border-radius:999px;font-size:11px;font-weight:700;';}var card=document.getElementById('r6p-stage-'+n);if(card)card.className='r6p-stage done';var done=Object.values(R6P.status).filter(function(s){return s==='done';}).length;var pct=Math.round(done/12*100);var fill=document.getElementById('r6p-fill');if(fill)fill.style.width=pct+'%';var pEl=document.getElementById('r6p-pct');if(pEl)pEl.textContent=pct+'%';r6pRenderProgress();if(n===1)r6pGoTo(7);else if(n<12&&R6P_RESCAN_GROUP.indexOf(n)<0)r6pGoTo(n+1);};
 
 window.r6pNext=function(){if(R6P.current<12)r6pGoTo(R6P.current+1);};
 window.r6pPrev=function(){if(R6P.current>1)r6pGoTo(R6P.current-1);};
@@ -250,7 +275,7 @@ window.r6pConfirmCompat=function(){
 
 window.r6pLoadBiz=function(){var list=document.getElementById('r6p-biz-list');if(!list)return;try{var sys=JSON.parse(localStorage.getItem('uatS1_systems')||'[]');if(!sys.length){list.innerHTML='<div style="color:#94a3b8;font-size:13px;padding:20px;text-align:center;">No business systems. Create them in Migration Logs first.</div>';return;}list.innerHTML=sys.map(function(s){var comps=s.components||[];return '<div class="r6p-bs-card" id="r6p-bsc-'+s.id+'" onclick="r6pSelectBS(\''+s.id+'\')">'+'<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;">'+'<div style="display:flex;align-items:center;gap:8px;">'+'<div style="width:32px;height:32px;border-radius:8px;background:#eff6ff;color:#2563eb;font-weight:900;font-size:11px;display:grid;place-items:center;">'+s.name.slice(0,2).toUpperCase()+'</div>'+'<div><div style="font-weight:800;color:#0f172a;font-size:14px;">'+s.name+'</div><div style="font-size:11px;color:#64748b;">'+(s.type||'')+(s.criticality?' - '+s.criticality:'')+(s.migrationWave?' - Wave '+s.migrationWave:'')+'</div></div></div>'+'<span style="background:#dcfce7;color:#16a34a;padding:2px 8px;border-radius:999px;font-size:10px;font-weight:700;">Active</span></div>'+'<div style="display:flex;flex-wrap:wrap;gap:3px;margin-bottom:10px;">'+comps.slice(0,7).map(function(c){return '<span class="r6p-chip">'+c.name+'</span>';}).join('')+'</div>'+'<div style="display:flex;gap:6px;"><button onclick="event.stopPropagation();r6pSelectBS(\''+s.id+'\')" class="r6p-btn primary" style="padding:5px 12px;font-size:11px;">Select for Refactor</button><button onclick="event.stopPropagation();typeof uatS1OpenModal===\'function\'&&uatS1OpenModal(\''+s.id+'\')" class="r6p-btn secondary" style="padding:5px 12px;font-size:11px;">Inspect</button></div></div>';}).join('');var ag=document.getElementById('r6p-arch-grid'),lg=document.getElementById('uatS1ArchList');if(ag&&lg&&lg.innerHTML.trim()){ag.innerHTML=lg.innerHTML;ag.querySelectorAll('.uat-s1-arch-card').forEach(function(c){c.style.cursor='pointer';c.addEventListener('click',function(){ag.querySelectorAll('.uat-s1-arch-card').forEach(function(x){x.classList.remove('selected');});c.classList.add('selected');var k=c.getAttribute('data-arch-key');typeof window.uatS1OpenModal==='function'&&window.uatS1OpenModal(null,k);});});}}catch(e){if(list)list.innerHTML='<div style="color:#dc2626;padding:10px;">'+e.message+'</div>';}};
 
-window.r6pSelectBS=function(id){document.querySelectorAll('[id^="r6p-bsc-"]').forEach(function(el){el.classList.remove('selected');});var c=document.getElementById('r6p-bsc-'+id);if(c)c.classList.add('selected');try{var sys=JSON.parse(localStorage.getItem('uatS1_systems')||'[]');var bs=sys.find(function(s){return s.id===id;});if(!bs)return;R6P.bs=bs;R6P.components=bs.components||[];var si=document.getElementById('r6p-sum-input');if(si)si.textContent=bs.name;var sc=document.getElementById('r6p-sum-comps');if(sc)sc.textContent=(bs.components||[]).length+' components';r6pMarkDone(1);}catch(e){}};
+window.r6pSelectBS=function(id){document.querySelectorAll('[id^="r6p-bsc-"]').forEach(function(el){el.classList.remove('selected');});var c=document.getElementById('r6p-bsc-'+id);if(c)c.classList.add('selected');try{var sys=JSON.parse(localStorage.getItem('uatS1_systems')||'[]');var bs=sys.find(function(s){return s.id===id;});if(!bs)return;R6P.bs=bs;R6P.components=bs.components||[];var si=document.getElementById('r6p-sum-input');if(si)si.textContent=bs.name;var sc=document.getElementById('r6p-sum-comps');if(sc)sc.textContent=(bs.components||[]).length+' components';R6P_RESCAN_GROUP.forEach(function(gn){R6P.status[gn]='done';});r6pMarkDone(1);}catch(e){}};
 
 window.r6pRunCmd=function(cmdId,outId){var out=document.getElementById(outId),cEl=document.getElementById(cmdId);if(!out||!cEl)return;var cmd=cEl.textContent.trim();out.style.display='block';out.style.borderColor='#134e4a';out.textContent='$ '+cmd+'\n';var url='/api/stream/run-cmd?cmd='+encodeURIComponent(cmd);var es=new EventSource(url);es.onmessage=function(e){if(e.data!=='[DONE]'){out.textContent+=e.data+'\n';out.scrollTop=out.scrollHeight;if(e.data.indexOf('[EXIT 0]')>=0)out.style.borderColor='#166534';}else{es.close();if((out.textContent.indexOf('EXIT 127')>=0||out.textContent.indexOf('command not found')>=0)&&R6ACE_INSTALL&&R6ACE_INSTALL[cmd]){out.style.borderColor='#dc2626';var iid='inst-'+cmdId;if(!document.getElementById(iid)){var ic=R6ACE_INSTALL[cmd];var d=document.createElement('div');d.id=iid;d.style.cssText='margin-top:8px;background:#fff3cd;border:2px solid #f59e0b;border-radius:8px;padding:12px;';d.innerHTML='<strong style="color:#92400e;">Not installed</strong><pre style="background:#0f172a;color:#fbbf24;border-radius:4px;padding:6px;font-size:10px;white-space:pre-wrap;margin:6px 0;">'+ic+'</pre><button onclick="r6aceRunInstall(\''+iid+'\',\''+cmdId+'\',\''+outId+'\')" style="background:#16a34a;color:#fff;border:none;border-radius:6px;padding:6px 14px;font-size:11px;font-weight:800;cursor:pointer;">Install Now</button>';out.parentNode.insertBefore(d,out.nextSibling);}}}};es.onerror=function(){out.textContent+='[closed]\n';es.close();};};
 window.r6aceRun=window.r6pRunCmd;
