@@ -13495,10 +13495,11 @@ ${certContent}
   }
   window.ocqsMountBusinessSystems = function(){ fsmMountBusinessSystemEngineTo('ocqs-fsm-uat-engine-host'); };
   window.ocqpMountBusinessSystems = function(){ fsmMountBusinessSystemEngineTo('ocqp-fsm-uat-engine-host'); };
-  setTimeout(function(){
-    if (document.getElementById('ocqs-fsm-uat-engine-host')) window.ocqsMountBusinessSystems();
-    else if (document.getElementById('ocqp-fsm-uat-engine-host')) window.ocqpMountBusinessSystems();
-  }, 500);
+  /* Deliberately NOT auto-mounting here on page load: #uatS1SystemsView is a single
+     shared element, and Stage 2's fsmAutoSeedRetry (below) already auto-claims it on
+     every page load. Racing both on load left the mount target in flux and could break
+     the Add Business System modal's save/render elsewhere. OpenCenter's "Refresh
+     Migration Matrix" button still mounts it manually via ocqsMountBusinessSystems(). */
   function fsmRestoreBusinessSystemEngine() {
     var engine = document.getElementById('uatS1SystemsView');
     var ph = window._fsmUatEnginePlaceholder;
@@ -13629,7 +13630,16 @@ ${certContent}
      System Scope Engine section stayed blank until the user manually clicked
      "Load Banking Demo". Auto-run once on page load - real data (if present) is
      rendered as-is via fsmRefresh(); demo only seeds when uatS1_systems is empty. */
-  setTimeout(function(){ if (typeof fsmSeedIfEmpty === 'function') fsmSeedIfEmpty(); }, 300);
+  /* fsmRefresh() (called by fsmSeedIfEmpty when data exists) mounts #uatS1SystemsView
+     into the host - but that element may not exist yet at first paint if it's rendered
+     by a later script. Retry a few times so the mount isn't silently skipped. */
+  (function fsmAutoSeedRetry(attempt){
+    if (typeof fsmSeedIfEmpty === 'function') fsmSeedIfEmpty();
+    var engine = document.getElementById('uatS1SystemsView');
+    var stage2Host = document.getElementById('fsm-uat-engine-host');
+    var mounted = engine && stage2Host && engine.parentNode === stage2Host;
+    if (!mounted && attempt < 6) setTimeout(function(){ fsmAutoSeedRetry(attempt + 1); }, 500);
+  })(0);
 
   function fsmMarkAllMigrated() {
     if (!_fsmSelId) return;
