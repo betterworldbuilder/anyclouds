@@ -525,6 +525,7 @@ window.r6pStage0=function(){
     +'<div style="display:flex;gap:6px;">'
     +'<button class="r6p-btn primary" onclick="r6pRunGitopsPreflight()" style="padding:5px 12px;font-size:11px;">Run GitOps Preflight</button>'
     +'<button class="r6p-btn secondary" onclick="r6pRunPreflight()" style="padding:5px 12px;font-size:11px;">Re-run All Checks</button>'
+    +'<button class="r6p-btn secondary" onclick="r6pTestKubectlLive()" style="padding:5px 12px;font-size:11px;background:#0369a1;color:#fff;">&#9654; Test kubectl Live</button>'
     +'</div></div>'
     +'<div style="padding:14px;overflow-x:auto;">'
     +'<table class="r6p-table"><thead><tr><th>Check</th><th>Status</th><th>Result</th></tr></thead><tbody id="r6p-gitops-checks">'
@@ -911,6 +912,32 @@ window.r6pRunGitopsPreflight=function(){
     if(map[key])r6pGCSet(map[key],ok,val);
   };
   es.onerror=function(){es.close();};
+};
+
+window.r6pTestKubectlLive=function(){
+  var gitDir=R6P.creds.opencenter.gitDir||document.getElementById('r6p-git-localdir')&&document.getElementById('r6p-git-localdir').value;
+  var out=document.getElementById('r6p-gc-out');if(out){out.style.display='block';out.textContent='';}
+  var cmd='GD="'+(gitDir||'')+'"\n'
+    +'CLN=$(opencenter cluster describe --output yaml 2>/dev/null | awk -F": " \'/^[[:space:]]*cluster_name:/{print $2; exit}\')\n'
+    +'KCFG=""\n'
+    +'[ -n "$GD" ] && [ -n "$CLN" ] && [ -f "$GD/infrastructure/clusters/$CLN/kubeconfig.yaml" ] && KCFG="$GD/infrastructure/clusters/$CLN/kubeconfig.yaml"\n'
+    +'[ -z "$KCFG" ] && [ -n "$GD" ] && [ -d "$GD" ] && KCFG=$(find "$GD/infrastructure/clusters" -maxdepth 2 -name kubeconfig.yaml 2>/dev/null | head -1)\n'
+    +'if [ -z "$KCFG" ]; then echo "No kubeconfig found yet for cluster \'$CLN\' under $GD/infrastructure/clusters - cluster is likely still bootstrapping."\n'
+    +'else\n'
+    +'  export KUBECONFIG="$KCFG"\n'
+    +'  echo "== Using kubeconfig: $KCFG =="\n'
+    +'  echo "== kubectl cluster-info =="\n'
+    +'  timeout 10 kubectl cluster-info 2>&1\n'
+    +'  echo "== kubectl get nodes -o wide =="\n'
+    +'  timeout 10 kubectl get nodes -o wide 2>&1\n'
+    +'fi';
+  var url='/api/stream/run-cmd?cmd='+encodeURIComponent(cmd);
+  var es=new EventSource(url);
+  es.onmessage=function(e){
+    if(e.data==='[DONE]'||e.data.indexOf('[EXIT')===0){es.close();return;}
+    if(out){out.textContent+=e.data+'\n';out.scrollTop=out.scrollHeight;}
+  };
+  es.onerror=function(){es.close();if(out)out.textContent+='[stream error]\n';};
 };
 
 function shellescape(s){return "'"+s.replace(/'/g,"'\\''")+"'";}
