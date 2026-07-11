@@ -390,6 +390,10 @@ window.r6pGenBundle=function(){
 
   R6P.bundle=output;
   R6P._bundleValidated=false;
+  R6P.artifacts=R6P.artifacts||{};
+  Object.keys(output.packageContents).forEach(function(k){R6P.artifacts[k]=output.packageContents[k]==='found';});
+  var body12=document.getElementById('r6p-body-12');
+  if(body12){var inner12=body12.querySelector('.r6p-stage-body-inner');if(inner12)inner12.innerHTML=r6pContent(12);}
 
   /* Update Stage 11 UI */
   var el=document.getElementById('r6p-bundle-preview');if(el)el.textContent=JSON.stringify(manifest,null,2);
