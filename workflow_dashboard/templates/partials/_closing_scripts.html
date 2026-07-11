@@ -9821,6 +9821,7 @@ ${certContent}
       +'<div class="uat-s1-field"><label>Health / Test Path</label><input data-field="path" value="'+pv+'" /></div>'
       +'</div>'
       +'<span class="uat-s1-pill '+col+'">In Scope</span>'
+      +_buildContainerReadyBlock(name, saved)
       +'</div>';
   }
 
@@ -9931,6 +9932,76 @@ ${certContent}
     if(n.includes('Cache'))    return 'PING';
     if(n.includes('Queue'))    return 'queue depth';
     return '/health';
+  }
+  /* Container-readiness profile: real, deterministic heuristics from the component
+     name/category - same intent as R6's classify/transform engines, kept local here
+     since this modal is shared across Migration Log/Stage 2/R6 and must not depend
+     on r6ace.js being loaded on the page. */
+  function _sState(n) {
+    if(n.includes('Database')) return 'Stateful';
+    if(n.includes('Queue'))    return 'Stateful';
+    if(n.includes('Cache'))    return 'Unknown / mixed';
+    if(n.includes('Monitoring')||n.includes('Gateway')) return 'Unknown / mixed';
+    return 'Stateless';
+  }
+  function _sRuntime(n) {
+    if(n.includes('Database')) return 'Relational database (product TBD)';
+    if(n.includes('Cache'))    return 'Redis-compatible cache';
+    if(n.includes('Queue'))    return 'AMQP-compatible queue';
+    if(n.includes('Gateway'))  return 'API Gateway / reverse proxy';
+    return 'Unknown - run Live Scan to confirm';
+  }
+  function _sDecision(n) {
+    if(n.includes('Database')) return 'Keep external initially or migrate later with a database operator';
+    if(n.includes('Cache'))    return 'Deploy with operator; rebuild if data is disposable';
+    if(n.includes('Queue'))    return 'Deploy with operator or use a managed queue';
+    if(n.includes('Gateway'))  return 'Replace with Gateway API or containerize custom logic';
+    if(n.includes('Monitoring')) return 'Replace with platform monitoring (Prometheus/Grafana)';
+    return 'Containerize as Deployment + Service';
+  }
+  function _sK8sResource(n) {
+    if(n.includes('Database')) return 'None in-cluster - Service alias to external/VM database';
+    if(n.includes('Cache')||n.includes('Queue')) return 'Custom Resource via operator';
+    if(n.includes('Gateway')) return 'Gateway API';
+    if(n.includes('Monitoring')) return 'Platform monitoring stack (no app resource)';
+    return 'Deployment + Service';
+  }
+  function _sDataPath(n) {
+    if(n.includes('Database')) return '/var/lib/ (database engine data directory)';
+    if(n.includes('Cache'))    return 'None required - disposable, rebuilds on restart';
+    if(n.includes('Queue'))    return '/var/lib/rabbitmq';
+    return 'None expected - verify no local writes during Live Scan';
+  }
+  function _sRisk(n) {
+    if(n.includes('Database')) return 'Medium - stateful, requires a planned data migration';
+    if(n.includes('Queue'))    return 'Medium - may hold in-flight business messages';
+    if(n.includes('Cache'))    return 'Low - typically disposable';
+    return 'Low';
+  }
+  function _sReadiness(saved) {
+    var t=(saved&&saved.tgt)||'', p=(saved&&saved.path)||'';
+    return (t&&p) ? 'Ready with changes' : 'Needs Target IP / health path (Step 1 Inspect)';
+  }
+  function _compProfileRow(label, val) {
+    return '<div style="display:flex;justify-content:space-between;gap:8px;padding:2px 0;font-size:10px;">'
+      +'<span style="color:#94a3b8;font-weight:700;flex-shrink:0;">'+label+'</span>'
+      +'<span style="color:#334155;text-align:right;">'+val+'</span></div>';
+  }
+  function _buildContainerReadyBlock(name, saved) {
+    var dep = (saved&&saved._siblings) ? saved._siblings : 'See other components in this system';
+    return '<div style="margin-top:8px;padding:8px 10px;background:#f8fafc;border:1px dashed #cbd5e1;border-radius:6px;">'
+      +'<div style="font-size:9px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;">Container-Ready Profile</div>'
+      +_compProfileRow('Component category', _sType(name))
+      +_compProfileRow('Runtime or product', _sRuntime(name))
+      +_compProfileRow('Stateless/Stateful/Unknown', _sState(name))
+      +_compProfileRow('Containerization decision', _sDecision(name))
+      +_compProfileRow('Target Kubernetes resource', _sK8sResource(name))
+      +_compProfileRow('Persistent data path', _sDataPath(name))
+      +_compProfileRow('Dependencies', dep)
+      +_compProfileRow('Readiness status', _sReadiness(saved))
+      +_compProfileRow('Migration risk', _sRisk(name))
+      +_compProfileRow('Recommended action', _sDecision(name))
+      +'</div>';
   }
 
   /* ── Automatic Business System Mapping from Existing (scanned) FLEX VMs ── */
