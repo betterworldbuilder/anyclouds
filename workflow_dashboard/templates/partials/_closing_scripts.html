@@ -10162,6 +10162,10 @@ ${certContent}
       _state.systems.push(sys);
     }
     _save(); uatS1CloseModal(); _render();
+    /* R6 renders its own separate business-system list (#r6p-biz-list via r6pLoadBiz),
+       independent from this engine's #uatS1Cards. Without this, a newly saved system
+       only appeared after a full page reload. Refresh whichever list is present. */
+    if (typeof window.r6pLoadBiz === 'function') window.r6pLoadBiz();
   };
   window.uatS1SaveDraft    = function(){ if (_state.templateMode) uatS1SaveCustomerTemplate(); else uatS1SaveSystem(true); };
   window.uatS1ExportPackage= function(){ alert('Export UAT Package: coming soon.'); };
@@ -10208,6 +10212,7 @@ ${certContent}
         var did = this.getAttribute('data-bz-del');
         _state.systems = _state.systems.filter(function(s){ return s.id!==did; });
         _save(); _render();
+        if (typeof window.r6pLoadBiz === 'function') window.r6pLoadBiz();
       });
       el.appendChild(div);
     });
