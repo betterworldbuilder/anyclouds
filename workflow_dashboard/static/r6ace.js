@@ -938,9 +938,16 @@ window.r6pAutoRunBuildPipeline=function(extractCmd,buildCmd,outId){
       if(!extractOk){out.textContent+='\n[Automatic mode stopped: asset extraction failed - build/push skipped]\n';out.style.borderColor='#dc2626';return;}
       out.textContent+='\n$ '+buildCmd+'\n';
       var es2=new EventSource('/api/stream/run-cmd?cmd='+encodeURIComponent(buildCmd));
+      var buildOk=false;
       es2.onmessage=function(e2){
-        if(e2.data!=='[DONE]'){out.textContent+=e2.data+'\n';out.scrollTop=out.scrollHeight;if(e2.data.indexOf('[EXIT 0]')>=0)out.style.borderColor='#166534';}
-        else{es2.close();}
+        if(e2.data!=='[DONE]'){out.textContent+=e2.data+'\n';out.scrollTop=out.scrollHeight;if(e2.data.indexOf('[EXIT 0]')>=0){out.style.borderColor='#166534';buildOk=true;}}
+        else{
+          es2.close();
+          if(buildOk&&typeof r6pAutoDeployToOpenCenter==='function'){
+            out.textContent+='\n[Automatic mode: build+push done - deploying to production GitOps now]\n';
+            r6pAutoDeployToOpenCenter();
+          }
+        }
       };
       es2.onerror=function(){out.textContent+='[closed]\n';es2.close();};
     }
