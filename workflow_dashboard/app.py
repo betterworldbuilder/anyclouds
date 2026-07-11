@@ -21089,7 +21089,7 @@ def r6_generate_bundle():
     commit_status = "skipped (auto_commit off)"
     gitops = home / ".config" / "opencenter" / "clusters" / "gitops" / org
     if data.get("import_to_gitops", True) and gitops.is_dir():
-        overlay = gitops / "applications" / "overlays" / cluster / "apps" / slug
+        overlay = gitops / "applications" / "overlays" / cluster / "managed-services" / slug
         overlay.mkdir(parents=True, exist_ok=True)
         for f in (out_dir / "kustomize_bundle").iterdir():
             _shutil.copy2(f, overlay / f.name)
@@ -21126,7 +21126,7 @@ def r6_generate_bundle():
         if data.get("auto_commit"):
             import subprocess as _sp2
             env2 = {**os.environ, "GIT_SSH_COMMAND": "ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no"}
-            rel = "applications/overlays/%s/apps/%s" % (cluster, slug)
+            rel = "applications/overlays/%s/managed-services/%s" % (cluster, slug)
             cmds = [["git", "add", rel], ["git", "commit", "-m", "R6 import: %s" % slug], ["git", "push"]]
             outs = []
             for c in cmds:
@@ -21142,7 +21142,7 @@ def r6_generate_bundle():
         "extract_cmd": "cd %s && bash extract_assets.sh" % out_dir,
         "pull_secret": sops_status, "gitops_commit": commit_status,
         "build_cmd": "cd %s && bash build_and_push.sh" % out_dir,
-        "push_cmd": "cd %s && git add applications/overlays/%s/apps/%s && git commit -m 'R6 import: %s' && git push" % (gitops, cluster, slug, slug),
+        "push_cmd": "cd %s && git add applications/overlays/%s/managed-services/%s && git commit -m 'R6 import: %s' && git push" % (gitops, cluster, slug, slug),
         "system": bundle.get("businessSystemName"), "org": org, "cluster": cluster,
         "registry": {"type": rtype, "host": reg_host, "project": project},
         "generated_at": stamp,
