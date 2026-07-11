@@ -14,7 +14,40 @@ var R6P_TOOLS=[
 ];
 var R6P_STEPS=[{n:0,label:'Preflight',title:'Preflight Requirements Check',desc:'Verify CLI tools, credentials, and GitOps access before running the refactor workflow.'},{n:1,label:'Input',title:'Select FLEX Business System / App Input',desc:'Select a migrated FLEX Business System or a single FLEX VM / DB. Only FLEX workloads are accepted.'},{n:2,label:'Discovery',title:'Discover FLEX Snapshots',desc:'Discover private FLEX VM images, VM snapshots, and volume snapshots as safe read-only capture sources.'},{n:3,label:'Snapshot',title:'Select Snapshot / Volume Snapshot',desc:'Select snapshots for Smart Snapshot or Full Snapshot capture.'},{n:4,label:'Mapping',title:'Map Snapshot to Business System Component',desc:'Link selected snapshots to business system components.'},{n:5,label:'Method',title:'Choose Capture and Conversion Method',desc:'Smart Snapshot (recommended) or Full Snapshot Compatibility (legacy fallback).'},{n:6,label:'Scan',title:'Snapshot Mount and Scan',desc:'Mount snapshot read-only. Scan OS, runtime, ports, services, volumes, config, secrets.'},{n:7,label:'Classify',title:'App Detection and File Classification',desc:'Identify real application content and classify all files.'},{n:8,label:'Readiness',title:'Container Readiness Assessment',desc:'Score each component: CLOUD_NATIVE_READY, READY_WITH_EXTERNALIZATION, KEEP_ON_FLEX, BLOCKED.'},{n:9,label:'Build',title:'Container Build Plan',desc:'Generate Dockerfile, image plan, base image, build/start command, health check, CPU/memory.'},{n:10,label:'GitOps',title:'Kubernetes YAML / Helm / Kustomize / Flux',desc:'Generate all Kubernetes and GitOps artifacts.'},{n:11,label:'Bundle',title:'OpenCenter Import Bundle',desc:'Assemble the final OpenCenter-ready application bundle.'},{n:12,label:'OpenCenter',title:'Send to OpenCenter GitOps',desc:'Import bundle, generate commit commands, trigger Flux reconciliation.'}];
 
-window.r6pInit=function(){r6pRenderProgress();r6pRenderStages();r6pGoTo(0);setTimeout(r6pLoadBiz,350);setTimeout(r6pLoadCredCache,200);};
+window.r6pInit=function(){r6pRenderProgress();r6pRenderStages();r6pGoTo(0);setTimeout(r6pLoadBiz,350);setTimeout(r6pLoadCredCache,200);setTimeout(r6pLoadCredsServer,250);};
+
+/* Server-side credential persistence - survives incognito/browser reset/different browsers.
+   localStorage stays as a fast local mirror; the server file is the source of truth. */
+window.r6pSaveCredsServer=function(){
+  var v=function(id){var el=document.getElementById(id);return el?el.value:'';};
+  var payload={
+    cloud:{authUrl:v('r6p-c-authurl'),authType:v('r6p-c-authtype'),username:v('r6p-c-username'),
+      password:v('r6p-c-password'),credId:v('r6p-c-credid'),secret:v('r6p-c-secret'),
+      proj:v('r6p-c-proj'),domain:v('r6p-c-domain'),region:v('r6p-c-region')},
+    gitops:{repo:v('r6p-git-repo'),branch:v('r6p-git-branch'),auth:v('r6p-git-auth'),
+      sshkey:v('r6p-git-sshkey'),localdir:v('r6p-git-localdir'),token:v('r6p-git-token')}
+  };
+  fetch('/api/r6/save-creds',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}).catch(function(){});
+};
+window.r6pLoadCredsServer=function(){
+  fetch('/api/r6/load-creds').then(function(r){return r.json();}).then(function(d){
+    if(!d||!d.ok||!d.data)return;
+    var c=d.data.cloud||{},g=d.data.gitops||{};
+    var set=function(id,val){if(!val)return;var el=document.getElementById(id);if(el&&!el.value)el.value=val;};
+    set('r6p-c-authurl',c.authUrl);set('r6p-c-username',c.username);set('r6p-c-password',c.password);
+    set('r6p-c-credid',c.credId);set('r6p-c-secret',c.secret);set('r6p-c-proj',c.proj);
+    set('r6p-c-domain',c.domain);
+    if(c.authType){var dt=document.getElementById('r6p-c-authtype');if(dt){dt.value=c.authType;r6pAuthTypeChange(c.authType);}}
+    if(c.region){var rs=document.getElementById('r6p-c-region');if(rs)rs.value=c.region;}
+    set('r6p-git-repo',g.repo);set('r6p-git-branch',g.branch);set('r6p-git-sshkey',g.sshkey);
+    set('r6p-git-localdir',g.localdir);set('r6p-git-token',g.token);
+    if(g.auth){var ga=document.getElementById('r6p-git-auth');if(ga){ga.value=g.auth;if(typeof r6pGitAuthToggle==='function')r6pGitAuthToggle();}}
+    if(g.localdir)R6P.creds.opencenter.gitDir=g.localdir;
+    if(typeof r6pRefreshCloudBadge==='function')setTimeout(r6pRefreshCloudBadge,0);
+    var b=document.getElementById('r6p-git-badge');
+    if(b&&g.repo){b.textContent='Configured';b.style.color='#15803d';}
+  }).catch(function(){});
+};
 window.r6aceInit=window.r6pInit;
 
 window.r6pRenderProgress=function(){
@@ -665,6 +698,7 @@ window.r6pRefreshCloudBadge=function(){
 };
 window.r6pSaveCredCache=function(){
   setTimeout(r6pRefreshCloudBadge,0);
+  if(typeof r6pSaveCredsServer==='function')r6pSaveCredsServer();
   var cache={
     authUrl:   (document.getElementById('r6p-c-authurl')||{}).value||'',
     authType:  (document.getElementById('r6p-c-authtype')||{}).value||'appcred',
@@ -1147,6 +1181,7 @@ window.r6pAutoDetectGitDir = function(){
   es.onerror = function(){ es.close(); };
 };
 window.r6pGitSave = function(){
+  if (typeof r6pSaveCredsServer === 'function') r6pSaveCredsServer();
   var v = function(id){ var el = document.getElementById(id); return el ? el.value.trim() : ''; };
   var st = {};
   try { st = JSON.parse(localStorage.getItem('ocqs_state') || '{}'); } catch(e){}

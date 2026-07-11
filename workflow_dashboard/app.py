@@ -21169,6 +21169,36 @@ def r6_state():
         return jsonify({"ok": False, "error": str(exc)}), 500
 
 
+@app.post("/api/r6/save-creds")
+def r6_save_creds():
+    """Persist R6 cloud + gitops credentials server-side so they survive browser
+    resets/incognito/different browsers. Explicit user request to cache everything,
+    including secrets. File is chmod 600 and .gitignored (never committed)."""
+    import json as _json
+    data = request.get_json(silent=True) or {}
+    p = Path(os.path.expanduser("~")) / ".config" / "opencenter" / "r6" / "creds.json"
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(_json.dumps(data, indent=2), encoding="utf-8")
+    try:
+        os.chmod(p, 0o600)
+    except Exception:
+        pass
+    return jsonify({"ok": True})
+
+
+@app.get("/api/r6/load-creds")
+def r6_load_creds():
+    """Return previously saved R6 credentials, if any."""
+    import json as _json
+    p = Path(os.path.expanduser("~")) / ".config" / "opencenter" / "r6" / "creds.json"
+    if not p.is_file():
+        return jsonify({"ok": True, "data": {}})
+    try:
+        return jsonify({"ok": True, "data": _json.loads(p.read_text(encoding="utf-8"))})
+    except Exception as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 500
+
+
 @app.get("/api/opencenter/export-bundle")
 def opencenter_export_bundle():
     """Zip all deployment input files (config blueprint, secrets, tokens, .sops.yaml) for org/cluster."""
