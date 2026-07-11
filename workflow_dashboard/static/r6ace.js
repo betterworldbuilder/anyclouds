@@ -421,7 +421,7 @@ window.r6pStage0=function(){
     /* Username/Password fields */
     +'<div id="r6p-c-pw-fields">'
     +'<div style="margin-bottom:10px;"><label style="font-size:12px;font-weight:600;color:#334155;display:block;margin-bottom:4px;">Username</label><input id="r6p-c-username" style="width:100%;padding:8px 10px;border:1px solid #e2e8f0;border-radius:5px;font-size:13px;box-sizing:border-box;" oninput="r6pSaveCredCache()" onchange="r6pSaveCred(\'cloud\',\'username\',this.value)"></div>'
-    +'<div style="margin-bottom:10px;"><label style="font-size:12px;font-weight:600;color:#334155;display:block;margin-bottom:4px;">Password</label><input id="r6p-c-password" type="password" style="width:100%;padding:8px 10px;border:1px solid #e2e8f0;border-radius:5px;font-size:13px;box-sizing:border-box;"></div>'
+    +'<div style="margin-bottom:10px;"><label style="font-size:12px;font-weight:600;color:#334155;display:block;margin-bottom:4px;">Password</label><input id="r6p-c-password" type="password" style="width:100%;padding:8px 10px;border:1px solid #e2e8f0;border-radius:5px;font-size:13px;box-sizing:border-box;" oninput="r6pSaveCredCache()"></div>'
     +'</div>'
     /* App Credential fields */
     +'<div id="r6p-c-appcred-fields" style="display:none;">'
@@ -452,7 +452,7 @@ window.r6pStage0=function(){
     +'<button onclick="r6pTestCloud()" style="background:#dc2626;color:#fff;border:none;border-radius:5px;padding:7px 16px;font-size:12px;font-weight:700;cursor:pointer;">Test Cloud Login</button>'
     +'</div>'
     +'<div id="r6p-cloud-result" style="font-size:12px;min-height:18px;margin-top:4px;"></div>'
-    +'<div style="font-size:10px;color:#94a3b8;margin-top:6px;">Secrets stored session-only. Never committed to GitOps repo or evidence bundles.</div>'
+    +'<div style="font-size:10px;color:#94a3b8;margin-top:6px;">Cached in this browser (localStorage) so you do not have to re-enter credentials. Never committed to GitOps repo or evidence bundles.</div>'
     +'</div></div>'
 
 
@@ -652,7 +652,7 @@ window.r6pDoInstall=function(){
 
 /* Credential cache — persists non-secret fields across sessions */
 var R6P_CACHE_KEY='r6p_cred_cache';
-var R6P_SECRET_FIELDS=['secret','password']; /* never cached */
+var R6P_SECRET_FIELDS=[]; /* caching everything, incl. secrets, per explicit user request */
 
 window.r6pRefreshCloudBadge=function(){
   var b=document.getElementById('r6p-cloud-badge'); if(!b) return;
@@ -670,6 +670,8 @@ window.r6pSaveCredCache=function(){
     authType:  (document.getElementById('r6p-c-authtype')||{}).value||'appcred',
     credId:    (document.getElementById('r6p-c-credid')||{}).value||'',
     username:  (document.getElementById('r6p-c-username')||{}).value||'',
+    password:  (document.getElementById('r6p-c-password')||{}).value||'',
+    secret:    (document.getElementById('r6p-c-secret')||{}).value||'',
     proj:      (document.getElementById('r6p-c-proj')||{}).value||'',
     domain:    (document.getElementById('r6p-c-domain')||{}).value||'',
     region:    (document.getElementById('r6p-c-region')||{}).value||''
@@ -687,6 +689,8 @@ window.r6pLoadCredCache=function(){
   set('r6p-c-authurl',  c.authUrl);
   set('r6p-c-credid',   c.credId);
   set('r6p-c-username', c.username);
+  set('r6p-c-password', c.password);
+  set('r6p-c-secret',   c.secret);
   set('r6p-c-proj',     c.proj);
   set('r6p-c-domain',   c.domain);
   /* auth type dropdown + show correct fields */
@@ -699,7 +703,7 @@ window.r6pLoadCredCache=function(){
     var rs=document.getElementById('r6p-c-region');
     if(rs){for(var i=0;i<rs.options.length;i++){if(rs.options[i].value===c.region){rs.selectedIndex=i;break;}}}
   }
-  /* restore R6P state (no secrets) */
+  /* restore R6P state */
   R6P.creds.cloud.authUrl=c.authUrl||'';
   R6P.creds.cloud.credId=c.credId||'';
   R6P.creds.cloud.projectId=c.proj||'';
@@ -843,14 +847,22 @@ window.r6pRunGitopsPreflight=function(){
   var gitDir=R6P.creds.opencenter.gitDir||document.getElementById('r6p-gs-path')&&document.getElementById('r6p-gs-path').value;
   var out=document.getElementById('r6p-gc-out');if(out){out.style.display='block';out.textContent='';}
   var cmd='GD="'+(gitDir||'')+'"\n'
-    +'[ -n "$GD" ] && echo "GITDIR:ok:$GD" || echo "GITDIR:fail:empty"\n'
-    +'[ -n "$GD" ] && git -C "$GD" rev-parse --git-dir &>/dev/null && echo "ISREPO:ok" || echo "ISREPO:fail"\n'
-    +'[ -n "$GD" ] && git -C "$GD" remote -v 2>/dev/null | grep -q fetch && echo "REMOTE:ok:$(git -C $GD remote get-url origin 2>/dev/null)" || echo "REMOTE:fail"\n'
-    +'[ -n "$GD" ] && { [ -d "$GD/applications/overlays" ] || [ -d "$GD/applications/workloads" ]; } && echo "WORKLOADS:ok" || echo "WORKLOADS:fail:applications/overlays missing"\n'
+    +'[ -n "$GD" ] && [ -d "$GD" ] && echo "GITDIR:ok:$GD" || echo "GITDIR:fail:'+(gitDir?'not a real directory - '+gitDir:'empty')+'"\n'
+    +'[ -n "$GD" ] && [ -d "$GD" ] && git -C "$GD" rev-parse --git-dir &>/dev/null && echo "ISREPO:ok" || echo "ISREPO:fail"\n'
+    +'[ -n "$GD" ] && [ -d "$GD" ] && git -C "$GD" remote -v 2>/dev/null | grep -q fetch && echo "REMOTE:ok:$(git -C $GD remote get-url origin 2>/dev/null)" || echo "REMOTE:fail"\n'
+    +'[ -n "$GD" ] && [ -d "$GD" ] && { [ -d "$GD/applications/overlays" ] || [ -d "$GD/applications/workloads" ]; } && echo "WORKLOADS:ok" || echo "WORKLOADS:fail:applications/overlays missing"\n'
     +'git config --global user.name &>/dev/null && echo "GITNAME:ok:$(git config --global user.name)" || echo "GITNAME:fail:not set"\n'
     +'git config --global user.email &>/dev/null && echo "GITEMAIL:ok:$(git config --global user.email)" || echo "GITEMAIL:fail:not set"\n'
     +'command -v flux &>/dev/null && echo "FLUX:ok:$(flux --version 2>/dev/null | head -1)" || echo "FLUX:fail:not installed"\n'
-    +'command -v kubectl &>/dev/null && kubectl cluster-info 2>/dev/null | head -1 | grep -q "running" && echo "KUBECTL:ok" || echo "KUBECTL:fail:no cluster access"';
+    +'CLN=$(opencenter cluster describe --output yaml 2>/dev/null | awk -F": " \'/^\\s*cluster_name:/{print $2; exit}\')\n'
+    +'KCFG=""\n'
+    +'[ -n "$GD" ] && [ -n "$CLN" ] && [ -f "$GD/infrastructure/clusters/$CLN/kubeconfig.yaml" ] && KCFG="$GD/infrastructure/clusters/$CLN/kubeconfig.yaml"\n'
+    +'[ -z "$KCFG" ] && [ -n "$GD" ] && [ -d "$GD" ] && KCFG=$(find "$GD/infrastructure/clusters" -maxdepth 2 -name kubeconfig.yaml 2>/dev/null | head -1)\n'
+    +'[ -n "$KCFG" ] && export KUBECONFIG="$KCFG"\n'
+    +'if [ -z "$KCFG" ]; then echo "KUBECTL:fail:no kubeconfig found under \\$GD/infrastructure/clusters"\n'
+    +'elif ! command -v kubectl &>/dev/null; then echo "KUBECTL:fail:kubectl not installed"\n'
+    +'elif kubectl cluster-info 2>/dev/null | head -1 | grep -qi "running\\|is running at"; then echo "KUBECTL:ok:$KCFG"\n'
+    +'else echo "KUBECTL:fail:cluster unreachable via $KCFG"; fi';
   var url='/api/stream/run-cmd?cmd='+encodeURIComponent(cmd);
   var es=new EventSource(url);
   es.onmessage=function(e){
@@ -1106,12 +1118,33 @@ window.r6pGitLoad = function(){
     set('r6p-git-sshkey', st.sshKey); set('r6p-git-token', st.tokVal);
     set('r6p-git-localdir', st.gitopsFolder);
     if (st.gitopsFolder) { R6P.creds.opencenter.gitDir = st.gitopsFolder; }
+    else if (typeof r6pAutoDetectGitDir === 'function') { r6pAutoDetectGitDir(); }
     var sel = document.getElementById('r6p-git-auth');
     if (sel && st.gitAuth) sel.value = st.gitAuth;
     r6pGitAuthToggle();
     var b = document.getElementById('r6p-git-badge');
     if (b && st.gitRepo){ b.textContent = 'Configured'; b.style.color = '#15803d'; }
   } catch(e){}
+};
+window.r6pAutoDetectGitDir = function(){
+  var cmd = 'opencenter cluster describe --output yaml 2>/dev/null | awk -F": " \'/^git_dir:/{print $2; exit}\'';
+  var es = new EventSource('/api/stream/run-cmd?cmd=' + encodeURIComponent(cmd));
+  var out = '';
+  es.onmessage = function(e){
+    if (e.data === '[DONE]' || e.data.indexOf('[EXIT') === 0){
+      es.close();
+      var dir = out.trim();
+      if (dir && dir.indexOf('/') === 0){
+        var el = document.getElementById('r6p-git-localdir');
+        if (el && !el.value) el.value = dir;
+        R6P.creds.opencenter.gitDir = dir;
+        if (typeof r6pGitSave === 'function') r6pGitSave();
+      }
+      return;
+    }
+    out += e.data;
+  };
+  es.onerror = function(){ es.close(); };
 };
 window.r6pGitSave = function(){
   var v = function(id){ var el = document.getElementById(id); return el ? el.value.trim() : ''; };
