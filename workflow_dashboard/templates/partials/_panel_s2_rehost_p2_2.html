@@ -38,7 +38,7 @@
       <div id="r6-light-view">
       <div class="gov-header">
         <div class="gov-title-area">
-          <h2>☸️ Apps Containerization Readiness</h2>
+          <h2>☸️ R6 : FLEX APPS REFACTORING</h2>
           <p>Transform selected customer business applications into container-ready, Kubernetes-packaged workloads that can be imported into the OpenCenter GitOps modernization stage.</p>
           <p style="margin-top:8px;color:#475569;font-size:13px;line-height:1.55;"><strong>R6 is the bridge between VM migration and OpenCenter modernization.</strong> It converts selected business application components into container-ready, Kubernetes-packaged workloads that can be imported into OpenCenter for GitOps-based deployment, security, observability, backup, and lifecycle operations.</p>
         </div>
@@ -120,6 +120,47 @@
       </div>
 
       <div id="r6-bundle-section" class="gov-section" style="display:none;">
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:end;margin:10px 0;padding:10px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;">
+          <div><label style="font-size:11px;font-weight:800;color:#0369a1;display:block;">Image Registry</label>
+            <select id="r6-reg-type" style="padding:6px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;">
+              <option value="harbor" selected>Harbor (in-cluster)</option>
+              <option value="dockerhub">Docker Hub (public)</option>
+              <option value="ecr">AWS ECR</option>
+              <option value="gcp">GCP Artifact Registry</option>
+              <option value="custom">Customer registry URL</option>
+            </select></div>
+          <div><label style="font-size:11px;font-weight:800;color:#0369a1;display:block;">Registry URL (optional override)</label>
+            <input id="r6-reg-url" placeholder="registry.example.com" style="padding:6px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;width:240px;"></div>
+          <div><label style="font-size:11px;font-weight:800;color:#0369a1;display:block;">Project / namespace</label>
+            <input id="r6-reg-project" value="flex-apps" style="padding:6px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;width:130px;"></div>
+          <div><label style="font-size:11px;font-weight:800;color:#0369a1;display:block;">Registry user</label>
+            <input id="r6-reg-user" placeholder="admin" style="padding:6px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;width:110px;"></div>
+          <div><label style="font-size:11px;font-weight:800;color:#0369a1;display:block;">Registry password</label>
+            <input id="r6-reg-pass" type="password" style="padding:6px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;width:130px;"></div>
+          <div><label style="font-size:11px;font-weight:800;color:#0369a1;display:block;">Source VM IP</label>
+            <input id="r6-vm-host" placeholder="10.0.0.5" style="padding:6px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;width:120px;"></div>
+          <div><label style="font-size:11px;font-weight:800;color:#0369a1;display:block;">VM SSH user</label>
+            <input id="r6-vm-user" value="root" style="padding:6px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;width:80px;"></div>
+          <label style="font-size:11px;font-weight:700;color:#334155;display:flex;align-items:center;gap:4px;"><input type="checkbox" id="r6-auto-commit" checked> auto commit+push to GitOps</label>
+        </div>
+        <div style="display:flex;gap:8px;margin:6px 0;">
+          <button onclick="r6RunProd('extract_cmd')" style="background:#7c3aed;color:#fff;border:none;border-radius:6px;padding:6px 14px;font-size:12px;font-weight:800;cursor:pointer;">&#128229; Run Extract Assets</button>
+          <button onclick="r6RunProd('build_cmd')" style="background:#0369a1;color:#fff;border:none;border-radius:6px;padding:6px 14px;font-size:12px;font-weight:800;cursor:pointer;">&#128296; Run Build + Push</button>
+          <button onclick="r6RunProd('push_cmd')" style="background:#15803d;color:#fff;border:none;border-radius:6px;padding:6px 14px;font-size:12px;font-weight:800;cursor:pointer;">&#128640; Commit to Pipeline</button>
+        </div>
+        <pre id="r6-prod-out" style="display:none;background:#0f172a;color:#86efac;border-radius:8px;padding:10px;font-size:11px;max-height:260px;overflow:auto;"></pre>
+        <script>
+        window.r6RunProd = function(key){
+          var d=null; try{ d=JSON.parse(localStorage.getItem('r6ProdBundle')||'null'); }catch(e){}
+          var out=document.getElementById('r6-prod-out');
+          if(!d||!d[key]){ if(out){out.style.display='block';out.textContent='Generate the OpenCenter bundle first.';} return; }
+          if(out){ out.style.display='block'; out.textContent='$ '+d[key]+'\n'; }
+          var es=new EventSource('/api/stream/run-cmd?cmd='+encodeURIComponent(d[key]));
+          es.onmessage=function(e){ if(out){ out.textContent+=e.data+'\n'; out.scrollTop=out.scrollHeight; } if(e.data.indexOf('[EXIT')===0) es.close(); };
+          es.onerror=function(){ es.close(); if(out) out.textContent+='[stream error]\n'; };
+        };
+        </script>
+        <div id="r6-prod-status" style="font-size:12px;font-weight:600;color:#64748b;margin:6px 0;line-height:1.7;"></div>
         <h3>Export to OpenCenter</h3>
         <p style="color:#64748b;margin-top:0;">The handoff bundle includes readiness, image plans, CI/CD metadata, Helm/Kustomize placeholders, Flux handoff, secrets placeholders, and README_OpenCenter_Import.md.</p>
         <div id="r6-bundle-summary" style="background:#f8fafc;border:1px solid #dbeafe;border-radius:10px;padding:12px;color:#0f172a;font-size:13px;margin-bottom:10px;"></div>

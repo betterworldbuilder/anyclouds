@@ -20920,6 +20920,232 @@ def openstack_networks():
         return jsonify({"error": str(e)}), 500
     return jsonify(result)
 
+@app.post("/api/r6/generate-bundle")
+def r6_generate_bundle():
+    """Write the R6 refactoring bundle as real files + Dockerfiles + build/push script,
+    and import rendered k8s manifests into the OpenCenter GitOps overlay."""
+    import json as _json, time as _time, shutil as _shutil
+    data = request.get_json(silent=True) or {}
+    bundle = data.get("bundle") or {}
+    org = re.sub(r"[^A-Za-z0-9_.-]", "", str(data.get("org") or "my-org"))
+    cluster = re.sub(r"[^A-Za-z0-9_.-]", "", str(data.get("cluster") or "my-cluster"))
+    reg = data.get("registry") or {}
+    rtype = str(reg.get("type") or "harbor").lower()
+    reg_user = str(reg.get("user") or "").strip()
+    reg_password = str(reg.get("password") or "")
+    src_vm = data.get("source_vm") or {}
+    vm_host = str(src_vm.get("host") or "").strip()
+    vm_user = str(src_vm.get("user") or "root").strip() or "root"
+    vm_key = str(src_vm.get("key_path") or "~/.ssh/id_rsa").strip() or "~/.ssh/id_rsa"
+    project = re.sub(r"[^A-Za-z0-9_./-]", "", str(reg.get("project") or "flex-apps")) or "flex-apps"
+    region = str(data.get("region") or "iad3").lower()
+    slug = re.sub(r"[^a-z0-9-]+", "-", str(bundle.get("businessSystemName") or "flex-app").lower()).strip("-") or "flex-app"
+    home = Path(os.path.expanduser("~"))
+    stamp = _time.strftime("%Y%m%d_%H%M%S")
+    out_dir = home / ".config" / "opencenter" / "bundles" / "r6" / ("%s-%s" % (slug, stamp))
+    (out_dir / "dockerfiles").mkdir(parents=True, exist_ok=True)
+    (out_dir / "kustomize_bundle").mkdir(parents=True, exist_ok=True)
+
+    harbor_url = "harbor.%s.%s.k8s.opencenter.cloud" % (cluster, region)
+    custom_url = str(reg.get("url") or "").strip().rstrip("/")
+    custom_url = re.sub(r"^https?://", "", custom_url)
+    if rtype == "harbor":
+        reg_host = custom_url or harbor_url
+        prefix = "%s/%s" % (reg_host, project)
+        login = 'docker login %s -u "${REGISTRY_USER:-admin}" -p "$REGISTRY_PASSWORD"' % reg_host
+    elif rtype == "dockerhub":
+        reg_host = "docker.io"
+        prefix = "docker.io/%s" % project
+        login = 'docker login -u "$REGISTRY_USER" -p "$REGISTRY_PASSWORD"'
+    elif rtype == "ecr":
+        reg_host = custom_url or "ACCOUNT_ID.dkr.ecr.AWS_REGION.amazonaws.com"
+        prefix = "%s/%s" % (reg_host, project)
+        login = "aws ecr get-login-password --region ${AWS_REGION:-us-east-1} | docker login --username AWS --password-stdin %s" % reg_host
+    elif rtype == "gcp":
+        reg_host = custom_url or "us-docker.pkg.dev/GCP_PROJECT"
+        prefix = "%s/%s" % (reg_host, project)
+        login = "gcloud auth configure-docker %s --quiet" % reg_host.split("/")[0]
+    else:
+        reg_host = custom_url or "registry.example.com"
+        prefix = "%s/%s" % (reg_host, project)
+        login = 'docker login %s -u "$REGISTRY_USER" -p "$REGISTRY_PASSWORD"' % reg_host
+
+    workloads = bundle.get("workloads") or []
+    deployable = [w for w in workloads if str(w.get("readiness")) != "KEEP_ON_VM_FOR_NOW"]
+    tag = stamp
+
+    def _comp(w):
+        return re.sub(r"[^a-z0-9-]+", "-", str(w.get("component", "app")).lower()).strip("-") or "app"
+
+    def _img(w):
+        return "%s/%s:%s" % (prefix, _comp(w), tag)
+
+    def _w(name, content):
+        fp = out_dir / name
+        fp.parent.mkdir(parents=True, exist_ok=True)
+        fp.write_text(content, encoding="utf-8")
+
+    _w("opencenter_import_manifest.json", _json.dumps({
+        "bundle_id": bundle.get("id"), "system": bundle.get("businessSystemName"),
+        "org": org, "cluster": cluster,
+        "registry": {"type": rtype, "host": reg_host, "project": project},
+        "images": [{"component": w.get("component"), "image": _img(w)} for w in deployable],
+        "generated_at": stamp}, indent=2))
+    _w("business_system_topology.json", _json.dumps(workloads, indent=2))
+    _w("container_readiness_assessment.json", _json.dumps(
+        [{"component": w.get("component"), "readiness": w.get("readiness"),
+          "action": w.get("actionRequired")} for w in workloads], indent=2))
+    _w("container_inventory.json", _json.dumps(
+        [{"component": w.get("component"), "base_image": w.get("image"), "target_image": _img(w),
+          "replicas": w.get("replicas", 1), "kind": w.get("kubernetesKind")} for w in deployable], indent=2))
+    _w("state_config_externalization.json", _json.dumps(
+        [{"component": w.get("component"), "configmap": bool(w.get("configMap")),
+          "secret": w.get("secret"), "pvc": bool(w.get("pvc"))} for w in workloads], indent=2))
+    _w("registry_push_plan.json", _json.dumps({
+        "registry_type": rtype, "host": reg_host, "project": project, "login": login,
+        "pushes": [_img(w) for w in deployable]}, indent=2))
+
+    layer_paths = {"Frontend": "/var/www/", "API": "/opt/app/", "Queue": "/etc/rabbitmq/",
+                   "Network": "/etc/nginx/", "Storage": "/srv/", "Database": "/var/lib/"}
+    extract_lines = ["#!/usr/bin/env bash", "set -euo pipefail", 'cd "$(dirname "$0")"',
+                     "# Pull app payloads from the source VM into each docker build context",
+                     'VM_HOST="${VM_HOST:-%s}"' % (vm_host or "SOURCE_VM_IP"),
+                     'VM_USER="${VM_USER:-%s}"' % vm_user,
+                     'SSH_KEY="${SSH_KEY:-%s}"' % vm_key]
+    build_lines = ["#!/usr/bin/env bash", "set -euo pipefail", 'cd "$(dirname "$0")"',
+                   "[ -f registry.env ] && . ./registry.env",
+                   "# R6 build & push - %s (%s registry)" % (slug, rtype),
+                   'echo "== registry login =="', login]
+    plan_yaml = ["images:"]
+    kust_res = ["namespace.yaml"]
+    for w in deployable:
+        comp = _comp(w)
+        base = str(w.get("image") or "docker.io/library/debian:stable-slim")
+        image = _img(w)
+        df_lines = [
+            "FROM %s" % base,
+            'LABEL org.opencontainers.image.title="%s" org.opencontainers.image.source="r6-flex-refactoring"' % comp,
+            "WORKDIR /app",
+            "COPY ./app /app",
+            "EXPOSE 8080",
+            "HEALTHCHECK --interval=30s --timeout=5s CMD curl -fsS http://localhost:8080/healthz || exit 1",
+        ]
+        _w("dockerfiles/%s/Dockerfile" % comp, "\n".join(df_lines) + "\n")
+        plan_yaml += ["  - component: %s" % comp, "    base_image: %s" % base,
+                      "    target: %s" % image, "    context: dockerfiles/%s" % comp,
+                      "    ports: [8080]", "    healthcheck: /healthz"]
+        (out_dir / "dockerfiles" / comp / "app").mkdir(parents=True, exist_ok=True)
+        (out_dir / "dockerfiles" / comp / "app" / ".gitkeep").write_text("", encoding="utf-8")
+        src_path = str(w.get("sourcePath") or layer_paths.get(str(w.get("layer")), "/opt/app/"))
+        extract_lines += ['echo "== extract %s from $VM_HOST:%s =="' % (comp, src_path),
+                          'rsync -az -e "ssh -i $SSH_KEY -o StrictHostKeyChecking=no" '
+                          '"$VM_USER@$VM_HOST:%s" "dockerfiles/%s/app/"' % (src_path, comp)]
+        build_lines += ['echo "== build %s =="' % comp,
+                        "docker build -t %s dockerfiles/%s" % (image, comp),
+                        "docker push %s" % image]
+        dep_lines = [
+            "apiVersion: apps/v1", "kind: Deployment",
+            "metadata:", "  name: %s" % comp, "  namespace: %s" % slug,
+            "  labels: {app: %s, r6-bundle: %s}" % (comp, slug),
+            "spec:", "  replicas: %s" % (w.get("replicas", 1) or 1),
+            "  selector:", "    matchLabels: {app: %s}" % comp,
+            "  template:", "    metadata:", "      labels: {app: %s}" % comp,
+            "    spec:", "      imagePullSecrets:", "        - name: r6-registry-pull",
+            "      containers:", "        - name: %s" % comp, "          image: %s" % image,
+            "          ports: [{containerPort: 8080}]",
+            "---",
+            "apiVersion: v1", "kind: Service",
+            "metadata:", "  name: %s" % comp, "  namespace: %s" % slug,
+            "spec:", "  selector: {app: %s}" % comp,
+            "  ports: [{port: 80, targetPort: 8080}]",
+        ]
+        _w("kustomize_bundle/%s.yaml" % comp, "\n".join(dep_lines) + "\n")
+        kust_res.append("%s.yaml" % comp)
+    _w("image_build_plan.yaml", "\n".join(plan_yaml) + "\n")
+    _w("build_and_push.sh", "\n".join(build_lines) + "\n")
+    os.chmod(out_dir / "build_and_push.sh", 0o755)
+    _w("extract_assets.sh", "\n".join(extract_lines) + "\n")
+    os.chmod(out_dir / "extract_assets.sh", 0o755)
+    if reg_user or reg_password:
+        _w("registry.env", "export REGISTRY_USER=%r\nexport REGISTRY_PASSWORD=%r\n" % (reg_user or "admin", reg_password))
+        os.chmod(out_dir / "registry.env", 0o600)
+    _w("kustomize_bundle/namespace.yaml",
+       "apiVersion: v1\nkind: Namespace\nmetadata:\n  name: %s\n" % slug)
+    _w("kustomize_bundle/pull-secret.TEMPLATE.yaml",
+       "# Create with:\n"
+       "# kubectl create secret docker-registry r6-registry-pull -n %s \\\n"
+       "#   --docker-server=%s --docker-username=$REGISTRY_USER --docker-password=$REGISTRY_PASSWORD \\\n"
+       "#   --dry-run=client -o yaml\n"
+       "# Then SOPS-encrypt before committing.\n" % (slug, reg_host))
+    _w("kustomize_bundle/kustomization.yaml",
+       "apiVersion: kustomize.config.k8s.io/v1beta1\nkind: Kustomization\nresources:\n"
+       + "".join("  - %s\n" % r for r in kust_res))
+    _w("ci_cd_pipeline.yaml",
+       "# CI: run build_and_push.sh on merge, then commit kustomize_bundle to the GitOps repo\n"
+       "stages: [build, push, gitops-commit]\nscript: ./build_and_push.sh\n")
+
+    imported = None
+    sops_status = "skipped (no registry credentials given)"
+    commit_status = "skipped (auto_commit off)"
+    gitops = home / ".config" / "opencenter" / "clusters" / "gitops" / org
+    if data.get("import_to_gitops", True) and gitops.is_dir():
+        overlay = gitops / "applications" / "overlays" / cluster / "apps" / slug
+        overlay.mkdir(parents=True, exist_ok=True)
+        for f in (out_dir / "kustomize_bundle").iterdir():
+            _shutil.copy2(f, overlay / f.name)
+        imported = str(overlay)
+        if reg_user and reg_password:
+            import base64 as _b64, subprocess as _sp
+            auth = _b64.b64encode(("%s:%s" % (reg_user, reg_password)).encode()).decode()
+            cfg = _json.dumps({"auths": {reg_host: {"username": reg_user, "password": reg_password, "auth": auth}}})
+            sec = ("apiVersion: v1\nkind: Secret\nmetadata:\n  name: r6-registry-pull\n  namespace: %s\n"
+                   "type: kubernetes.io/dockerconfigjson\ndata:\n  .dockerconfigjson: %s\n"
+                   % (slug, _b64.b64encode(cfg.encode()).decode()))
+            (overlay / "pull-secret.yaml").write_text(sec, encoding="utf-8")
+            try:
+                _sops = str(home / ".local" / "bin" / "sops") if (home / ".local" / "bin" / "sops").exists() else "sops"
+                _agepub = home / ".config" / "opencenter" / "clusters" / "secrets" / org / cluster / "age" / "keys" / ("%s-key.pub" % cluster)
+                _recip = _agepub.read_text(encoding="utf-8").strip() if _agepub.is_file() else ""
+                _sopscfg = out_dir / "sops-pullsecret.yaml"
+                _sopscfg.write_text(
+                    "creation_rules:" + chr(10)
+                    + "  - path_regex: .*" + chr(10)
+                    + "    encrypted_regex: ^(data|stringData)$" + chr(10)
+                    + "    age: " + _recip + chr(10), encoding="utf-8")
+                _cmd = [_sops, "--config", str(_sopscfg), "--encrypt", "--in-place", str(overlay / "pull-secret.yaml")]
+                r = _sp.run(_cmd, cwd=str(gitops), capture_output=True, text=True, timeout=60)
+                sops_status = "encrypted" if r.returncode == 0 else ("sops failed: " + (r.stderr or "")[:200])
+                if r.returncode != 0:
+                    (overlay / "pull-secret.yaml").unlink()
+            except FileNotFoundError:
+                sops_status = "sops binary not found - plaintext secret removed"
+                (overlay / "pull-secret.yaml").unlink()
+            if sops_status == "encrypted":
+                k = overlay / "kustomization.yaml"
+                k.write_text(k.read_text(encoding="utf-8") + "  - pull-secret.yaml\n", encoding="utf-8")
+        if data.get("auto_commit"):
+            import subprocess as _sp2
+            env2 = {**os.environ, "GIT_SSH_COMMAND": "ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no"}
+            rel = "applications/overlays/%s/apps/%s" % (cluster, slug)
+            cmds = [["git", "add", rel], ["git", "commit", "-m", "R6 import: %s" % slug], ["git", "push"]]
+            outs = []
+            for c in cmds:
+                r2 = _sp2.run(c, cwd=str(gitops), capture_output=True, text=True, timeout=120, env=env2)
+                outs.append("%s -> %s %s" % (" ".join(c[:2]), r2.returncode, (r2.stdout + r2.stderr).strip()[-160:]))
+                if r2.returncode != 0 and c[1] != "commit":
+                    break
+            commit_status = " | ".join(outs)
+    return jsonify({
+        "ok": True, "bundle_dir": str(out_dir),
+        "files": sorted(str(f.relative_to(out_dir)) for f in out_dir.rglob("*") if f.is_file()),
+        "imported_to": imported,
+        "extract_cmd": "cd %s && bash extract_assets.sh" % out_dir,
+        "pull_secret": sops_status, "gitops_commit": commit_status,
+        "build_cmd": "cd %s && bash build_and_push.sh" % out_dir,
+        "push_cmd": "cd %s && git add applications/overlays/%s/apps/%s && git commit -m 'R6 import: %s' && git push" % (gitops, cluster, slug, slug),
+    })
+
+
 @app.get("/api/opencenter/export-bundle")
 def opencenter_export_bundle():
     """Zip all deployment input files (config blueprint, secrets, tokens, .sops.yaml) for org/cluster."""

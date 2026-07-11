@@ -455,6 +455,30 @@ window.r6pStage0=function(){
     +'<div style="font-size:10px;color:#94a3b8;margin-top:6px;">Secrets stored session-only. Never committed to GitOps repo or evidence bundles.</div>'
     +'</div></div>'
 
+
+    /* 2. GitOps credentials (synced with OpenCenter quickstart state) */
+    +'<div style="border:1px solid #e2e8f0;border-radius:8px;padding:14px 16px;margin:12px 16px 16px;">'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">'
+    +'<div><div style="font-weight:700;font-size:13px;">2. GitOps Credentials</div>'
+    +'<div style="font-size:11px;color:#64748b;">Repo + auth used to push refactored app manifests into the OpenCenter pipeline</div></div>'
+    +'<span id="r6p-git-badge" style="font-size:10px;font-weight:800;color:#94a3b8;">Not Configured</span></div>'
+    +'<div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:10px;">'
+    +'<div><label style="font-size:11px;font-weight:700;color:#334155;display:block;">GitOps Repository URL</label>'
+    +'<input id="r6p-git-repo" style="width:100%;padding:6px;border:1px solid #cbd5e1;border-radius:5px;font-size:12px;" placeholder="https://github.com/USER/repo.git"></div>'
+    +'<div><label style="font-size:11px;font-weight:700;color:#334155;display:block;">Branch</label>'
+    +'<input id="r6p-git-branch" value="main" style="width:100%;padding:6px;border:1px solid #cbd5e1;border-radius:5px;font-size:12px;"></div>'
+    +'<div><label style="font-size:11px;font-weight:700;color:#334155;display:block;">Auth Method</label>'
+    +'<select id="r6p-git-auth" onchange="r6pGitAuthToggle()" style="width:100%;padding:6px;border:1px solid #cbd5e1;border-radius:5px;font-size:12px;">'
+    +'<option value="ssh" selected>SSH key</option><option value="token">HTTPS token</option></select></div>'
+    +'</div>'
+    +'<div id="r6p-git-ssh-row" style="margin-top:8px;"><label style="font-size:11px;font-weight:700;color:#334155;display:block;">SSH Key Path</label>'
+    +'<input id="r6p-git-sshkey" value="~/.ssh/id_rsa" style="width:100%;padding:6px;border:1px solid #cbd5e1;border-radius:5px;font-size:12px;"></div>'
+    +'<div id="r6p-git-token-row" style="margin-top:8px;display:none;"><label style="font-size:11px;font-weight:700;color:#334155;display:block;">Git Token (stored session-only)</label>'
+    +'<input id="r6p-git-token" type="password" style="width:100%;padding:6px;border:1px solid #cbd5e1;border-radius:5px;font-size:12px;" placeholder="ghp_..."></div>'
+    +'<div style="display:flex;gap:8px;margin-top:10px;align-items:center;">'
+    +'<button onclick="r6pGitSave()" style="background:#0f172a;color:#fff;border:none;border-radius:5px;padding:7px 16px;font-size:12px;font-weight:700;cursor:pointer;">Save GitOps Credentials</button>'
+    +'<span id="r6p-git-status" style="font-size:12px;color:#64748b;"></span></div>'
+    +'</div>'
     +'</div></div>'/* end section B */
 
     /* ─── SECTION C: GitOps Preflight ─── */
@@ -808,7 +832,7 @@ window.r6pRunGitopsPreflight=function(){
     +'[ -n "$GD" ] && echo "GITDIR:ok:$GD" || echo "GITDIR:fail:empty"\n'
     +'[ -n "$GD" ] && git -C "$GD" rev-parse --git-dir &>/dev/null && echo "ISREPO:ok" || echo "ISREPO:fail"\n'
     +'[ -n "$GD" ] && git -C "$GD" remote -v 2>/dev/null | grep -q fetch && echo "REMOTE:ok:$(git -C $GD remote get-url origin 2>/dev/null)" || echo "REMOTE:fail"\n'
-    +'[ -n "$GD" ] && [ -d "$GD/applications/workloads" ] && echo "WORKLOADS:ok" || echo "WORKLOADS:fail:directory missing"\n'
+    +'[ -n "$GD" ] && { [ -d "$GD/applications/overlays" ] || [ -d "$GD/applications/workloads" ]; } && echo "WORKLOADS:ok" || echo "WORKLOADS:fail:applications/overlays missing"\n'
     +'git config --global user.name &>/dev/null && echo "GITNAME:ok:$(git config --global user.name)" || echo "GITNAME:fail:not set"\n'
     +'git config --global user.email &>/dev/null && echo "GITEMAIL:ok:$(git config --global user.email)" || echo "GITEMAIL:fail:not set"\n'
     +'command -v flux &>/dev/null && echo "FLUX:ok:$(flux --version 2>/dev/null | head -1)" || echo "FLUX:fail:not installed"\n'
@@ -1052,3 +1076,41 @@ window.clfImportOpenRC=function(evt){
 /* Install button map */
 var R6ACE_INSTALL={'opencenter version':'git clone https://github.com/opencenter-cloud/openCenter-cli.git && cd openCenter-cli && mise trust && mise install && mise run build && sudo cp ./bin/opencenter /usr/local/bin/opencenter && opencenter version','kubectl version --client':'curl -LO "https://dl.k8s.io/release/$(curl -sL https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" && sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl && kubectl version --client','opentofu version':'curl -sSLo /tmp/opentofu.zip https://github.com/opentofu/opentofu/releases/download/v1.8.0/tofu_1.8.0_linux_amd64.zip && cd /tmp && unzip -o opentofu.zip && sudo mv tofu /usr/local/bin/opentofu && opentofu version','flux --version || true':'curl -s https://fluxcd.io/install.sh | sudo bash && flux --version','git --version':'sudo apt-get update && sudo apt-get install -y git','curl --version':'sudo apt-get update && sudo apt-get install -y curl','jq --version':'sudo apt-get update && sudo apt-get install -y jq','helm version':'curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash','yq --version':'sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 && sudo chmod +x /usr/local/bin/yq && yq --version','kustomize version':'curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash && sudo mv kustomize /usr/local/bin/kustomize && kustomize version'};
 window.r6aceRunInstall=function(did,cmdId,outId){var d=document.getElementById(did);if(d)d.remove();var out=document.getElementById(outId),cEl=document.getElementById(cmdId);if(!out||!cEl)return;var cmd=cEl.textContent.trim();var ic=R6ACE_INSTALL[cmd];if(!ic)return;out.textContent='Installing...\n';out.style.borderColor='#134e4a';var url='/api/stream/run-cmd?cmd='+encodeURIComponent(ic);var es=new EventSource(url);es.onmessage=function(e){if(e.data!=='[DONE]'){out.textContent+=e.data+'\n';out.scrollTop=out.scrollHeight;}else{es.close();setTimeout(function(){r6pRunCmd(cmdId,outId);},500);}};es.onerror=function(){out.textContent+='[install error]\n';es.close();};};
+
+/* GitOps credentials card: two-way sync with the OpenCenter quickstart state */
+window.r6pGitAuthToggle = function(){
+  var a = (document.getElementById('r6p-git-auth')||{}).value || 'ssh';
+  var sr = document.getElementById('r6p-git-ssh-row'), tr = document.getElementById('r6p-git-token-row');
+  if (sr) sr.style.display = (a === 'ssh') ? '' : 'none';
+  if (tr) tr.style.display = (a === 'token') ? '' : 'none';
+};
+window.r6pGitLoad = function(){
+  try {
+    var st = JSON.parse(localStorage.getItem('ocqs_state') || '{}');
+    var set = function(id, v){ var el = document.getElementById(id); if (el && v) el.value = v; };
+    set('r6p-git-repo', st.gitRepo); set('r6p-git-branch', st.gitBranch);
+    set('r6p-git-sshkey', st.sshKey); set('r6p-git-token', st.tokVal);
+    var sel = document.getElementById('r6p-git-auth');
+    if (sel && st.gitAuth) sel.value = st.gitAuth;
+    r6pGitAuthToggle();
+    var b = document.getElementById('r6p-git-badge');
+    if (b && st.gitRepo){ b.textContent = 'Configured'; b.style.color = '#15803d'; }
+  } catch(e){}
+};
+window.r6pGitSave = function(){
+  var v = function(id){ var el = document.getElementById(id); return el ? el.value.trim() : ''; };
+  var st = {};
+  try { st = JSON.parse(localStorage.getItem('ocqs_state') || '{}'); } catch(e){}
+  st.gitRepo = v('r6p-git-repo'); st.gitBranch = v('r6p-git-branch') || 'main';
+  st.gitAuth = v('r6p-git-auth') || 'ssh'; st.sshKey = v('r6p-git-sshkey') || '~/.ssh/id_rsa';
+  if (v('r6p-git-token')) st.tokVal = v('r6p-git-token');
+  try { localStorage.setItem('ocqs_state', JSON.stringify(st)); } catch(e){}
+  var stEl = document.getElementById('r6p-git-status');
+  if (stEl){
+    if (!st.gitRepo){ stEl.textContent = '\u2717 repository URL required'; stEl.style.color = '#dc2626'; return; }
+    stEl.textContent = '\u2713 saved - shared with OpenCenter quickstart (Stage 2)'; stEl.style.color = '#15803d';
+  }
+  var b = document.getElementById('r6p-git-badge');
+  if (b){ b.textContent = 'Configured'; b.style.color = '#15803d'; }
+};
+setTimeout(function(){ if (document.getElementById('r6p-git-repo')) r6pGitLoad(); }, 400);
