@@ -372,6 +372,32 @@ window.r6pSetClassifyOverride=function(name,val){
   R6P.classifyOverride=R6P.classifyOverride||{};
   R6P.classifyOverride[name]=val;
 };
+/* Per-component lifecycle status. The pipeline currently checkpoints at the
+   business-system level (one Mark Complete/Approve per step, not per component),
+   so this derives a real, honest stage from those actual step-completion flags
+   rather than inventing untracked per-component granularity. Kept-external
+   components (Keep on FLEX badge) follow the short KEEP_EXTERNAL path instead
+   of the container build path. */
+window.r6pLifecycleFor=function(c){
+  var saved=(R6P.targetForms&&R6P.targetForms[c.name])||r6pDecideTargetForm(c).form;
+  var badge=r6pBadgeForTargetForm(saved)[0];
+  var isExternalPath=(badge==='Keep on FLEX'||saved==='EXTERNAL_SERVICE'||saved==='EXCLUDED');
+  var st=R6P.status||{};
+  if(st[13]==='done')return 'CUTOVER_VALIDATED';
+  if(isExternalPath){
+    if(st[12]==='done')return 'BACKUP_VALIDATED';
+    if(st[8]==='done')return 'CONNECTIVITY_VALIDATED';
+    if(R6P.targetForms&&R6P.targetForms[c.name])return 'KEEP_EXTERNAL';
+    return 'CLASSIFIED';
+  }
+  if(st[12]==='done')return 'STAGING_DEPLOYED';
+  if(st[11]==='done'||R6P.bundle||R6P._realBundle)return 'IMAGE_GENERATED';
+  if(st[9]==='done')return 'IMAGE_GENERATED';
+  if(st[8]==='done')return 'DECISION_APPROVED';
+  if(R6P.targetForms&&R6P.targetForms[c.name])return 'DECISION_APPROVED';
+  if(st[7]==='done'||R6P.classifyOverride&&R6P.classifyOverride[c.name])return 'CLASSIFIED';
+  return 'DISCOVERED';
+};
 function r6pCmd(id,cmd){var cid='r6p-cmd-'+id,oid='r6p-out-'+id;return '<div class="r6p-cmd-box" id="'+cid+'">'+cmd.replace(/</g,'&lt;').replace(/>/g,'&gt;')+'</div><div style="display:flex;gap:5px;margin-bottom:8px;"><button onclick="navigator.clipboard&&navigator.clipboard.writeText(document.getElementById(\''+cid+'\').textContent)" style="background:#f1f5f9;color:#475569;border:1px solid #e2e8f0;border-radius:4px;padding:3px 10px;font-size:10px;cursor:pointer;">Copy</button><button onclick="r6pRunCmd(\''+cid+'\',\''+oid+'\')" style="background:#eff6ff;color:#0369a1;border:1px solid #bfdbfe;border-radius:4px;padding:3px 10px;font-size:10px;font-weight:700;cursor:pointer;">Run</button><button onclick="var e=document.getElementById(\''+oid+'\');e.style.display=e.style.display===\'none\'?\'block\':\'none\'" style="background:#f1f5f9;color:#64748b;border:1px solid #e2e8f0;border-radius:4px;padding:3px 10px;font-size:10px;cursor:pointer;">Log</button></div><div id="'+oid+'" class="r6p-terminal" style="display:none;">$ waiting...</div>';}
 
 window.r6pContent=function(n){
@@ -453,14 +479,18 @@ window.r6pContent=function(n){
       +(allCanProceed?'':'<div class="r6p-warn-box" style="margin-top:10px;">One or more components are BLOCKED - resolve before approving.</div>')
       +'<div style="font-weight:800;font-size:13px;color:#0f172a;margin:20px 0 8px;">Transform: Target Runtime Decision (Hybrid)</div>'
       +'<div class="r6p-info-box">Assigns every real selected component one of 11 target forms - CONTAINERIZED, KUBERNETES_NATIVE, OPERATOR_MANAGED, RETAINED_FLEX_VM, REDEPLOYED_FLEX_VM, EXTERNAL_SERVICE, DATA_MIGRATION_REQUIRED, PARTIALLY_CONTAINERIZED, MANUAL_REVIEW, BLOCKED or EXCLUDED. Engineers can override any row - overrides are saved per component.</div>'
-      +'<div style="overflow-x:auto;"><table class="r6p-table"><thead><tr><th>Component</th><th>Default Target Form</th><th>UI Decision Badge</th><th>Required Gate Before Deploy</th><th>Reason</th><th>Override</th></tr></thead><tbody>'
+      +'<div style="overflow-x:auto;"><table class="r6p-table"><thead><tr><th>Component</th><th>State</th><th>Containerized</th><th>Default Target Form</th><th>UI Decision Badge</th><th>Lifecycle</th><th>Required Gate Before Deploy</th><th>Reason</th><th>Override</th></tr></thead><tbody>'
       +comps8.map(function(c){
         var tf=r6pDecideTargetForm(c);
         var saved=(R6P.targetForms&&R6P.targetForms[c.name])||tf.form;
         var badge=r6pBadgeForTargetForm(saved);
         var gate=r6pRequiredGateFor(saved);
+        var cls=r6pClassifyForComponent(c);
+        var isContainerized=(badge[0]==='Containerize'||badge[0]==='Partially Containerize')?'Yes':(badge[0]==='Deploy with Operator'?'No direct conversion':'No');
+        var lc=r6pLifecycleFor(c);
+        var stDot=cls.state==='Stateless'?'#16a34a':cls.state==='Stateful'?'#dc2626':'#d97706';
         var opts=R6_TARGET_FORMS.map(function(r){return '<option value="'+r[0]+'"'+(r[0]===saved?' selected':'')+'>'+r[0]+'</option>';}).join('');
-        return '<tr><td style="font-weight:600;">'+c.name+'</td><td><span style="background:#eff6ff;color:#0369a1;padding:2px 8px;border-radius:999px;font-size:10px;font-weight:700;">'+saved+'</span></td><td><span style="background:'+badge[1]+'22;color:'+badge[1]+';padding:2px 8px;border-radius:999px;font-size:10px;font-weight:700;">'+badge[0]+'</span></td><td style="font-size:11px;color:#64748b;max-width:200px;">'+gate+'</td><td style="font-size:11px;color:#64748b;max-width:220px;">'+tf.reason+'</td><td><select onchange="r6pSetTargetForm(\''+c.name.replace(/'/g,"\\'")+'\',this.value)" style="padding:4px 6px;border:1px solid #cbd5e1;border-radius:5px;font-size:11px;">'+opts+'</select></td></tr>';
+        return '<tr><td style="font-weight:600;">'+c.name+'</td><td><span style="background:'+stDot+'22;color:'+stDot+';padding:2px 8px;border-radius:999px;font-size:10px;font-weight:700;">'+cls.state+'</span></td><td style="font-size:11px;color:#334155;">'+isContainerized+'</td><td><span style="background:#eff6ff;color:#0369a1;padding:2px 8px;border-radius:999px;font-size:10px;font-weight:700;">'+saved+'</span></td><td><span style="background:'+badge[1]+'22;color:'+badge[1]+';padding:2px 8px;border-radius:999px;font-size:10px;font-weight:700;">'+badge[0]+'</span></td><td style="font-size:10px;color:#7c3aed;font-weight:700;">'+lc.replace(/_/g,' ')+'</td><td style="font-size:11px;color:#64748b;max-width:180px;">'+gate+'</td><td style="font-size:11px;color:#64748b;max-width:200px;">'+tf.reason+'</td><td><select onchange="r6pSetTargetForm(\''+c.name.replace(/'/g,"\\'")+'\',this.value)" style="padding:4px 6px;border:1px solid #cbd5e1;border-radius:5px;font-size:11px;">'+opts+'</select></td></tr>';
       }).join('')
       +'</tbody></table></div>'
       +r6pFoot(8,'<button class="r6p-btn success" onclick="r6pMarkDone(8)"'+(allCanProceed?'':' disabled')+'>Approve Readiness Plan</button>');}
