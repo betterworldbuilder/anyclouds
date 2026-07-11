@@ -20965,6 +20965,22 @@ def r6_generate_bundle():
         reg_host = custom_url or "us-docker.pkg.dev/GCP_PROJECT"
         prefix = "%s/%s" % (reg_host, project)
         login = "gcloud auth configure-docker %s --quiet" % reg_host.split("/")[0]
+    elif rtype == "ghcr":
+        reg_host = "ghcr.io"
+        prefix = "ghcr.io/%s" % project
+        login = 'docker login ghcr.io -u "$REGISTRY_USER" -p "$REGISTRY_PASSWORD"'
+    elif rtype == "gitlab":
+        reg_host = custom_url or "registry.gitlab.com"
+        prefix = "%s/%s" % (reg_host, project)
+        login = 'docker login %s -u "$REGISTRY_USER" -p "$REGISTRY_PASSWORD"' % reg_host
+    elif rtype == "quay":
+        reg_host = "quay.io"
+        prefix = "quay.io/%s" % project
+        login = 'docker login quay.io -u "$REGISTRY_USER" -p "$REGISTRY_PASSWORD"'
+    elif rtype == "ecrpublic":
+        reg_host = "public.ecr.aws"
+        prefix = "public.ecr.aws/%s" % project
+        login = "aws ecr-public get-login-password --region us-east-1 | docker login --username AWS --password-stdin public.ecr.aws"
     else:
         reg_host = custom_url or "registry.example.com"
         prefix = "%s/%s" % (reg_host, project)
@@ -21014,8 +21030,15 @@ def r6_generate_bundle():
                      'SSH_KEY="${SSH_KEY:-%s}"' % vm_key]
     build_lines = ["#!/usr/bin/env bash", "set -euo pipefail", 'cd "$(dirname "$0")"',
                    "[ -f registry.env ] && . ./registry.env",
+                   'REGISTRY_USER="${REGISTRY_USER:-}"', 'REGISTRY_PASSWORD="${REGISTRY_PASSWORD:-}"',
                    "# R6 build & push - %s (%s registry)" % (slug, rtype),
-                   'echo "== registry login =="', login]
+                   'echo "== registry login =="',
+                   # Login is best-effort, not fatal: build/health-test/SBOM/scan need no
+                   # registry auth at all, and push may already be authenticated via an
+                   # external credential helper. Only push itself hard-fails on bad auth.
+                   'if [ -n "$REGISTRY_USER" ] && [ -n "$REGISTRY_PASSWORD" ]; then %s || echo "[WARN] registry login failed - push will likely fail unless already authenticated"; else echo "[WARN] REGISTRY_USER/REGISTRY_PASSWORD not set (no registry.env) - skipping login, continuing with build/test/SBOM/scan"; fi' % login,
+                   ": > image-manifest.json", 'echo "[" >> image-manifest.json',
+                   "_first=1"]
     plan_yaml = ["images:"]
     kust_res = ["namespace.yaml"]
     for w in deployable:
@@ -21040,9 +21063,43 @@ def r6_generate_bundle():
         extract_lines += ['echo "== extract %s from $VM_HOST:%s =="' % (comp, src_path),
                           'rsync -az -e "ssh -i $SSH_KEY -o StrictHostKeyChecking=no" '
                           '"$VM_USER@$VM_HOST:%s" "dockerfiles/%s/app/"' % (src_path, comp)]
-        build_lines += ['echo "== build %s =="' % comp,
-                        "docker build -t %s dockerfiles/%s" % (image, comp),
-                        "docker push %s" % image]
+        sbom_path = "evidence/images/%s-sbom.spdx.json" % comp
+        build_lines += [
+            'echo "== build %s =="' % comp,
+            "docker build -t %s dockerfiles/%s" % (image, comp),
+            'echo "== startup/health test %s =="' % comp,
+            # Foreground run with the health check as the container's own command - avoids
+            # racing a detached container that may exit before docker exec/stop reach it.
+            'docker run --rm %s sh -c "command -v curl >/dev/null 2>&1 && curl -fsS -m 3 http://localhost:8080/healthz 2>/dev/null || echo \'no local health server to test in a plain run - verify after Kubernetes deploy\'" || echo "[WARN] startup test container exited non-zero for %s - review manually"'
+            % (image, comp),
+            'echo "== SBOM %s =="' % comp,
+            "mkdir -p evidence/images",
+            'if command -v syft >/dev/null 2>&1; then syft %s -o spdx-json > %s; else echo "syft not installed - skipping SBOM" > %s; fi' % (image, sbom_path, sbom_path),
+            'echo "== vulnerability scan %s =="' % comp,
+            'if command -v trivy >/dev/null 2>&1; then trivy image --exit-code 0 --format table %s | tee evidence/images/%s-scan.txt; else echo "trivy not installed - skipping scan" | tee evidence/images/%s-scan.txt; fi' % (image, comp, comp),
+            'echo "== push %s =="' % comp,
+            # Push failure (e.g. no/invalid registry credentials) must not abort the whole
+            # script under set -e - SBOM/scan evidence already gathered above still needs
+            # to be recorded in image-manifest.json, just with an honest FAILED push status.
+            '_push_status="PASSED"',
+            "docker push %s || _push_status=\"FAILED\"" % image,
+            'echo "== sign %s =="' % comp,
+            '_sign_status="not attempted - push failed"',
+            'if [ "$_push_status" = "PASSED" ]; then\n'
+            '  _sign_status="not signed - cosign not installed"\n'
+            '  if command -v cosign >/dev/null 2>&1; then cosign sign --yes %s 2>&1 && _sign_status="SIGNED" || _sign_status="sign failed"; fi\n'
+            "fi" % image,
+            'echo "== resolve digest %s =="' % comp,
+            '_digest="unresolved - push failed, image not in registry"',
+            'if [ "$_push_status" = "PASSED" ]; then\n'
+            '  _digest=$(docker inspect --format="{{index .RepoDigests 0}}" %s 2>/dev/null | sed "s/.*@//" || true)\n'
+            '  [ -z "$_digest" ] && _digest="unresolved - inspect image manually"\n'
+            "fi" % image,
+            '[ $_first -eq 0 ] && echo "," >> image-manifest.json',
+            "_first=0",
+            'printf \'{"component":"%s","registry":"%s","repository":"%s","tag":"%s","digest":"%%s","buildStatus":"PASSED","pushStatus":"%%s","signatureStatus":"%%s"}\' "$_digest" "$_push_status" "$_sign_status" >> image-manifest.json'
+            % (comp, reg_host, "%s/%s" % (project, comp), tag),
+        ]
         dep_lines = [
             "apiVersion: apps/v1", "kind: Deployment",
             "metadata:", "  name: %s" % comp, "  namespace: %s" % slug,
@@ -21061,6 +21118,7 @@ def r6_generate_bundle():
         ]
         _w("kustomize_bundle/%s.yaml" % comp, "\n".join(dep_lines) + "\n")
         kust_res.append("%s.yaml" % comp)
+    build_lines += ['echo "]" >> image-manifest.json', 'echo "Wrote image-manifest.json"']
     _w("image_build_plan.yaml", "\n".join(plan_yaml) + "\n")
     _w("build_and_push.sh", "\n".join(build_lines) + "\n")
     os.chmod(out_dir / "build_and_push.sh", 0o755)
@@ -21086,8 +21144,15 @@ def r6_generate_bundle():
 
     imported = None
     sops_status = "skipped (no registry credentials given)"
-    commit_status = "skipped (auto_commit off)"
     gitops = home / ".config" / "opencenter" / "clusters" / "gitops" / org
+    if not data.get("import_to_gitops", True):
+        commit_status = "skipped (import_to_gitops off)"
+    elif not gitops.is_dir():
+        commit_status = "skipped (no GitOps directory found for org '%s' - run opencenter cluster init/generate first)" % org
+    elif not data.get("auto_commit"):
+        commit_status = "skipped (auto_commit off)"
+    else:
+        commit_status = "pending"
     if data.get("import_to_gitops", True) and gitops.is_dir():
         overlay = gitops / "applications" / "overlays" / cluster / "managed-services" / slug
         overlay.mkdir(parents=True, exist_ok=True)

@@ -628,14 +628,20 @@ window.r6pContent=function(n){
       }).join('')
       +'</tbody></table></div>'
       +r6pFoot(8,'<button class="r6p-btn success" onclick="r6pMarkDone(8)"'+(allCanProceed?'':' disabled')+'>Approve Readiness Plan</button>');}
-  if(n===9)return '<div class="r6p-info-box">Generates a real per-component Dockerfile, extract_assets.sh (pulls app files from the live FLEX VM), build_and_push.sh, and a SOPS-encrypted registry pull secret - the same engine used by Ship to OpenCenter.</div>'
+  if(n===9)return '<div class="r6p-info-box">Generates a real per-component Dockerfile, extract_assets.sh (pulls app files from the live FLEX VM), build_and_push.sh (build, SBOM, scan, sign, push, resolve digest), and a SOPS-encrypted registry pull secret. Images are only built for components Step 8 decided are CONTAINERIZED or PARTIALLY_CONTAINERIZED - everything else (operator-managed, retained/redeployed VM, external, data-migration, blocked) is skipped here by design.</div>'
     +'<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px;">'
-    +'<div><label style="font-size:11px;font-weight:700;color:#334155;display:block;margin-bottom:4px;">Registry</label><select id="r6p-build-regtype" style="padding:7px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;"><option value="harbor" selected>Harbor (in-cluster)</option><option value="dockerhub">Docker Hub</option><option value="ecr">AWS ECR</option><option value="gcp">GCP Artifact Registry</option><option value="custom">Custom URL</option></select></div>'
+    +'<div><label style="font-size:11px;font-weight:700;color:#334155;display:block;margin-bottom:4px;">Registry</label><select id="r6p-build-regtype" style="padding:7px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;"><option value="harbor" selected>Harbor (in-cluster, recommended default)</option><option value="dockerhub">Docker Hub</option><option value="ghcr">GitHub Container Registry</option><option value="gitlab">GitLab Container Registry</option><option value="quay">Quay.io</option><option value="ecr">AWS ECR (private)</option><option value="ecrpublic">AWS ECR Public</option><option value="gcp">GCP Artifact Registry</option><option value="custom">Custom OCI URL</option></select></div>'
     +'<div><label style="font-size:11px;font-weight:700;color:#334155;display:block;margin-bottom:4px;">Registry URL (optional)</label><input id="r6p-build-regurl" placeholder="registry.example.com" style="padding:7px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;width:200px;"></div>'
     +'<div><label style="font-size:11px;font-weight:700;color:#334155;display:block;margin-bottom:4px;">Project</label><input id="r6p-build-project" value="flex-apps" style="padding:7px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;width:120px;"></div>'
     +'<div><label style="font-size:11px;font-weight:700;color:#334155;display:block;margin-bottom:4px;">Registry User</label><input id="r6p-build-reguser" placeholder="admin" style="padding:7px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;width:100px;"></div>'
     +'<div><label style="font-size:11px;font-weight:700;color:#334155;display:block;margin-bottom:4px;">Registry Password</label><input id="r6p-build-regpass" type="password" style="padding:7px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;width:120px;"></div>'
     +'<button class="r6p-btn primary" onclick="r6pGenRealDockerfiles()" style="padding:8px 16px;font-size:12px;">&#9654; Generate Dockerfiles + Build Plan</button>'
+    +'</div>'
+    +'<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 14px;margin-bottom:14px;">'
+    +'<div style="font-size:11px;font-weight:700;color:#334155;margin-bottom:6px;">Build Mode</div>'
+    +'<label style="font-size:12px;color:#334155;margin-right:16px;cursor:pointer;"><input type="radio" name="r6p-build-mode" value="manual" checked style="margin-right:6px;">Manual - review and click Run on each command</label>'
+    +'<label style="font-size:12px;color:#334155;cursor:pointer;"><input type="radio" name="r6p-build-mode" value="auto" style="margin-right:6px;">Automatic - extract, build, scan and push run immediately after generation</label>'
+    +'<div style="font-size:10px;color:#94a3b8;margin-top:4px;">Automatic mode pushes real images to the selected registry with no extra confirmation step - use Manual for a first run against a new registry.</div>'
     +'</div>'
     +'<div id="r6p-build-status" style="font-size:12px;font-weight:600;color:#64748b;margin-bottom:10px;line-height:1.7;"></div>'
     +r6pFoot(9);
@@ -725,8 +731,10 @@ window.r6pContent=function(n){
     +'<div class="r6p-stage-footer">'
     +'<button class="r6p-btn primary" onclick="r6pValidateBundle()">Validate Bundle</button>'
     +'<button class="r6p-btn success" id="r6p-send-oc-btn" onclick="r6pSendToOC()" style="'+(R6P._bundleValidated?'':'opacity:.5;cursor:not-allowed;')+'" '+(R6P._bundleValidated?'':'title="Validate bundle first"')+'>Send to OpenCenter Import Stage</button>'
+    +'<button class="r6p-btn purple" onclick="r6pAutoDeployToOpenCenter()">&#9889; Deploy to Production GitOps Now (real git commit + push)</button>'
     +'<button class="r6p-btn secondary" onclick="r6pMarkDone(12)">Mark Complete</button>'
     +'</div>'
+    +'<div id="r6p-auto-deploy-status" style="font-size:12px;font-weight:600;color:#64748b;margin-bottom:6px;"></div>'
 
     /* ─── Advanced Direct GitOps (hidden by default) ─── */
     +'<div style="margin-top:18px;border:1px dashed #cbd5e1;border-radius:8px;overflow:hidden;">'
@@ -736,7 +744,7 @@ window.r6pContent=function(n){
     +'<div style="display:none;padding:14px;">'
     +'<div style="background:#fef3c7;border:1px solid #f59e0b;border-radius:6px;padding:10px;font-size:12px;color:#92400e;margin-bottom:12px;">'
     +'<strong>Warning:</strong> Direct GitOps bypasses OpenCenter-managed deployment. Use only for development or troubleshooting.</div>'
-    +r6pCmd('12-git-adv','BS_NAME="'+bsSlug+'"\n\n# Verify opencenter CLI\nif ! command -v opencenter &>/dev/null; then\n  echo "[ERROR] opencenter CLI not installed."\n  exit 127\nfi\n\nGITOPS_DIR=$(opencenter cluster describe rackspace-flex/flex-prod-k8s 2>/dev/null | grep "git_dir:" | awk \'{print $2}\')\n\n[ -z "$GITOPS_DIR" ] && { echo "[ERROR] GITOPS_DIR empty. Run: opencenter cluster list"; exit 1; }\n\ngit -C "$GITOPS_DIR" add "applications/workloads/$BS_NAME"\ngit -C "$GITOPS_DIR" commit -m "Import R6 app bundle: $BS_NAME"\ngit -C "$GITOPS_DIR" push\ncommand -v flux &>/dev/null && flux reconcile kustomization flux-system --with-source || echo "[WARN] flux not installed"')
+    +r6pCmd('12-git-adv','BS_NAME="'+bsSlug+'"\n\n# Verify opencenter CLI\nif ! command -v opencenter &>/dev/null; then\n  echo "[ERROR] opencenter CLI not installed."\n  exit 127\nfi\n\nGITOPS_DIR=$(opencenter cluster describe '+(R6P.creds.opencenter.clusterRef||'rackspace-flex/flex-prod-k8s')+' 2>/dev/null | grep "git_dir:" | awk \'{print $2}\')\n\n[ -z "$GITOPS_DIR" ] && { echo "[ERROR] GITOPS_DIR empty. Run: opencenter cluster list"; exit 1; }\n\ngit -C "$GITOPS_DIR" add "applications/workloads/$BS_NAME"\ngit -C "$GITOPS_DIR" commit -m "Import R6 app bundle: $BS_NAME"\ngit -C "$GITOPS_DIR" push\ncommand -v flux &>/dev/null && flux reconcile kustomization flux-system --with-source || echo "[WARN] flux not installed"')
     +'</div></div>';
   }
   if(n===13){
@@ -768,9 +776,45 @@ window.r6pContent=function(n){
       +'openstack loadbalancer member create --address <TARGET_POD_IP> --protocol-port 80 <LISTENER_POOL_ID>\n'
       +'# 7. Monitor 24-48h\n'
       +'# 8. Rollback path: revert DNS/LB to source VM if error rate/latency regress';
+    var nsSlug=((R6P.bs&&R6P.bs.name)||'app').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'');
+    var uatRows=(R6P.components||[]).map(function(c){
+      var form=(R6P.targetForms&&R6P.targetForms[c.name])||r6pDecideTargetForm(c).form;
+      var compSlug=(c.name||'app').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'');
+      var healthPath=(c.path&&c.path.indexOf('/')===0)?c.path.split(',')[0]:'/health';
+      var isContainerized=(form==='CONTAINERIZED'||form==='PARTIALLY_CONTAINERIZED');
+      var isVm=(form==='RETAINED_FLEX_VM'||form==='REDEPLOYED_FLEX_VM');
+      var isOperator=(form==='OPERATOR_MANAGED'||form==='KUBERNETES_NATIVE');
+      var uatCmd;
+      if(isContainerized){
+        uatCmd='# Confirm pods are Running/Ready in the target namespace\n'
+          +'kubectl get pods -n '+nsSlug+' -l app='+compSlug+' -o wide\n'
+          +'# Hit the real health endpoint inside the deployed pod (post-migration target, not the source VM)\n'
+          +'kubectl exec -n '+nsSlug+' deploy/'+compSlug+' -- sh -c "curl -fsS -o /dev/null -w \'HTTP %{http_code}\\n\' http://localhost:8080'+healthPath+'" || echo "UAT FAILED: '+c.name+' health check did not return 2xx"';
+      } else if(isVm&&c.tgt){
+        uatCmd='# Confirm the retained/redeployed FLEX VM is reachable and healthy post-migration\n'
+          +'ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no root@'+c.tgt+' "curl -fsS -o /dev/null -w \'HTTP %{http_code}\\n\' http://localhost'+healthPath+'" || echo "UAT FAILED: '+c.name+' health check did not return 2xx"';
+      } else if(isOperator){
+        uatCmd='# Confirm the operator-managed / Kubernetes-native resource is ready\n'
+          +'kubectl get pods,svc -n '+nsSlug+' -l app='+compSlug+'\n'
+          +'kubectl exec -n '+nsSlug+' deploy/'+compSlug+' -- sh -c "true" 2>/dev/null && echo "'+compSlug+' pod reachable" || echo "UAT NEEDS REVIEW: confirm '+c.name+' operator status manually"';
+      } else {
+        uatCmd='# '+c.name+' ('+form+') has no in-cluster/VM endpoint to smoke-test automatically - confirm manually per its connectivity plan.';
+      }
+      return '<div style="border:1px solid #e2e8f0;border-radius:8px;padding:12px;margin-bottom:10px;">'
+        +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px;"><div style="font-weight:800;font-size:13px;color:#0f172a;">'+c.name+'</div><span style="background:#eff6ff;color:#0369a1;padding:2px 8px;border-radius:999px;font-size:10px;font-weight:700;">'+form+'</span></div>'
+        +r6pCmd('13-uat-'+c.name.replace(/\W+/g,''),uatCmd)
+        +'</div>';
+    }).join('');
     return '<div class="r6p-info-box">Real per-component data migration and validation commands, plus a cutover checklist with real OpenStack/Kubernetes commands (edit IDs/SGs for your environment).</div>'
       +rows13
       +'<div style="font-weight:800;font-size:13px;color:#0f172a;margin:14px 0 4px;">Cutover</div>'+r6pCmd('13-cutover',cutover)
+      +'<div style="font-weight:800;font-size:14px;color:#0f172a;margin:20px 0 4px;">UAT: Verify Every Migrated Component Is Actually Working</div>'
+      +'<div class="r6p-info-box">Runs after OpenCenter production deployment (Step 12). Tests the real post-migration target - the deployed Kubernetes pod for containerized/operator-managed components, the retained/redeployed VM for VM-targeted components - not the old source VM. Click Run on each row, or Run All below.</div>'
+      +uatRows
+      +'<div style="display:flex;gap:8px;align-items:center;margin-top:6px;">'
+      +'<button class="r6p-btn success" onclick="r6pMarkUatSignoff()">&#10003; UAT Sign-off: All Migrated Apps Verified Working</button>'
+      +'<span id="r6p-uat-signoff-status" style="font-size:12px;font-weight:700;color:'+(R6P.uatSignedOff?'#16a34a':'#94a3b8')+';">'+(R6P.uatSignedOff?'Signed off '+R6P.uatSignedOff:'Not signed off yet')+'</span>'
+      +'</div>'
       +r6pFoot(13);
   }
   if(n===14){
@@ -876,6 +920,33 @@ window.r6pGenHelm=function(){var n=((R6P.bs&&R6P.bs.name)||'app').toLowerCase().
 window.r6pGenKustomize=function(){var el=document.getElementById('r6p-yaml-preview');if(el)el.textContent='# kustomization.yaml\napiVersion: kustomize.config.k8s.io/v1beta1\nkind: Kustomization\nresources:\n- namespace.yaml\n- deployment.yaml\n- service.yaml\n- configmap.yaml\n- ingress.yaml\noverlays: dev/ uat/ prod/\n';};
 window.r6pGenFlux=function(){var n=((R6P.bs&&R6P.bs.name)||'app').toLowerCase().replace(/\s+/g,'-');var el=document.getElementById('r6p-yaml-preview');if(el)el.textContent='apiVersion: kustomize.toolkit.fluxcd.io/v1\nkind: Kustomization\nmetadata:\n  name: '+n+'\n  namespace: flux-system\nspec:\n  interval: 5m\n  path: "./applications/overlays/'+n+'"\n  prune: true\n  sourceRef:\n    kind: GitRepository\n    name: opencenter-gitops\n';};
 
+/* Chains two streamed shell commands (extract, then build+push) into one terminal box.
+   Reuses the same real /api/stream/run-cmd mechanism as every other Run button in R6 -
+   no new backend execution path, just sequencing on the client. Used by Automatic mode;
+   Manual mode instead renders two independent r6pCmd() boxes the operator clicks Run on. */
+window.r6pAutoRunBuildPipeline=function(extractCmd,buildCmd,outId){
+  var out=document.getElementById(outId);if(!out)return;
+  out.style.display='block';out.style.borderColor='#134e4a';out.textContent='$ '+extractCmd+'\n';
+  var extractOk=false;
+  var es1=new EventSource('/api/stream/run-cmd?cmd='+encodeURIComponent(extractCmd));
+  es1.onmessage=function(e){
+    if(e.data!=='[DONE]'){
+      out.textContent+=e.data+'\n';out.scrollTop=out.scrollHeight;
+      if(e.data.indexOf('[EXIT 0]')>=0)extractOk=true;
+    } else {
+      es1.close();
+      if(!extractOk){out.textContent+='\n[Automatic mode stopped: asset extraction failed - build/push skipped]\n';out.style.borderColor='#dc2626';return;}
+      out.textContent+='\n$ '+buildCmd+'\n';
+      var es2=new EventSource('/api/stream/run-cmd?cmd='+encodeURIComponent(buildCmd));
+      es2.onmessage=function(e2){
+        if(e2.data!=='[DONE]'){out.textContent+=e2.data+'\n';out.scrollTop=out.scrollHeight;if(e2.data.indexOf('[EXIT 0]')>=0)out.style.borderColor='#166534';}
+        else{es2.close();}
+      };
+      es2.onerror=function(){out.textContent+='[closed]\n';es2.close();};
+    }
+  };
+  es1.onerror=function(){out.textContent+='[closed]\n';es1.close();};
+};
 window.r6pGenRealDockerfiles=function(){
   var st=document.getElementById('r6p-build-status');
   if(!R6P.components||!R6P.components.length){if(st){st.textContent='Select a Business System in Step 1 first.';st.style.color='#dc2626';}return;}
@@ -883,12 +954,22 @@ window.r6pGenRealDockerfiles=function(){
   var org=clusterRef[0]||'rackspace-flex',cluster=clusterRef[1]||'flex-prod-k8s';
   var comps=R6P.components.filter(function(c){return c.tgt;});
   var srcComp=comps[0];
+  /* Only components Step 8's real Transform decision assigned CONTAINERIZED or
+     PARTIALLY_CONTAINERIZED get a Dockerfile/image - every other target form
+     (operator-managed, retained/redeployed VM, external, data-migration, manual
+     review, blocked, excluded) is intentionally skipped here, matching Step 6's decision. */
   var workloads=comps.map(function(c){
-    var role=(c.type||c.role||'backend').toLowerCase();
-    var isDb=role==='database'||role==='db';
-    return {component:c.name,image:isDb?'postgres:16':'debian:stable-slim',replicas:1,
-      readiness:isDb?'KEEP_ON_VM_FOR_NOW':'READY',layer:isDb?'Database':'API',sourcePath:c.path||'/opt/app'};
+    var form=(R6P.targetForms&&R6P.targetForms[c.name])||r6pDecideTargetForm(c).form;
+    var buildable=(form==='CONTAINERIZED'||form==='PARTIALLY_CONTAINERIZED');
+    return {component:c.name,image:'debian:stable-slim',replicas:1,
+      readiness:buildable?'READY':'KEEP_ON_VM_FOR_NOW',layer:'API',sourcePath:c.path||'/opt/app',targetForm:form};
   });
+  var skipped=workloads.filter(function(w){return w.readiness==='KEEP_ON_VM_FOR_NOW';});
+  var mode=(document.querySelector('input[name="r6p-build-mode"]:checked')||{}).value||'manual';
+  /* Automatic mode makes the whole R6-to-production-OpenCenter transfer fully automatic in
+     one action: build+push images (client-side chain below) AND commit+push the GitOps
+     overlay for real (auto_commit:true) in the same generate-bundle call. Manual mode never
+     commits/pushes without a separate explicit action (Step 12's Deploy button). */
   var payload={org:org,cluster:cluster,region:'iad3',
     registry:{type:(document.getElementById('r6p-build-regtype')||{}).value||'harbor',
       url:(document.getElementById('r6p-build-regurl')||{}).value||'',
@@ -896,7 +977,7 @@ window.r6pGenRealDockerfiles=function(){
       user:(document.getElementById('r6p-build-reguser')||{}).value||'',
       password:(document.getElementById('r6p-build-regpass')||{}).value||''},
     source_vm:{host:(srcComp&&srcComp.tgt)||'',user:'root'},
-    auto_commit:false,import_to_gitops:true,
+    auto_commit:mode==='auto',import_to_gitops:true,
     bundle:{id:'r6p-'+Date.now(),businessSystemName:(R6P.bs&&R6P.bs.name)||'app',workloads:workloads}};
   if(st){st.textContent='Generating real Dockerfiles + build plan...';st.style.color='#0369a1';}
   fetch('/api/r6/generate-bundle',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
@@ -909,11 +990,24 @@ window.r6pGenRealDockerfiles=function(){
       ['opencenter_import_manifest.json','k8s/','helm/','kustomize/','flux/','Dockerfile','image_build_plan.yaml',
        'app_capture_manifest.json','externalization_plan.yaml','container_readiness_report.json','container_readiness_report.md'
       ].forEach(function(k){R6P.artifacts[k]=true;});
+      var skipMsg=skipped.length?('<br><span style="color:#64748b;">Skipped (not CONTAINERIZED/PARTIALLY_CONTAINERIZED): '+skipped.map(function(w){return w.component+' ('+w.targetForm+')';}).join(', ')+'</span>'):'';
+      var gitopsMsg=(mode==='auto')?('<br>GitOps commit+push: <code>'+(d.gitops_commit||'skipped')+'</code>'):'';
       if(st){st.innerHTML='&#10003; '+d.files.length+' files written to <code>'+d.bundle_dir+'</code>'
         +(d.imported_to?'<br>&#10003; K8s manifests imported to GitOps overlay: <code>'+d.imported_to+'</code>':'<br>&#9888; GitOps repo not found - manifests not imported')
-        +'<br>Pull secret: '+d.pull_secret
-        +'<br>&#9654; Build+push (run when ready): <code>'+d.build_cmd+'</code>';
+        +'<br>Pull secret: '+d.pull_secret+skipMsg+gitopsMsg;
         st.style.color='#15803d';}
+      var box=document.getElementById('r6p-build-cmds');
+      if(!box){box=document.createElement('div');box.id='r6p-build-cmds';box.style.marginTop='10px';st.parentNode.insertBefore(box,st.nextSibling);}
+      if(mode==='auto'){
+        box.innerHTML='<div style="font-weight:700;font-size:12px;color:#0f172a;margin-bottom:6px;">Automatic mode - running extract, build, scan and push now:</div>'
+          +'<div class="r6p-terminal" id="r6p-auto-build-out" style="display:block;max-height:320px;"></div>';
+        r6pAutoRunBuildPipeline(d.extract_cmd,d.build_cmd,'r6p-auto-build-out');
+      } else {
+        box.innerHTML='<div style="font-weight:700;font-size:12px;color:#0f172a;margin-bottom:6px;">1. Extract app assets from the source FLEX VM</div>'
+          +r6pCmd('extract9',d.extract_cmd)
+          +'<div style="font-weight:700;font-size:12px;color:#0f172a;margin:10px 0 6px;">2. Build, scan, sign and push (run after extraction succeeds)</div>'
+          +r6pCmd('build9',d.build_cmd);
+      }
       r6pMarkDone(9);
     })
     .catch(function(e){if(st){st.textContent='✗ '+e;st.style.color='#dc2626';}});
@@ -1049,6 +1143,49 @@ window.r6pSendToOC=function(){
   r6pMarkDone(12);
 };
 
+/* Real, fully-automatic R6-to-production-OpenCenter transfer: re-runs the same real
+   generate-bundle backend used by Step 9, but with auto_commit:true so it actually runs
+   git add/commit/push against the production GitOps repo (org/cluster resolved from the
+   real Production OpenCenter panel via r6pGitLoad, not a placeholder). Safe to call even
+   if Step 9 was run in Manual mode - it regenerates the bundle from current state first. */
+window.r6pAutoDeployToOpenCenter=function(){
+  var st=document.getElementById('r6p-auto-deploy-status');
+  if(!R6P.components||!R6P.components.length){if(st){st.textContent='Select a Business System in Step 1 first.';st.style.color='#dc2626';}return;}
+  var clusterRef=(R6P.creds.opencenter.clusterRef||'rackspace-flex/flex-prod-k8s').split('/');
+  var org=clusterRef[0]||'rackspace-flex',cluster=clusterRef[1]||'flex-prod-k8s';
+  var comps=R6P.components.filter(function(c){return c.tgt;});
+  var workloads=comps.map(function(c){
+    var form=(R6P.targetForms&&R6P.targetForms[c.name])||r6pDecideTargetForm(c).form;
+    var buildable=(form==='CONTAINERIZED'||form==='PARTIALLY_CONTAINERIZED');
+    return {component:c.name,image:'debian:stable-slim',replicas:1,
+      readiness:buildable?'READY':'KEEP_ON_VM_FOR_NOW',layer:'API',sourcePath:c.path||'/opt/app',targetForm:form};
+  });
+  var payload={org:org,cluster:cluster,region:'iad3',
+    registry:{type:(document.getElementById('r6p-build-regtype')||{}).value||'harbor',
+      url:(document.getElementById('r6p-build-regurl')||{}).value||'',
+      project:(document.getElementById('r6p-build-project')||{}).value||'flex-apps',
+      user:(document.getElementById('r6p-build-reguser')||{}).value||'',
+      password:(document.getElementById('r6p-build-regpass')||{}).value||''},
+    source_vm:{host:(comps[0]&&comps[0].tgt)||'',user:'root'},
+    auto_commit:true,import_to_gitops:true,
+    bundle:{id:'r6p-deploy-'+Date.now(),businessSystemName:(R6P.bs&&R6P.bs.name)||'app',workloads:workloads}};
+  if(st){st.textContent='Deploying to production GitOps (org='+org+', cluster='+cluster+')...';st.style.color='#0369a1';}
+  fetch('/api/r6/generate-bundle',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
+    .then(function(r){return r.json();})
+    .then(function(d){
+      if(!d||!d.ok){if(st){st.textContent='✗ '+((d&&d.error)||'deploy failed');st.style.color='#dc2626';}return;}
+      if(st){st.innerHTML='&#10003; Imported to <code>'+(d.imported_to||'(not imported - no gitops dir for org '+org+')')+'</code>'
+        +'<br>Commit+push result: <code>'+(d.gitops_commit||'skipped')+'</code>';
+        st.style.color=(d.gitops_commit&&d.gitops_commit.indexOf('push -> 0')>=0)?'#15803d':'#d97706';}
+      r6pMarkDone(12);
+    })
+    .catch(function(e){if(st){st.textContent='✗ '+e;st.style.color='#dc2626';}});
+};
+window.r6pMarkUatSignoff=function(){
+  R6P.uatSignedOff=new Date().toISOString();
+  var el=document.getElementById('r6p-uat-signoff-status');
+  if(el){el.textContent='Signed off '+R6P.uatSignedOff;el.style.color='#16a34a';}
+};
 window.r6pRunAll=function(){r6pGenBundle();for(var i=1;i<=12;i++)r6pMarkDone(i);r6pGoTo(12);};
 
 window.r6pPreviewArtifact=function(f){
