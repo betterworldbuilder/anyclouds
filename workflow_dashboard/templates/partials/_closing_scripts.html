@@ -9978,7 +9978,6 @@ ${certContent}
   function _sDecision(n)   { return _compEntry(n).decision; }
   function _sK8sResource(n){ return _compEntry(n).k8s; }
   function _sDataPath(n)   { return _compEntry(n).path; }
-  function _sRisk(n)       { return _compEntry(n).risk; }
   function _sRuntime(n) {
     if(n.includes('Database')) return 'Relational database (product TBD)';
     if(n.includes('Cache'))    return 'Redis-compatible cache';
@@ -9986,30 +9985,42 @@ ${certContent}
     if(n.includes('Gateway'))  return 'API Gateway / reverse proxy';
     return 'Unknown - run Live Scan to confirm';
   }
-  function _sReadiness(saved) {
-    var t=(saved&&saved.tgt)||'', p=(saved&&saved.path)||'';
-    return (t&&p) ? 'Ready with changes' : 'Needs Target IP / health path (Step 1 Inspect)';
+  var _STATE_PILL = {'Stateless':'green','Stateful':'red','Unknown / mixed':'orange'};
+  var _DECISION_PILL_WORDS = {
+    'Containerize':'blue','Deploy with operator':'purple','Keep external initially':'orange',
+    'Replace with Gateway API':'purple','Convert to CronJob':'purple','Migrate separately':'orange',
+    'Connect as external storage':'gray','Containerize with external database':'blue',
+    'Containerize after assessment':'blue','Use platform monitoring':'gray','Use platform logging':'gray',
+    'Use platform backup service':'gray'
+  };
+  function _pillField(label, val, pillClass) {
+    return '<div class="uat-s1-field"><label>'+label+'</label>'
+      +'<div style="padding:9px;border:1px solid #e2e8f0;border-radius:8px;background:#f8fafc;">'
+      +'<span class="uat-s1-pill '+(pillClass||'gray')+'">'+val+'</span></div></div>';
   }
-  function _compProfileRow(label, val) {
-    return '<div style="display:flex;justify-content:space-between;gap:8px;padding:2px 0;font-size:10px;">'
-      +'<span style="color:#94a3b8;font-weight:700;flex-shrink:0;">'+label+'</span>'
-      +'<span style="color:#334155;text-align:right;">'+val+'</span></div>';
+  function _textField(label, val) {
+    return '<div class="uat-s1-field"><label>'+label+'</label>'
+      +'<div style="padding:9px;border:1px solid #e2e8f0;border-radius:8px;background:#f8fafc;color:#0f172a;font-size:12px;">'+val+'</div></div>';
   }
+  /* Container-Ready Profile: the 6 fields not already shown elsewhere in this row
+     (name, category subtitle, OSPC/FLEX endpoints and health path already exist above).
+     Same visual language as the existing OSPC/FLEX/Health grid - .uat-s1-field labels,
+     bordered boxes, and the same .uat-s1-pill badge style used by the In Scope pill. */
   function _buildContainerReadyBlock(name, saved) {
     var dep = (saved&&saved._siblings) ? saved._siblings : 'See other components in this system';
-    return '<div style="margin-top:8px;padding:8px 10px;background:#f8fafc;border:1px dashed #cbd5e1;border-radius:6px;">'
-      +'<div style="font-size:9px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;">Container-Ready Profile</div>'
-      +_compProfileRow('Component category', _sType(name))
-      +_compProfileRow('Runtime or product', _sRuntime(name))
-      +_compProfileRow('Stateless/Stateful/Unknown', _sState(name))
-      +_compProfileRow('Containerization decision', _sDecision(name))
-      +_compProfileRow('Target Runtime Resource', _sK8sResource(name))
-      +_compProfileRow('Persistent data path', _sDataPath(name))
-      +_compProfileRow('Dependencies', dep)
-      +_compProfileRow('Readiness status', _sReadiness(saved))
-      +_compProfileRow('Migration risk', _sRisk(name))
-      +_compProfileRow('Recommended action', _sDecision(name))
-      +'</div>';
+    var state = _sState(name), decision = _sDecision(name);
+    return '<div style="margin-top:10px;padding-top:10px;border-top:1px dashed #dbe4f0;">'
+      +'<div style="font-size:10px;font-weight:800;color:#475569;text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px;">Container Readiness</div>'
+      +'<div class="uat-s1-form-grid" style="grid-template-columns:1fr 1fr 1fr;margin-bottom:10px;">'
+      +_textField('Runtime / Product', _sRuntime(name))
+      +_pillField('State', state, _STATE_PILL[state]||'gray')
+      +_pillField('Containerization Decision', decision, _DECISION_PILL_WORDS[decision]||'blue')
+      +'</div>'
+      +'<div class="uat-s1-form-grid" style="grid-template-columns:1fr 1fr 1fr;">'
+      +_textField('Target Runtime Resource', _sK8sResource(name))
+      +_textField('Persistent Data Path', _sDataPath(name))
+      +_textField('Dependencies', dep)
+      +'</div></div>';
   }
 
   /* ── Automatic Business System Mapping from Existing (scanned) FLEX VMs ── */
