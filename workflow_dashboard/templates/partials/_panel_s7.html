@@ -228,7 +228,7 @@
               <tr><td colspan="5" style="padding:16px;text-align:center;color:#94a3b8;font-size:12px;font-style:italic;">Load from UAT to see scanned infra breakdown.</td></tr>
             </tbody>
           </table>
-        </div>
+        </div><div style="display:flex;justify-content:flex-end;margin-top:10px;"><button onclick="tcoExportCsv('tco-infra-tbody','ospc_infra_baseline')" style="background:#7c2d12;color:#fff;border:none;border-radius:6px;padding:6px 14px;font-size:11px;font-weight:800;cursor:pointer;">&#11015; Export CSV</button></div>
       </div>
 
       <!-- Detailed per-component OSPC TCO table -->
@@ -403,7 +403,7 @@
               <tr><td colspan="4" style="padding:16px;text-align:center;color:#94a3b8;font-size:12px;font-style:italic;">Load from UAT to see comparison.</td></tr>
             </tbody>
           </table>
-        </div>
+        </div><div style="display:flex;justify-content:flex-end;margin-top:10px;"><button onclick="tcoExportCsv('tco-comparison-tbody','tco_comparison_savings')" style="background:#7c2d12;color:#fff;border:none;border-radius:6px;padding:6px 14px;font-size:11px;font-weight:800;cursor:pointer;">&#11015; Export CSV</button></div>
       </div>
 
       <!-- Component-Level OSPC → FLEX TCO -->
@@ -426,10 +426,34 @@
               <tr><td colspan="8" style="padding:16px;text-align:center;color:#94a3b8;font-size:12px;font-style:italic;">Load from UAT to see per-component cost comparison.</td></tr>
             </tbody>
           </table>
-        </div>
+        </div><div style="display:flex;justify-content:flex-end;margin-top:10px;"><button onclick="tcoExportCsv('tco-comp-tbody','ospc_vs_flex_component_detail')" style="background:#7c2d12;color:#fff;border:none;border-radius:6px;padding:6px 14px;font-size:11px;font-weight:800;cursor:pointer;">&#11015; Export CSV</button></div>
       </div>
 
-      <!-- TCO JS engine -->
+      
+      <script>
+      window.tcoExportCsv = function(tbodyId, filename){
+        var tbody = document.getElementById(tbodyId);
+        if (!tbody) return;
+        var table = tbody.closest('table');
+        var rows = [];
+        var head = table.querySelector('thead tr');
+        if (head) rows.push(Array.prototype.map.call(head.children, function(th){ return th.textContent.trim(); }));
+        Array.prototype.forEach.call(tbody.querySelectorAll('tr'), function(tr){
+          var cells = tr.children;
+          if (cells.length === 1 && cells[0].hasAttribute('colspan')) return;
+          rows.push(Array.prototype.map.call(cells, function(td){ return td.textContent.trim(); }));
+        });
+        var csv = rows.map(function(r){
+          return r.map(function(c){ return '"' + String(c).replace(/"/g, '""') + '"'; }).join(',');
+        }).join('\r\n');
+        var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        var a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = filename + '_' + new Date().toISOString().slice(0,10) + '.csv';
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      };
+      </script>
+<!-- TCO JS engine -->
       <script>
       (function(){
         // Demo defaults: used immediately so charts/insights render without needing "Load from UAT"
