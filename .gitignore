@@ -148,3 +148,30 @@ quick_c5_repair_and_boot.sh
 recreate_like_centos7.sh
 run_centos5_module_repair_boot.sh
 workflow_dashboard/templates/*.ace_work_*
+
+# Credentials / secrets — never commit (added 2026-07-11)
+*appcred*.json
+*Appcred*.json
+FlexIAD*.json
+ghp_*
+gho_*
+github_pat_*
+*git-token*
+*token*.txt
+*password*
+*credential*
+*.pem
+id_rsa
+id_rsa.pub
+id_ed25519*
+openrc*
+*.openrc
+clouds.yaml
+secure.yaml
+*-key.txt
+age/keys/
+
+# Claude/agent local files
+[Cc]laude*
+output/export/manifests/secret.yaml
+**/secret.yaml
