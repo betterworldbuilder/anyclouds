@@ -1036,7 +1036,8 @@ window.r6pGenFlux=function(){
     return {component:c.name,image:'debian:stable-slim',replicas:1,
       readiness:buildable?'READY':'KEEP_ON_VM_FOR_NOW',layer:'API',sourcePath:c.path||'/opt/app',targetForm:form,
       startCommand:startCmd,healthPath:(c.path&&c.path.indexOf('/')===0)?c.path.split(',')[0]:'/health',
-      dependencies:siblingDeps,targetIp:endpoint.ip,targetPort:endpoint.port};
+      dependencies:siblingDeps,targetIp:endpoint.ip,targetPort:endpoint.port,
+      persistentPath:r6pPersistentPathFor(c)};
   });
   var payload={org:org,cluster:cluster,region:'iad3',
     registry:{type:'harbor',project:'flex-apps'},
@@ -1154,7 +1155,8 @@ window.r6pGenRealDockerfiles=function(){
     return {component:c.name,image:'debian:stable-slim',replicas:1,
       readiness:buildable?'READY':'KEEP_ON_VM_FOR_NOW',layer:'API',sourcePath:c.path||'/opt/app',targetForm:form,
       startCommand:startCmd,healthPath:(c.path&&c.path.indexOf('/')===0)?c.path.split(',')[0]:'/health',
-      dependencies:siblingDeps,targetIp:endpoint.ip,targetPort:endpoint.port};
+      dependencies:siblingDeps,targetIp:endpoint.ip,targetPort:endpoint.port,
+      persistentPath:r6pPersistentPathFor(c)};
   });
   var skipped=workloads.filter(function(w){return w.readiness==='KEEP_ON_VM_FOR_NOW';});
   var mode=(document.querySelector('input[name="r6p-build-mode"]:checked')||{}).value||'manual';
@@ -1350,7 +1352,8 @@ window.r6pAutoDeployToOpenCenter=function(){
     var form=(R6P.targetForms&&R6P.targetForms[c.name])||r6pDecideTargetForm(c).form;
     var buildable=(form==='CONTAINERIZED'||form==='PARTIALLY_CONTAINERIZED');
     return {component:c.name,image:'debian:stable-slim',replicas:1,
-      readiness:buildable?'READY':'KEEP_ON_VM_FOR_NOW',layer:'API',sourcePath:c.path||'/opt/app',targetForm:form};
+      readiness:buildable?'READY':'KEEP_ON_VM_FOR_NOW',layer:'API',sourcePath:c.path||'/opt/app',targetForm:form,
+      persistentPath:r6pPersistentPathFor(c)};
   });
   var payload={org:org,cluster:cluster,region:'iad3',
     registry:{type:(document.getElementById('r6p-build-regtype')||{}).value||'harbor',

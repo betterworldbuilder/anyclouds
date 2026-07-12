@@ -415,6 +415,64 @@ def test_stage12_gate_allows_import_when_only_warnings_present():
         _cleanup_fake_gitops(org)
 
 
+def test_deployment_gets_standalone_pvc_and_volume_mount():
+    data = _generate(
+        [{"component": "uploads-service", "readiness": "READY", "image": "node:20-slim",
+          "startCommand": "node server.js", "healthPath": "/health", "dependencies": [],
+          "persistentPath": "/srv/uploads"}],
+        id_suffix="pvcdeploy",
+    )
+    docs = list(yaml.safe_load_all((Path(data["bundle_dir"]) / "kustomize_bundle" / "uploads-service.yaml").read_text()))
+    pvc = next(d for d in docs if d.get("kind") == "PersistentVolumeClaim")
+    assert pvc["metadata"]["name"] == "uploads-service-data"
+    assert pvc["spec"]["accessModes"] == ["ReadWriteOnce"]
+    assert pvc["spec"]["resources"]["requests"]["storage"] == "10Gi"
+    dep = next(d for d in docs if d.get("kind") == "Deployment")
+    pod_spec = dep["spec"]["template"]["spec"]
+    assert pod_spec["volumes"] == [{"name": "data", "persistentVolumeClaim": {"claimName": "uploads-service-data"}}]
+    assert pod_spec["containers"][0]["volumeMounts"] == [{"name": "data", "mountPath": "/srv/uploads"}]
+    assert any("cluster default StorageClass" in w for w in data["bundle_validation"]["warnings"])
+    _cleanup(data["bundle_dir"])
+
+
+def test_statefulset_gets_volume_claim_template_not_standalone_pvc():
+    data = _generate(
+        [{"component": "session-store", "readiness": "READY", "image": "custom/session-store:1.0",
+          "startCommand": "/app/run.sh", "healthPath": "/health", "dependencies": [],
+          "workloadKind": "StatefulSet", "persistentPath": "/var/lib/sessions"}],
+        id_suffix="pvcsts",
+    )
+    docs = list(yaml.safe_load_all((Path(data["bundle_dir"]) / "kustomize_bundle" / "session-store.yaml").read_text()))
+    kinds = [d.get("kind") for d in docs if d]
+    assert "PersistentVolumeClaim" not in kinds, "StatefulSet must use volumeClaimTemplates, not a standalone PVC"
+    sts = next(d for d in docs if d.get("kind") == "StatefulSet")
+    vct = sts["spec"]["volumeClaimTemplates"]
+    assert vct == [{"metadata": {"name": "data"}, "spec": {"accessModes": ["ReadWriteOnce"], "resources": {"requests": {"storage": "10Gi"}}}}]
+    mount = sts["spec"]["template"]["spec"]["containers"][0]["volumeMounts"]
+    assert mount == [{"name": "data", "mountPath": "/var/lib/sessions"}]
+    _cleanup(data["bundle_dir"])
+
+
+def test_no_pvc_generated_for_stateless_or_missing_persistent_path():
+    data = _generate(
+        [{"component": "stateless-api", "readiness": "READY", "image": "node:20-slim",
+          "startCommand": "node server.js", "healthPath": "/health", "dependencies": [],
+          "persistentPath": "None - stateless"},
+         {"component": "unknown-api", "readiness": "READY", "image": "node:20-slim",
+          "startCommand": "node server.js", "healthPath": "/health", "dependencies": []}],
+        id_suffix="nopvc",
+    )
+    for comp in ("stateless-api", "unknown-api"):
+        docs = list(yaml.safe_load_all((Path(data["bundle_dir"]) / "kustomize_bundle" / ("%s.yaml" % comp)).read_text()))
+        kinds = [d.get("kind") for d in docs if d]
+        assert "PersistentVolumeClaim" not in kinds
+        dep = next(d for d in docs if d.get("kind") == "Deployment")
+        assert "volumes" not in dep["spec"]["template"]["spec"]
+    assert any("unknown-api" in w and "persistentPath" in w for w in data["bundle_validation"]["warnings"])
+    assert not any("stateless-api" in w and "persistentPath" in w for w in data["bundle_validation"]["warnings"])
+    _cleanup(data["bundle_dir"])
+
+
 def test_flux_preview_generated_without_any_gitops_repo():
     """The Step 10 UI button calls generate-bundle with import_to_gitops off for a safe
     preview. It must still get back a real Flux Kustomization manifest (not an empty
