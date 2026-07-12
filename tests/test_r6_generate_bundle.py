@@ -331,7 +331,11 @@ def test_flux_kustomization_generated_and_reachable_with_resolved_dependson():
         _cleanup_fake_gitops(org)
 
 
-def test_flux_dependson_skipped_with_warning_when_operator_kustomization_missing():
+def test_missing_operator_kustomization_for_operator_managed_component_is_blocker():
+    """Stage 10.10: An OPERATOR_MANAGED component whose required operator Kustomization
+    is absent from the GitOps repo must produce a BLOCKER (not a warning). The bundle
+    must not be imported or written to the GitOps repo — a blocked bundle leaves the
+    cluster in a consistent state rather than applying CRs against missing CRDs."""
     org, cluster = "r6-dryrun-flux-missing-op-org", "r6-dryrun-flux-cluster"
     _make_fake_gitops(org, cluster, wire_managed_services_fluxcd=True, stub_operators=[])
     try:
@@ -341,11 +345,17 @@ def test_flux_dependson_skipped_with_warning_when_operator_kustomization_missing
             id_suffix="fluxmissingop", name="Flux Missing Op", org=org, cluster=cluster,
             import_to_gitops=True, auto_commit=False,
         )
+        assert data["bundle_validation"]["status"] == "BLOCKED", \
+            "missing OPERATOR_MANAGED operator must BLOCK the bundle, not just warn"
+        assert any("redis-operator" in b and "OPERATOR_MANAGED" in b
+                   for b in data["bundle_validation"]["blockers"]), \
+            "blocker must name both the operator and the OPERATOR_MANAGED component"
+        # Blocked bundle must not write Flux Kustomization or manifests to the GitOps repo
         fluxcd_dir = GITOPS_ROOT / org / "applications" / "overlays" / cluster / "managed-services" / "fluxcd"
-        flux_doc = yaml.safe_load((fluxcd_dir / "flux-missing-op.yaml").read_text())
-        assert "dependsOn" not in flux_doc["spec"]
-        assert any("redis-operator" in w and "no FluxCD Kustomization was found" in w
-                   for w in data["bundle_validation"]["warnings"])
+        assert not (fluxcd_dir / "flux-missing-op.yaml").exists(), \
+            "a blocked bundle must never write its Flux Kustomization to the GitOps repo"
+        assert data["imported_to"] is None, \
+            "a blocked bundle must not import manifests to the GitOps working tree"
         _cleanup(data["bundle_dir"])
     finally:
         _cleanup_fake_gitops(org)
@@ -911,4 +921,130 @@ def test_pdb_omitted_and_warning_issued_for_single_replica_critical_deployment()
     assert any("critical=true" in w and "auth-service" in w and "replicas=1" in w
                for w in data["bundle_validation"]["warnings"]), \
         "must warn that HA is unavailable when critical=true but replicas=1"
+    _cleanup(data["bundle_dir"])
+
+
+# ---------------------------------------------------------------------------
+# Increment 14 — Operator Custom Resources (PostgreSQL, Redis, RabbitMQ, Kafka)
+# ---------------------------------------------------------------------------
+
+def test_postgres_operator_cr_generated_for_operator_managed_component():
+    """Stage 10.10: A component with targetForm=OPERATOR_MANAGED and 'postgres' in the
+    name must produce a postgresql.cnpg.io/v1 Cluster CR (not a Deployment) in
+    {comp}-operator-cr.yaml. The CR must be listed in kustomization.yaml resources."""
+    data = _generate(
+        [{"component": "postgres-primary", "readiness": "KEEP_ON_VM_FOR_NOW",
+          "targetForm": "OPERATOR_MANAGED", "targetIp": "", "targetPort": 5432,
+          "replicas": 2, "storageClass": "fast-ssd", "storageSize": "50Gi"}],
+        id_suffix="pgcr",
+    )
+    cr_path = Path(data["bundle_dir"]) / "kustomize_bundle" / "postgres-primary-operator-cr.yaml"
+    assert cr_path.exists(), "PostgreSQL operator CR must be generated"
+    cr = yaml.safe_load(cr_path.read_text())
+    assert cr["apiVersion"] == "postgresql.cnpg.io/v1"
+    assert cr["kind"] == "Cluster"
+    assert cr["spec"]["instances"] == 2
+    assert cr["spec"]["storage"]["size"] == "50Gi"
+    assert cr["spec"]["storage"]["storageClass"] == "fast-ssd"
+    kust = yaml.safe_load(
+        (Path(data["bundle_dir"]) / "kustomize_bundle" / "kustomization.yaml").read_text())
+    assert "postgres-primary-operator-cr.yaml" in kust["resources"]
+    _cleanup(data["bundle_dir"])
+
+
+def test_redis_operator_cr_generated_for_operator_managed_component():
+    """Stage 10.10: A component with targetForm=OPERATOR_MANAGED and 'redis' in the name
+    must produce a redis.redis.opstreelabs.in/v1beta2 Redis CR."""
+    data = _generate(
+        [{"component": "redis-cache", "readiness": "KEEP_ON_VM_FOR_NOW",
+          "targetForm": "OPERATOR_MANAGED", "targetIp": "", "targetPort": 6379,
+          "replicas": 3, "storageSize": "20Gi"}],
+        id_suffix="rediscr",
+    )
+    cr_path = Path(data["bundle_dir"]) / "kustomize_bundle" / "redis-cache-operator-cr.yaml"
+    assert cr_path.exists()
+    cr = yaml.safe_load(cr_path.read_text())
+    assert cr["apiVersion"] == "redis.redis.opstreelabs.in/v1beta2"
+    assert cr["kind"] == "Redis"
+    assert cr["spec"]["clusterSize"] == 3
+    assert cr["spec"]["persistenceEnabled"] is True
+    assert cr["spec"]["storage"]["volumeClaimTemplate"]["spec"]["resources"]["requests"]["storage"] == "20Gi"
+    _cleanup(data["bundle_dir"])
+
+
+def test_rabbitmq_operator_cr_generated_for_operator_managed_component():
+    """Stage 10.10: A component with targetForm=OPERATOR_MANAGED and 'rabbitmq' in the
+    name must produce a rabbitmq.com/v1beta1 RabbitmqCluster CR."""
+    data = _generate(
+        [{"component": "rabbitmq-broker", "readiness": "KEEP_ON_VM_FOR_NOW",
+          "targetForm": "OPERATOR_MANAGED", "targetIp": "", "targetPort": 5672,
+          "replicas": 3}],
+        id_suffix="rmqcr",
+    )
+    cr_path = Path(data["bundle_dir"]) / "kustomize_bundle" / "rabbitmq-broker-operator-cr.yaml"
+    assert cr_path.exists()
+    cr = yaml.safe_load(cr_path.read_text())
+    assert cr["apiVersion"] == "rabbitmq.com/v1beta1"
+    assert cr["kind"] == "RabbitmqCluster"
+    assert cr["spec"]["replicas"] == 3
+    _cleanup(data["bundle_dir"])
+
+
+def test_kafka_operator_cr_generated_for_operator_managed_component():
+    """Stage 10.10: A component with targetForm=OPERATOR_MANAGED and 'kafka' in the name
+    must produce a kafka.strimzi.io/v1beta2 Kafka CR with kafka, zookeeper and
+    entityOperator sections."""
+    data = _generate(
+        [{"component": "kafka-cluster", "readiness": "KEEP_ON_VM_FOR_NOW",
+          "targetForm": "OPERATOR_MANAGED", "targetIp": "", "targetPort": 9092,
+          "replicas": 1}],
+        id_suffix="kafkacr",
+    )
+    cr_path = Path(data["bundle_dir"]) / "kustomize_bundle" / "kafka-cluster-operator-cr.yaml"
+    assert cr_path.exists()
+    cr = yaml.safe_load(cr_path.read_text())
+    assert cr["apiVersion"] == "kafka.strimzi.io/v1beta2"
+    assert cr["kind"] == "Kafka"
+    assert "kafka" in cr["spec"] and "zookeeper" in cr["spec"]
+    assert "entityOperator" in cr["spec"]
+    assert cr["spec"]["kafka"]["replicas"] == 1
+    _cleanup(data["bundle_dir"])
+
+
+def test_missing_operator_for_operator_managed_component_is_a_blocker():
+    """Stage 10.10: When a component is OPERATOR_MANAGED but its required operator
+    FluxCD Kustomization is absent from the GitOps repo, bundle_validation.status must
+    be BLOCKED (not PASSED_WITH_WARNINGS) because the generated CR would be applied
+    against a cluster with no CRD to accept it."""
+    org, cluster = "r6-dryrun-op-blocker-org", "r6-dryrun-op-blocker-cluster"
+    _make_fake_gitops(org, cluster, wire_managed_services_fluxcd=True, stub_operators=[])
+    try:
+        data = _generate(
+            [{"component": "postgres-primary", "readiness": "KEEP_ON_VM_FOR_NOW",
+              "targetForm": "OPERATOR_MANAGED", "targetIp": "", "targetPort": 5432}],
+            id_suffix="opblocker", name="Op Blocker", org=org, cluster=cluster,
+            import_to_gitops=True, auto_commit=False,
+        )
+        assert data["bundle_validation"]["status"] == "BLOCKED", \
+            "missing required operator must be a blocker, not just a warning"
+        assert any("postgres-operator" in b and "OPERATOR_MANAGED" in b
+                   for b in data["bundle_validation"]["blockers"]), \
+            "blocker must name the missing operator and the OPERATOR_MANAGED component"
+        _cleanup(data["bundle_dir"])
+    finally:
+        _cleanup_fake_gitops(org)
+
+
+def test_operator_cr_not_generated_for_non_operator_managed_component():
+    """Stage 10.10: NOT_APPLICABLE — a component with a postgres/redis name but
+    targetForm != OPERATOR_MANAGED must not receive an operator CR."""
+    data = _generate(
+        [{"component": "postgres-sidecar", "readiness": "READY", "image": "node:20-slim",
+          "startCommand": "node run.js", "healthPath": "/health", "dependencies": [],
+          "targetForm": "CONTAINERIZED"}],
+        id_suffix="noopcr",
+    )
+    cr_path = Path(data["bundle_dir"]) / "kustomize_bundle" / "postgres-sidecar-operator-cr.yaml"
+    assert not cr_path.exists(), \
+        "operator CR must not be generated for a non-OPERATOR_MANAGED component"
     _cleanup(data["bundle_dir"])

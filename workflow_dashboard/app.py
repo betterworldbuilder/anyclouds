@@ -20997,6 +20997,11 @@ def r6_generate_bundle():
     # KUBERNETES_NATIVE with a gateway-shaped name. Computed here (rather than after the
     # GitOps import block) because the Flux Kustomization's dependsOn needs it too.
     op_names = set()
+    # operator_managed_workloads: opname -> list of workloads that MUST have that operator
+    # installed before Stage 12 (targetForm=OPERATOR_MANAGED). A missing operator is a
+    # BLOCKER (not just a warning) because the component produces no deployable resource
+    # without it.
+    operator_managed_workloads = {}
     needs_gateway = False
     for w in workloads:
         form = str(w.get("targetForm") or "")
@@ -21006,6 +21011,7 @@ def r6_generate_bundle():
                                  ("postgres", "postgres-operator"), ("kafka", "kafka-operator")):
                 if key in wname:
                     op_names.add(opname)
+                    operator_managed_workloads.setdefault(opname, []).append(w)
         if form == "KUBERNETES_NATIVE" and "gateway" in wname:
             needs_gateway = True
 
@@ -21499,6 +21505,137 @@ def r6_generate_bundle():
     if vm_bindings:
         _w("virtual-machines/service-bindings.yaml", _yaml.dump_all(vm_bindings, default_flow_style=False, sort_keys=False))
 
+    # Stage 10.10 - Operator Custom Resources for OPERATOR_MANAGED components.
+    # The op_names detection pass above only registers the operator prerequisite for Flux
+    # dependsOn. This pass generates the actual CR that tells each operator what to
+    # provision. Without this CR the operator is running but has nothing to act on and the
+    # component will never become Ready. Only generates when the operator type is
+    # definitively known from the component name; unknown types are warned, not silently
+    # skipped.
+    operator_cr_blockers = []  # merged into validation_blockers after it is initialised
+    for opname, op_workloads in sorted(operator_managed_workloads.items()):
+        for w in op_workloads:
+            comp = _comp(w)
+            _replicas_op = 1
+            try:
+                _replicas_op = max(1, int(w.get("replicas") or 1))
+            except (TypeError, ValueError):
+                pass
+            _storage_op = str(w.get("storageClass") or "").strip() or None
+            _storage_size_op = str(w.get("storageSize") or "").strip()
+
+            if opname == "postgres-operator":
+                # CloudNativePG postgresql.cnpg.io/v1 Cluster - most widely adopted OSS
+                # PostgreSQL operator; Zalando acid.zalan.do also uses this field shape.
+                pg_spec = {
+                    "instances": _replicas_op,
+                    "storage": {"size": _storage_size_op or "20Gi"},
+                    "resources": {
+                        "requests": {"cpu": "500m", "memory": "1Gi"},
+                        "limits": {"cpu": "2", "memory": "4Gi"},
+                    },
+                }
+                if _storage_op:
+                    pg_spec["storage"]["storageClass"] = _storage_op
+                cr_doc = {
+                    "apiVersion": "postgresql.cnpg.io/v1", "kind": "Cluster",
+                    "metadata": {"name": comp, "namespace": slug,
+                                 "labels": {"app": comp, "r6-bundle": slug}},
+                    "spec": pg_spec,
+                }
+
+            elif opname == "redis-operator":
+                redis_storage = {
+                    "volumeClaimTemplate": {"spec": {
+                        "accessModes": ["ReadWriteOnce"],
+                        "resources": {"requests": {"storage": _storage_size_op or "10Gi"}},
+                    }},
+                }
+                if _storage_op:
+                    redis_storage["volumeClaimTemplate"]["spec"]["storageClassName"] = _storage_op
+                cr_doc = {
+                    "apiVersion": "redis.redis.opstreelabs.in/v1beta2", "kind": "Redis",
+                    "metadata": {"name": comp, "namespace": slug,
+                                 "labels": {"app": comp, "r6-bundle": slug}},
+                    "spec": {
+                        "clusterVersion": "v7",
+                        "clusterSize": _replicas_op,
+                        "persistenceEnabled": True,
+                        "kubernetesConfig": {
+                            "image": "redis:7-alpine",
+                            "imagePullPolicy": "IfNotPresent",
+                            "resources": {
+                                "requests": {"cpu": "100m", "memory": "256Mi"},
+                                "limits": {"cpu": "500m", "memory": "1Gi"},
+                            },
+                        },
+                        "storage": redis_storage,
+                    },
+                }
+
+            elif opname == "rabbitmq-cluster-operator":
+                rmq_persistence = {"storage": _storage_size_op or "10Gi"}
+                if _storage_op:
+                    rmq_persistence["storageClassName"] = _storage_op
+                cr_doc = {
+                    "apiVersion": "rabbitmq.com/v1beta1", "kind": "RabbitmqCluster",
+                    "metadata": {"name": comp, "namespace": slug,
+                                 "labels": {"app": comp, "r6-bundle": slug}},
+                    "spec": {
+                        "replicas": _replicas_op,
+                        "resources": {
+                            "requests": {"cpu": "200m", "memory": "256Mi"},
+                            "limits": {"cpu": "1", "memory": "1Gi"},
+                        },
+                        "persistence": rmq_persistence,
+                    },
+                }
+
+            elif opname == "kafka-operator":
+                # Strimzi kafka.strimzi.io/v1beta2 Kafka CR. Replication factors of 1
+                # are safe for single-broker dev/staging; bump min.insync.replicas and
+                # replication factors for a multi-broker production cluster.
+                kafka_storage = {"type": "persistent-claim",
+                                 "size": _storage_size_op or "100Gi", "deleteClaim": False}
+                if _storage_op:
+                    kafka_storage["class"] = _storage_op
+                zk_storage = dict(kafka_storage, size=_storage_size_op or "10Gi")
+                cr_doc = {
+                    "apiVersion": "kafka.strimzi.io/v1beta2", "kind": "Kafka",
+                    "metadata": {"name": comp, "namespace": slug,
+                                 "labels": {"app": comp, "r6-bundle": slug}},
+                    "spec": {
+                        "kafka": {
+                            "version": "3.6.0", "replicas": _replicas_op,
+                            "listeners": [
+                                {"name": "plain", "port": 9092, "type": "internal", "tls": False},
+                                {"name": "tls", "port": 9093, "type": "internal", "tls": True},
+                            ],
+                            "config": {
+                                "offsets.topic.replication.factor": 1,
+                                "transaction.state.log.replication.factor": 1,
+                                "transaction.state.log.min.isr": 1,
+                                "default.replication.factor": 1,
+                                "min.insync.replicas": 1,
+                            },
+                            "storage": kafka_storage,
+                        },
+                        "zookeeper": {"replicas": _replicas_op, "storage": zk_storage},
+                        "entityOperator": {"topicOperator": {}, "userOperator": {}},
+                    },
+                }
+            else:
+                # Unknown operator type - should not happen given the fixed opname set above
+                operator_cr_blockers.append(
+                    "%s: OPERATOR_MANAGED but operator type '%s' is not recognised - "
+                    "no Custom Resource was generated. Remediation: set the component name "
+                    "to include 'postgres', 'redis', 'rabbitmq' or 'kafka'." % (comp, opname))
+                continue
+
+            _w("kustomize_bundle/%s-operator-cr.yaml" % comp,
+               _yaml.dump(cr_doc, default_flow_style=False, sort_keys=False))
+            kust_res.append("%s-operator-cr.yaml" % comp)
+
     # Stage 10.10 - NetworkPolicies (default-deny namespace isolation, explicit allow rules
     # derived from real dependency declarations) and OpenStack security-group intent.
     netpol_docs = [{
@@ -21728,10 +21865,23 @@ def r6_generate_bundle():
             if candidate.is_file():
                 depends_on.append({"name": "%s-base" % opname, "namespace": "flux-system"})
             else:
-                flux_warnings.append(
-                    "operator '%s' is required but no FluxCD Kustomization was found at %s - "
-                    "install/generate the operator first, or this app's Kustomization will "
-                    "never become Ready" % (opname, candidate))
+                # OPERATOR_MANAGED components strictly require the operator to exist:
+                # without it, the generated CR will be applied against a cluster that has
+                # no CRD to accept it and the component will never start. This is a blocker,
+                # not a warning. Non-OPERATOR_MANAGED op_names (inferred) stay as warnings.
+                if opname in operator_managed_workloads:
+                    operator_cr_blockers.append(
+                        "operator '%s' is required by OPERATOR_MANAGED component(s) %s but "
+                        "no FluxCD Kustomization was found at %s - install the operator or "
+                        "provide an approved installation plan before Stage 12." % (
+                            opname,
+                            ", ".join(_comp(w) for w in operator_managed_workloads[opname]),
+                            candidate))
+                else:
+                    flux_warnings.append(
+                        "operator '%s' is required but no FluxCD Kustomization was found at %s - "
+                        "install/generate the operator first, or this app's Kustomization will "
+                        "never become Ready" % (opname, candidate))
 
         # Records every path referenced as a "resources:" entry anywhere in the graph, not
         # just ones that already exist as a directory - managed-services/fluxcd is created
@@ -21841,7 +21991,7 @@ def r6_generate_bundle():
 
     # Every blocker/warning names the component, the field, and the remediation - not just
     # a bare description - so Stage 12 can show exactly what is wrong and how to fix it.
-    validation_blockers = []
+    validation_blockers = list(operator_cr_blockers)  # missing required operators are blockers
     validation_warnings = []
     for _comp_name in components_critical_single_replica:
         validation_warnings.append(
