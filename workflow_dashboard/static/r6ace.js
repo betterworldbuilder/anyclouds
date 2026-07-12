@@ -399,6 +399,10 @@ window.r6pSetTargetForm=function(name,val){
   var b=document.getElementById('r6p-tf-badge-'+btoa(unescape(encodeURIComponent(name))).replace(/[^a-zA-Z0-9]/g,''));
   if(typeof r6pRenderContainerReadyForm==='function')r6pRenderContainerReadyForm();
 };
+window.r6pSetStartCommand=function(name,val){
+  R6P.startCmdOverride=R6P.startCmdOverride||{};
+  R6P.startCmdOverride[name]=val;
+};
 /* State/portability override (Step 7 Classify table) - takes priority over the static
    reference classification and also feeds Step 8's Transform decision engine, so an
    engineer's override in Classify actually changes the downstream target-form default. */
@@ -704,7 +708,24 @@ window.r6pContent=function(n){
       }).join('')
       +'</tbody></table></div>'
       +r6pFoot(8,'<button class="r6p-btn success" onclick="r6pMarkDone(8)"'+(allCanProceed?'':' disabled')+'>Approve Readiness Plan</button>');}
-  if(n===9)return '<div class="r6p-info-box">Generates a real per-component Dockerfile, extract_assets.sh (pulls app files from the live FLEX VM), build_and_push.sh (build, SBOM, scan, sign, push, resolve digest), and a SOPS-encrypted registry pull secret. Images are only built for components Step 8 decided are CONTAINERIZED or PARTIALLY_CONTAINERIZED - everything else (operator-managed, retained/redeployed VM, external, data-migration, blocked) is skipped here by design.</div>'
+  if(n===9){
+    var buildableComps9=(R6P.components||[]).filter(function(c){
+      var form=(R6P.targetForms&&R6P.targetForms[c.name])||r6pDecideTargetForm(c).form;
+      return form==='CONTAINERIZED'||form==='PARTIALLY_CONTAINERIZED';
+    });
+    var startCmdRows=buildableComps9.map(function(c){
+      var detected=(R6P.startCmdOverride&&R6P.startCmdOverride[c.name])||r6pDetectStartCommand(c);
+      var missing=!detected;
+      return '<tr><td style="font-weight:600;">'+c.name+'</td>'
+        +'<td><input value="'+(detected||'').replace(/"/g,'&quot;')+'" placeholder="e.g. node server.js / java -jar app.jar" '
+        +'onchange="r6pSetStartCommand(\''+c.name.replace(/'/g,"\\'")+'\',this.value)" '
+        +'style="width:100%;padding:5px 7px;border:1px solid '+(missing?'#fca5a5':'#cbd5e1')+';border-radius:5px;font-size:11px;font-family:monospace;"></td>'
+        +'<td>'+(missing?'<span style="color:#dc2626;font-size:10px;font-weight:700;">Not detected - run Live Scan or set manually</span>':'<span style="color:#16a34a;font-size:10px;font-weight:700;">Detected from Live Scan</span>')+'</td></tr>';
+    }).join('');
+    return '<div class="r6p-info-box">Generates a real per-component Dockerfile, extract_assets.sh (pulls app files from the live FLEX VM), build_and_push.sh (build, SBOM, scan, sign, push, resolve digest), and a SOPS-encrypted registry pull secret. Images are only built for components Step 8 decided are CONTAINERIZED or PARTIALLY_CONTAINERIZED - everything else (operator-managed, retained/redeployed VM, external, data-migration, blocked) is skipped here by design.</div>'
+    +(buildableComps9.length?('<div style="font-weight:800;font-size:13px;color:#0f172a;margin-bottom:6px;">Start Command Review</div>'
+      +'<div class="r6p-warn-box" style="margin-bottom:10px;">A container with no start command will not run your application - it will exit or hang doing nothing even though Kubernetes shows it as scheduled. Review every row below before building.</div>'
+      +'<div style="overflow-x:auto;margin-bottom:14px;"><table class="r6p-table"><thead><tr><th>Component</th><th>Start Command</th><th>Source</th></tr></thead><tbody>'+startCmdRows+'</tbody></table></div>'):'')
     +'<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px;">'
     +'<div><label style="font-size:11px;font-weight:700;color:#334155;display:block;margin-bottom:4px;">Registry</label><select id="r6p-build-regtype" style="padding:7px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;"><option value="harbor" selected>Harbor (in-cluster, recommended default)</option><option value="dockerhub">Docker Hub</option><option value="ghcr">GitHub Container Registry</option><option value="gitlab">GitLab Container Registry</option><option value="quay">Quay.io</option><option value="ecr">AWS ECR (private)</option><option value="ecrpublic">AWS ECR Public</option><option value="gcp">GCP Artifact Registry</option><option value="custom">Custom OCI URL</option></select></div>'
     +'<div><label style="font-size:11px;font-weight:700;color:#334155;display:block;margin-bottom:4px;">Registry URL (optional)</label><input id="r6p-build-regurl" placeholder="registry.example.com" style="padding:7px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;width:200px;"></div>'
@@ -721,6 +742,7 @@ window.r6pContent=function(n){
     +'</div>'
     +'<div id="r6p-build-status" style="font-size:12px;font-weight:600;color:#64748b;margin-bottom:10px;line-height:1.7;"></div>'
     +r6pFoot(9);
+  }
   if(n===10)return '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;"><button class="r6p-btn primary" onclick="r6pGenYAML()">Generate All YAML</button><button class="r6p-btn secondary" onclick="r6pGenHelm()">Helm Chart</button><button class="r6p-btn secondary" onclick="r6pGenKustomize()">Kustomize</button><button class="r6p-btn secondary" onclick="r6pGenFlux()">Flux</button></div><pre id="r6p-yaml-preview" style="background:#0f172a;color:#2dd4bf;border-radius:8px;padding:14px;font-size:11px;max-height:280px;overflow:auto;white-space:pre-wrap;min-height:60px;margin-bottom:14px;">-- Click Generate All YAML --</pre>'+r6pFoot(10);
   if(n===11)return '<div id="r6p-bundle-status" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px;margin-bottom:12px;font-size:12px;color:#64748b;">Generate bundle to see status.</div><pre id="r6p-bundle-preview" style="background:#0f172a;color:#c4b5fd;border-radius:8px;padding:14px;font-size:11px;max-height:220px;overflow:auto;white-space:pre-wrap;min-height:60px;margin-bottom:12px;">-- Generate bundle to see manifest --</pre>'+r6pFoot(11,'<button class="r6p-btn primary" onclick="r6pGenBundle()">Generate OpenCenter Bundle</button><button class="r6p-btn secondary" onclick="r6pDownloadBundle()">Download</button>');
   if(n===12){
@@ -1030,6 +1052,32 @@ window.r6pAutoRunBuildPipeline=function(extractCmd,buildCmd,outId){
   };
   es1.onerror=function(){out.textContent+='[closed]\n';es1.close();};
 };
+/* Real start-command detection: parses the actual `ps aux --sort=-%mem` output captured
+   by Live Scan (Step 3/6) - not a guess. Picks the heaviest process that is not the SSH
+   session, shell or scan tooling itself. Returns '' (not a fake command) when no scan has
+   been run, so the backend emits a loud, fail-fast placeholder instead of something wrong. */
+window.r6pDetectStartCommand=function(c){
+  var scan=R6P.depScan&&R6P.depScan[c.name];
+  if(!scan||!scan.rawLog)return '';
+  var lines=scan.rawLog.split('\n');
+  var start=-1,end=lines.length;
+  for(var i=0;i<lines.length;i++){
+    if(start<0&&/top processes/i.test(lines[i])){start=i+1;continue;}
+    if(start>=0&&i>start&&/^--\s/.test(lines[i].trim())){end=i;break;}
+  }
+  if(start<0)return '';
+  var noise=/^(ps|ssh|sshd:?|bash|sh|-bash|systemd|\[.*\]|init|cron|dbus|rsyslog|agetty|login|command)$/i;
+  for(var j=start;j<end;j++){
+    var parts=lines[j].trim().split(/\s+/);
+    if(parts.length<11)continue;
+    if(/^user$/i.test(parts[0])&&/^pid$/i.test(parts[1]))continue; // ps aux header row
+    var cmd=parts.slice(10).join(' ');
+    var bin=(cmd.split(/\s+/)[0]||'').split('/').pop();
+    if(!bin||noise.test(bin))continue;
+    return cmd;
+  }
+  return '';
+};
 window.r6pGenRealDockerfiles=function(){
   var st=document.getElementById('r6p-build-status');
   if(!R6P.components||!R6P.components.length){if(st){st.textContent='Select a Business System in Step 1 first.';st.style.color='#dc2626';}return;}
@@ -1044,8 +1092,12 @@ window.r6pGenRealDockerfiles=function(){
   var workloads=comps.map(function(c){
     var form=(R6P.targetForms&&R6P.targetForms[c.name])||r6pDecideTargetForm(c).form;
     var buildable=(form==='CONTAINERIZED'||form==='PARTIALLY_CONTAINERIZED');
+    var startCmd=(R6P.startCmdOverride&&R6P.startCmdOverride[c.name])||r6pDetectStartCommand(c);
+    var siblingDeps=(R6P.components||[]).filter(function(x){return x.name!==c.name;}).map(function(x){return x.name;});
     return {component:c.name,image:'debian:stable-slim',replicas:1,
-      readiness:buildable?'READY':'KEEP_ON_VM_FOR_NOW',layer:'API',sourcePath:c.path||'/opt/app',targetForm:form};
+      readiness:buildable?'READY':'KEEP_ON_VM_FOR_NOW',layer:'API',sourcePath:c.path||'/opt/app',targetForm:form,
+      startCommand:startCmd,healthPath:(c.path&&c.path.indexOf('/')===0)?c.path.split(',')[0]:'/health',
+      dependencies:siblingDeps};
   });
   var skipped=workloads.filter(function(w){return w.readiness==='KEEP_ON_VM_FOR_NOW';});
   var mode=(document.querySelector('input[name="r6p-build-mode"]:checked')||{}).value||'manual';

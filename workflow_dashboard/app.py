@@ -21045,13 +21045,28 @@ def r6_generate_bundle():
         comp = _comp(w)
         base = str(w.get("image") or "docker.io/library/debian:stable-slim")
         image = _img(w)
+        start_cmd = str(w.get("startCommand") or "").strip()
+        health_path = str(w.get("healthPath") or "").strip() or "/health"
+        if start_cmd:
+            cmd_line = 'CMD ["sh", "-c", %s]' % _json.dumps(start_cmd)
+        else:
+            # No detected or manually supplied start command - fail loudly and immediately
+            # instead of silently running the base image's default process (which looks
+            # "Running" in Kubernetes while doing nothing). Detected via Live Scan (Step 3/6)
+            # parsing real `ps aux` output, or set manually in Step 9.
+            cmd_line = (
+                'CMD ["sh", "-c", "echo \'[R6] No start command detected for %s - run Live Scan '
+                "(Step 3/6) so R6 can detect it from the running process, or set one manually in "
+                'Step 9 before rebuilding.\' >&2; exit 1"]' % comp
+            )
         df_lines = [
             "FROM %s" % base,
             'LABEL org.opencontainers.image.title="%s" org.opencontainers.image.source="r6-flex-refactoring"' % comp,
             "WORKDIR /app",
             "COPY ./app /app",
             "EXPOSE 8080",
-            "HEALTHCHECK --interval=30s --timeout=5s CMD curl -fsS http://localhost:8080/healthz || exit 1",
+            "HEALTHCHECK --interval=30s --timeout=5s CMD curl -fsS http://localhost:8080%s || exit 1" % health_path,
+            cmd_line,
         ]
         _w("dockerfiles/%s/Dockerfile" % comp, "\n".join(df_lines) + "\n")
         plan_yaml += ["  - component: %s" % comp, "    base_image: %s" % base,
@@ -21100,6 +21115,21 @@ def r6_generate_bundle():
             'printf \'{"component":"%s","registry":"%s","repository":"%s","tag":"%s","digest":"%%s","buildStatus":"PASSED","pushStatus":"%%s","signatureStatus":"%%s"}\' "$_digest" "$_push_status" "$_sign_status" >> image-manifest.json'
             % (comp, reg_host, "%s/%s" % (project, comp), tag),
         ]
+        deps = [str(d).strip() for d in (w.get("dependencies") or []) if str(d).strip()]
+        dep_slugs = [re.sub(r"[^a-z0-9-]+", "-", d.lower()).strip("-") for d in deps]
+        cfg_name = "%s-deps" % comp
+        env_lines = []
+        cm_data_lines = []
+        for orig, dslug in zip(deps, dep_slugs):
+            var = re.sub(r"[^A-Z0-9]+", "_", orig.upper()).strip("_") + "_HOST"
+            env_lines += ["            - name: %s" % var,
+                          "              valueFrom:", "                configMapKeyRef:",
+                          "                  name: %s" % cfg_name, "                  key: %s" % var]
+            # Points at the in-cluster Service name for a containerized dependency in this
+            # same bundle, or the retained/redeployed VM's logical alias otherwise - both
+            # resolve to dslug as a DNS name once OpenCenter creates the matching Service/
+            # EndpointSlice pair for VM-backed components.
+            cm_data_lines.append("  %s: %s" % (var, dslug))
         dep_lines = [
             "apiVersion: apps/v1", "kind: Deployment",
             "metadata:", "  name: %s" % comp, "  namespace: %s" % slug,
@@ -21110,12 +21140,29 @@ def r6_generate_bundle():
             "    spec:", "      imagePullSecrets:", "        - name: r6-registry-pull",
             "      containers:", "        - name: %s" % comp, "          image: %s" % image,
             "          ports: [{containerPort: 8080}]",
+        ]
+        if env_lines:
+            dep_lines += ["          env:"] + env_lines
+        dep_lines += [
+            "          readinessProbe:",
+            "            httpGet: {path: %s, port: 8080}" % health_path,
+            "            initialDelaySeconds: 5", "            periodSeconds: 10",
+            "          livenessProbe:",
+            "            httpGet: {path: %s, port: 8080}" % health_path,
+            "            initialDelaySeconds: 15", "            periodSeconds: 20",
             "---",
             "apiVersion: v1", "kind: Service",
             "metadata:", "  name: %s" % comp, "  namespace: %s" % slug,
             "spec:", "  selector: {app: %s}" % comp,
             "  ports: [{port: 80, targetPort: 8080}]",
         ]
+        if cm_data_lines:
+            dep_lines += [
+                "---",
+                "apiVersion: v1", "kind: ConfigMap",
+                "metadata:", "  name: %s" % cfg_name, "  namespace: %s" % slug,
+                "data:",
+            ] + cm_data_lines
         _w("kustomize_bundle/%s.yaml" % comp, "\n".join(dep_lines) + "\n")
         kust_res.append("%s.yaml" % comp)
     build_lines += ['echo "]" >> image-manifest.json', 'echo "Wrote image-manifest.json"']
