@@ -1335,3 +1335,96 @@ def test_validation_jobs_not_generated_for_daemonset_or_job_components():
         assert not any("log-collector" in j["metadata"]["name"] for j in http_jobs), \
             "DaemonSet must not receive an HTTP validation Job"
     _cleanup(data["bundle_dir"])
+
+
+# ---------------------------------------------------------------------------
+# Increment 17: Stage 13 — /api/r6/run-validation endpoint and evidence
+# ---------------------------------------------------------------------------
+
+VALIDATION_ENDPOINT = BASE_URL + "/api/r6/run-validation"
+
+
+def test_run_validation_rejects_missing_bundle_dir():
+    """Stage 13: run-validation must return a clear error when bundle_dir is absent."""
+    try:
+        resp = requests.post(VALIDATION_ENDPOINT, json={}, timeout=10)
+    except requests.exceptions.ConnectionError:
+        pytest.skip("osflex-dashboard is not running")
+    assert resp.status_code == 400
+    body = resp.json()
+    assert body.get("ok") is False
+    assert "bundle_dir" in body.get("error", "")
+
+
+def test_run_validation_rejects_nonexistent_bundle_dir():
+    """Stage 13: run-validation must return a clear error when bundle_dir does not exist."""
+    try:
+        resp = requests.post(VALIDATION_ENDPOINT,
+                             json={"bundle_dir": "/tmp/r6-nonexistent-bundle-12345"},
+                             timeout=10)
+    except requests.exceptions.ConnectionError:
+        pytest.skip("osflex-dashboard is not running")
+    assert resp.status_code == 400
+    body = resp.json()
+    assert body.get("ok") is False
+    assert "does not exist" in body.get("error", "")
+
+
+def test_run_validation_rejects_bundle_without_validation_jobs():
+    """Stage 13: run-validation must return a clear error when the bundle has no
+    validation-jobs.yaml — this happens when Stage 10.12 was skipped or the bundle
+    had no HTTP-serving or VM-alias components."""
+    # Generate a bundle with only VM workloads (no deployable HTTP components)
+    # so validation-jobs.yaml is not generated
+    data = _generate(
+        [{"component": "legacy-only", "readiness": "KEEP_ON_VM_FOR_NOW",
+          "targetIp": "10.0.0.5", "targetPort": 8080}],
+        id_suffix="novalidjobs17",
+    )
+    bundle_dir = data["bundle_dir"]
+    jobs_path = Path(bundle_dir) / "kustomize_bundle" / "validation-jobs.yaml"
+    # This bundle has VM-only workload → DNS job IS generated (legacy-only is in vm_workloads).
+    # Remove the file manually to test the "no validation-jobs.yaml" error path.
+    if jobs_path.exists():
+        jobs_path.unlink()
+    try:
+        resp = requests.post(VALIDATION_ENDPOINT, json={"bundle_dir": bundle_dir}, timeout=10)
+    except requests.exceptions.ConnectionError:
+        pytest.skip("osflex-dashboard is not running")
+    assert resp.status_code == 400
+    body = resp.json()
+    assert body.get("ok") is False
+    assert "validation-jobs.yaml" in body.get("error", "")
+    _cleanup(bundle_dir)
+
+
+def test_run_validation_response_structure_when_no_cluster_available():
+    """Stage 13: When kubectl is not configured or fails to apply, run-validation must
+    return a structured error response (not a 500 crash). The evidence schema must be
+    consistent regardless of kubectl availability — this tests the response contract."""
+    data = _generate(
+        [{"component": "api-server", "readiness": "READY", "image": "node:20-slim",
+          "startCommand": "node server.js", "healthPath": "/health", "dependencies": [],
+          "targetForm": "CONTAINERIZED"}],
+        id_suffix="runvalidstruct",
+    )
+    bundle_dir = data["bundle_dir"]
+    try:
+        resp = requests.post(VALIDATION_ENDPOINT,
+                             json={"bundle_dir": bundle_dir,
+                                   "kubeconfig": "/tmp/r6-no-such-kubeconfig.yaml"},
+                             timeout=30)
+    except requests.exceptions.ConnectionError:
+        pytest.skip("osflex-dashboard is not running")
+    # Either 500 (kubectl apply failed) or 200 (if kubectl returns quickly)
+    # In both cases: response must be JSON with an 'ok' field
+    body = resp.json()
+    assert "ok" in body, "response must always include 'ok' field"
+    if resp.status_code == 500:
+        assert body["ok"] is False
+        assert "error" in body
+    elif resp.status_code == 200:
+        assert "results" in body
+        assert "all_passed" in body
+        assert "evidence_path" in body
+    _cleanup(bundle_dir)
