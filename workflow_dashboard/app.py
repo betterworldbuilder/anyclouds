@@ -21162,11 +21162,15 @@ def r6_generate_bundle():
                     "source": {"type": "OPENCENTER_SECRET", "reference": "%s/%s" % (slug, comp)},
                 },
             })
-        # Workload kind selection - name-based for now (the target-form taxonomy does not
-        # yet distinguish "needs an image but isn't long-running" from a plain Deployment;
-        # broadening that is future work). Defaults to Deployment, matching prior behavior.
+        # Workload kind selection. An explicit workloadKind on the component (e.g. from the
+        # Container Readiness decision table's Target Runtime Resource field) always wins;
+        # otherwise falls back to the prior name-based heuristic, matching existing behavior
+        # for every payload that doesn't set it (including legacy pre-Stage-10 bundles).
         comp_lower = str(w.get("component", "")).lower()
-        if "scheduler" in comp_lower:
+        workload_kind_override = str(w.get("workloadKind") or "").strip().upper()
+        if workload_kind_override in ("STATEFULSET", "DAEMONSET", "DEPLOYMENT", "JOB", "CRONJOB"):
+            workload_kind = workload_kind_override
+        elif "scheduler" in comp_lower:
             workload_kind = "CRONJOB"
         elif "batch" in comp_lower:
             workload_kind = "JOB"
@@ -21209,54 +21213,98 @@ def r6_generate_bundle():
             "metadata": {"name": sa_name, "namespace": slug},
         }]
 
-        if workload_kind == "CRONJOB":
+        if workload_kind in ("CRONJOB", "JOB"):
             job_pod_spec = dict(pod_spec_base, restartPolicy="Never")
-            docs.append({
-                "apiVersion": "batch/v1", "kind": "CronJob",
-                "metadata": {"name": comp, "namespace": slug, "labels": {"app": comp, "r6-bundle": slug}},
-                "spec": {
-                    # Placeholder schedule - confirm the real schedule before production use.
-                    "schedule": "0 2 * * *", "timeZone": "UTC", "concurrencyPolicy": "Forbid",
-                    "successfulJobsHistoryLimit": 3, "failedJobsHistoryLimit": 5,
-                    "jobTemplate": {"spec": {
-                        "backoffLimit": 3, "activeDeadlineSeconds": 3600, "ttlSecondsAfterFinished": 86400,
-                        "template": {"metadata": {"labels": {"app": comp}}, "spec": job_pod_spec},
-                    }},
-                },
-            })
-        elif workload_kind == "JOB":
-            job_pod_spec = dict(pod_spec_base, restartPolicy="Never")
-            docs.append({
-                "apiVersion": "batch/v1", "kind": "Job",
-                "metadata": {"name": comp, "namespace": slug, "labels": {"app": comp, "r6-bundle": slug}},
-                "spec": {
-                    "backoffLimit": 3, "activeDeadlineSeconds": 3600, "ttlSecondsAfterFinished": 86400,
-                    "template": {"metadata": {"labels": {"app": comp}}, "spec": job_pod_spec},
-                },
-            })
+            job_spec = {"backoffLimit": 3, "activeDeadlineSeconds": 3600, "ttlSecondsAfterFinished": 86400,
+                        "template": {"metadata": {"labels": {"app": comp}}, "spec": job_pod_spec}}
+            if workload_kind == "CRONJOB":
+                docs.append({
+                    "apiVersion": "batch/v1", "kind": "CronJob",
+                    "metadata": {"name": comp, "namespace": slug, "labels": {"app": comp, "r6-bundle": slug}},
+                    "spec": {
+                        # Placeholder schedule - confirm the real schedule before production use.
+                        "schedule": "0 2 * * *", "timeZone": "UTC", "concurrencyPolicy": "Forbid",
+                        "successfulJobsHistoryLimit": 3, "failedJobsHistoryLimit": 5,
+                        "jobTemplate": {"spec": job_spec},
+                    },
+                })
+            else:
+                docs.append({
+                    "apiVersion": "batch/v1", "kind": "Job",
+                    "metadata": {"name": comp, "namespace": slug, "labels": {"app": comp, "r6-bundle": slug}},
+                    "spec": job_spec,
+                })
         else:
+            # Deployment, StatefulSet and DaemonSet all run the same long-lived, probed
+            # container shape - only the controller kind (and Service style) differs.
             container["ports"] = [{"containerPort": 8080}]
             container["readinessProbe"] = {"httpGet": {"path": health_path, "port": 8080}, "initialDelaySeconds": 5, "periodSeconds": 10}
             container["livenessProbe"] = {"httpGet": {"path": health_path, "port": 8080}, "initialDelaySeconds": 15, "periodSeconds": 20}
-            docs.append({
-                "apiVersion": "apps/v1", "kind": "Deployment",
-                "metadata": {"name": comp, "namespace": slug, "labels": {"app": comp, "r6-bundle": slug}},
-                "spec": {
-                    "replicas": w.get("replicas", 1) or 1,
-                    "selector": {"matchLabels": {"app": comp}},
-                    "template": {"metadata": {"labels": {"app": comp}}, "spec": pod_spec_base},
-                },
-            })
-            docs.append({
-                "apiVersion": "v1", "kind": "Service",
-                "metadata": {"name": comp, "namespace": slug},
-                "spec": {"selector": {"app": comp}, "ports": [{"port": 80, "targetPort": 8080}]},
-            })
+            pod_template = {"metadata": {"labels": {"app": comp}}, "spec": pod_spec_base}
+            metadata = {"name": comp, "namespace": slug, "labels": {"app": comp, "r6-bundle": slug}}
+            if workload_kind == "STATEFULSET":
+                docs.append({
+                    "apiVersion": "apps/v1", "kind": "StatefulSet", "metadata": metadata,
+                    "spec": {
+                        # serviceName must match the headless Service below - required by
+                        # the StatefulSet controller for stable per-pod DNS.
+                        "serviceName": comp, "replicas": w.get("replicas", 1) or 1,
+                        "podManagementPolicy": "OrderedReady",
+                        "selector": {"matchLabels": {"app": comp}}, "template": pod_template,
+                        # volumeClaimTemplates intentionally omitted - real PVC/StorageClass
+                        # generation is separate follow-up work (bundle_validation flags this).
+                    },
+                })
+                docs.append({
+                    "apiVersion": "v1", "kind": "Service", "metadata": {"name": comp, "namespace": slug},
+                    # Headless (clusterIP: None) - required for StatefulSet pod DNS
+                    # identity, not a load-balanced ClusterIP like a Deployment's Service.
+                    "spec": {"clusterIP": "None", "selector": {"app": comp}, "ports": [{"port": 80, "targetPort": 8080}]},
+                })
+            elif workload_kind == "DAEMONSET":
+                docs.append({
+                    "apiVersion": "apps/v1", "kind": "DaemonSet", "metadata": metadata,
+                    "spec": {"selector": {"matchLabels": {"app": comp}}, "template": pod_template},
+                    # No Service - a DaemonSet's pods are addressed per-node, not through a
+                    # single ClusterIP.
+                })
+            else:
+                docs.append({
+                    "apiVersion": "apps/v1", "kind": "Deployment", "metadata": metadata,
+                    "spec": {
+                        "replicas": w.get("replicas", 1) or 1,
+                        "selector": {"matchLabels": {"app": comp}}, "template": pod_template,
+                    },
+                })
+                docs.append({
+                    "apiVersion": "v1", "kind": "Service", "metadata": {"name": comp, "namespace": slug},
+                    "spec": {"selector": {"app": comp}, "ports": [{"port": 80, "targetPort": 8080}]},
+                })
         if cm_data:
             docs.append({
                 "apiVersion": "v1", "kind": "ConfigMap",
                 "metadata": {"name": cfg_name, "namespace": slug},
                 "data": cm_data,
+            })
+        # Least-privilege RBAC: the component's ServiceAccount may only read the exact
+        # ConfigMap/Secret objects it declared a dependency on - never a blanket
+        # get-all-secrets grant. Skipped entirely when there is nothing to grant access to.
+        role_rules = []
+        if cm_data:
+            role_rules.append({"apiGroups": [""], "resources": ["configmaps"], "resourceNames": [cfg_name], "verbs": ["get", "list", "watch"]})
+        if comp_required_keys:
+            role_rules.append({"apiGroups": [""], "resources": ["secrets"], "resourceNames": ["%s-secrets" % comp], "verbs": ["get", "list", "watch"]})
+        if role_rules:
+            docs.append({
+                "apiVersion": "rbac.authorization.k8s.io/v1", "kind": "Role",
+                "metadata": {"name": "%s-role" % comp, "namespace": slug},
+                "rules": role_rules,
+            })
+            docs.append({
+                "apiVersion": "rbac.authorization.k8s.io/v1", "kind": "RoleBinding",
+                "metadata": {"name": "%s-rolebinding" % comp, "namespace": slug},
+                "roleRef": {"apiGroup": "rbac.authorization.k8s.io", "kind": "Role", "name": "%s-role" % comp},
+                "subjects": [{"kind": "ServiceAccount", "name": sa_name, "namespace": slug}],
             })
         _w("kustomize_bundle/%s.yaml" % comp, _yaml.dump_all(docs, default_flow_style=False, sort_keys=False))
         kust_res.append("%s.yaml" % comp)
