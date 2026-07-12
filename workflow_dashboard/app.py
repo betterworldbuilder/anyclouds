@@ -21065,6 +21065,7 @@ def r6_generate_bundle():
     components_using_default_storageclass = []
     components_missing_persistent_path = []
     storage_classes_used = set()
+    components_critical_single_replica = []  # critical=true but replicas=1; HA gap recorded after validation_warnings init
     for w in deployable:
         comp = _comp(w)
         base = str(w.get("image") or "docker.io/library/debian:stable-slim")
@@ -21378,6 +21379,69 @@ def r6_generate_bundle():
             })
         _w("kustomize_bundle/%s.yaml" % comp, _yaml.dump_all(docs, default_flow_style=False, sort_keys=False))
         kust_res.append("%s.yaml" % comp)
+
+        # Stage 10.9 — HPA and PDB with applicability gates.
+        # HPA: opt-in via hpa={minReplicas, maxReplicas, targetCPUUtilizationPercentage}.
+        #   CPU/memory requests are always present (SMALL_PRODUCTION defaults), so the
+        #   prerequisite is always satisfied. Only Deployment and StatefulSet are eligible;
+        #   DaemonSet is node-scoped, CronJob/Job are finite-run, neither can be scaled.
+        # PDB: generated for multi-replica Deployment/StatefulSet, or single-replica components
+        #   flagged critical (those get a bundle_validation warning instead of a useless PDB).
+        _replicas = 1
+        try:
+            _replicas = max(1, int(w.get("replicas") or 1))
+        except (TypeError, ValueError):
+            pass
+        _critical = bool(w.get("critical"))
+        _scale_target_kind = {"DEPLOYMENT": "Deployment", "STATEFULSET": "StatefulSet"}.get(workload_kind)
+        scaling_docs = []
+
+        hpa_cfg = w.get("hpa") or {}
+        if hpa_cfg and _scale_target_kind:
+            _min_r = max(1, int(hpa_cfg.get("minReplicas") or 1))
+            _max_r = max(_min_r + 1, int(hpa_cfg.get("maxReplicas") or 10))
+            _cpu_pct = int(hpa_cfg.get("targetCPUUtilizationPercentage") or 70)
+            hpa_metrics = [{"type": "Resource", "resource": {
+                "name": "cpu",
+                "target": {"type": "Utilization", "averageUtilization": _cpu_pct},
+            }}]
+            _mem_pct = int(hpa_cfg.get("targetMemoryUtilizationPercentage") or 0)
+            if _mem_pct:
+                hpa_metrics.append({"type": "Resource", "resource": {
+                    "name": "memory",
+                    "target": {"type": "Utilization", "averageUtilization": _mem_pct},
+                }})
+            scaling_docs.append({
+                "apiVersion": "autoscaling/v2", "kind": "HorizontalPodAutoscaler",
+                "metadata": {"name": comp, "namespace": slug},
+                "spec": {
+                    "scaleTargetRef": {"apiVersion": "apps/v1",
+                                       "kind": _scale_target_kind, "name": comp},
+                    "minReplicas": _min_r, "maxReplicas": _max_r,
+                    "metrics": hpa_metrics,
+                },
+            })
+
+        if _scale_target_kind:
+            if _replicas > 1:
+                # minAvailable keeps at least 1 pod running during node drain or rolling
+                # update. For replicas >= 3 keep at least 2 (50% floor) for extra resilience.
+                _min_avail = 2 if _replicas >= 3 else 1
+                scaling_docs.append({
+                    "apiVersion": "policy/v1", "kind": "PodDisruptionBudget",
+                    "metadata": {"name": comp, "namespace": slug},
+                    "spec": {"minAvailable": _min_avail,
+                             "selector": {"matchLabels": {"app": comp}}},
+                })
+            elif _critical:
+                # A PDB on a single-replica pod blocks all node drains permanently -
+                # record the HA gap for the operator to resolve before production.
+                components_critical_single_replica.append(comp)
+
+        if scaling_docs:
+            _w("kustomize_bundle/%s-scaling.yaml" % comp,
+               _yaml.dump_all(scaling_docs, default_flow_style=False, sort_keys=False))
+            kust_res.append("%s-scaling.yaml" % comp)
 
     # Stage 10.5 - VM connectivity. Components kept as a VM (retained or redeployed) never
     # get a Deployment/image, but containers still need a stable in-cluster name to reach
@@ -21779,6 +21843,11 @@ def r6_generate_bundle():
     # a bare description - so Stage 12 can show exactly what is wrong and how to fix it.
     validation_blockers = []
     validation_warnings = []
+    for _comp_name in components_critical_single_replica:
+        validation_warnings.append(
+            "%s: critical=true but replicas=1 — PodDisruptionBudget cannot protect a single "
+            "replica from disruption during node drain or rolling update. Increase replicas to "
+            "at least 2 to enable disruption protection, or remove the critical flag." % _comp_name)
     for w in deployable:
         if not str(w.get("startCommand") or "").strip():
             validation_blockers.append(

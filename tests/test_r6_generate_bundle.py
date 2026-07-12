@@ -758,3 +758,157 @@ def test_flux_kustomization_has_prune_true_and_drift_warning():
                for w in data["bundle_validation"]["warnings"]), \
         "bundle_validation must remind operators to configure a drift-detection PrometheusRule alert"
     _cleanup(data["bundle_dir"])
+
+
+# ---------------------------------------------------------------------------
+# Increment 13 — HPA and PDB with applicability gates
+# ---------------------------------------------------------------------------
+
+def test_hpa_generated_for_deployment_with_hpa_config():
+    """Stage 10.9: When a Deployment component includes an hpa block, an autoscaling/v2
+    HorizontalPodAutoscaler must be generated in a separate -scaling.yaml file with the
+    declared min/max replicas and CPU target. The HPA scaleTargetRef must point to the
+    Deployment by name."""
+    data = _generate(
+        [{"component": "api-server", "readiness": "READY", "image": "node:20-slim",
+          "startCommand": "node server.js", "healthPath": "/health", "dependencies": [],
+          "hpa": {"minReplicas": 2, "maxReplicas": 10, "targetCPUUtilizationPercentage": 70}}],
+        id_suffix="hpa",
+    )
+    scaling_path = Path(data["bundle_dir"]) / "kustomize_bundle" / "api-server-scaling.yaml"
+    assert scaling_path.exists(), "HPA config must generate api-server-scaling.yaml"
+    docs = list(yaml.safe_load_all(scaling_path.read_text()))
+    hpa = next(d for d in docs if d.get("kind") == "HorizontalPodAutoscaler")
+    assert hpa["apiVersion"] == "autoscaling/v2"
+    assert hpa["spec"]["scaleTargetRef"] == {"apiVersion": "apps/v1", "kind": "Deployment", "name": "api-server"}
+    assert hpa["spec"]["minReplicas"] == 2
+    assert hpa["spec"]["maxReplicas"] == 10
+    cpu_metric = next(m for m in hpa["spec"]["metrics"] if m["resource"]["name"] == "cpu")
+    assert cpu_metric["resource"]["target"]["averageUtilization"] == 70
+    # Scaling manifest must be listed in kustomization.yaml resources
+    kust = yaml.safe_load((Path(data["bundle_dir"]) / "kustomize_bundle" / "kustomization.yaml").read_text())
+    assert "api-server-scaling.yaml" in kust["resources"]
+    _cleanup(data["bundle_dir"])
+
+
+def test_hpa_includes_memory_metric_when_configured():
+    """Stage 10.9: When targetMemoryUtilizationPercentage is set, a second memory Resource
+    metric must appear alongside the CPU metric in the HPA spec."""
+    data = _generate(
+        [{"component": "api-server", "readiness": "READY", "image": "node:20-slim",
+          "startCommand": "node server.js", "healthPath": "/health", "dependencies": [],
+          "hpa": {"minReplicas": 2, "maxReplicas": 8,
+                  "targetCPUUtilizationPercentage": 70,
+                  "targetMemoryUtilizationPercentage": 80}}],
+        id_suffix="hpamem",
+    )
+    docs = list(yaml.safe_load_all(
+        (Path(data["bundle_dir"]) / "kustomize_bundle" / "api-server-scaling.yaml").read_text()))
+    hpa = next(d for d in docs if d.get("kind") == "HorizontalPodAutoscaler")
+    metric_names = {m["resource"]["name"] for m in hpa["spec"]["metrics"]}
+    assert "cpu" in metric_names and "memory" in metric_names
+    _cleanup(data["bundle_dir"])
+
+
+def test_no_hpa_generated_when_hpa_field_absent():
+    """Stage 10.9: NOT_APPLICABLE — no HPA block in the workload means autoscaling was
+    not requested. No -scaling.yaml file should be created for an HPA-only absence."""
+    data = _generate(
+        [{"component": "backend-worker", "readiness": "READY", "image": "node:20-slim",
+          "startCommand": "node worker.js", "healthPath": "/health", "dependencies": []}],
+        id_suffix="nohpa",
+    )
+    # HPA not requested - no scaling file created for HPA
+    scaling_path = Path(data["bundle_dir"]) / "kustomize_bundle" / "backend-worker-scaling.yaml"
+    assert not scaling_path.exists(), "no HPA config means no scaling manifest should be generated"
+    _cleanup(data["bundle_dir"])
+
+
+def test_hpa_not_generated_for_daemonset_or_job():
+    """Stage 10.9: DaemonSet, CronJob and Job must not get an HPA even when hpa config is
+    present — DaemonSet is node-scoped, CronJob/Job are finite-run workloads."""
+    for kind, suffix_comp in [("DaemonSet", "node-agent"), ("CronJob", "nightly-scheduler")]:
+        workload_kind_field = kind.upper()
+        data = _generate(
+            [{"component": suffix_comp, "readiness": "READY", "image": "node:20-slim",
+              "startCommand": "node run.js", "healthPath": "/health", "dependencies": [],
+              "workloadKind": workload_kind_field,
+              "hpa": {"minReplicas": 2, "maxReplicas": 5, "targetCPUUtilizationPercentage": 70}}],
+            id_suffix="nohpa-%s" % kind.lower(),
+        )
+        scaling_path = Path(data["bundle_dir"]) / "kustomize_bundle" / ("%s-scaling.yaml" % suffix_comp)
+        assert not scaling_path.exists(), "%s must not receive an HPA" % kind
+        _cleanup(data["bundle_dir"])
+
+
+def test_pdb_generated_for_multi_replica_deployment():
+    """Stage 10.9: A Deployment with replicas >= 2 must produce a policy/v1
+    PodDisruptionBudget with minAvailable:1 in the -scaling.yaml file so that at least
+    one replica remains running during node drain or rolling update."""
+    data = _generate(
+        [{"component": "api-server", "readiness": "READY", "image": "node:20-slim",
+          "startCommand": "node server.js", "healthPath": "/health", "dependencies": [],
+          "replicas": 2}],
+        id_suffix="pdb2",
+    )
+    scaling_path = Path(data["bundle_dir"]) / "kustomize_bundle" / "api-server-scaling.yaml"
+    assert scaling_path.exists()
+    docs = list(yaml.safe_load_all(scaling_path.read_text()))
+    pdb = next(d for d in docs if d.get("kind") == "PodDisruptionBudget")
+    assert pdb["apiVersion"] == "policy/v1"
+    assert pdb["spec"]["minAvailable"] == 1
+    assert pdb["spec"]["selector"] == {"matchLabels": {"app": "api-server"}}
+    _cleanup(data["bundle_dir"])
+
+
+def test_pdb_min_available_2_for_three_or_more_replicas():
+    """Stage 10.9: A Deployment with replicas >= 3 must use minAvailable:2 so that at
+    least 50% of replicas remain available during disruption."""
+    data = _generate(
+        [{"component": "api-server", "readiness": "READY", "image": "node:20-slim",
+          "startCommand": "node server.js", "healthPath": "/health", "dependencies": [],
+          "replicas": 3}],
+        id_suffix="pdb3",
+    )
+    docs = list(yaml.safe_load_all(
+        (Path(data["bundle_dir"]) / "kustomize_bundle" / "api-server-scaling.yaml").read_text()))
+    pdb = next(d for d in docs if d.get("kind") == "PodDisruptionBudget")
+    assert pdb["spec"]["minAvailable"] == 2
+    _cleanup(data["bundle_dir"])
+
+
+def test_no_pdb_for_single_replica_non_critical_deployment():
+    """Stage 10.9: NOT_APPLICABLE — a single-replica, non-critical Deployment does not
+    receive a PDB (a PDB with minAvailable:1 on 1 replica would block all node drains)."""
+    data = _generate(
+        [{"component": "backend-worker", "readiness": "READY", "image": "node:20-slim",
+          "startCommand": "node worker.js", "healthPath": "/health", "dependencies": [],
+          "replicas": 1}],
+        id_suffix="nopdb1",
+    )
+    scaling_path = Path(data["bundle_dir"]) / "kustomize_bundle" / "backend-worker-scaling.yaml"
+    assert not scaling_path.exists(), \
+        "single-replica non-critical Deployment must not receive a PDB"
+    _cleanup(data["bundle_dir"])
+
+
+def test_pdb_omitted_and_warning_issued_for_single_replica_critical_deployment():
+    """Stage 10.9: A component flagged critical=true but with replicas=1 must NOT get a
+    PDB (it would permanently block node drains) but must produce a bundle_validation
+    warning explaining that HA is unavailable."""
+    data = _generate(
+        [{"component": "auth-service", "readiness": "READY", "image": "node:20-slim",
+          "startCommand": "node auth.js", "healthPath": "/health", "dependencies": [],
+          "replicas": 1, "critical": True}],
+        id_suffix="criticalpdb",
+    )
+    scaling_path = Path(data["bundle_dir"]) / "kustomize_bundle" / "auth-service-scaling.yaml"
+    if scaling_path.exists():
+        docs = list(yaml.safe_load_all(scaling_path.read_text()))
+        kinds = [d.get("kind") for d in docs if d]
+        assert "PodDisruptionBudget" not in kinds, \
+            "must not generate a PDB for single-replica critical component"
+    assert any("critical=true" in w and "auth-service" in w and "replicas=1" in w
+               for w in data["bundle_validation"]["warnings"]), \
+        "must warn that HA is unavailable when critical=true but replicas=1"
+    _cleanup(data["bundle_dir"])
