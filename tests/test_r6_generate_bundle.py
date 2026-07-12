@@ -1220,3 +1220,118 @@ def test_velero_not_generated_for_stateless_namespace():
     assert not velero_path.exists(), \
         "Velero Schedule must not be generated for a stateless namespace"
     _cleanup(data["bundle_dir"])
+
+
+# ---------------------------------------------------------------------------
+# Increment 16: Stage 10.12 — HTTP, DNS, Database Validation Jobs
+# ---------------------------------------------------------------------------
+
+_BUSYBOX_DIGEST = "sha256:73aaf090f3d85aa34ee199857f03fa3a95c8ede2ffd4cc2cdb5b94e566b11662"
+_POSTGRES_DIGEST = "sha256:57c72fd2a128e416c7fcc499958864df5301e940bca0a56f58fddf30ffc07777"
+
+
+def test_http_validation_jobs_generated_for_http_components():
+    """Stage 10.12: One HTTP validation Job per Deployment/StatefulSet component, using
+    a digest-pinned busybox image to wget the /health endpoint via in-cluster DNS."""
+    data = _generate(
+        [{"component": "api-server", "readiness": "READY", "image": "node:20-slim",
+          "startCommand": "node server.js", "healthPath": "/health", "dependencies": [],
+          "targetForm": "CONTAINERIZED"},
+         {"component": "worker", "readiness": "READY", "image": "python:3.12-slim",
+          "startCommand": "python worker.py", "healthPath": "/health", "dependencies": [],
+          "targetForm": "CONTAINERIZED"}],
+        id_suffix="httpvalidjob",
+    )
+    jobs_path = Path(data["bundle_dir"]) / "kustomize_bundle" / "validation-jobs.yaml"
+    assert jobs_path.exists(), "validation-jobs.yaml must be generated for HTTP components"
+    jobs = [d for d in yaml.safe_load_all(jobs_path.read_text()) if d and d.get("kind") == "Job"]
+    http_jobs = [j for j in jobs if j.get("metadata", {}).get("labels", {}).get("r6-validation") == "http"]
+    assert len(http_jobs) == 2, "one HTTP Job per HTTP component expected, got %d" % len(http_jobs)
+    http_job_names = {j["metadata"]["name"] for j in http_jobs}
+    assert "validate-http-api-server" in http_job_names
+    assert "validate-http-worker" in http_job_names
+    for j in http_jobs:
+        img = j["spec"]["template"]["spec"]["containers"][0]["image"]
+        assert "@" + _BUSYBOX_DIGEST in img, \
+            "HTTP validation Job image must be digest-pinned, got: %s" % img
+        cmd = j["spec"]["template"]["spec"]["containers"][0]["command"]
+        assert "wget" in cmd, "HTTP validation Job must use wget"
+        assert j["spec"]["template"]["spec"]["restartPolicy"] == "Never"
+    _cleanup(data["bundle_dir"])
+
+
+def test_dns_validation_job_generated_for_service_names():
+    """Stage 10.12: A single DNS validation Job is generated that resolves every
+    in-cluster Service name (and VM aliases) using nslookup via in-cluster DNS."""
+    data = _generate(
+        [{"component": "api-server", "readiness": "READY", "image": "node:20-slim",
+          "startCommand": "node server.js", "healthPath": "/health", "dependencies": [],
+          "targetForm": "CONTAINERIZED"},
+         {"component": "legacy-db", "readiness": "KEEP_ON_VM_FOR_NOW",
+          "targetIp": "10.0.0.5", "targetPort": 5432}],
+        id_suffix="dnsvalidjob",
+    )
+    jobs_path = Path(data["bundle_dir"]) / "kustomize_bundle" / "validation-jobs.yaml"
+    assert jobs_path.exists()
+    jobs = [d for d in yaml.safe_load_all(jobs_path.read_text()) if d and d.get("kind") == "Job"]
+    dns_jobs = [j for j in jobs if j.get("metadata", {}).get("labels", {}).get("r6-validation") == "dns"]
+    assert len(dns_jobs) == 1, "exactly one DNS validation Job expected"
+    dns_cmd = " ".join(str(x) for x in dns_jobs[0]["spec"]["template"]["spec"]["containers"][0]["command"])
+    assert "nslookup" in dns_cmd
+    assert "api-server" in dns_cmd
+    assert "legacy-db" in dns_cmd
+    img = dns_jobs[0]["spec"]["template"]["spec"]["containers"][0]["image"]
+    assert "@" + _BUSYBOX_DIGEST in img, "DNS validation Job image must be digest-pinned"
+    _cleanup(data["bundle_dir"])
+
+
+def test_database_validation_job_uses_secret_references_not_inline_credentials():
+    """Stage 10.12: Database validation Job must reference DB credentials via secretKeyRef
+    (from the component's SecretContract) and the DB host via configMapKeyRef — never inline.
+    Inline credentials in env vars would be a plaintext secret in the bundle."""
+    data = _generate(
+        [{"component": "api-server", "readiness": "READY", "image": "node:20-slim",
+          "startCommand": "node server.js", "healthPath": "/health",
+          "dependencies": ["postgres-primary"],
+          "targetForm": "CONTAINERIZED"}],
+        id_suffix="dbvalidjob",
+    )
+    jobs_path = Path(data["bundle_dir"]) / "kustomize_bundle" / "validation-jobs.yaml"
+    assert jobs_path.exists()
+    jobs = [d for d in yaml.safe_load_all(jobs_path.read_text()) if d and d.get("kind") == "Job"]
+    db_jobs = [j for j in jobs if j.get("metadata", {}).get("labels", {}).get("r6-validation") == "database"]
+    assert len(db_jobs) >= 1, "at least one database validation Job expected for DB dependency"
+    db_job = db_jobs[0]
+    env = db_job["spec"]["template"]["spec"]["containers"][0]["env"]
+    for ev in env:
+        assert "value" not in ev, \
+            "inline credential detected in env var '%s' — must use valueFrom" % ev.get("name")
+    host_var = next(e for e in env if e["name"] == "DB_HOST")
+    assert "configMapKeyRef" in host_var.get("valueFrom", {}), \
+        "DB_HOST must come from configMapKeyRef (non-secret config)"
+    user_var = next(e for e in env if e["name"] == "DB_USER")
+    pass_var = next(e for e in env if e["name"] == "DB_PASS")
+    assert "secretKeyRef" in user_var.get("valueFrom", {}), "DB_USER must use secretKeyRef"
+    assert "secretKeyRef" in pass_var.get("valueFrom", {}), "DB_PASS must use secretKeyRef"
+    img = db_job["spec"]["template"]["spec"]["containers"][0]["image"]
+    assert "@sha256:" in img, "database validation Job image must be digest-pinned"
+    _cleanup(data["bundle_dir"])
+
+
+def test_validation_jobs_not_generated_for_daemonset_or_job_components():
+    """Stage 10.12: NOT_APPLICABLE — DaemonSet and Job/CronJob components are not
+    HTTP-serving (no ClusterIP Service), so no HTTP validation Job is generated for them."""
+    data = _generate(
+        [{"component": "log-collector", "readiness": "READY", "image": "fluent/fluent-bit:latest",
+          "startCommand": "fluentbit", "healthPath": "/health", "dependencies": [],
+          "targetForm": "CONTAINERIZED", "workloadKind": "DAEMONSET"}],
+        id_suffix="novalidjobds",
+    )
+    jobs_path = Path(data["bundle_dir"]) / "kustomize_bundle" / "validation-jobs.yaml"
+    if jobs_path.exists():
+        jobs = [d for d in yaml.safe_load_all(jobs_path.read_text()) if d and d.get("kind") == "Job"]
+        http_jobs = [j for j in jobs
+                     if j.get("metadata", {}).get("labels", {}).get("r6-validation") == "http"]
+        assert not any("log-collector" in j["metadata"]["name"] for j in http_jobs), \
+            "DaemonSet must not receive an HTTP validation Job"
+    _cleanup(data["bundle_dir"])

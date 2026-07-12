@@ -21073,6 +21073,7 @@ def r6_generate_bundle():
     storage_classes_used = set()
     components_critical_single_replica = []  # critical=true but replicas=1; HA gap recorded after validation_warnings init
     monitorable_components = []  # Deployment/StatefulSet HTTP components eligible for ServiceMonitor
+    db_validation_targets = []  # {comp, secret, host_var, dep_type} for database validation Jobs
     for w in deployable:
         comp = _comp(w)
         base = str(w.get("image") or "docker.io/library/debian:stable-slim")
@@ -21179,6 +21180,14 @@ def r6_generate_bundle():
             dep_lower = orig.lower()
             if any(k in dep_lower for k in ("database", "db", "mysql", "postgres", "mongo", "oracle")):
                 comp_required_keys += ["%s_USERNAME" % var[:-5], "%s_PASSWORD" % var[:-5]]
+                if not any(t["comp"] == comp for t in db_validation_targets):
+                    _dep_type = ("postgres" if "postgres" in dep_lower
+                                 else "mysql" if "mysql" in dep_lower else "generic")
+                    db_validation_targets.append({
+                        "comp": comp, "secret": "%s-secrets" % comp,
+                        "host_var": var, "user_var": "%s_USERNAME" % var[:-5],
+                        "pass_var": "%s_PASSWORD" % var[:-5], "dep_type": _dep_type,
+                    })
             elif any(k in dep_lower for k in ("cache", "redis")):
                 comp_required_keys.append("%s_PASSWORD" % var[:-5])
             elif any(k in dep_lower for k in ("queue", "rabbitmq", "kafka")):
@@ -22062,6 +22071,141 @@ def r6_generate_bundle():
                 "components): no Velero Kustomization found in %s. "
                 "Install Velero to enable scheduled namespace backup and PVC snapshots." % (
                     slug, services_fluxcd_dir))
+
+    # Stage 10.12 — Validation Jobs: HTTP health-check, DNS resolution, database connectivity.
+    # All images are pinned by digest to prevent supply-chain substitution between bundle
+    # generation and Stage 13 apply. Credentials come from Secret references only — never
+    # inline. Jobs are generated into kustomize_bundle/validation-jobs.yaml and tracked
+    # in kustomization.yaml so they can be applied and cleaned up by Stage 13.
+    #
+    # Images (pinned at bundle generation time):
+    _BUSYBOX_IMAGE = "busybox:stable@sha256:73aaf090f3d85aa34ee199857f03fa3a95c8ede2ffd4cc2cdb5b94e566b11662"
+    _POSTGRES_IMAGE = "postgres:16-alpine@sha256:57c72fd2a128e416c7fcc499958864df5301e940bca0a56f58fddf30ffc07777"
+    _validation_job_docs = []
+
+    # HTTP validation Job: one per HTTP-serving Deployment/StatefulSet component.
+    for _vc in monitorable_components:
+        _health_url = "http://%s.%s.svc.cluster.local/health" % (_vc, slug)
+        _validation_job_docs.append({
+            "apiVersion": "batch/v1", "kind": "Job",
+            "metadata": {
+                "name": "validate-http-%s" % _vc, "namespace": slug,
+                "labels": {"r6-bundle": slug, "r6-validation": "http"},
+                "annotations": {"r6.opencenter.io/validation-type": "http-health",
+                                "r6.opencenter.io/target": _health_url},
+            },
+            "spec": {
+                "backoffLimit": 3, "ttlSecondsAfterFinished": 3600,
+                "template": {
+                    "metadata": {"labels": {"r6-validation": "http"}},
+                    "spec": {
+                        "restartPolicy": "Never",
+                        "securityContext": {"runAsNonRoot": True, "runAsUser": 1000,
+                                            "seccompProfile": {"type": "RuntimeDefault"}},
+                        "containers": [{
+                            "name": "http-check", "image": _BUSYBOX_IMAGE,
+                            "securityContext": {"allowPrivilegeEscalation": False,
+                                               "readOnlyRootFilesystem": True,
+                                               "capabilities": {"drop": ["ALL"]}},
+                            "command": ["wget", "-q", "--spider", "--tries=3",
+                                        "--timeout=10", _health_url],
+                        }],
+                    },
+                },
+            },
+        })
+
+    # DNS validation Job: resolves every in-cluster Service to prove DNS is working.
+    all_svc_names = list(monitorable_components) + [_comp(w) for w in vm_workloads]
+    if all_svc_names:
+        _dns_cmds = " && ".join(
+            "nslookup %s.%s.svc.cluster.local" % (svc, slug) for svc in all_svc_names)
+        _validation_job_docs.append({
+            "apiVersion": "batch/v1", "kind": "Job",
+            "metadata": {
+                "name": "validate-dns-%s" % slug, "namespace": slug,
+                "labels": {"r6-bundle": slug, "r6-validation": "dns"},
+                "annotations": {"r6.opencenter.io/validation-type": "dns-resolution",
+                                "r6.opencenter.io/targets": ",".join(all_svc_names)},
+            },
+            "spec": {
+                "backoffLimit": 2, "ttlSecondsAfterFinished": 3600,
+                "template": {
+                    "metadata": {"labels": {"r6-validation": "dns"}},
+                    "spec": {
+                        "restartPolicy": "Never",
+                        "securityContext": {"runAsNonRoot": True, "runAsUser": 1000,
+                                            "seccompProfile": {"type": "RuntimeDefault"}},
+                        "containers": [{
+                            "name": "dns-check", "image": _BUSYBOX_IMAGE,
+                            "securityContext": {"allowPrivilegeEscalation": False,
+                                               "readOnlyRootFilesystem": True,
+                                               "capabilities": {"drop": ["ALL"]}},
+                            "command": ["sh", "-c", _dns_cmds],
+                        }],
+                    },
+                },
+            },
+        })
+
+    # Database validation Job: one per component with a detected database dependency.
+    # Uses the component's SecretContract-derived Secret for credentials — no inline values.
+    for _dbt in db_validation_targets:
+        _db_image = _POSTGRES_IMAGE if _dbt["dep_type"] in ("postgres", "generic") else _BUSYBOX_IMAGE
+        if _dbt["dep_type"] == "postgres":
+            _db_cmd = ["sh", "-c",
+                       "PGPASSWORD=$DB_PASS psql -h $DB_HOST -U $DB_USER -c 'SELECT 1'"]
+        elif _dbt["dep_type"] == "mysql":
+            _db_cmd = ["sh", "-c",
+                       "mysql -h $DB_HOST -u $DB_USER --password=$DB_PASS -e 'SELECT 1'"]
+        else:
+            _db_cmd = ["sh", "-c", "nc -z $DB_HOST 5432 && echo 'TCP OK'"]
+        _validation_job_docs.append({
+            "apiVersion": "batch/v1", "kind": "Job",
+            "metadata": {
+                "name": "validate-db-%s" % _dbt["comp"], "namespace": slug,
+                "labels": {"r6-bundle": slug, "r6-validation": "database"},
+                "annotations": {"r6.opencenter.io/validation-type": "database-connectivity",
+                                "r6.opencenter.io/secret": _dbt["secret"]},
+            },
+            "spec": {
+                "backoffLimit": 2, "ttlSecondsAfterFinished": 3600,
+                "template": {
+                    "metadata": {"labels": {"r6-validation": "database"}},
+                    "spec": {
+                        "restartPolicy": "Never",
+                        "securityContext": {"runAsNonRoot": True, "runAsUser": 999,
+                                            "seccompProfile": {"type": "RuntimeDefault"}},
+                        "containers": [{
+                            "name": "db-check", "image": _db_image,
+                            "securityContext": {"allowPrivilegeEscalation": False,
+                                               "readOnlyRootFilesystem": True,
+                                               "capabilities": {"drop": ["ALL"]}},
+                            "command": _db_cmd,
+                            "env": [
+                                # Host is non-secret - comes from the component ConfigMap
+                                {"name": "DB_HOST",
+                                 "valueFrom": {"configMapKeyRef": {
+                                     "name": "%s-deps" % _dbt["comp"],
+                                     "key": _dbt["host_var"]}}},
+                                # Credentials come from the SecretContract-derived Secret - never inline
+                                {"name": "DB_USER",
+                                 "valueFrom": {"secretKeyRef": {"name": _dbt["secret"],
+                                                                "key": _dbt["user_var"]}}},
+                                {"name": "DB_PASS",
+                                 "valueFrom": {"secretKeyRef": {"name": _dbt["secret"],
+                                                                "key": _dbt["pass_var"]}}},
+                            ],
+                        }],
+                    },
+                },
+            },
+        })
+
+    if _validation_job_docs:
+        _w("kustomize_bundle/validation-jobs.yaml",
+           _yaml.dump_all(_validation_job_docs, default_flow_style=False, sort_keys=False))
+        kust_res.append("validation-jobs.yaml")
 
     # Stage 11 - unified OpenCenter hybrid blueprint + pre-deployment validation.
     blueprint = {
