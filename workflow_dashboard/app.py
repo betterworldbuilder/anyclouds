@@ -22321,6 +22321,73 @@ def r6_generate_bundle():
     }
     _w("bundle-validation.json", _json.dumps(bundle_validation, indent=2))
 
+    # Stage 14 — Rollback runbook. Generated unconditionally (always required before cutover)
+    # so that operators have a documented recovery procedure ready before traffic is switched.
+    # Populated with what is known at bundle-generation time; the operator fills in the
+    # deployment-time Git revision, previous image digests, and LB address before cutover.
+    _rollback_images = [
+        {"component": _comp(w),
+         "generated_image": _img(w),
+         "previous_image": "<fill-in: docker.io/<repo>/<image>@sha256:<previous-digest>>"
+         } for w in deployable
+    ]
+    _vm_components = [{"component": _comp(w), "ip": str(w.get("targetIp") or "UNRESOLVED"),
+                        "port": w.get("targetPort") or 80} for w in vm_workloads]
+    _rollback_hostname = locals().get("hostname") or "<external-hostname-if-gateway-was-generated>"
+    _rollback_doc = {
+        "apiVersion": "r6.opencenter.io/v1alpha1", "kind": "RollbackRunbook",
+        "metadata": {
+            "name": slug, "namespace": slug,
+            "annotations": {
+                "r6.opencenter.io/bundle-generated-at": stamp,
+                "r6.opencenter.io/business-system": str(bundle.get("businessSystemName") or slug),
+                "r6.opencenter.io/target-cluster": "%s/%s" % (org, cluster),
+            },
+        },
+        "spec": {
+            "gitRevision": {
+                "deployedCommit": "<fill-in: git rev-parse HEAD at deploy time>",
+                "previousCommit": "<fill-in: git rev-parse HEAD^ at deploy time>",
+                "rollbackCommand": "git -C <gitops-repo> revert <deployed-commit> && git push && flux reconcile kustomization %s --with-source" % slug,
+            },
+            "images": _rollback_images,
+            "traffic": {
+                "externalHostname": _rollback_hostname,
+                "lbRollback": "Update DNS A record for %s to point back to the previous load-balancer address. "
+                              "If using an Envoy Gateway, delete the HTTPRoute resources for this namespace and "
+                              "restore the previous Gateway configuration." % _rollback_hostname,
+                "dnsFlushCommand": "kubectl delete httproute -n %s --all" % slug,
+                "trafficCutbackCommand": "kubectl annotate gateway %s-gateway -n %s "
+                                         "r6.opencenter.io/traffic=previous --overwrite" % (slug, slug),
+            },
+            "vmWorkloads": _vm_components,
+            "vmNote": ("VM-backed components (%s) are NOT rolled back by this runbook. "
+                       "They remain on their current VM state. If the VM was migrated or "
+                       "reconfigured during this deployment, roll back the VM separately before "
+                       "re-pointing Kubernetes Services at the old endpoint."
+                       % (", ".join(v["component"] for v in _vm_components) if _vm_components else "none")),
+            "dataLimitations": [
+                "This runbook rolls back Kubernetes resources (Deployments, Services, ConfigMaps, "
+                "Secrets, operator CRs) and traffic routing. It does NOT roll back database data, "
+                "PVC contents, or object storage state.",
+                "If the deployment included a database schema migration, perform a database-specific "
+                "rollback (e.g. flyway undo, liquibase rollback) BEFORE reverting Kubernetes resources "
+                "to avoid a schema/application version mismatch.",
+                "PVC data written after cutover cannot be recovered by a git revert. "
+                "Ensure a Velero backup was taken immediately before cutover (see velero-schedule.yaml).",
+            ],
+            "verificationSteps": [
+                "kubectl get pods -n %s — all pods Running/Ready" % slug,
+                "kubectl get kustomization %s -n flux-system — status=Ready" % slug,
+                "Run validation Jobs: POST /api/r6/run-validation with bundle_dir pointing to the previous bundle",
+                "Verify external endpoint: curl -f https://%s/health" % _rollback_hostname,
+                "Confirm Velero backup completed: velero backup get | grep %s" % slug,
+            ],
+        },
+    }
+    _w("operations/rollback-runbook.yaml",
+       _yaml.dump(_rollback_doc, default_flow_style=False, sort_keys=False))
+
     # Stage 12 deployment gate. A blocked bundle never touches the real GitOps repo - no
     # working-tree copy, no commit, no push - it stays local-only until the blockers listed
     # above are fixed and the bundle is regenerated. Warnings never block; only blockers do.

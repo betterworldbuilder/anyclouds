@@ -1428,3 +1428,93 @@ def test_run_validation_response_structure_when_no_cluster_available():
         assert "all_passed" in body
         assert "evidence_path" in body
     _cleanup(bundle_dir)
+
+
+# ---------------------------------------------------------------------------
+# Increment 18: Stage 14 — Rollback runbook
+# ---------------------------------------------------------------------------
+
+def test_rollback_runbook_generated_unconditionally():
+    """Stage 14: A rollback runbook must be generated for every bundle, regardless of
+    workload type or cluster configuration. It is always required before production cutover."""
+    data = _generate(
+        [{"component": "api-server", "readiness": "READY", "image": "node:20-slim",
+          "startCommand": "node server.js", "healthPath": "/health", "dependencies": [],
+          "targetForm": "CONTAINERIZED"}],
+        id_suffix="rollback1",
+    )
+    runbook_path = Path(data["bundle_dir"]) / "operations" / "rollback-runbook.yaml"
+    assert runbook_path.exists(), "operations/rollback-runbook.yaml must always be generated"
+    runbook = yaml.safe_load(runbook_path.read_text())
+    assert runbook["kind"] == "RollbackRunbook"
+    assert runbook["apiVersion"] == "r6.opencenter.io/v1alpha1"
+    _cleanup(data["bundle_dir"])
+
+
+def test_rollback_runbook_contains_required_sections():
+    """Stage 14: Rollback runbook must include git revision instructions, image list,
+    traffic/DNS rollback steps, VM workload handling, and data limitations."""
+    data = _generate(
+        [{"component": "api-server", "readiness": "READY", "image": "node:20-slim",
+          "startCommand": "node server.js", "healthPath": "/health", "dependencies": [],
+          "targetForm": "CONTAINERIZED"},
+         {"component": "legacy-db", "readiness": "KEEP_ON_VM_FOR_NOW",
+          "targetIp": "10.0.0.5", "targetPort": 5432}],
+        id_suffix="rollback2",
+    )
+    runbook_path = Path(data["bundle_dir"]) / "operations" / "rollback-runbook.yaml"
+    runbook = yaml.safe_load(runbook_path.read_text())
+    spec = runbook["spec"]
+
+    assert "gitRevision" in spec, "rollback runbook must include git revision section"
+    assert "rollbackCommand" in spec["gitRevision"]
+    assert "flux" in spec["gitRevision"]["rollbackCommand"].lower()
+
+    assert "images" in spec, "rollback runbook must list component images"
+    assert len(spec["images"]) >= 1
+    for img in spec["images"]:
+        assert "component" in img
+        assert "generated_image" in img
+        assert "previous_image" in img
+
+    assert "traffic" in spec, "rollback runbook must include traffic/DNS rollback section"
+    assert "lbRollback" in spec["traffic"]
+    assert "dnsFlushCommand" in spec["traffic"]
+
+    assert "vmWorkloads" in spec, "rollback runbook must list VM workloads"
+    vm_names = [v["component"] for v in spec["vmWorkloads"]]
+    assert "legacy-db" in vm_names, "VM-backed components must appear in vmWorkloads"
+
+    assert "vmNote" in spec, "rollback runbook must include a VM rollback limitation note"
+    assert "legacy-db" in spec["vmNote"]
+
+    assert "dataLimitations" in spec, "rollback runbook must document data rollback limitations"
+    assert len(spec["dataLimitations"]) >= 2
+    assert any("database" in lim.lower() or "schema" in lim.lower()
+               for lim in spec["dataLimitations"])
+    assert any("PVC" in lim or "data" in lim.lower() for lim in spec["dataLimitations"])
+
+    assert "verificationSteps" in spec
+    assert len(spec["verificationSteps"]) >= 3
+
+    _cleanup(data["bundle_dir"])
+
+
+def test_rollback_runbook_image_list_covers_all_deployable_components():
+    """Stage 14: Every deployable component must have an entry in the rollback runbook's
+    image list so operators know exactly what to revert on rollback."""
+    data = _generate(
+        [{"component": "api-server", "readiness": "READY", "image": "node:20-slim",
+          "startCommand": "node server.js", "healthPath": "/health", "dependencies": [],
+          "targetForm": "CONTAINERIZED"},
+         {"component": "worker", "readiness": "READY", "image": "python:3.12-slim",
+          "startCommand": "python worker.py", "healthPath": "/health", "dependencies": [],
+          "targetForm": "CONTAINERIZED"}],
+        id_suffix="rollback3",
+    )
+    runbook_path = Path(data["bundle_dir"]) / "operations" / "rollback-runbook.yaml"
+    runbook = yaml.safe_load(runbook_path.read_text())
+    image_comps = {img["component"] for img in runbook["spec"]["images"]}
+    assert "api-server" in image_comps
+    assert "worker" in image_comps
+    _cleanup(data["bundle_dir"])
