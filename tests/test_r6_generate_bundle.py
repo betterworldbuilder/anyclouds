@@ -415,6 +415,56 @@ def test_stage12_gate_allows_import_when_only_warnings_present():
         _cleanup_fake_gitops(org)
 
 
+def test_gateway_certificate_httproute_for_exposed_component():
+    data = _generate(
+        [{"component": "web-frontend", "readiness": "READY", "image": "node:20-slim",
+          "startCommand": "node server.js", "healthPath": "/health", "dependencies": [],
+          "ingressGateway": True}],
+        id_suffix="gw", name="Gw App", externalHostname="app.realdomain.example",
+    )
+    docs = list(yaml.safe_load_all((Path(data["bundle_dir"]) / "kustomize_bundle" / "gateway.yaml").read_text()))
+    gw = next(d for d in docs if d["kind"] == "Gateway")
+    assert gw["spec"]["gatewayClassName"] == "envoy"
+    https_listener = next(l for l in gw["spec"]["listeners"] if l["name"] == "https")
+    assert https_listener["hostname"] == "app.realdomain.example"
+    assert https_listener["tls"]["certificateRefs"] == [{"name": "gw-app-tls"}]
+    cert = next(d for d in docs if d["kind"] == "Certificate")
+    assert cert["spec"]["issuerRef"] == {"name": "letsencrypt-prod", "kind": "ClusterIssuer"}
+    assert cert["spec"]["dnsNames"] == ["app.realdomain.example"]
+    route = next(d for d in docs if d["kind"] == "HTTPRoute")
+    assert route["spec"]["rules"][0]["backendRefs"] == [{"name": "web-frontend", "port": 80}]
+    dns_intent = yaml.safe_load((Path(data["bundle_dir"]) / "virtual-machines" / "dns-lb-intent.yaml").read_text())
+    assert dns_intent["spec"]["hostname"] == "app.realdomain.example"
+    assert not any("externalHostname" in w for w in data["bundle_validation"]["warnings"])
+    _cleanup(data["bundle_dir"])
+
+
+def test_gateway_placeholder_hostname_warns_when_not_provided():
+    data = _generate(
+        [{"component": "web-frontend", "readiness": "READY", "image": "node:20-slim",
+          "startCommand": "node server.js", "healthPath": "/health", "dependencies": [],
+          "ingressGateway": True}],
+        id_suffix="gwnohost", name="Gw No Host",
+    )
+    docs = list(yaml.safe_load_all((Path(data["bundle_dir"]) / "kustomize_bundle" / "gateway.yaml").read_text()))
+    gw = next(d for d in docs if d["kind"] == "Gateway")
+    https_listener = next(l for l in gw["spec"]["listeners"] if l["name"] == "https")
+    assert https_listener["hostname"] == "gw-no-host.example.com"
+    assert any("externalHostname" in w and "Remediation:" in w for w in data["bundle_validation"]["warnings"])
+    _cleanup(data["bundle_dir"])
+
+
+def test_no_gateway_generated_without_any_exposed_component():
+    data = _generate(
+        [{"component": "backend-worker", "readiness": "READY", "image": "node:20-slim",
+          "startCommand": "node worker.js", "healthPath": "/health", "dependencies": []}],
+        id_suffix="nogw",
+    )
+    assert not (Path(data["bundle_dir"]) / "kustomize_bundle" / "gateway.yaml").exists()
+    assert not (Path(data["bundle_dir"]) / "virtual-machines" / "dns-lb-intent.yaml").exists()
+    _cleanup(data["bundle_dir"])
+
+
 def test_network_policies_default_deny_dns_and_dependency_ingress():
     data = _generate(
         [{"component": "api-server", "readiness": "READY", "image": "node:20-slim",

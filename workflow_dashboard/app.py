@@ -21489,6 +21489,63 @@ def r6_generate_bundle():
                        "metadata": {"name": slug}, "spec": {"rules": openstack_intent}},
                       default_flow_style=False, sort_keys=False))
 
+    # Stage 10.11 - Gateway API, Certificate, DNS/LB intent for components explicitly
+    # marked ingressGateway (the same field name the pre-Stage-10 "Ship to OpenCenter"
+    # panel already sends per component - reused rather than inventing a new one).
+    # DaemonSet excluded - it gets no Service (Stage 10 design: DaemonSet pods are
+    # addressed per-node), so an HTTPRoute backendRef would point at nothing.
+    exposed_components = [_comp(w) for w in deployable
+                           if w.get("ingressGateway") and str(w.get("workloadKind") or "").upper() not in ("JOB", "CRONJOB", "DAEMONSET")]
+    external_hostname_missing = False
+    if exposed_components:
+        hostname = str(bundle.get("externalHostname") or "").strip()
+        if not hostname:
+            hostname = "%s.example.com" % slug
+            external_hostname_missing = True
+        gw_name = "%s-gateway" % slug
+        cert_secret = "%s-tls" % slug
+        gw_docs = [{
+            "apiVersion": "gateway.networking.k8s.io/v1", "kind": "Gateway",
+            "metadata": {"name": gw_name, "namespace": slug},
+            "spec": {
+                "gatewayClassName": "envoy",
+                "listeners": [
+                    {"name": "https", "protocol": "HTTPS", "port": 443, "hostname": hostname,
+                     "tls": {"mode": "Terminate", "certificateRefs": [{"name": cert_secret}]},
+                     "allowedRoutes": {"namespaces": {"from": "Same"}}},
+                    {"name": "http", "protocol": "HTTP", "port": 80, "hostname": hostname,
+                     "allowedRoutes": {"namespaces": {"from": "Same"}}},
+                ],
+            },
+        }, {
+            # ClusterIssuer name matches the one already used elsewhere in this GitOps
+            # repo's cert-manager setup - not invented.
+            "apiVersion": "cert-manager.io/v1", "kind": "Certificate",
+            "metadata": {"name": cert_secret, "namespace": slug},
+            "spec": {"secretName": cert_secret, "dnsNames": [hostname],
+                     "issuerRef": {"name": "letsencrypt-prod", "kind": "ClusterIssuer"}},
+        }]
+        for comp in exposed_components:
+            gw_docs.append({
+                "apiVersion": "gateway.networking.k8s.io/v1", "kind": "HTTPRoute",
+                "metadata": {"name": "%s-route" % comp, "namespace": slug},
+                "spec": {
+                    "parentRefs": [{"name": gw_name}], "hostnames": [hostname],
+                    "rules": [{"backendRefs": [{"name": comp, "port": 80}]}],
+                },
+            })
+        _w("kustomize_bundle/gateway.yaml", _yaml.dump_all(gw_docs, default_flow_style=False, sort_keys=False))
+        kust_res.append("gateway.yaml")
+        # DNS/LB are real infrastructure OpenCenter/OpenStack must provision - declared as
+        # intent, same non-applied pattern as the OpenStack security-group intent above.
+        _w("virtual-machines/dns-lb-intent.yaml",
+           _yaml.dump({"apiVersion": "r6.opencenter.io/v1alpha1", "kind": "DnsLoadBalancerIntent",
+                       "metadata": {"name": slug},
+                       "spec": {"hostname": hostname, "recordType": "A",
+                                "target": "<load-balancer-address-once-provisioned>", "ttl": 300,
+                                "loadBalancer": {"scope": "EXTERNAL", "gateway": gw_name}}},
+                      default_flow_style=False, sort_keys=False))
+
     build_lines += ['echo "]" >> image-manifest.json', 'echo "Wrote image-manifest.json"']
     _w("image_build_plan.yaml", "\n".join(plan_yaml) + "\n")
     _w("build_and_push.sh", "\n".join(build_lines) + "\n")
@@ -21729,6 +21786,11 @@ def r6_generate_bundle():
             "the exact file(s). Remediation: replace the plaintext value with a "
             "SecretContract reference or an OpenCenter-managed secret, then regenerate.")
     validation_warnings += flux_warnings
+    if external_hostname_missing:
+        validation_warnings.append(
+            "bundle: field 'externalHostname' was not provided for %s - using placeholder "
+            "'%s.example.com'. Remediation: set the real public hostname before Stage 12, "
+            "or the Gateway/Certificate/DNS intent will reference a non-resolvable name." % (", ".join(exposed_components), slug))
     # Persistent-path coverage gate: every deployable component should have a confirmed
     # data disposition (a real PVC mount, or an explicit "None - stateless"/"disposable"
     # decision) - a component with no persistentPath at all is a real, unconfirmed gap,
