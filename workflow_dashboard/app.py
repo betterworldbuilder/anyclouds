@@ -21072,6 +21072,7 @@ def r6_generate_bundle():
     components_missing_persistent_path = []
     storage_classes_used = set()
     components_critical_single_replica = []  # critical=true but replicas=1; HA gap recorded after validation_warnings init
+    monitorable_components = []  # Deployment/StatefulSet HTTP components eligible for ServiceMonitor
     for w in deployable:
         comp = _comp(w)
         base = str(w.get("image") or "docker.io/library/debian:stable-slim")
@@ -21323,7 +21324,7 @@ def r6_generate_bundle():
                     "apiVersion": "v1", "kind": "Service", "metadata": {"name": comp, "namespace": slug},
                     # Headless (clusterIP: None) - required for StatefulSet pod DNS
                     # identity, not a load-balanced ClusterIP like a Deployment's Service.
-                    "spec": {"clusterIP": "None", "selector": {"app": comp}, "ports": [{"port": 80, "targetPort": 8080}]},
+                    "spec": {"clusterIP": "None", "selector": {"app": comp}, "ports": [{"name": "http", "port": 80, "targetPort": 8080}]},
                 })
             elif workload_kind == "DAEMONSET":
                 if persistent_path:
@@ -21346,7 +21347,7 @@ def r6_generate_bundle():
                 })
                 docs.append({
                     "apiVersion": "v1", "kind": "Service", "metadata": {"name": comp, "namespace": slug},
-                    "spec": {"selector": {"app": comp}, "ports": [{"port": 80, "targetPort": 8080}]},
+                    "spec": {"selector": {"app": comp}, "ports": [{"name": "http", "port": 80, "targetPort": 8080}]},
                 })
             # Standalone PVC only for Deployment/DaemonSet - StatefulSet gets one per
             # replica automatically via volumeClaimTemplates above, so a separate PVC here
@@ -21448,6 +21449,11 @@ def r6_generate_bundle():
             _w("kustomize_bundle/%s-scaling.yaml" % comp,
                _yaml.dump_all(scaling_docs, default_flow_style=False, sort_keys=False))
             kust_res.append("%s-scaling.yaml" % comp)
+
+        # Collect HTTP-serving non-operator components for ServiceMonitor generation.
+        # DaemonSet/Job/CronJob have no ClusterIP Service so they get no ServiceMonitor.
+        if _scale_target_kind and str(w.get("targetForm") or "") != "OPERATOR_MANAGED":
+            monitorable_components.append(comp)
 
     # Stage 10.5 - VM connectivity. Components kept as a VM (retained or redeployed) never
     # get a Deployment/image, but containers still need a stable in-cluster name to reach
@@ -21856,6 +21862,7 @@ def r6_generate_bundle():
     # Stage 12 validation gate further down, after bundle_validation is fully computed.
     depends_on = []
     reachable = None
+    services_fluxcd_dir = None  # set inside gitops_available block; used for platform capability checks below
     if gitops_available:
         cluster_overlay_root = gitops / "applications" / "overlays" / cluster
         fluxcd_dir = cluster_overlay_root / "managed-services" / "fluxcd"
@@ -21940,6 +21947,121 @@ def r6_generate_bundle():
         flux_kustomization["spec"]["dependsOn"] = depends_on
     flux_yaml_text = _yaml.dump(flux_kustomization, default_flow_style=False, sort_keys=False)
     _w("flux/%s-kustomization.yaml" % slug, flux_yaml_text)
+
+    # Stage 10.11 — Observability (ServiceMonitor + PrometheusRule) and backup (Velero Schedule).
+    # Applicability gates:
+    #   ServiceMonitor/PrometheusRule: implemented + applicable when monitorable_components exist.
+    #     Platform capability (Prometheus Operator) is checked against the GitOps repo; absent → BLOCKED.
+    #   Velero Schedule: implemented + applicable when namespace has PVCs or stateful operator components.
+    #     Platform capability (Velero) is checked against the GitOps repo; absent → BLOCKED.
+    prometheus_available = bool(services_fluxcd_dir) and any(
+        (services_fluxcd_dir / f).is_file()
+        for f in ("prometheus-operator.yaml", "kube-prometheus-stack.yaml", "prometheus.yaml")
+    )
+
+    if monitorable_components:
+        if prometheus_available or not gitops_available:
+            obs_docs = []
+            for _mc in monitorable_components:
+                obs_docs.append({
+                    "apiVersion": "monitoring.coreos.com/v1", "kind": "ServiceMonitor",
+                    "metadata": {"name": _mc, "namespace": slug, "labels": {"r6-bundle": slug}},
+                    "spec": {
+                        "selector": {"matchLabels": {"app": _mc}},
+                        "namespaceSelector": {"matchNames": [slug]},
+                        "endpoints": [{"port": "http", "path": "/metrics",
+                                       "interval": "30s", "scrapeTimeout": "10s"}],
+                    },
+                })
+            # PrometheusRule: namespace-level alerting covering error rate, latency, crash loops,
+            # PVC saturation and Flux reconciliation failure. Alert thresholds are conservative
+            # production defaults; tune per-application before Stage 13 sign-off.
+            obs_docs.append({
+                "apiVersion": "monitoring.coreos.com/v1", "kind": "PrometheusRule",
+                "metadata": {"name": "%s-alerts" % slug, "namespace": slug,
+                             "labels": {"r6-bundle": slug}},
+                "spec": {"groups": [{
+                    "name": "%s.availability" % slug, "interval": "30s",
+                    "rules": [
+                        {"alert": "HighErrorRate",
+                         "expr": 'rate(http_requests_total{namespace="%s",status=~"5.."}[5m]) / rate(http_requests_total{namespace="%s"}[5m]) > 0.05' % (slug, slug),
+                         "for": "5m", "labels": {"severity": "critical", "namespace": slug},
+                         "annotations": {"summary": "High error rate in %s" % slug,
+                                         "description": "HTTP 5xx rate exceeds 5%% over 5 min"}},
+                        {"alert": "HighLatency",
+                         "expr": 'histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{namespace="%s"}[5m])) > 2' % slug,
+                         "for": "10m", "labels": {"severity": "warning", "namespace": slug},
+                         "annotations": {"summary": "p95 latency > 2s in %s" % slug}},
+                        {"alert": "PodCrashLooping",
+                         "expr": 'rate(kube_pod_container_status_restarts_total{namespace="%s"}[15m]) > 0.05' % slug,
+                         "for": "5m", "labels": {"severity": "critical", "namespace": slug},
+                         "annotations": {"summary": "Pod crash-looping in %s" % slug}},
+                        {"alert": "PVCNearFull",
+                         "expr": 'kubelet_volume_stats_used_bytes{namespace="%s"} / kubelet_volume_stats_capacity_bytes{namespace="%s"} > 0.85' % (slug, slug),
+                         "for": "5m", "labels": {"severity": "warning", "namespace": slug},
+                         "annotations": {"summary": "PVC >85%% full in %s" % slug}},
+                        {"alert": "FluxReconciliationFailed",
+                         "expr": 'gotk_reconcile_condition{type="Ready",status="False",name="%s"} == 1' % slug,
+                         "for": "5m", "labels": {"severity": "critical", "namespace": slug},
+                         "annotations": {"summary": "Flux reconciliation failed for %s" % slug}},
+                    ],
+                }]},
+            })
+            _w("kustomize_bundle/observability.yaml",
+               _yaml.dump_all(obs_docs, default_flow_style=False, sort_keys=False))
+            kust_res.append("observability.yaml")
+        elif gitops_available:
+            # Platform lacks Prometheus Operator → NOT_APPLICABLE for this cluster (warning only).
+            # The app can deploy without in-cluster metrics scraping; the operator must be
+            # installed before Stage 13 sign-off if monitoring is a production requirement.
+            flux_warnings.append(
+                "ServiceMonitor and PrometheusRule not generated for %d HTTP component(s) in "
+                "namespace '%s': no Prometheus Operator Kustomization found in %s. "
+                "Install prometheus-operator or kube-prometheus-stack to enable metrics scraping." % (
+                    len(monitorable_components), slug, services_fluxcd_dir))
+
+    # Velero Schedule: applicable when namespace contains PVCs or stateful operator-managed components.
+    velero_applicable = bool(components_with_storage or operator_managed_workloads)
+    velero_available = bool(services_fluxcd_dir) and any(
+        (services_fluxcd_dir / f).is_file()
+        for f in ("velero.yaml", "velero-operator.yaml")
+    )
+
+    if velero_applicable:
+        if velero_available or not gitops_available:
+            velero_doc = {
+                "apiVersion": "velero.io/v1", "kind": "Schedule",
+                "metadata": {"name": "%s-backup" % slug, "namespace": "velero",
+                             "labels": {"r6-bundle": slug}},
+                "spec": {
+                    "schedule": "0 2 * * *",
+                    "template": {
+                        "includedNamespaces": [slug],
+                        "excludedResources": ["events", "pods"],
+                        "storageLocation": "default",
+                        "volumeSnapshotLocations": ["default"],
+                        "ttl": "720h0m0s",
+                    },
+                },
+            }
+            _w("kustomize_bundle/velero-schedule.yaml",
+               _yaml.dump(velero_doc, default_flow_style=False, sort_keys=False))
+            kust_res.append("velero-schedule.yaml")
+            # Velero cannot protect FLEX database VMs or other external stateful resources;
+            # make this limitation explicit so operators know what is and is not covered.
+            if operator_managed_workloads:
+                flux_warnings.append(
+                    "Velero backs up in-cluster PVCs and Kubernetes resources for namespace '%s'. "
+                    "It does NOT protect external FLEX database VMs or retained VM-based components "
+                    "(%s). Ensure those resources have their own backup policy before production cutover." % (
+                        slug, ", ".join(sorted(operator_managed_workloads.keys()))))
+        elif gitops_available:
+            # Platform lacks Velero → NOT_APPLICABLE for this cluster (warning only).
+            flux_warnings.append(
+                "Velero Schedule not generated for namespace '%s' (has PVCs or stateful operator "
+                "components): no Velero Kustomization found in %s. "
+                "Install Velero to enable scheduled namespace backup and PVC snapshots." % (
+                    slug, services_fluxcd_dir))
 
     # Stage 11 - unified OpenCenter hybrid blueprint + pre-deployment validation.
     blueprint = {

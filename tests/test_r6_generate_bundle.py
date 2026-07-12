@@ -1048,3 +1048,175 @@ def test_operator_cr_not_generated_for_non_operator_managed_component():
     assert not cr_path.exists(), \
         "operator CR must not be generated for a non-OPERATOR_MANAGED component"
     _cleanup(data["bundle_dir"])
+
+
+# ---------------------------------------------------------------------------
+# Increment 15: Stage 10.11 — ServiceMonitor, PrometheusRule, Velero Schedule
+# ---------------------------------------------------------------------------
+
+def test_service_monitor_and_prometheus_rule_generated_when_prometheus_operator_available():
+    """Stage 10.11: ServiceMonitor per HTTP component + namespace-wide PrometheusRule are
+    generated when prometheus-operator is present in the cluster's services/fluxcd directory.
+    The Service port must be named 'http' so the ServiceMonitor selector resolves."""
+    org, cluster = "r6-dryrun-obs-avail-org", "r6-dryrun-obs-cluster"
+    _make_fake_gitops(org, cluster, wire_managed_services_fluxcd=True,
+                      stub_operators=["prometheus-operator"])
+    try:
+        data = _generate(
+            [{"component": "api-server", "readiness": "READY", "image": "node:20-slim",
+              "startCommand": "node server.js", "healthPath": "/health", "dependencies": [],
+              "targetForm": "CONTAINERIZED"},
+             {"component": "worker", "readiness": "READY", "image": "python:3.12-slim",
+              "startCommand": "python worker.py", "healthPath": "/health", "dependencies": [],
+              "targetForm": "CONTAINERIZED"}],
+            id_suffix="obsavail", name="Obs Available", org=org, cluster=cluster,
+            import_to_gitops=True, auto_commit=False,
+        )
+        obs_path = Path(data["bundle_dir"]) / "kustomize_bundle" / "observability.yaml"
+        assert obs_path.exists(), "observability.yaml must be generated when prometheus-operator is present"
+        obs_docs = list(yaml.safe_load_all(obs_path.read_text()))
+        obs_docs = [d for d in obs_docs if d]
+
+        sms = [d for d in obs_docs if d.get("kind") == "ServiceMonitor"]
+        assert len(sms) == 2, "one ServiceMonitor per HTTP component expected, got %d" % len(sms)
+        sm_names = {sm["metadata"]["name"] for sm in sms}
+        assert sm_names == {"api-server", "worker"}
+        for sm in sms:
+            ep = sm["spec"]["endpoints"][0]
+            assert ep["port"] == "http", "ServiceMonitor endpoint must reference named port 'http'"
+            assert ep["path"] == "/metrics"
+            assert ep["interval"] == "30s"
+
+        rules = [d for d in obs_docs if d.get("kind") == "PrometheusRule"]
+        assert len(rules) == 1, "one PrometheusRule per namespace expected"
+        alert_names = {r["alert"] for r in rules[0]["spec"]["groups"][0]["rules"]}
+        assert "HighErrorRate" in alert_names
+        assert "PodCrashLooping" in alert_names
+        assert "FluxReconciliationFailed" in alert_names
+
+        # Service port must be named 'http' so the ServiceMonitor selector resolves
+        svc_doc = _load_kind(data["bundle_dir"], "api-server.yaml", "Service")
+        port = svc_doc["spec"]["ports"][0]
+        assert port.get("name") == "http", "Service port must be named 'http' for ServiceMonitor"
+
+        assert "kustomize_bundle/observability.yaml" in data["files"]
+        _cleanup(data["bundle_dir"])
+    finally:
+        _cleanup_fake_gitops(org)
+
+
+def test_service_monitor_not_generated_when_prometheus_operator_absent():
+    """Stage 10.11: NOT_APPLICABLE — when the cluster has no Prometheus Operator in
+    services/fluxcd, observability.yaml is not generated and a warning is issued instead."""
+    org, cluster = "r6-dryrun-obs-absent-org", "r6-dryrun-obs-abs-cluster"
+    _make_fake_gitops(org, cluster, wire_managed_services_fluxcd=True, stub_operators=[])
+    try:
+        data = _generate(
+            [{"component": "api-server", "readiness": "READY", "image": "node:20-slim",
+              "startCommand": "node server.js", "healthPath": "/health", "dependencies": [],
+              "targetForm": "CONTAINERIZED"}],
+            id_suffix="obsabsent", name="Obs Absent", org=org, cluster=cluster,
+            import_to_gitops=True, auto_commit=False,
+        )
+        obs_path = Path(data["bundle_dir"]) / "kustomize_bundle" / "observability.yaml"
+        assert not obs_path.exists(), \
+            "observability.yaml must not be generated when Prometheus Operator is absent"
+        assert data["bundle_validation"]["status"] != "BLOCKED", \
+            "missing prometheus operator must not block the bundle (NOT_APPLICABLE, not BLOCKED)"
+        assert any("prometheus" in w.lower() and "not generated" in w.lower()
+                   for w in data["bundle_validation"]["warnings"]), \
+            "a warning must explain that ServiceMonitor was not generated"
+        _cleanup(data["bundle_dir"])
+    finally:
+        _cleanup_fake_gitops(org)
+
+
+def test_service_monitor_not_generated_for_operator_managed_components():
+    """Stage 10.11: NOT_APPLICABLE — OPERATOR_MANAGED components have their own Service
+    managed by the operator; no ServiceMonitor from the standard template should be generated."""
+    data = _generate(
+        [{"component": "redis-cache", "readiness": "READY",
+          "targetForm": "OPERATOR_MANAGED", "targetIp": "", "targetPort": 6379}],
+        id_suffix="obsopmgd",
+    )
+    obs_path = Path(data["bundle_dir"]) / "kustomize_bundle" / "observability.yaml"
+    # No prometheus operator available (preview mode, no gitops) and OPERATOR_MANAGED →
+    # no ServiceMonitor should appear
+    if obs_path.exists():
+        obs_docs = [d for d in yaml.safe_load_all(obs_path.read_text()) if d]
+        sms = [d for d in obs_docs if d.get("kind") == "ServiceMonitor"]
+        assert all(sm["metadata"]["name"] != "redis-cache" for sm in sms), \
+            "OPERATOR_MANAGED component must not receive a standard ServiceMonitor"
+    _cleanup(data["bundle_dir"])
+
+
+def test_velero_schedule_generated_for_namespace_with_pvcs():
+    """Stage 10.11: Velero Schedule generated for namespace with persistent storage when
+    velero is present in the cluster's services/fluxcd directory."""
+    org, cluster = "r6-dryrun-velero-avail-org", "r6-dryrun-velero-cluster"
+    _make_fake_gitops(org, cluster, wire_managed_services_fluxcd=True,
+                      stub_operators=["velero"])
+    try:
+        data = _generate(
+            [{"component": "db-primary", "readiness": "READY", "image": "postgres:15-alpine",
+              "startCommand": "postgres", "healthPath": "/health", "dependencies": [],
+              "persistentPath": "/var/lib/postgresql/data", "storageClass": "fast-ssd",
+              "targetForm": "CONTAINERIZED"}],
+            id_suffix="veleroa", name="Velero Available", org=org, cluster=cluster,
+            import_to_gitops=True, auto_commit=False,
+        )
+        velero_path = Path(data["bundle_dir"]) / "kustomize_bundle" / "velero-schedule.yaml"
+        assert velero_path.exists(), "velero-schedule.yaml must be generated for namespaces with PVCs"
+        sched = yaml.safe_load(velero_path.read_text())
+        assert sched["apiVersion"] == "velero.io/v1"
+        assert sched["kind"] == "Schedule"
+        included_ns = sched["spec"]["template"]["includedNamespaces"]
+        assert len(included_ns) == 1 and included_ns[0], \
+            "Schedule must target exactly one namespace"
+        assert sched["spec"]["schedule"] == "0 2 * * *"
+        assert "events" in sched["spec"]["template"]["excludedResources"]
+        assert "kustomize_bundle/velero-schedule.yaml" in data["files"]
+        _cleanup(data["bundle_dir"])
+    finally:
+        _cleanup_fake_gitops(org)
+
+
+def test_velero_schedule_not_generated_when_velero_absent():
+    """Stage 10.11: NOT_APPLICABLE — when the cluster has no Velero in services/fluxcd,
+    no Velero Schedule is generated and a warning is issued instead."""
+    org, cluster = "r6-dryrun-velero-absent-org", "r6-dryrun-velero-abs-cluster"
+    _make_fake_gitops(org, cluster, wire_managed_services_fluxcd=True, stub_operators=[])
+    try:
+        data = _generate(
+            [{"component": "db-primary", "readiness": "READY", "image": "postgres:15-alpine",
+              "startCommand": "postgres", "healthPath": "/health", "dependencies": [],
+              "persistentPath": "/var/lib/postgresql/data", "targetForm": "CONTAINERIZED"}],
+            id_suffix="velerob", name="Velero Absent", org=org, cluster=cluster,
+            import_to_gitops=True, auto_commit=False,
+        )
+        velero_path = Path(data["bundle_dir"]) / "kustomize_bundle" / "velero-schedule.yaml"
+        assert not velero_path.exists(), \
+            "velero-schedule.yaml must not be generated when Velero is absent from the cluster"
+        assert data["bundle_validation"]["status"] != "BLOCKED", \
+            "missing velero must not block the bundle (NOT_APPLICABLE, not BLOCKED)"
+        assert any("velero" in w.lower() and "not generated" in w.lower()
+                   for w in data["bundle_validation"]["warnings"]), \
+            "a warning must explain that Velero Schedule was not generated"
+        _cleanup(data["bundle_dir"])
+    finally:
+        _cleanup_fake_gitops(org)
+
+
+def test_velero_not_generated_for_stateless_namespace():
+    """Stage 10.11: NOT_APPLICABLE — a namespace with no PVCs and no stateful operator
+    components must not generate a Velero Schedule."""
+    data = _generate(
+        [{"component": "api-server", "readiness": "READY", "image": "node:20-slim",
+          "startCommand": "node server.js", "healthPath": "/health", "dependencies": [],
+          "targetForm": "CONTAINERIZED"}],
+        id_suffix="veleroNA",
+    )
+    velero_path = Path(data["bundle_dir"]) / "kustomize_bundle" / "velero-schedule.yaml"
+    assert not velero_path.exists(), \
+        "Velero Schedule must not be generated for a stateless namespace"
+    _cleanup(data["bundle_dir"])
