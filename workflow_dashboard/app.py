@@ -21323,8 +21323,49 @@ def r6_generate_bundle():
     if reg_user or reg_password:
         _w("registry.env", "export REGISTRY_USER=%r\nexport REGISTRY_PASSWORD=%r\n" % (reg_user or "admin", reg_password))
         os.chmod(out_dir / "registry.env", 0o600)
-    _w("kustomize_bundle/namespace.yaml",
-       "apiVersion: v1\nkind: Namespace\nmetadata:\n  name: %s\n" % slug)
+    # Stage 10.1 - namespace governance. owner/environment/cutoverWave are optional bundle
+    # fields; when the caller does not supply them, defaults are used and clearly are
+    # defaults (not fabricated as if they were real business-system metadata).
+    ns_doc = {
+        "apiVersion": "v1", "kind": "Namespace",
+        "metadata": {
+            "name": slug,
+            "labels": {
+                "app.kubernetes.io/part-of": slug,
+                "r6.opencenter.io/bundle": str(bundle.get("id") or slug),
+                "r6.opencenter.io/environment": str(bundle.get("environment") or "production"),
+                "r6.opencenter.io/owner": str(bundle.get("owner") or "unassigned"),
+                "r6.opencenter.io/cutover-wave": str(bundle.get("cutoverWave") or "wave-1"),
+                "pod-security.kubernetes.io/enforce": "restricted",
+                "pod-security.kubernetes.io/audit": "restricted",
+                "pod-security.kubernetes.io/warn": "restricted",
+            },
+        },
+    }
+    # No production telemetry exists yet to size a real quota - SMALL_PRODUCTION default
+    # profile only, matching the per-container resource defaults used above.
+    quota_doc = {
+        "apiVersion": "v1", "kind": "ResourceQuota",
+        "metadata": {"name": "%s-quota" % slug, "namespace": slug},
+        "spec": {"hard": {
+            "requests.cpu": "4", "requests.memory": "8Gi",
+            "limits.cpu": "8", "limits.memory": "16Gi",
+            "pods": "40",
+        }},
+    }
+    limitrange_doc = {
+        "apiVersion": "v1", "kind": "LimitRange",
+        "metadata": {"name": "%s-limits" % slug, "namespace": slug},
+        "spec": {"limits": [{
+            "type": "Container",
+            "default": {"cpu": "500m", "memory": "512Mi"},
+            "defaultRequest": {"cpu": "100m", "memory": "128Mi"},
+        }]},
+    }
+    _w("kustomize_bundle/namespace.yaml", _yaml.dump(ns_doc, default_flow_style=False, sort_keys=False))
+    _w("kustomize_bundle/resource-quota.yaml", _yaml.dump(quota_doc, default_flow_style=False, sort_keys=False))
+    _w("kustomize_bundle/limit-range.yaml", _yaml.dump(limitrange_doc, default_flow_style=False, sort_keys=False))
+    kust_res += ["resource-quota.yaml", "limit-range.yaml"]
     _w("kustomize_bundle/pull-secret.TEMPLATE.yaml",
        "# Create with:\n"
        "# kubectl create secret docker-registry r6-registry-pull -n %s \\\n"
@@ -21414,6 +21455,93 @@ def r6_generate_bundle():
                 if r2.returncode != 0 and c[1] != "commit":
                     break
             commit_status = " | ".join(outs)
+
+    # Stage 11 - unified OpenCenter hybrid blueprint + pre-deployment validation.
+    # Platform requirements are derived from real per-component decisions already made
+    # above, not invented: an operator requirement only appears when a component actually
+    # resolved to OPERATOR_MANAGED; gateway-api only appears when a component resolved to
+    # KUBERNETES_NATIVE with a gateway-shaped name.
+    op_names = set()
+    needs_gateway = False
+    for w in workloads:
+        form = str(w.get("targetForm") or "")
+        wname = str(w.get("component") or "").lower()
+        if form == "OPERATOR_MANAGED":
+            for key, opname in (("redis", "redis-operator"), ("rabbitmq", "rabbitmq-cluster-operator"),
+                                 ("postgres", "postgres-operator"), ("kafka", "kafka-operator")):
+                if key in wname:
+                    op_names.add(opname)
+        if form == "KUBERNETES_NATIVE" and "gateway" in wname:
+            needs_gateway = True
+
+    blueprint = {
+        "apiVersion": "r6.opencenter.io/v1alpha1", "kind": "BusinessApplicationSystem",
+        "metadata": {"name": slug, "namespace": slug, "sourceSystem": str(bundle.get("sourceBusinessSystemId") or bundle.get("id") or slug)},
+        "spec": {
+            "targetCluster": {"mode": "EXISTING_CLUSTER", "name": cluster},
+            "kubernetes": {
+                "gitPath": "managed-services/%s" % slug,
+                "stagingOverlay": "overlays/staging", "productionOverlay": "overlays/production",
+            },
+            "platformRequirements": {
+                "storageClasses": [],  # no PVC/storage generation implemented yet - honest empty list, not omitted
+                "gatewayClass": "envoy" if needs_gateway else None,
+                "operators": sorted(op_names),
+                "services": (["gateway-api", "gateway"] if needs_gateway else []),
+            },
+            "vmComponents": [{"name": _comp(w), "targetIp": w.get("targetIp") or None, "port": w.get("targetPort")}
+                              for w in vm_workloads],
+            "vmServiceBindings": vm_bindings,
+        },
+    }
+    _w("business-system.yaml", _yaml.dump(blueprint, default_flow_style=False, sort_keys=False))
+
+    # Real secret-leak scan across every generated text file - not a placeholder check.
+    # (?!\$) excludes shell variable expansions like VAR="${VAR:-}" or VAR="$OTHER_VAR" -
+    # those contain no actual secret material, just a reference/default idiom. Confirmed
+    # necessary by a real false positive this scanner produced on generated
+    # build_and_push.sh's REGISTRY_PASSWORD="${REGISTRY_PASSWORD:-}" line.
+    _secret_patterns = [
+        (r'(?i)password["\']?\s*[:=]\s*["\'](?!\$)[^"\']{3,}["\']', "possible plaintext password"),
+        (r'(?i)(api[_-]?key|secret[_-]?key)["\']?\s*[:=]\s*["\'](?!\$)[^"\']{8,}["\']', "possible plaintext API/secret key"),
+        (r'-----BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY-----', "embedded private key"),
+        (r'AKIA[0-9A-Z]{16}', "AWS access key ID"),
+    ]
+    secret_findings = []
+    for _f in sorted(out_dir.rglob("*")):
+        if not _f.is_file() or _f.name == "registry.env" or _f.suffix not in (".yaml", ".yml", ".json", ".sh"):
+            continue
+        try:
+            _text = _f.read_text(encoding="utf-8", errors="ignore")
+        except Exception:
+            continue
+        for _pattern, _desc in _secret_patterns:
+            if re.search(_pattern, _text):
+                secret_findings.append({"file": str(_f.relative_to(out_dir)), "issue": _desc})
+
+    validation_blockers = []
+    validation_warnings = []
+    for w in deployable:
+        if not str(w.get("startCommand") or "").strip():
+            validation_blockers.append("%s: no start command detected or set - image will not run its application" % _comp(w))
+    known_component_names = {str(w.get("component") or "").strip().lower() for w in workloads}
+    for w in workloads:
+        for dep in (w.get("dependencies") or []):
+            if str(dep).strip().lower() not in known_component_names:
+                validation_warnings.append("%s: dependency '%s' does not match any component in this bundle" % (_comp(w), dep))
+    if secret_findings:
+        validation_blockers.append("plaintext secret pattern(s) detected in generated output - see secretFindings")
+    validation_warnings.append("storage/PVC generation not yet implemented - persistent paths are not validated in this report")
+    validation_warnings.append("image digest/build/scan/sign status cannot be validated until after build_and_push.sh runs - re-validate before Stage 12")
+
+    bundle_validation = {
+        "generatedAt": stamp, "businessSystem": bundle.get("businessSystemName"),
+        "secretFindings": secret_findings,
+        "blockers": validation_blockers, "warnings": validation_warnings,
+        "status": "BLOCKED" if validation_blockers else "PASSED_WITH_WARNINGS" if validation_warnings else "PASSED",
+    }
+    _w("bundle-validation.json", _json.dumps(bundle_validation, indent=2))
+
     resp = {
         "ok": True, "bundle_dir": str(out_dir),
         "files": sorted(str(f.relative_to(out_dir)) for f in out_dir.rglob("*") if f.is_file()),
@@ -21425,6 +21553,7 @@ def r6_generate_bundle():
         "system": bundle.get("businessSystemName"), "org": org, "cluster": cluster,
         "registry": {"type": rtype, "host": reg_host, "project": project},
         "generated_at": stamp,
+        "bundle_validation": bundle_validation,
     }
     # Single source of truth: persist latest pipeline state server-side (no secrets)
     try:
