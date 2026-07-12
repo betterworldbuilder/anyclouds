@@ -12,6 +12,7 @@ osflex-dashboard) and:
 Uses org="r6-dryrun-test" throughout so import_to_gitops never touches a real
 GitOps directory - these are safe, isolated fixture runs.
 """
+import os
 import re
 import shutil
 from pathlib import Path
@@ -22,6 +23,10 @@ import yaml
 
 BASE_URL = "http://127.0.0.1:5001"
 ENDPOINT = BASE_URL + "/api/r6/generate-bundle"
+GITOPS_ROOT = Path(os.path.expanduser("~")) / ".config" / "opencenter" / "clusters" / "gitops"
+
+
+_TOP_LEVEL_KEYS = ("org", "cluster", "import_to_gitops", "auto_commit")
 
 
 def _generate(workloads, **overrides):
@@ -37,6 +42,9 @@ def _generate(workloads, **overrides):
             "workloads": workloads,
         },
     }
+    for key in _TOP_LEVEL_KEYS:
+        if key in overrides:
+            payload[key] = overrides.pop(key)
     payload["bundle"].update(overrides)
     try:
         resp = requests.post(ENDPOINT, json=payload, timeout=30)
@@ -257,6 +265,123 @@ def test_no_rbac_generated_when_component_has_no_dependencies():
     docs = list(yaml.safe_load_all((Path(data["bundle_dir"]) / "kustomize_bundle" / "standalone-worker.yaml").read_text()))
     kinds = [d.get("kind") for d in docs if d]
     assert "Role" not in kinds and "RoleBinding" not in kinds
+    _cleanup(data["bundle_dir"])
+
+
+def _make_fake_gitops(org, cluster, wire_managed_services_fluxcd, stub_operators=()):
+    """Builds a minimal but real GitOps directory tree so the Flux reachability-graph walk
+    and dependsOn resolution can be exercised against real files on disk, without touching
+    the actual production GitOps repo. Returns the cluster overlay root Path."""
+    root = GITOPS_ROOT / org / "applications" / "overlays" / cluster
+    (root / "managed-services").mkdir(parents=True, exist_ok=True)
+    root_resources = ["./managed-services/fluxcd"] if wire_managed_services_fluxcd else ["./flux-system"]
+    (root / "kustomization.yaml").write_text(
+        "apiVersion: kustomize.config.k8s.io/v1beta1\nkind: Kustomization\nresources:\n"
+        + "".join("  - %s\n" % r for r in root_resources), encoding="utf-8")
+    if not wire_managed_services_fluxcd:
+        (root / "flux-system").mkdir(parents=True, exist_ok=True)
+        (root / "flux-system" / "kustomization.yaml").write_text(
+            "apiVersion: kustomize.config.k8s.io/v1beta1\nkind: Kustomization\nresources: []\n", encoding="utf-8")
+    services_fluxcd = root / "services" / "fluxcd"
+    services_fluxcd.mkdir(parents=True, exist_ok=True)
+    for op in stub_operators:
+        (services_fluxcd / ("%s.yaml" % op)).write_text("# stub for test\n", encoding="utf-8")
+    return root
+
+
+def _cleanup_fake_gitops(org):
+    shutil.rmtree(GITOPS_ROOT / org, ignore_errors=True)
+
+
+def test_flux_kustomization_generated_and_reachable_with_resolved_dependson():
+    org, cluster = "r6-dryrun-flux-org", "r6-dryrun-flux-cluster"
+    _make_fake_gitops(org, cluster, wire_managed_services_fluxcd=True, stub_operators=["postgres-operator"])
+    try:
+        data = _generate(
+            [{"component": "api-server", "readiness": "READY", "image": "node:20-slim",
+              "startCommand": "node server.js", "healthPath": "/health", "dependencies": [],
+              "targetForm": "CONTAINERIZED"},
+             {"component": "postgres-primary", "readiness": "KEEP_ON_VM_FOR_NOW",
+              "targetForm": "OPERATOR_MANAGED", "targetIp": "", "targetPort": 5432}],
+            id_suffix="fluxreach", name="Flux Reach", org=org, cluster=cluster,
+            import_to_gitops=True, auto_commit=False,
+        )
+        assert "reachable" in data["flux_status"]
+        assert "postgres-operator-base" in data["flux_status"]
+
+        fluxcd_dir = GITOPS_ROOT / org / "applications" / "overlays" / cluster / "managed-services" / "fluxcd"
+        flux_doc = yaml.safe_load((fluxcd_dir / "flux-reach.yaml").read_text())
+        assert flux_doc["kind"] == "Kustomization"
+        assert flux_doc["apiVersion"] == "kustomize.toolkit.fluxcd.io/v1"
+        assert flux_doc["spec"]["dependsOn"] == [{"name": "postgres-operator-base", "namespace": "flux-system"}]
+        assert flux_doc["spec"]["path"] == (
+            "./applications/overlays/%s/managed-services/flux-reach/overlays/production" % cluster)
+
+        agg = (fluxcd_dir / "kustomization.yaml").read_text()
+        assert "./flux-reach.yaml" in agg
+
+        overlay_root = GITOPS_ROOT / org / "applications" / "overlays" / cluster / "managed-services" / "flux-reach"
+        assert (overlay_root / "kustomize_bundle" / "kustomization.yaml").is_file()
+        assert (overlay_root / "overlays" / "staging" / "kustomization.yaml").is_file()
+        assert (overlay_root / "overlays" / "production" / "kustomization.yaml").is_file()
+
+        assert not any("not reachable" in w for w in data["bundle_validation"]["warnings"])
+        _cleanup(data["bundle_dir"])
+    finally:
+        _cleanup_fake_gitops(org)
+
+
+def test_flux_dependson_skipped_with_warning_when_operator_kustomization_missing():
+    org, cluster = "r6-dryrun-flux-missing-op-org", "r6-dryrun-flux-cluster"
+    _make_fake_gitops(org, cluster, wire_managed_services_fluxcd=True, stub_operators=[])
+    try:
+        data = _generate(
+            [{"component": "redis-cache", "readiness": "KEEP_ON_VM_FOR_NOW",
+              "targetForm": "OPERATOR_MANAGED", "targetIp": "", "targetPort": 6379}],
+            id_suffix="fluxmissingop", name="Flux Missing Op", org=org, cluster=cluster,
+            import_to_gitops=True, auto_commit=False,
+        )
+        fluxcd_dir = GITOPS_ROOT / org / "applications" / "overlays" / cluster / "managed-services" / "fluxcd"
+        flux_doc = yaml.safe_load((fluxcd_dir / "flux-missing-op.yaml").read_text())
+        assert "dependsOn" not in flux_doc["spec"]
+        assert any("redis-operator" in w and "no FluxCD Kustomization was found" in w
+                   for w in data["bundle_validation"]["warnings"])
+        _cleanup(data["bundle_dir"])
+    finally:
+        _cleanup_fake_gitops(org)
+
+
+def test_flux_unreachable_graph_surfaces_honest_warning():
+    org, cluster = "r6-dryrun-flux-unreachable-org", "r6-dryrun-flux-cluster"
+    _make_fake_gitops(org, cluster, wire_managed_services_fluxcd=False)
+    try:
+        data = _generate(
+            [{"component": "api-server", "readiness": "READY", "image": "node:20-slim",
+              "startCommand": "node server.js", "healthPath": "/health", "dependencies": []}],
+            id_suffix="fluxunreachable", org=org, cluster=cluster, import_to_gitops=True, auto_commit=False,
+        )
+        assert "not reachable" in data["flux_status"]
+        assert any("not referenced anywhere" in w for w in data["bundle_validation"]["warnings"])
+        _cleanup(data["bundle_dir"])
+    finally:
+        _cleanup_fake_gitops(org)
+
+
+def test_flux_preview_generated_without_any_gitops_repo():
+    """The Step 10 UI button calls generate-bundle with import_to_gitops off for a safe
+    preview. It must still get back a real Flux Kustomization manifest (not an empty
+    result) - with dependsOn best-effort and explicitly flagged as unverified, since there
+    is no real GitOps repo on disk to check operator Kustomizations against."""
+    data = _generate(
+        [{"component": "redis-cache", "readiness": "KEEP_ON_VM_FOR_NOW",
+          "targetForm": "OPERATOR_MANAGED", "targetIp": "", "targetPort": 6379}],
+        id_suffix="fluxpreview",
+    )
+    assert "preview only" in data["flux_status"]
+    flux_doc = yaml.safe_load(data["flux_yaml"])
+    assert flux_doc["kind"] == "Kustomization"
+    assert flux_doc["spec"]["dependsOn"] == [{"name": "redis-operator-base", "namespace": "flux-system"}]
+    assert any("not verified against a real GitOps repo" in w for w in data["bundle_validation"]["warnings"])
     _cleanup(data["bundle_dir"])
 
 

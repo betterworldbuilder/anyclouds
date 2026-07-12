@@ -20991,6 +20991,24 @@ def r6_generate_bundle():
     deployable = [w for w in workloads if str(w.get("readiness")) != "KEEP_ON_VM_FOR_NOW"]
     tag = stamp
 
+    # Platform requirements derived from real per-component decisions, not invented: an
+    # operator requirement only appears when a component actually resolved to
+    # OPERATOR_MANAGED; gateway-api only appears when a component resolved to
+    # KUBERNETES_NATIVE with a gateway-shaped name. Computed here (rather than after the
+    # GitOps import block) because the Flux Kustomization's dependsOn needs it too.
+    op_names = set()
+    needs_gateway = False
+    for w in workloads:
+        form = str(w.get("targetForm") or "")
+        wname = str(w.get("component") or "").lower()
+        if form == "OPERATOR_MANAGED":
+            for key, opname in (("redis", "redis-operator"), ("rabbitmq", "rabbitmq-cluster-operator"),
+                                 ("postgres", "postgres-operator"), ("kafka", "kafka-operator")):
+                if key in wname:
+                    op_names.add(opname)
+        if form == "KUBERNETES_NATIVE" and "gateway" in wname:
+            needs_gateway = True
+
     def _comp(w):
         return re.sub(r"[^a-z0-9-]+", "-", str(w.get("component", "app")).lower()).strip("-") or "app"
 
@@ -21447,7 +21465,9 @@ def r6_generate_bundle():
 
     imported = None
     sops_status = "skipped (no registry credentials given)"
+    flux_warnings = []
     gitops = home / ".config" / "opencenter" / "clusters" / "gitops" / org
+    gitops_available = data.get("import_to_gitops", True) and gitops.is_dir()
     if not data.get("import_to_gitops", True):
         commit_status = "skipped (import_to_gitops off)"
     elif not gitops.is_dir():
@@ -21456,11 +21476,61 @@ def r6_generate_bundle():
         commit_status = "skipped (auto_commit off)"
     else:
         commit_status = "pending"
-    if data.get("import_to_gitops", True) and gitops.is_dir():
-        overlay = gitops / "applications" / "overlays" / cluster / "managed-services" / slug
-        overlay.mkdir(parents=True, exist_ok=True)
-        for f in (out_dir / "kustomize_bundle").iterdir():
-            _shutil.copy2(f, overlay / f.name)
+
+    # Stage 10.7 - real Flux Kustomization generation, replacing the decorative
+    # client-side preview. Always generated into the local bundle (so a preview/dry-run
+    # call with import_to_gitops off still returns a real manifest, not an empty result) -
+    # mirrors the working services/fluxcd/postgres-operator.yaml pattern already present in
+    # this GitOps repo: a dedicated kustomize.toolkit.fluxcd.io/v1 Kustomization, dependsOn
+    # naming other Kustomizations by their real "<name>-base" convention.
+    depends_on = []
+    if gitops_available:
+        services_fluxcd_dir = gitops / "applications" / "overlays" / cluster / "services" / "fluxcd"
+        for opname in sorted(op_names):
+            candidate = services_fluxcd_dir / ("%s.yaml" % opname)
+            if candidate.is_file():
+                depends_on.append({"name": "%s-base" % opname, "namespace": "flux-system"})
+            else:
+                flux_warnings.append(
+                    "operator '%s' is required but no FluxCD Kustomization was found at %s - "
+                    "install/generate the operator first, or this app's Kustomization will "
+                    "never become Ready" % (opname, candidate))
+    elif op_names:
+        # No real GitOps repo to check against (preview/dry-run call) - best-effort
+        # dependsOn using the naming convention, explicitly flagged as unverified rather
+        # than silently presented as confirmed.
+        depends_on = [{"name": "%s-base" % o, "namespace": "flux-system"} for o in sorted(op_names)]
+        flux_warnings.append(
+            "dependsOn for %s not verified against a real GitOps repo (import_to_gitops was "
+            "off or no GitOps directory was found for org '%s')" % (sorted(op_names), org))
+    flux_kustomization = {
+        "apiVersion": "kustomize.toolkit.fluxcd.io/v1", "kind": "Kustomization",
+        "metadata": {"name": slug, "namespace": "flux-system"},
+        "spec": {
+            "interval": "5m", "retryInterval": "1m", "timeout": "10m",
+            "sourceRef": {"kind": "GitRepository", "name": "flux-system", "namespace": "flux-system"},
+            "path": "./applications/overlays/%s/managed-services/%s/overlays/production" % (cluster, slug),
+            "targetNamespace": slug, "prune": True, "wait": True,
+            "commonMetadata": {"labels": {
+                "app.kubernetes.io/part-of": slug, "app.kubernetes.io/managed-by": "flux",
+                "r6.opencenter.io/bundle": str(bundle.get("id") or slug),
+            }},
+        },
+    }
+    if depends_on:
+        flux_kustomization["spec"]["dependsOn"] = depends_on
+    flux_yaml_text = _yaml.dump(flux_kustomization, default_flow_style=False, sort_keys=False)
+    _w("flux/%s-kustomization.yaml" % slug, flux_yaml_text)
+    flux_status = "generated (preview only - not imported to a GitOps repo)"
+
+    if gitops_available:
+        cluster_overlay_root = gitops / "applications" / "overlays" / cluster
+        overlay = cluster_overlay_root / "managed-services" / slug
+        # Mirrors the local out_dir layout exactly (kustomize_bundle/ + overlays/{staging,
+        # production}/) so the overlays' "../../kustomize_bundle" relative reference still
+        # resolves once imported - a flat copy (the prior behavior) silently broke this.
+        _shutil.copytree(out_dir / "kustomize_bundle", overlay / "kustomize_bundle", dirs_exist_ok=True)
+        _shutil.copytree(out_dir / "overlays", overlay / "overlays", dirs_exist_ok=True)
         imported = str(overlay)
         if reg_user and reg_password:
             import base64 as _b64, subprocess as _sp
@@ -21469,7 +21539,7 @@ def r6_generate_bundle():
             sec = ("apiVersion: v1\nkind: Secret\nmetadata:\n  name: r6-registry-pull\n  namespace: %s\n"
                    "type: kubernetes.io/dockerconfigjson\ndata:\n  .dockerconfigjson: %s\n"
                    % (slug, _b64.b64encode(cfg.encode()).decode()))
-            (overlay / "pull-secret.yaml").write_text(sec, encoding="utf-8")
+            (overlay / "kustomize_bundle" / "pull-secret.yaml").write_text(sec, encoding="utf-8")
             try:
                 _sops = str(home / ".local" / "bin" / "sops") if (home / ".local" / "bin" / "sops").exists() else "sops"
                 _agepub = home / ".config" / "opencenter" / "clusters" / "secrets" / org / cluster / "age" / "keys" / ("%s-key.pub" % cluster)
@@ -21480,22 +21550,74 @@ def r6_generate_bundle():
                     + "  - path_regex: .*" + chr(10)
                     + "    encrypted_regex: ^(data|stringData)$" + chr(10)
                     + "    age: " + _recip + chr(10), encoding="utf-8")
-                _cmd = [_sops, "--config", str(_sopscfg), "--encrypt", "--in-place", str(overlay / "pull-secret.yaml")]
+                _cmd = [_sops, "--config", str(_sopscfg), "--encrypt", "--in-place", str(overlay / "kustomize_bundle" / "pull-secret.yaml")]
                 r = _sp.run(_cmd, cwd=str(gitops), capture_output=True, text=True, timeout=60)
                 sops_status = "encrypted" if r.returncode == 0 else ("sops failed: " + (r.stderr or "")[:200])
                 if r.returncode != 0:
-                    (overlay / "pull-secret.yaml").unlink()
+                    (overlay / "kustomize_bundle" / "pull-secret.yaml").unlink()
             except FileNotFoundError:
                 sops_status = "sops binary not found - plaintext secret removed"
-                (overlay / "pull-secret.yaml").unlink()
+                (overlay / "kustomize_bundle" / "pull-secret.yaml").unlink()
             if sops_status == "encrypted":
-                k = overlay / "kustomization.yaml"
+                k = overlay / "kustomize_bundle" / "kustomization.yaml"
                 k.write_text(k.read_text(encoding="utf-8") + "  - pull-secret.yaml\n", encoding="utf-8")
+
+        # Import the already-generated Flux Kustomization (built above, unconditionally)
+        # into the real GitOps repo, aggregated via managed-services/fluxcd/kustomization.yaml
+        # - mirroring the working services/fluxcd/postgres-operator.yaml pattern already
+        # present in this repo.
+        fluxcd_dir = cluster_overlay_root / "managed-services" / "fluxcd"
+        fluxcd_dir.mkdir(parents=True, exist_ok=True)
+        (fluxcd_dir / ("%s.yaml" % slug)).write_text(flux_yaml_text, encoding="utf-8")
+
+        fx_kustomization_file = fluxcd_dir / "kustomization.yaml"
+        fx_resource_line = "  - ./%s.yaml" % slug
+        if fx_kustomization_file.is_file():
+            fx_text = fx_kustomization_file.read_text(encoding="utf-8")
+            if fx_resource_line not in fx_text:
+                fx_kustomization_file.write_text(fx_text.rstrip("\n") + "\n" + fx_resource_line + "\n", encoding="utf-8")
+        else:
+            fx_kustomization_file.write_text(
+                "apiVersion: kustomize.config.k8s.io/v1beta1\nkind: Kustomization\nresources:\n" + fx_resource_line + "\n",
+                encoding="utf-8")
+
+        # Real reachability check, not an assumption: is managed-services/fluxcd actually
+        # wired into this cluster's Flux reconciliation graph? Walks the plain-kustomize
+        # resource tree from the cluster overlay root; if managed-services/fluxcd never
+        # appears, this app's Kustomization would sit on disk but Flux would never apply it.
+        def _kustomize_resource_dirs(kfile, seen, depth=0):
+            if depth > 6 or kfile in seen or not kfile.is_file():
+                return
+            seen.add(kfile)
+            try:
+                kdoc = _yaml.safe_load(kfile.read_text(encoding="utf-8")) or {}
+            except Exception:
+                return
+            for res in (kdoc.get("resources") or []):
+                res_path = (kfile.parent / str(res)).resolve()
+                if res_path.is_dir():
+                    _kustomize_resource_dirs(res_path / "kustomization.yaml", seen, depth + 1)
+                elif res_path.name == "kustomization.yaml":
+                    _kustomize_resource_dirs(res_path, seen, depth + 1)
+
+        visited = set()
+        _kustomize_resource_dirs(cluster_overlay_root / "kustomization.yaml", visited)
+        reachable = any(f.parent.resolve() == fluxcd_dir.resolve() for f in visited)
+        if not reachable:
+            flux_warnings.append(
+                "managed-services/fluxcd is not referenced anywhere in the kustomization "
+                "resource graph starting at applications/overlays/%s/kustomization.yaml - "
+                "this app's Flux Kustomization was written to disk but will not be "
+                "reconciled until managed-services/fluxcd is wired into that graph" % cluster)
+        flux_status = ("reachable, dependsOn: %s" % [d["name"] for d in depends_on]) if reachable \
+            else "written but not reachable from Flux - see warnings"
+
         if data.get("auto_commit"):
             import subprocess as _sp2
             env2 = {**os.environ, "GIT_SSH_COMMAND": "ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no"}
             rel = "applications/overlays/%s/managed-services/%s" % (cluster, slug)
-            cmds = [["git", "add", rel], ["git", "commit", "-m", "R6 import: %s" % slug], ["git", "push"]]
+            fx_rel = "applications/overlays/%s/managed-services/fluxcd" % cluster
+            cmds = [["git", "add", rel, fx_rel], ["git", "commit", "-m", "R6 import: %s" % slug], ["git", "push"]]
             outs = []
             for c in cmds:
                 r2 = _sp2.run(c, cwd=str(gitops), capture_output=True, text=True, timeout=120, env=env2)
@@ -21505,23 +21627,6 @@ def r6_generate_bundle():
             commit_status = " | ".join(outs)
 
     # Stage 11 - unified OpenCenter hybrid blueprint + pre-deployment validation.
-    # Platform requirements are derived from real per-component decisions already made
-    # above, not invented: an operator requirement only appears when a component actually
-    # resolved to OPERATOR_MANAGED; gateway-api only appears when a component resolved to
-    # KUBERNETES_NATIVE with a gateway-shaped name.
-    op_names = set()
-    needs_gateway = False
-    for w in workloads:
-        form = str(w.get("targetForm") or "")
-        wname = str(w.get("component") or "").lower()
-        if form == "OPERATOR_MANAGED":
-            for key, opname in (("redis", "redis-operator"), ("rabbitmq", "rabbitmq-cluster-operator"),
-                                 ("postgres", "postgres-operator"), ("kafka", "kafka-operator")):
-                if key in wname:
-                    op_names.add(opname)
-        if form == "KUBERNETES_NATIVE" and "gateway" in wname:
-            needs_gateway = True
-
     blueprint = {
         "apiVersion": "r6.opencenter.io/v1alpha1", "kind": "BusinessApplicationSystem",
         "metadata": {"name": slug, "namespace": slug, "sourceSystem": str(bundle.get("sourceBusinessSystemId") or bundle.get("id") or slug)},
@@ -21579,6 +21684,7 @@ def r6_generate_bundle():
                 validation_warnings.append("%s: dependency '%s' does not match any component in this bundle" % (_comp(w), dep))
     if secret_findings:
         validation_blockers.append("plaintext secret pattern(s) detected in generated output - see secretFindings")
+    validation_warnings += flux_warnings
     validation_warnings.append("storage/PVC generation not yet implemented - persistent paths are not validated in this report")
     validation_warnings.append("image digest/build/scan/sign status cannot be validated until after build_and_push.sh runs - re-validate before Stage 12")
 
@@ -21596,6 +21702,7 @@ def r6_generate_bundle():
         "imported_to": imported,
         "extract_cmd": "cd %s && bash extract_assets.sh" % out_dir,
         "pull_secret": sops_status, "gitops_commit": commit_status,
+        "flux_status": flux_status, "flux_yaml": flux_yaml_text,
         "build_cmd": "cd %s && bash build_and_push.sh" % out_dir,
         "push_cmd": "cd %s && git add applications/overlays/%s/managed-services/%s && git commit -m 'R6 import: %s' && git push" % (gitops, cluster, slug, slug),
         "system": bundle.get("businessSystemName"), "org": org, "cluster": cluster,
