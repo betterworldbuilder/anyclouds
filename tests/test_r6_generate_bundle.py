@@ -415,6 +415,63 @@ def test_stage12_gate_allows_import_when_only_warnings_present():
         _cleanup_fake_gitops(org)
 
 
+def test_network_policies_default_deny_dns_and_dependency_ingress():
+    data = _generate(
+        [{"component": "api-server", "readiness": "READY", "image": "node:20-slim",
+          "startCommand": "node server.js", "healthPath": "/health", "dependencies": ["worker-service"]},
+         {"component": "worker-service", "readiness": "READY", "image": "python:3.12-slim",
+          "startCommand": "python worker.py", "healthPath": "/health", "dependencies": []}],
+        id_suffix="netpol",
+    )
+    docs = list(yaml.safe_load_all((Path(data["bundle_dir"]) / "kustomize_bundle" / "network-policies.yaml").read_text()))
+    names = {d["metadata"]["name"] for d in docs if d}
+    assert "default-deny-all" in names
+    deny = next(d for d in docs if d["metadata"]["name"] == "default-deny-all")
+    assert deny["spec"]["podSelector"] == {} and set(deny["spec"]["policyTypes"]) == {"Ingress", "Egress"}
+    assert "allow-dns-egress" in names
+    dep_policy = next(d for d in docs if d["metadata"]["name"] == "worker-service-allow-dependents")
+    assert dep_policy["spec"]["podSelector"] == {"matchLabels": {"app": "worker-service"}}
+    consumers = dep_policy["spec"]["ingress"][0]["from"]
+    assert {"podSelector": {"matchLabels": {"app": "api-server"}}} in consumers
+    _cleanup(data["bundle_dir"])
+
+
+def test_egress_netpol_and_openstack_intent_for_resolved_vm_dependency():
+    data = _generate(
+        [{"component": "api-server", "readiness": "READY", "image": "node:20-slim",
+          "startCommand": "node server.js", "healthPath": "/health", "dependencies": ["oracle-database"]},
+         {"component": "oracle-database", "readiness": "KEEP_ON_VM_FOR_NOW",
+          "targetIp": "10.20.30.10", "targetPort": 1521}],
+        id_suffix="netpolvm",
+    )
+    docs = list(yaml.safe_load_all((Path(data["bundle_dir"]) / "kustomize_bundle" / "network-policies.yaml").read_text()))
+    egress = next(d for d in docs if d["metadata"]["name"] == "api-server-allow-egress-to-oracle-database")
+    assert egress["spec"]["egress"][0]["to"] == [{"ipBlock": {"cidr": "10.20.30.10/32"}}]
+    assert egress["spec"]["egress"][0]["ports"] == [{"protocol": "TCP", "port": 1521}]
+
+    intent_path = Path(data["bundle_dir"]) / "virtual-machines" / "openstack-security-group-intent.yaml"
+    assert intent_path.is_file()
+    intent = yaml.safe_load(intent_path.read_text())
+    assert intent["kind"] == "OpenStackSecurityGroupIntent"
+    rule = intent["spec"]["rules"][0]
+    assert rule["toAddress"] == "10.20.30.10/32" and rule["port"] == 1521
+    _cleanup(data["bundle_dir"])
+
+
+def test_no_egress_netpol_for_unresolved_vm_dependency():
+    data = _generate(
+        [{"component": "api-server", "readiness": "READY", "image": "node:20-slim",
+          "startCommand": "node server.js", "healthPath": "/health", "dependencies": ["oracle-database"]},
+         {"component": "oracle-database", "readiness": "KEEP_ON_VM_FOR_NOW", "targetIp": "", "targetPort": 1521}],
+        id_suffix="netpolunresolved",
+    )
+    docs = list(yaml.safe_load_all((Path(data["bundle_dir"]) / "kustomize_bundle" / "network-policies.yaml").read_text()))
+    names = {d["metadata"]["name"] for d in docs if d}
+    assert "api-server-allow-egress-to-oracle-database" not in names, "must never allow egress to an unresolved (fabricated) VM address"
+    assert not (Path(data["bundle_dir"]) / "virtual-machines" / "openstack-security-group-intent.yaml").exists()
+    _cleanup(data["bundle_dir"])
+
+
 def test_deployment_gets_standalone_pvc_and_volume_mount():
     data = _generate(
         [{"component": "uploads-service", "readiness": "READY", "image": "node:20-slim",

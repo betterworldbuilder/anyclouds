@@ -21373,6 +21373,7 @@ def r6_generate_bundle():
     # selectorless Service plus a VMServiceBinding recording that OpenCenter must resolve
     # the real address after VM provisioning (Stage 12), exactly as the schema specifies.
     vm_bindings = []
+    vm_resolved_endpoints = {}
     vm_workloads = [w for w in workloads if str(w.get("readiness")) == "KEEP_ON_VM_FOR_NOW"]
     for w in vm_workloads:
         comp = _comp(w)
@@ -21414,10 +21415,79 @@ def r6_generate_bundle():
                     "resolutionPolicy": "AFTER_VM_PROVISION",
                 },
             })
+        if resolved:
+            vm_resolved_endpoints[comp] = (target_ip, target_port)
         _w("kustomize_bundle/vm-%s.yaml" % comp, _yaml.dump_all(svc_docs, default_flow_style=False, sort_keys=False))
         kust_res.append("vm-%s.yaml" % comp)
     if vm_bindings:
         _w("virtual-machines/service-bindings.yaml", _yaml.dump_all(vm_bindings, default_flow_style=False, sort_keys=False))
+
+    # Stage 10.10 - NetworkPolicies (default-deny namespace isolation, explicit allow rules
+    # derived from real dependency declarations) and OpenStack security-group intent.
+    netpol_docs = [{
+        "apiVersion": "networking.k8s.io/v1", "kind": "NetworkPolicy",
+        "metadata": {"name": "default-deny-all", "namespace": slug},
+        "spec": {"podSelector": {}, "policyTypes": ["Ingress", "Egress"]},
+    }, {
+        # Without this, default-deny also blocks DNS resolution, breaking every component -
+        # not just external traffic.
+        "apiVersion": "networking.k8s.io/v1", "kind": "NetworkPolicy",
+        "metadata": {"name": "allow-dns-egress", "namespace": slug},
+        "spec": {
+            "podSelector": {}, "policyTypes": ["Egress"],
+            "egress": [{"to": [{"namespaceSelector": {}, "podSelector": {"matchLabels": {"k8s-app": "kube-dns"}}}],
+                        "ports": [{"protocol": "UDP", "port": 53}, {"protocol": "TCP", "port": 53}]}],
+        },
+    }]
+    deployable_names = {_comp(w) for w in deployable}
+    provider_to_consumers = {}
+    for w in workloads:
+        consumer = _comp(w)
+        for dep in (w.get("dependencies") or []):
+            provider = re.sub(r"[^a-z0-9-]+", "-", str(dep).lower()).strip("-")
+            if provider in deployable_names:
+                provider_to_consumers.setdefault(provider, set()).add(consumer)
+    for provider, consumers in sorted(provider_to_consumers.items()):
+        netpol_docs.append({
+            "apiVersion": "networking.k8s.io/v1", "kind": "NetworkPolicy",
+            "metadata": {"name": "%s-allow-dependents" % provider, "namespace": slug},
+            "spec": {
+                "podSelector": {"matchLabels": {"app": provider}}, "policyTypes": ["Ingress"],
+                "ingress": [{"from": [{"podSelector": {"matchLabels": {"app": c}}} for c in sorted(consumers)],
+                             "ports": [{"protocol": "TCP", "port": 8080}]}],
+            },
+        })
+    openstack_intent = []
+    for w in workloads:
+        consumer = _comp(w)
+        for dep in (w.get("dependencies") or []):
+            vm_provider = re.sub(r"[^a-z0-9-]+", "-", str(dep).lower()).strip("-")
+            if vm_provider in vm_resolved_endpoints:
+                ip, port = vm_resolved_endpoints[vm_provider]
+                netpol_docs.append({
+                    "apiVersion": "networking.k8s.io/v1", "kind": "NetworkPolicy",
+                    "metadata": {"name": "%s-allow-egress-to-%s" % (consumer, vm_provider), "namespace": slug},
+                    "spec": {
+                        "podSelector": {"matchLabels": {"app": consumer}}, "policyTypes": ["Egress"],
+                        "egress": [{"to": [{"ipBlock": {"cidr": "%s/32" % ip}}],
+                                    "ports": [{"protocol": "TCP", "port": port}]}],
+                    },
+                })
+                # Not a Kubernetes object - an OpenStack security-group requirement
+                # OpenCenter must translate into real infra rules, same non-applied pattern
+                # as VMServiceBinding above (no matching CRD/controller exists for this).
+                openstack_intent.append({
+                    "fromComponent": consumer, "toVmComponent": vm_provider,
+                    "toAddress": "%s/32" % ip, "port": port, "protocol": "TCP",
+                    "direction": "K8S_POD_CIDR_TO_VM",
+                })
+    _w("kustomize_bundle/network-policies.yaml", _yaml.dump_all(netpol_docs, default_flow_style=False, sort_keys=False))
+    kust_res.append("network-policies.yaml")
+    if openstack_intent:
+        _w("virtual-machines/openstack-security-group-intent.yaml",
+           _yaml.dump({"apiVersion": "r6.opencenter.io/v1alpha1", "kind": "OpenStackSecurityGroupIntent",
+                       "metadata": {"name": slug}, "spec": {"rules": openstack_intent}},
+                      default_flow_style=False, sort_keys=False))
 
     build_lines += ['echo "]" >> image-manifest.json', 'echo "Wrote image-manifest.json"']
     _w("image_build_plan.yaml", "\n".join(plan_yaml) + "\n")
