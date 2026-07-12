@@ -655,3 +655,106 @@ def test_generation_is_structurally_deterministic():
     assert n1 == n2, "generation is not deterministic - same input produced different structure"
     _cleanup(data1["bundle_dir"])
     _cleanup(data2["bundle_dir"])
+
+
+# ---------------------------------------------------------------------------
+# Increment 12 — close PARTIAL gaps: PSS, storageClass, cert renewBefore, drift
+# ---------------------------------------------------------------------------
+
+def test_pss_namespace_labels_enforce_restricted():
+    """Stage 10.3: Namespace must carry all three Pod Security Standards labels at
+    'restricted' level so the cluster admission controller enforces (not merely audits)
+    the restricted policy on every pod in this namespace."""
+    data = _generate(
+        [{"component": "api-server", "readiness": "READY", "image": "node:20-slim",
+          "startCommand": "node server.js", "healthPath": "/health", "dependencies": []}],
+        id_suffix="pss",
+    )
+    ns = yaml.safe_load((Path(data["bundle_dir"]) / "kustomize_bundle" / "namespace.yaml").read_text())
+    labels = ns["metadata"]["labels"]
+    assert labels.get("pod-security.kubernetes.io/enforce") == "restricted", \
+        "namespace must enforce restricted PSS - pods violating it are rejected at admission"
+    assert labels.get("pod-security.kubernetes.io/audit") == "restricted", \
+        "namespace must audit restricted PSS to surface violations in the audit log"
+    assert labels.get("pod-security.kubernetes.io/warn") == "restricted", \
+        "namespace must warn restricted PSS so kubectl shows inline warnings"
+    _cleanup(data["bundle_dir"])
+
+
+def test_storageclass_propagated_to_pvc_and_blueprint():
+    """Stage 10.6: When a component declares an explicit storageClass it must appear in
+    the PVC spec and in the blueprint's platformRequirements.storageClasses list.
+    No 'cluster default StorageClass' warning should fire for this component."""
+    data = _generate(
+        [{"component": "db-service", "readiness": "READY", "image": "postgres:16-alpine",
+          "startCommand": "postgres", "healthPath": "/health", "dependencies": [],
+          "persistentPath": "/var/lib/postgresql", "storageClass": "fast-ssd"}],
+        id_suffix="storageclass",
+    )
+    docs = list(yaml.safe_load_all(
+        (Path(data["bundle_dir"]) / "kustomize_bundle" / "db-service.yaml").read_text()))
+    pvc = next(d for d in docs if d.get("kind") == "PersistentVolumeClaim")
+    assert pvc["spec"].get("storageClassName") == "fast-ssd", \
+        "explicit storageClass must be written into PVC spec"
+    blueprint = yaml.safe_load((Path(data["bundle_dir"]) / "business-system.yaml").read_text())
+    assert "fast-ssd" in blueprint["spec"]["platformRequirements"]["storageClasses"], \
+        "storageClass must be registered in blueprint platformRequirements"
+    # Explicit storageClass - no 'cluster default' warning for this component
+    assert not any("cluster default StorageClass" in w and "db-service" in w
+                   for w in data["bundle_validation"]["warnings"])
+    _cleanup(data["bundle_dir"])
+
+
+def test_storageclass_default_warning_fires_when_storageclass_omitted():
+    """Stage 10.6: A component with persistentPath but no explicit storageClass must
+    trigger a bundle_validation warning about defaulting to the cluster StorageClass."""
+    data = _generate(
+        [{"component": "uploads-service", "readiness": "READY", "image": "node:20-slim",
+          "startCommand": "node server.js", "healthPath": "/health", "dependencies": [],
+          "persistentPath": "/srv/uploads"}],  # no storageClass field
+        id_suffix="scdefault",
+    )
+    docs = list(yaml.safe_load_all(
+        (Path(data["bundle_dir"]) / "kustomize_bundle" / "uploads-service.yaml").read_text()))
+    pvc = next(d for d in docs if d.get("kind") == "PersistentVolumeClaim")
+    assert "storageClassName" not in pvc["spec"], \
+        "no storageClass specified - PVC must omit storageClassName and use cluster default"
+    assert any("cluster default StorageClass" in w for w in data["bundle_validation"]["warnings"]), \
+        "must warn that cluster default StorageClass is being assumed"
+    _cleanup(data["bundle_dir"])
+
+
+def test_certificate_has_renew_before():
+    """Stage 10.8 / Stage 14: TLS Certificate must declare renewBefore so cert-manager
+    begins renewal 30 days before expiry rather than at the last possible moment."""
+    data = _generate(
+        [{"component": "web-frontend", "readiness": "READY", "image": "node:20-slim",
+          "startCommand": "node server.js", "healthPath": "/health", "dependencies": [],
+          "ingressGateway": True}],
+        id_suffix="certrenewal", name="Cert Renewal App",
+        externalHostname="app.example.com",
+    )
+    docs = list(yaml.safe_load_all(
+        (Path(data["bundle_dir"]) / "kustomize_bundle" / "gateway.yaml").read_text()))
+    cert = next(d for d in docs if d.get("kind") == "Certificate")
+    assert cert["spec"].get("renewBefore") == "720h", \
+        "Certificate must declare renewBefore:720h for automatic 30-day pre-expiry renewal"
+    _cleanup(data["bundle_dir"])
+
+
+def test_flux_kustomization_has_prune_true_and_drift_warning():
+    """Stage 10.14 / Stage 14: Flux Kustomization must have prune:true so orphaned
+    resources are deleted (drift correction). bundle_validation must include a reminder
+    to configure a PrometheusRule alert for reconciliation failures."""
+    data = _generate(
+        [{"component": "api-server", "readiness": "READY", "image": "node:20-slim",
+          "startCommand": "node server.js", "healthPath": "/health", "dependencies": []}],
+        id_suffix="driftgate",
+    )
+    flux_doc = yaml.safe_load(data["flux_yaml"])
+    assert flux_doc["spec"].get("prune") is True, \
+        "Flux Kustomization must have prune:true to delete orphaned resources and prevent drift"
+    assert any("gotk_reconcile_condition" in w and "drift" in w
+               for w in data["bundle_validation"]["warnings"]), \
+        "bundle_validation must remind operators to configure a drift-detection PrometheusRule alert"
+    _cleanup(data["bundle_dir"])

@@ -21062,7 +21062,9 @@ def r6_generate_bundle():
     kust_res = ["namespace.yaml"]
     secret_contracts = []
     components_with_storage = []
+    components_using_default_storageclass = []
     components_missing_persistent_path = []
+    storage_classes_used = set()
     for w in deployable:
         comp = _comp(w)
         base = str(w.get("image") or "docker.io/library/debian:stable-slim")
@@ -21228,8 +21230,18 @@ def r6_generate_bundle():
         # never invented when the field is empty or already says no volume is needed.
         raw_persistent_path = str(w.get("persistentPath") or "").strip()
         persistent_path = raw_persistent_path if raw_persistent_path.startswith("/") else ""
+        # storageClass: explicit StorageClass name requested by this component. When supplied,
+        # it is written directly into the PVC spec and registered in the blueprint's
+        # platformRequirements so the cluster provisioner check knows what to expect.
+        # When absent, the cluster default applies (generates a warning, not a blocker,
+        # since most clusters have a functional default).
+        storage_class = str(w.get("storageClass") or "").strip()
         if persistent_path:
             components_with_storage.append(comp)
+            if storage_class:
+                storage_classes_used.add(storage_class)
+            else:
+                components_using_default_storageclass.append(comp)
         elif not raw_persistent_path:
             components_missing_persistent_path.append(comp)
         pvc_name = "%s-data" % comp
@@ -21238,8 +21250,9 @@ def r6_generate_bundle():
         pvc_spec = {
             "accessModes": ["ReadWriteOnce"],
             "resources": {"requests": {"storage": "10Gi"}},
-        }  # storageClassName intentionally omitted - uses the cluster default; flagged in
-           # bundle_validation as a prerequisite to confirm before Stage 12.
+        }
+        if storage_class:
+            pvc_spec["storageClassName"] = storage_class
 
         pod_spec_base = {
             "serviceAccountName": sa_name,
@@ -21523,7 +21536,8 @@ def r6_generate_bundle():
             "apiVersion": "cert-manager.io/v1", "kind": "Certificate",
             "metadata": {"name": cert_secret, "namespace": slug},
             "spec": {"secretName": cert_secret, "dnsNames": [hostname],
-                     "issuerRef": {"name": "letsencrypt-prod", "kind": "ClusterIssuer"}},
+                     "issuerRef": {"name": "letsencrypt-prod", "kind": "ClusterIssuer"},
+                     "renewBefore": "720h"},
         }]
         for comp in exposed_components:
             gw_docs.append({
@@ -21724,10 +21738,9 @@ def r6_generate_bundle():
                 "stagingOverlay": "overlays/staging", "productionOverlay": "overlays/production",
             },
             "platformRequirements": {
-                # No component requested a specific StorageClass (the field only carries a
-                # mount path, not a class name) - PVCs use the cluster default, which is why
-                # this stays an honest empty list rather than a guessed class name.
-                "storageClasses": [],
+                # StorageClass names explicitly requested by components with persistent storage.
+                # Empty list means all PVCs use the cluster default (see bundle_validation warnings).
+                "storageClasses": sorted(storage_classes_used),
                 "gatewayClass": "envoy" if needs_gateway else None,
                 "operators": sorted(op_names),
                 "services": (["gateway-api", "gateway"] if needs_gateway else []),
@@ -21800,12 +21813,20 @@ def r6_generate_bundle():
             "%s: field 'persistentPath' was not provided - cannot confirm whether this "
             "component needs a PVC. Remediation: set its persistent data path (or "
             "explicitly 'None - stateless') in the Container Readiness form." % _comp_name)
-    if components_with_storage:
+    if components_using_default_storageclass:
         validation_warnings.append(
-            "%s: PersistentVolumeClaim(s) use the cluster default StorageClass (none was "
-            "explicitly selected) with a default 10Gi ReadWriteOnce request - confirm this "
-            "matches the real data volume and access mode before Stage 12." % ", ".join(components_with_storage))
+            "%s: PersistentVolumeClaim(s) use the cluster default StorageClass (no storageClass "
+            "was set on these components) with a default 10Gi ReadWriteOnce request - confirm "
+            "the cluster default StorageClass exists and meets each workload's I/O requirements "
+            "before Stage 12. Remediation: set storageClass on each component or confirm the "
+            "cluster default is appropriate." % ", ".join(components_using_default_storageclass))
     validation_warnings.append("image digest/build/scan/sign status cannot be validated until after build_and_push.sh runs - re-validate before Stage 12")
+    # Drift monitoring reminder - prune:true prevents resource drift but a broken reconcile
+    # loop is silent without an alert. Required before Stage 14.
+    validation_warnings.append(
+        "drift monitoring: Flux prune is enabled for this bundle - configure a PrometheusRule "
+        "alert for gotk_reconcile_condition{type=Ready,status=False,name=%s} to detect "
+        "reconciliation failures before they cause undetected drift. Required before Stage 14." % slug)
 
     bundle_validation = {
         "generatedAt": stamp, "businessSystem": bundle.get("businessSystemName"),
