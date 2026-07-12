@@ -21468,24 +21468,17 @@ def r6_generate_bundle():
     flux_warnings = []
     gitops = home / ".config" / "opencenter" / "clusters" / "gitops" / org
     gitops_available = data.get("import_to_gitops", True) and gitops.is_dir()
-    if not data.get("import_to_gitops", True):
-        commit_status = "skipped (import_to_gitops off)"
-    elif not gitops.is_dir():
-        commit_status = "skipped (no GitOps directory found for org '%s' - run opencenter cluster init/generate first)" % org
-    elif not data.get("auto_commit"):
-        commit_status = "skipped (auto_commit off)"
-    else:
-        commit_status = "pending"
 
-    # Stage 10.7 - real Flux Kustomization generation, replacing the decorative
-    # client-side preview. Always generated into the local bundle (so a preview/dry-run
-    # call with import_to_gitops off still returns a real manifest, not an empty result) -
-    # mirrors the working services/fluxcd/postgres-operator.yaml pattern already present in
-    # this GitOps repo: a dedicated kustomize.toolkit.fluxcd.io/v1 Kustomization, dependsOn
-    # naming other Kustomizations by their real "<name>-base" convention.
+    # Stage 10.7 - real Flux Kustomization generation. dependsOn/reachability are checked
+    # read-only against the real repo's EXISTING structure here - nothing is written into
+    # the real GitOps repo yet. Whether it is safe to write/commit/push is decided by the
+    # Stage 12 validation gate further down, after bundle_validation is fully computed.
     depends_on = []
+    reachable = None
     if gitops_available:
-        services_fluxcd_dir = gitops / "applications" / "overlays" / cluster / "services" / "fluxcd"
+        cluster_overlay_root = gitops / "applications" / "overlays" / cluster
+        fluxcd_dir = cluster_overlay_root / "managed-services" / "fluxcd"
+        services_fluxcd_dir = cluster_overlay_root / "services" / "fluxcd"
         for opname in sorted(op_names):
             candidate = services_fluxcd_dir / ("%s.yaml" % opname)
             if candidate.is_file():
@@ -21495,6 +21488,37 @@ def r6_generate_bundle():
                     "operator '%s' is required but no FluxCD Kustomization was found at %s - "
                     "install/generate the operator first, or this app's Kustomization will "
                     "never become Ready" % (opname, candidate))
+
+        # Records every path referenced as a "resources:" entry anywhere in the graph, not
+        # just ones that already exist as a directory - managed-services/fluxcd is created
+        # by THIS request when it is missing, so requiring it to pre-exist would wrongly
+        # report "unreachable" for the very first app ever generated against a cluster even
+        # when the root kustomization.yaml correctly references it.
+        def _kustomize_referenced_paths(kfile, seen_files, referenced, depth=0):
+            if depth > 6 or kfile in seen_files or not kfile.is_file():
+                return
+            seen_files.add(kfile)
+            try:
+                kdoc = _yaml.safe_load(kfile.read_text(encoding="utf-8")) or {}
+            except Exception:
+                return
+            for res in (kdoc.get("resources") or []):
+                res_path = (kfile.parent / str(res)).resolve()
+                referenced.add(res_path)
+                if res_path.is_dir():
+                    _kustomize_referenced_paths(res_path / "kustomization.yaml", seen_files, referenced, depth + 1)
+                elif res_path.name == "kustomization.yaml" and res_path.is_file():
+                    _kustomize_referenced_paths(res_path, seen_files, referenced, depth + 1)
+
+        referenced_paths = set()
+        _kustomize_referenced_paths(cluster_overlay_root / "kustomization.yaml", set(), referenced_paths)
+        reachable = fluxcd_dir.resolve() in referenced_paths
+        if not reachable:
+            flux_warnings.append(
+                "managed-services/fluxcd is not referenced anywhere in the kustomization "
+                "resource graph starting at applications/overlays/%s/kustomization.yaml - "
+                "this app's Flux Kustomization would sit on disk but Flux would never "
+                "reconcile it until managed-services/fluxcd is wired into that graph" % cluster)
     elif op_names:
         # No real GitOps repo to check against (preview/dry-run call) - best-effort
         # dependsOn using the naming convention, explicitly flagged as unverified rather
@@ -21503,6 +21527,7 @@ def r6_generate_bundle():
         flux_warnings.append(
             "dependsOn for %s not verified against a real GitOps repo (import_to_gitops was "
             "off or no GitOps directory was found for org '%s')" % (sorted(op_names), org))
+
     flux_kustomization = {
         "apiVersion": "kustomize.toolkit.fluxcd.io/v1", "kind": "Kustomization",
         "metadata": {"name": slug, "namespace": "flux-system"},
@@ -21521,110 +21546,6 @@ def r6_generate_bundle():
         flux_kustomization["spec"]["dependsOn"] = depends_on
     flux_yaml_text = _yaml.dump(flux_kustomization, default_flow_style=False, sort_keys=False)
     _w("flux/%s-kustomization.yaml" % slug, flux_yaml_text)
-    flux_status = "generated (preview only - not imported to a GitOps repo)"
-
-    if gitops_available:
-        cluster_overlay_root = gitops / "applications" / "overlays" / cluster
-        overlay = cluster_overlay_root / "managed-services" / slug
-        # Mirrors the local out_dir layout exactly (kustomize_bundle/ + overlays/{staging,
-        # production}/) so the overlays' "../../kustomize_bundle" relative reference still
-        # resolves once imported - a flat copy (the prior behavior) silently broke this.
-        _shutil.copytree(out_dir / "kustomize_bundle", overlay / "kustomize_bundle", dirs_exist_ok=True)
-        _shutil.copytree(out_dir / "overlays", overlay / "overlays", dirs_exist_ok=True)
-        imported = str(overlay)
-        if reg_user and reg_password:
-            import base64 as _b64, subprocess as _sp
-            auth = _b64.b64encode(("%s:%s" % (reg_user, reg_password)).encode()).decode()
-            cfg = _json.dumps({"auths": {reg_host: {"username": reg_user, "password": reg_password, "auth": auth}}})
-            sec = ("apiVersion: v1\nkind: Secret\nmetadata:\n  name: r6-registry-pull\n  namespace: %s\n"
-                   "type: kubernetes.io/dockerconfigjson\ndata:\n  .dockerconfigjson: %s\n"
-                   % (slug, _b64.b64encode(cfg.encode()).decode()))
-            (overlay / "kustomize_bundle" / "pull-secret.yaml").write_text(sec, encoding="utf-8")
-            try:
-                _sops = str(home / ".local" / "bin" / "sops") if (home / ".local" / "bin" / "sops").exists() else "sops"
-                _agepub = home / ".config" / "opencenter" / "clusters" / "secrets" / org / cluster / "age" / "keys" / ("%s-key.pub" % cluster)
-                _recip = _agepub.read_text(encoding="utf-8").strip() if _agepub.is_file() else ""
-                _sopscfg = out_dir / "sops-pullsecret.yaml"
-                _sopscfg.write_text(
-                    "creation_rules:" + chr(10)
-                    + "  - path_regex: .*" + chr(10)
-                    + "    encrypted_regex: ^(data|stringData)$" + chr(10)
-                    + "    age: " + _recip + chr(10), encoding="utf-8")
-                _cmd = [_sops, "--config", str(_sopscfg), "--encrypt", "--in-place", str(overlay / "kustomize_bundle" / "pull-secret.yaml")]
-                r = _sp.run(_cmd, cwd=str(gitops), capture_output=True, text=True, timeout=60)
-                sops_status = "encrypted" if r.returncode == 0 else ("sops failed: " + (r.stderr or "")[:200])
-                if r.returncode != 0:
-                    (overlay / "kustomize_bundle" / "pull-secret.yaml").unlink()
-            except FileNotFoundError:
-                sops_status = "sops binary not found - plaintext secret removed"
-                (overlay / "kustomize_bundle" / "pull-secret.yaml").unlink()
-            if sops_status == "encrypted":
-                k = overlay / "kustomize_bundle" / "kustomization.yaml"
-                k.write_text(k.read_text(encoding="utf-8") + "  - pull-secret.yaml\n", encoding="utf-8")
-
-        # Import the already-generated Flux Kustomization (built above, unconditionally)
-        # into the real GitOps repo, aggregated via managed-services/fluxcd/kustomization.yaml
-        # - mirroring the working services/fluxcd/postgres-operator.yaml pattern already
-        # present in this repo.
-        fluxcd_dir = cluster_overlay_root / "managed-services" / "fluxcd"
-        fluxcd_dir.mkdir(parents=True, exist_ok=True)
-        (fluxcd_dir / ("%s.yaml" % slug)).write_text(flux_yaml_text, encoding="utf-8")
-
-        fx_kustomization_file = fluxcd_dir / "kustomization.yaml"
-        fx_resource_line = "  - ./%s.yaml" % slug
-        if fx_kustomization_file.is_file():
-            fx_text = fx_kustomization_file.read_text(encoding="utf-8")
-            if fx_resource_line not in fx_text:
-                fx_kustomization_file.write_text(fx_text.rstrip("\n") + "\n" + fx_resource_line + "\n", encoding="utf-8")
-        else:
-            fx_kustomization_file.write_text(
-                "apiVersion: kustomize.config.k8s.io/v1beta1\nkind: Kustomization\nresources:\n" + fx_resource_line + "\n",
-                encoding="utf-8")
-
-        # Real reachability check, not an assumption: is managed-services/fluxcd actually
-        # wired into this cluster's Flux reconciliation graph? Walks the plain-kustomize
-        # resource tree from the cluster overlay root; if managed-services/fluxcd never
-        # appears, this app's Kustomization would sit on disk but Flux would never apply it.
-        def _kustomize_resource_dirs(kfile, seen, depth=0):
-            if depth > 6 or kfile in seen or not kfile.is_file():
-                return
-            seen.add(kfile)
-            try:
-                kdoc = _yaml.safe_load(kfile.read_text(encoding="utf-8")) or {}
-            except Exception:
-                return
-            for res in (kdoc.get("resources") or []):
-                res_path = (kfile.parent / str(res)).resolve()
-                if res_path.is_dir():
-                    _kustomize_resource_dirs(res_path / "kustomization.yaml", seen, depth + 1)
-                elif res_path.name == "kustomization.yaml":
-                    _kustomize_resource_dirs(res_path, seen, depth + 1)
-
-        visited = set()
-        _kustomize_resource_dirs(cluster_overlay_root / "kustomization.yaml", visited)
-        reachable = any(f.parent.resolve() == fluxcd_dir.resolve() for f in visited)
-        if not reachable:
-            flux_warnings.append(
-                "managed-services/fluxcd is not referenced anywhere in the kustomization "
-                "resource graph starting at applications/overlays/%s/kustomization.yaml - "
-                "this app's Flux Kustomization was written to disk but will not be "
-                "reconciled until managed-services/fluxcd is wired into that graph" % cluster)
-        flux_status = ("reachable, dependsOn: %s" % [d["name"] for d in depends_on]) if reachable \
-            else "written but not reachable from Flux - see warnings"
-
-        if data.get("auto_commit"):
-            import subprocess as _sp2
-            env2 = {**os.environ, "GIT_SSH_COMMAND": "ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no"}
-            rel = "applications/overlays/%s/managed-services/%s" % (cluster, slug)
-            fx_rel = "applications/overlays/%s/managed-services/fluxcd" % cluster
-            cmds = [["git", "add", rel, fx_rel], ["git", "commit", "-m", "R6 import: %s" % slug], ["git", "push"]]
-            outs = []
-            for c in cmds:
-                r2 = _sp2.run(c, cwd=str(gitops), capture_output=True, text=True, timeout=120, env=env2)
-                outs.append("%s -> %s %s" % (" ".join(c[:2]), r2.returncode, (r2.stdout + r2.stderr).strip()[-160:]))
-                if r2.returncode != 0 and c[1] != "commit":
-                    break
-            commit_status = " | ".join(outs)
 
     # Stage 11 - unified OpenCenter hybrid blueprint + pre-deployment validation.
     blueprint = {
@@ -21672,18 +21593,29 @@ def r6_generate_bundle():
             if re.search(_pattern, _text):
                 secret_findings.append({"file": str(_f.relative_to(out_dir)), "issue": _desc})
 
+    # Every blocker/warning names the component, the field, and the remediation - not just
+    # a bare description - so Stage 12 can show exactly what is wrong and how to fix it.
     validation_blockers = []
     validation_warnings = []
     for w in deployable:
         if not str(w.get("startCommand") or "").strip():
-            validation_blockers.append("%s: no start command detected or set - image will not run its application" % _comp(w))
+            validation_blockers.append(
+                "%s: field 'startCommand' is not set - image will not run its application. "
+                "Remediation: run Live Scan (Step 3/6) so R6 can detect it from the running "
+                "process, or set it manually in Step 9's Start Command Review." % _comp(w))
     known_component_names = {str(w.get("component") or "").strip().lower() for w in workloads}
     for w in workloads:
         for dep in (w.get("dependencies") or []):
             if str(dep).strip().lower() not in known_component_names:
-                validation_warnings.append("%s: dependency '%s' does not match any component in this bundle" % (_comp(w), dep))
+                validation_warnings.append(
+                    "%s: field 'dependencies' references '%s', which does not match any "
+                    "component in this bundle. Remediation: fix the dependency name, or "
+                    "remove it if that component was renamed or removed." % (_comp(w), dep))
     if secret_findings:
-        validation_blockers.append("plaintext secret pattern(s) detected in generated output - see secretFindings")
+        validation_blockers.append(
+            "generated output: plaintext secret pattern(s) detected - see secretFindings for "
+            "the exact file(s). Remediation: replace the plaintext value with a "
+            "SecretContract reference or an OpenCenter-managed secret, then regenerate.")
     validation_warnings += flux_warnings
     validation_warnings.append("storage/PVC generation not yet implemented - persistent paths are not validated in this report")
     validation_warnings.append("image digest/build/scan/sign status cannot be validated until after build_and_push.sh runs - re-validate before Stage 12")
@@ -21695,6 +21627,91 @@ def r6_generate_bundle():
         "status": "BLOCKED" if validation_blockers else "PASSED_WITH_WARNINGS" if validation_warnings else "PASSED",
     }
     _w("bundle-validation.json", _json.dumps(bundle_validation, indent=2))
+
+    # Stage 12 deployment gate. A blocked bundle never touches the real GitOps repo - no
+    # working-tree copy, no commit, no push - it stays local-only until the blockers listed
+    # above are fixed and the bundle is regenerated. Warnings never block; only blockers do.
+    if validation_blockers:
+        commit_status = ("BLOCKED by bundle_validation (%d blocker(s)) - not imported, "
+                          "committed or pushed. See bundle_validation.blockers." % len(validation_blockers))
+        flux_status = "BLOCKED by bundle_validation - Flux Kustomization generated locally only, not written to the GitOps repo"
+    elif not data.get("import_to_gitops", True):
+        commit_status = "skipped (import_to_gitops off)"
+        flux_status = "generated (preview only - not imported to a GitOps repo)"
+    elif not gitops.is_dir():
+        commit_status = "skipped (no GitOps directory found for org '%s' - run opencenter cluster init/generate first)" % org
+        flux_status = "generated (preview only - no GitOps directory found for org '%s')" % org
+    else:
+        overlay = cluster_overlay_root / "managed-services" / slug
+        # Mirrors the local out_dir layout exactly (kustomize_bundle/ + overlays/{staging,
+        # production}/) so the overlays' "../../kustomize_bundle" relative reference still
+        # resolves once imported - a flat copy (the prior behavior) silently broke this.
+        _shutil.copytree(out_dir / "kustomize_bundle", overlay / "kustomize_bundle", dirs_exist_ok=True)
+        _shutil.copytree(out_dir / "overlays", overlay / "overlays", dirs_exist_ok=True)
+        imported = str(overlay)
+        if reg_user and reg_password:
+            import base64 as _b64, subprocess as _sp
+            auth = _b64.b64encode(("%s:%s" % (reg_user, reg_password)).encode()).decode()
+            cfg = _json.dumps({"auths": {reg_host: {"username": reg_user, "password": reg_password, "auth": auth}}})
+            sec = ("apiVersion: v1\nkind: Secret\nmetadata:\n  name: r6-registry-pull\n  namespace: %s\n"
+                   "type: kubernetes.io/dockerconfigjson\ndata:\n  .dockerconfigjson: %s\n"
+                   % (slug, _b64.b64encode(cfg.encode()).decode()))
+            (overlay / "kustomize_bundle" / "pull-secret.yaml").write_text(sec, encoding="utf-8")
+            try:
+                _sops = str(home / ".local" / "bin" / "sops") if (home / ".local" / "bin" / "sops").exists() else "sops"
+                _agepub = home / ".config" / "opencenter" / "clusters" / "secrets" / org / cluster / "age" / "keys" / ("%s-key.pub" % cluster)
+                _recip = _agepub.read_text(encoding="utf-8").strip() if _agepub.is_file() else ""
+                _sopscfg = out_dir / "sops-pullsecret.yaml"
+                _sopscfg.write_text(
+                    "creation_rules:" + chr(10)
+                    + "  - path_regex: .*" + chr(10)
+                    + "    encrypted_regex: ^(data|stringData)$" + chr(10)
+                    + "    age: " + _recip + chr(10), encoding="utf-8")
+                _cmd = [_sops, "--config", str(_sopscfg), "--encrypt", "--in-place", str(overlay / "kustomize_bundle" / "pull-secret.yaml")]
+                r = _sp.run(_cmd, cwd=str(gitops), capture_output=True, text=True, timeout=60)
+                sops_status = "encrypted" if r.returncode == 0 else ("sops failed: " + (r.stderr or "")[:200])
+                if r.returncode != 0:
+                    (overlay / "kustomize_bundle" / "pull-secret.yaml").unlink()
+            except FileNotFoundError:
+                sops_status = "sops binary not found - plaintext secret removed"
+                (overlay / "kustomize_bundle" / "pull-secret.yaml").unlink()
+            if sops_status == "encrypted":
+                k = overlay / "kustomize_bundle" / "kustomization.yaml"
+                k.write_text(k.read_text(encoding="utf-8") + "  - pull-secret.yaml\n", encoding="utf-8")
+
+        # Import the already-generated Flux Kustomization (built above) into the real
+        # GitOps repo, aggregated via managed-services/fluxcd/kustomization.yaml - mirroring
+        # the working services/fluxcd/postgres-operator.yaml pattern already in this repo.
+        fluxcd_dir.mkdir(parents=True, exist_ok=True)
+        (fluxcd_dir / ("%s.yaml" % slug)).write_text(flux_yaml_text, encoding="utf-8")
+        fx_kustomization_file = fluxcd_dir / "kustomization.yaml"
+        fx_resource_line = "  - ./%s.yaml" % slug
+        if fx_kustomization_file.is_file():
+            fx_text = fx_kustomization_file.read_text(encoding="utf-8")
+            if fx_resource_line not in fx_text:
+                fx_kustomization_file.write_text(fx_text.rstrip("\n") + "\n" + fx_resource_line + "\n", encoding="utf-8")
+        else:
+            fx_kustomization_file.write_text(
+                "apiVersion: kustomize.config.k8s.io/v1beta1\nkind: Kustomization\nresources:\n" + fx_resource_line + "\n",
+                encoding="utf-8")
+        flux_status = ("reachable, dependsOn: %s" % [d["name"] for d in depends_on]) if reachable \
+            else "written but not reachable from Flux - see warnings"
+
+        if not data.get("auto_commit"):
+            commit_status = "skipped (auto_commit off)"
+        else:
+            import subprocess as _sp2
+            env2 = {**os.environ, "GIT_SSH_COMMAND": "ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no"}
+            rel = "applications/overlays/%s/managed-services/%s" % (cluster, slug)
+            fx_rel = "applications/overlays/%s/managed-services/fluxcd" % cluster
+            cmds = [["git", "add", rel, fx_rel], ["git", "commit", "-m", "R6 import: %s" % slug], ["git", "push"]]
+            outs = []
+            for c in cmds:
+                r2 = _sp2.run(c, cwd=str(gitops), capture_output=True, text=True, timeout=120, env=env2)
+                outs.append("%s -> %s %s" % (" ".join(c[:2]), r2.returncode, (r2.stdout + r2.stderr).strip()[-160:]))
+                if r2.returncode != 0 and c[1] != "commit":
+                    break
+            commit_status = " | ".join(outs)
 
     resp = {
         "ok": True, "bundle_dir": str(out_dir),

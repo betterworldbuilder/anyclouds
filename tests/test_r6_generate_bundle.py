@@ -367,6 +367,54 @@ def test_flux_unreachable_graph_surfaces_honest_warning():
         _cleanup_fake_gitops(org)
 
 
+def test_stage12_gate_blocks_import_commit_and_push_on_blocker():
+    """Stage 12: a bundle with a real blocker (no startCommand) must never touch the real
+    GitOps repo - no working-tree copy, no commit, no push - even with import_to_gitops and
+    auto_commit both on. This is the core deployment-safety gate."""
+    org, cluster = "r6-dryrun-gate-org", "r6-dryrun-flux-cluster"
+    _make_fake_gitops(org, cluster, wire_managed_services_fluxcd=True)
+    try:
+        data = _generate(
+            [{"component": "api-server", "readiness": "READY", "image": "node:20-slim",
+              "healthPath": "/health", "dependencies": []}],  # no startCommand - a real blocker
+            id_suffix="gateblock", name="Gate Block", org=org, cluster=cluster,
+            import_to_gitops=True, auto_commit=True,
+        )
+        assert data["bundle_validation"]["status"] == "BLOCKED"
+        assert any("startCommand" in b and "Remediation:" in b for b in data["bundle_validation"]["blockers"])
+        assert data["imported_to"] is None
+        assert "BLOCKED" in data["gitops_commit"]
+        assert "BLOCKED" in data["flux_status"]
+
+        overlay_root = GITOPS_ROOT / org / "applications" / "overlays" / cluster / "managed-services" / "gate-block"
+        assert not overlay_root.exists(), "a blocked bundle must never write into the real GitOps working tree"
+        fluxcd_dir = GITOPS_ROOT / org / "applications" / "overlays" / cluster / "managed-services" / "fluxcd" / "gate-block.yaml"
+        assert not fluxcd_dir.exists(), "a blocked bundle must never write its Flux Kustomization into the real repo"
+        _cleanup(data["bundle_dir"])
+    finally:
+        _cleanup_fake_gitops(org)
+
+
+def test_stage12_gate_allows_import_when_only_warnings_present():
+    """Warnings must never block - only real blockers do."""
+    org, cluster = "r6-dryrun-gate-warn-org", "r6-dryrun-flux-cluster"
+    _make_fake_gitops(org, cluster, wire_managed_services_fluxcd=True)
+    try:
+        data = _generate(
+            [{"component": "api-server", "readiness": "READY", "image": "node:20-slim",
+              "startCommand": "node server.js", "healthPath": "/health",
+              "dependencies": ["nonexistent-component"]}],  # dependency mismatch -> warning only
+            id_suffix="gatewarn", name="Gate Warn", org=org, cluster=cluster,
+            import_to_gitops=True, auto_commit=False,
+        )
+        assert data["bundle_validation"]["status"] == "PASSED_WITH_WARNINGS"
+        assert data["imported_to"] is not None
+        assert "reachable" in data["flux_status"]
+        _cleanup(data["bundle_dir"])
+    finally:
+        _cleanup_fake_gitops(org)
+
+
 def test_flux_preview_generated_without_any_gitops_repo():
     """The Step 10 UI button calls generate-bundle with import_to_gitops off for a safe
     preview. It must still get back a real Flux Kustomization manifest (not an empty
