@@ -21260,6 +21260,60 @@ def r6_generate_bundle():
             })
         _w("kustomize_bundle/%s.yaml" % comp, _yaml.dump_all(docs, default_flow_style=False, sort_keys=False))
         kust_res.append("%s.yaml" % comp)
+
+    # Stage 10.5 - VM connectivity. Components kept as a VM (retained or redeployed) never
+    # get a Deployment/image, but containers still need a stable in-cluster name to reach
+    # them by. A real IP (from Step 1 Inspect's Target IP) gets a real EndpointSlice; an
+    # unknown IP (VM not provisioned yet) never gets a fabricated address - it gets a
+    # selectorless Service plus a VMServiceBinding recording that OpenCenter must resolve
+    # the real address after VM provisioning (Stage 12), exactly as the schema specifies.
+    vm_bindings = []
+    vm_workloads = [w for w in workloads if str(w.get("readiness")) == "KEEP_ON_VM_FOR_NOW"]
+    for w in vm_workloads:
+        comp = _comp(w)
+        target_ip = str(w.get("targetIp") or "").strip()
+        target_port = w.get("targetPort") or 80
+        try:
+            target_port = int(target_port)
+        except (TypeError, ValueError):
+            target_port = 80
+        resolved = bool(re.match(r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$", target_ip))
+        svc_docs = [{
+            "apiVersion": "v1", "kind": "Service",
+            "metadata": {
+                "name": comp, "namespace": slug,
+                "annotations": {"r6.opencenter.io/resolution": "RESOLVED" if resolved else "PENDING_OPENCENTER_RESOLUTION"},
+            },
+            # Selectorless - no "selector" key at all, so Kubernetes does not try to manage
+            # endpoints itself; the EndpointSlice below (or a future one, once resolved)
+            # supplies the real backend address.
+            "spec": {"ports": [{"name": "main", "port": target_port, "protocol": "TCP"}]},
+        }]
+        if resolved:
+            svc_docs.append({
+                "apiVersion": "discovery.k8s.io/v1", "kind": "EndpointSlice",
+                "metadata": {
+                    "name": "%s-flex" % comp, "namespace": slug,
+                    "labels": {"kubernetes.io/service-name": comp},
+                },
+                "addressType": "IPv4",
+                "ports": [{"name": "main", "protocol": "TCP", "port": target_port}],
+                "endpoints": [{"addresses": [target_ip]}],
+            })
+        else:
+            vm_bindings.append({
+                "apiVersion": "r6.opencenter.io/v1alpha1", "kind": "VMServiceBinding",
+                "metadata": {"name": comp, "namespace": slug},
+                "spec": {
+                    "serviceName": comp, "vmComponentId": comp, "port": target_port,
+                    "resolutionPolicy": "AFTER_VM_PROVISION",
+                },
+            })
+        _w("kustomize_bundle/vm-%s.yaml" % comp, _yaml.dump_all(svc_docs, default_flow_style=False, sort_keys=False))
+        kust_res.append("vm-%s.yaml" % comp)
+    if vm_bindings:
+        _w("virtual-machines/service-bindings.yaml", _yaml.dump_all(vm_bindings, default_flow_style=False, sort_keys=False))
+
     build_lines += ['echo "]" >> image-manifest.json', 'echo "Wrote image-manifest.json"']
     _w("image_build_plan.yaml", "\n".join(plan_yaml) + "\n")
     _w("build_and_push.sh", "\n".join(build_lines) + "\n")

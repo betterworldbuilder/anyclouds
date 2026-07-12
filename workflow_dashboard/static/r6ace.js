@@ -1056,6 +1056,17 @@ window.r6pAutoRunBuildPipeline=function(extractCmd,buildCmd,outId){
    by Live Scan (Step 3/6) - not a guess. Picks the heaviest process that is not the SSH
    session, shell or scan tooling itself. Returns '' (not a fake command) when no scan has
    been run, so the backend emits a loud, fail-fast placeholder instead of something wrong. */
+/* Parses a real component target endpoint (e.g. "mysql://50.56.158.30:3306",
+   "http://FLEX-IP:80", a bare IP, or empty/placeholder) into {ip, port}. Only returns a
+   real ip when it looks like an actual IPv4 address - the "FLEX-IP"/"OSPC-IP" placeholder
+   values used before Step 1 Inspect is filled in never get treated as a resolvable address. */
+window.r6pParseTargetEndpoint=function(tgt){
+  var s=(tgt||'').trim();
+  var m=s.match(/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\/([^:\/]+)(?::(\d+))?/)||s.match(/^([^:\/]+)(?::(\d+))?$/);
+  var host=m?m[1]:'',port=m&&m[2]?parseInt(m[2],10):null;
+  var isRealIp=/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(host);
+  return {ip:isRealIp?host:'',port:port};
+};
 window.r6pDetectStartCommand=function(c){
   var scan=R6P.depScan&&R6P.depScan[c.name];
   if(!scan||!scan.rawLog)return '';
@@ -1094,10 +1105,11 @@ window.r6pGenRealDockerfiles=function(){
     var buildable=(form==='CONTAINERIZED'||form==='PARTIALLY_CONTAINERIZED');
     var startCmd=(R6P.startCmdOverride&&R6P.startCmdOverride[c.name])||r6pDetectStartCommand(c);
     var siblingDeps=(R6P.components||[]).filter(function(x){return x.name!==c.name;}).map(function(x){return x.name;});
+    var endpoint=r6pParseTargetEndpoint(c.tgt);
     return {component:c.name,image:'debian:stable-slim',replicas:1,
       readiness:buildable?'READY':'KEEP_ON_VM_FOR_NOW',layer:'API',sourcePath:c.path||'/opt/app',targetForm:form,
       startCommand:startCmd,healthPath:(c.path&&c.path.indexOf('/')===0)?c.path.split(',')[0]:'/health',
-      dependencies:siblingDeps};
+      dependencies:siblingDeps,targetIp:endpoint.ip,targetPort:endpoint.port};
   });
   var skipped=workloads.filter(function(w){return w.readiness==='KEEP_ON_VM_FOR_NOW';});
   var mode=(document.querySelector('input[name="r6p-build-mode"]:checked')||{}).value||'manual';
