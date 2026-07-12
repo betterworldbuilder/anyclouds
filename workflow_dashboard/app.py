@@ -26,6 +26,7 @@ from uuid import uuid4
 
 from flask import Flask, Response, jsonify, render_template, request, send_from_directory, stream_with_context
 from werkzeug.utils import secure_filename
+import yaml as _yaml
 
 
 BASE_DIR = Path(__file__).resolve().parents[1]
@@ -21110,6 +21111,14 @@ def r6_generate_bundle():
             '  _digest=$(docker inspect --format="{{index .RepoDigests 0}}" %s 2>/dev/null | sed "s/.*@//" || true)\n'
             '  [ -z "$_digest" ] && _digest="unresolved - inspect image manually"\n'
             "fi" % image,
+            # Patch the Deployment YAML to reference the immutable digest instead of the
+            # mutable tag - only when a real sha256 digest was actually resolved, so a
+            # failed/unresolved digest never corrupts the manifest with a bad image ref.
+            'echo "== pin Deployment to digest %s =="' % comp,
+            'case "$_digest" in\n'
+            '  sha256:*) sed -i "s|image: %s|image: %s@$_digest|" kustomize_bundle/%s.yaml && echo "pinned %s to digest" ;;\n'
+            '  *) echo "[WARN] no resolved digest for %s - kustomize_bundle/%s.yaml still references the mutable tag" ;;\n'
+            "esac" % (image, "%s/%s" % (prefix, comp), comp, comp, comp, comp),
             '[ $_first -eq 0 ] && echo "," >> image-manifest.json',
             "_first=0",
             'printf \'{"component":"%s","registry":"%s","repository":"%s","tag":"%s","digest":"%%s","buildStatus":"PASSED","pushStatus":"%%s","signatureStatus":"%%s"}\' "$_digest" "$_push_status" "$_sign_status" >> image-manifest.json'
@@ -21118,52 +21127,113 @@ def r6_generate_bundle():
         deps = [str(d).strip() for d in (w.get("dependencies") or []) if str(d).strip()]
         dep_slugs = [re.sub(r"[^a-z0-9-]+", "-", d.lower()).strip("-") for d in deps]
         cfg_name = "%s-deps" % comp
-        env_lines = []
-        cm_data_lines = []
+        env_lines_struct = []
+        cm_data = {}
         for orig, dslug in zip(deps, dep_slugs):
             var = re.sub(r"[^A-Z0-9]+", "_", orig.upper()).strip("_") + "_HOST"
-            env_lines += ["            - name: %s" % var,
-                          "              valueFrom:", "                configMapKeyRef:",
-                          "                  name: %s" % cfg_name, "                  key: %s" % var]
+            env_lines_struct.append({"name": var, "valueFrom": {"configMapKeyRef": {"name": cfg_name, "key": var}}})
             # Points at the in-cluster Service name for a containerized dependency in this
             # same bundle, or the retained/redeployed VM's logical alias otherwise - both
             # resolve to dslug as a DNS name once OpenCenter creates the matching Service/
             # EndpointSlice pair for VM-backed components.
-            cm_data_lines.append("  %s: %s" % (var, dslug))
-        dep_lines = [
-            "apiVersion: apps/v1", "kind: Deployment",
-            "metadata:", "  name: %s" % comp, "  namespace: %s" % slug,
-            "  labels: {app: %s, r6-bundle: %s}" % (comp, slug),
-            "spec:", "  replicas: %s" % (w.get("replicas", 1) or 1),
-            "  selector:", "    matchLabels: {app: %s}" % comp,
-            "  template:", "    metadata:", "      labels: {app: %s}" % comp,
-            "    spec:", "      imagePullSecrets:", "        - name: r6-registry-pull",
-            "      containers:", "        - name: %s" % comp, "          image: %s" % image,
-            "          ports: [{containerPort: 8080}]",
-        ]
-        if env_lines:
-            dep_lines += ["          env:"] + env_lines
-        dep_lines += [
-            "          readinessProbe:",
-            "            httpGet: {path: %s, port: 8080}" % health_path,
-            "            initialDelaySeconds: 5", "            periodSeconds: 10",
-            "          livenessProbe:",
-            "            httpGet: {path: %s, port: 8080}" % health_path,
-            "            initialDelaySeconds: 15", "            periodSeconds: 20",
-            "---",
-            "apiVersion: v1", "kind: Service",
-            "metadata:", "  name: %s" % comp, "  namespace: %s" % slug,
-            "spec:", "  selector: {app: %s}" % comp,
-            "  ports: [{port: 80, targetPort: 8080}]",
-        ]
-        if cm_data_lines:
-            dep_lines += [
-                "---",
-                "apiVersion: v1", "kind: ConfigMap",
-                "metadata:", "  name: %s" % cfg_name, "  namespace: %s" % slug,
-                "data:",
-            ] + cm_data_lines
-        _w("kustomize_bundle/%s.yaml" % comp, "\n".join(dep_lines) + "\n")
+            cm_data[var] = dslug
+        # Workload kind selection - name-based for now (the target-form taxonomy does not
+        # yet distinguish "needs an image but isn't long-running" from a plain Deployment;
+        # broadening that is future work). Defaults to Deployment, matching prior behavior.
+        comp_lower = str(w.get("component", "")).lower()
+        if "scheduler" in comp_lower:
+            workload_kind = "CRONJOB"
+        elif "batch" in comp_lower:
+            workload_kind = "JOB"
+        else:
+            workload_kind = "DEPLOYMENT"
+        sa_name = "%s-sa" % comp
+
+        # Built as structured Python dicts and serialized with a real YAML library (PyYAML)
+        # rather than hand-indented string concatenation - the latter previously produced a
+        # CronJob with securityContext/containers nested at the wrong level, caught by
+        # actually running the output through `kubectl kustomize`.
+        pod_security_context = {
+            "runAsNonRoot": True, "runAsUser": 10001, "runAsGroup": 10001,
+            "fsGroup": 10001, "seccompProfile": {"type": "RuntimeDefault"},
+        }
+        container_security_context = {
+            "allowPrivilegeEscalation": False, "readOnlyRootFilesystem": True,
+            "capabilities": {"drop": ["ALL"]},
+        }
+        # No production telemetry is available to size requests/limits precisely - using a
+        # clearly-labeled default profile rather than inventing numbers.
+        resources = {
+            "requests": {"cpu": "100m", "memory": "128Mi"},
+            "limits": {"cpu": "500m", "memory": "512Mi"},
+        }  # SMALL_PRODUCTION default profile
+
+        container = {"name": comp, "image": image, "securityContext": container_security_context, "resources": resources}
+        if env_lines_struct:
+            container["env"] = env_lines_struct
+
+        pod_spec_base = {
+            "serviceAccountName": sa_name,
+            "imagePullSecrets": [{"name": "r6-registry-pull"}],
+            "securityContext": pod_security_context,
+            "containers": [container],
+        }
+
+        docs = [{
+            "apiVersion": "v1", "kind": "ServiceAccount",
+            "metadata": {"name": sa_name, "namespace": slug},
+        }]
+
+        if workload_kind == "CRONJOB":
+            job_pod_spec = dict(pod_spec_base, restartPolicy="Never")
+            docs.append({
+                "apiVersion": "batch/v1", "kind": "CronJob",
+                "metadata": {"name": comp, "namespace": slug, "labels": {"app": comp, "r6-bundle": slug}},
+                "spec": {
+                    # Placeholder schedule - confirm the real schedule before production use.
+                    "schedule": "0 2 * * *", "timeZone": "UTC", "concurrencyPolicy": "Forbid",
+                    "successfulJobsHistoryLimit": 3, "failedJobsHistoryLimit": 5,
+                    "jobTemplate": {"spec": {
+                        "backoffLimit": 3, "activeDeadlineSeconds": 3600, "ttlSecondsAfterFinished": 86400,
+                        "template": {"metadata": {"labels": {"app": comp}}, "spec": job_pod_spec},
+                    }},
+                },
+            })
+        elif workload_kind == "JOB":
+            job_pod_spec = dict(pod_spec_base, restartPolicy="Never")
+            docs.append({
+                "apiVersion": "batch/v1", "kind": "Job",
+                "metadata": {"name": comp, "namespace": slug, "labels": {"app": comp, "r6-bundle": slug}},
+                "spec": {
+                    "backoffLimit": 3, "activeDeadlineSeconds": 3600, "ttlSecondsAfterFinished": 86400,
+                    "template": {"metadata": {"labels": {"app": comp}}, "spec": job_pod_spec},
+                },
+            })
+        else:
+            container["ports"] = [{"containerPort": 8080}]
+            container["readinessProbe"] = {"httpGet": {"path": health_path, "port": 8080}, "initialDelaySeconds": 5, "periodSeconds": 10}
+            container["livenessProbe"] = {"httpGet": {"path": health_path, "port": 8080}, "initialDelaySeconds": 15, "periodSeconds": 20}
+            docs.append({
+                "apiVersion": "apps/v1", "kind": "Deployment",
+                "metadata": {"name": comp, "namespace": slug, "labels": {"app": comp, "r6-bundle": slug}},
+                "spec": {
+                    "replicas": w.get("replicas", 1) or 1,
+                    "selector": {"matchLabels": {"app": comp}},
+                    "template": {"metadata": {"labels": {"app": comp}}, "spec": pod_spec_base},
+                },
+            })
+            docs.append({
+                "apiVersion": "v1", "kind": "Service",
+                "metadata": {"name": comp, "namespace": slug},
+                "spec": {"selector": {"app": comp}, "ports": [{"port": 80, "targetPort": 8080}]},
+            })
+        if cm_data:
+            docs.append({
+                "apiVersion": "v1", "kind": "ConfigMap",
+                "metadata": {"name": cfg_name, "namespace": slug},
+                "data": cm_data,
+            })
+        _w("kustomize_bundle/%s.yaml" % comp, _yaml.dump_all(docs, default_flow_style=False, sort_keys=False))
         kust_res.append("%s.yaml" % comp)
     build_lines += ['echo "]" >> image-manifest.json', 'echo "Wrote image-manifest.json"']
     _w("image_build_plan.yaml", "\n".join(plan_yaml) + "\n")
