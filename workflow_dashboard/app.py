@@ -21042,6 +21042,7 @@ def r6_generate_bundle():
                    "_first=1"]
     plan_yaml = ["images:"]
     kust_res = ["namespace.yaml"]
+    secret_contracts = []
     for w in deployable:
         comp = _comp(w)
         base = str(w.get("image") or "docker.io/library/debian:stable-slim")
@@ -21129,6 +21130,7 @@ def r6_generate_bundle():
         cfg_name = "%s-deps" % comp
         env_lines_struct = []
         cm_data = {}
+        comp_required_keys = []
         for orig, dslug in zip(deps, dep_slugs):
             var = re.sub(r"[^A-Z0-9]+", "_", orig.upper()).strip("_") + "_HOST"
             env_lines_struct.append({"name": var, "valueFrom": {"configMapKeyRef": {"name": cfg_name, "key": var}}})
@@ -21137,6 +21139,29 @@ def r6_generate_bundle():
             # resolve to dslug as a DNS name once OpenCenter creates the matching Service/
             # EndpointSlice pair for VM-backed components.
             cm_data[var] = dslug
+            # Declare a credential contract (required key names only, never values) for
+            # dependency types that normally require authentication. This does not invent
+            # actual credentials - it is a request that OpenCenter/the secret manager must
+            # fulfil before Stage 12 can safely deploy this component. Keys accumulate into
+            # one contract per component (comp_required_keys) rather than one per dependency,
+            # since two SecretContract resources with the same component-derived name would
+            # collide once this file is wired into the kustomization.
+            dep_lower = orig.lower()
+            if any(k in dep_lower for k in ("database", "db", "mysql", "postgres", "mongo", "oracle")):
+                comp_required_keys += ["%s_USERNAME" % var[:-5], "%s_PASSWORD" % var[:-5]]
+            elif any(k in dep_lower for k in ("cache", "redis")):
+                comp_required_keys.append("%s_PASSWORD" % var[:-5])
+            elif any(k in dep_lower for k in ("queue", "rabbitmq", "kafka")):
+                comp_required_keys += ["%s_USERNAME" % var[:-5], "%s_PASSWORD" % var[:-5]]
+        if comp_required_keys:
+            secret_contracts.append({
+                "apiVersion": "r6.opencenter.io/v1alpha1", "kind": "SecretContract",
+                "metadata": {"name": "%s-secrets" % comp, "namespace": slug},
+                "spec": {
+                    "requiredKeys": comp_required_keys,
+                    "source": {"type": "OPENCENTER_SECRET", "reference": "%s/%s" % (slug, comp)},
+                },
+            })
         # Workload kind selection - name-based for now (the target-form taxonomy does not
         # yet distinguish "needs an image but isn't long-running" from a plain Deployment;
         # broadening that is future work). Defaults to Deployment, matching prior behavior.
@@ -21255,6 +21280,24 @@ def r6_generate_bundle():
     _w("kustomize_bundle/kustomization.yaml",
        "apiVersion: kustomize.config.k8s.io/v1beta1\nkind: Kustomization\nresources:\n"
        + "".join("  - %s\n" % r for r in kust_res))
+    if secret_contracts:
+        _w("secrets/secret-contracts.yaml", _yaml.dump_all(secret_contracts, default_flow_style=False, sort_keys=False))
+    # Staging/production overlays both build on top of the same base (kustomize_bundle/) -
+    # kept as a sibling reference rather than renaming kustomize_bundle to base/, since the
+    # GitOps import step below and the real production repo overlay path it writes into
+    # were already verified this session against the kustomize_bundle/ name.
+    _w("overlays/staging/kustomization.yaml",
+       _yaml.dump({
+           "apiVersion": "kustomize.config.k8s.io/v1beta1", "kind": "Kustomization",
+           "namespace": "%s-staging" % slug,
+           "resources": ["../../kustomize_bundle"],
+       }, default_flow_style=False, sort_keys=False))
+    _w("overlays/production/kustomization.yaml",
+       _yaml.dump({
+           "apiVersion": "kustomize.config.k8s.io/v1beta1", "kind": "Kustomization",
+           "namespace": slug,
+           "resources": ["../../kustomize_bundle"],
+       }, default_flow_style=False, sort_keys=False))
     _w("ci_cd_pipeline.yaml",
        "# CI: run build_and_push.sh on merge, then commit kustomize_bundle to the GitOps repo\n"
        "stages: [build, push, gitops-commit]\nscript: ./build_and_push.sh\n")
