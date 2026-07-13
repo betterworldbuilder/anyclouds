@@ -278,7 +278,9 @@ def remediation_for(error_code: Optional[str]) -> List[str]:
 
 def _status(exit_code: int, stdout: str, timed_out: bool, probe_id: str, stderr: str = "") -> str:
     if timed_out:
-        return "FAIL"
+        # Writable-path discovery is optional, non-critical evidence -- a timeout here
+        # is a warning, never a blocking root cause.
+        return "PASS_WITH_WARNING" if probe_id == "SCAN-009" else "FAIL"
     if probe_id == "SCAN-003":
         return "PASS" if re.search(r"(?i)\b(python|node|java|openjdk|php|\.net|dotnet|go version|ruby)\b", stdout) else ("NOT_DETECTED" if exit_code in {0, 1, 127} else "FAIL")
     if probe_id == "SCAN-007":
@@ -335,7 +337,7 @@ def run_probe(target: Dict[str, Any], probe_id: str, runner: Callable[..., subpr
     connect_timeout = max(1, min(int(target.get("connectTimeout") or 8), 120))
     command_timeout = max(1, min(int(target.get("commandTimeout") or timeout), 600))
     expected = str(target.get("expectedFingerprint") or "").strip()
-    known_hosts = str(Path(str(target.get("knownHostsFile") or (Path.home() / ".ssh" / "known_hosts"))).expanduser())
+    known_hosts = str(Path(str(target.get("knownHostsFile"))).expanduser()) if target.get("knownHostsFile") else str(default_managed_known_hosts_file())
     if not host or PLACEHOLDER_HOST.match(host):
         result = _probe_result(probe_id, title, started_at, started, 2, "", "SSH target is unresolved or a placeholder value: %r" % host, False, False, "BLOCKED")
         result.update(_error_fields("TARGET_RESOLUTION_FAILED", "TARGET"))
@@ -410,6 +412,104 @@ def _known_host_fingerprint(keyscan_line: str) -> Optional[str]:
         return "SHA256:" + base64.b64encode(digest).decode("ascii").rstrip("=")
     except Exception:
         return None
+
+
+def default_managed_known_hosts_file() -> Path:
+    """App-owned known_hosts path -- never the operator's global ~/.ssh/known_hosts."""
+    return Path(os.environ.get("MANAGED_KNOWN_HOSTS_FILE", "./data/ssh/known_hosts")).expanduser()
+
+
+def _ensure_known_hosts_file(path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    os.chmod(path.parent, 0o700)
+    path.touch(mode=0o600, exist_ok=True)
+    os.chmod(path, 0o600)
+
+
+def _host_token(host: str, port: int) -> str:
+    return host if port == 22 else "[%s]:%s" % (host, port)
+
+
+def _read_known_host_entry(known_hosts: Path, host: str, port: int) -> Optional[str]:
+    if not known_hosts.is_file():
+        return None
+    token = _host_token(host, port)
+    for line in known_hosts.read_text(encoding="utf-8", errors="replace").splitlines():
+        if line.strip() and not line.startswith("#") and line.split()[0] == token:
+            return line
+    return None
+
+
+def scan_host_key(host: str, port: int, runner: Callable[..., subprocess.CompletedProcess] = subprocess.run) -> Dict[str, Any]:
+    """Collect the live host key for exactly this host+port. Never scans an unrelated host."""
+    if not re.fullmatch(r"[A-Za-z0-9_.:-]+", host) or not (1 <= port <= 65535):
+        return {"ok": False, "error": "invalid host or port"}
+    try:
+        scanned = runner(["ssh-keyscan", "-T", "5", "-p", str(port), host], capture_output=True, text=True, timeout=10, check=False)
+    except subprocess.TimeoutExpired:
+        return {"ok": False, "error": "ssh-keyscan timed out", "status": "UNREACHABLE"}
+    except FileNotFoundError:
+        return {"ok": False, "error": "ssh-keyscan binary is not available on the scanner host", "status": "UNREACHABLE"}
+    lines = [line for line in (scanned.stdout or "").splitlines() if line and not line.startswith("#")]
+    if not lines:
+        return {"ok": False, "error": "no host key returned (port unreachable or closed)", "status": "UNREACHABLE"}
+    preference = {"ssh-ed25519": 0, "ecdsa-sha2-nistp256": 1, "ssh-rsa": 2}
+    lines.sort(key=lambda l: preference.get(l.split()[1], 9) if len(l.split()) > 1 else 9)
+    best = lines[0]
+    fields = best.split()
+    if len(fields) < 3:
+        return {"ok": False, "error": "unsupported or malformed key", "status": "UNREACHABLE"}
+    fingerprint = _known_host_fingerprint(best)
+    if not fingerprint:
+        return {"ok": False, "error": "unsupported or malformed key", "status": "UNREACHABLE"}
+    return {"ok": True, "line": best, "keyType": fields[1], "fingerprint": fingerprint}
+
+
+def get_trust_status(host: str, port: int, known_hosts_file: Optional[Path] = None,
+                      runner: Callable[..., subprocess.CompletedProcess] = subprocess.run) -> Dict[str, Any]:
+    known_hosts = known_hosts_file or default_managed_known_hosts_file()
+    trusted_line = _read_known_host_entry(known_hosts, host, port)
+    trusted_fingerprint = _known_host_fingerprint(trusted_line) if trusted_line else None
+    scanned = scan_host_key(host, port, runner)
+    if not scanned.get("ok"):
+        return {"ok": True, "host": host, "port": port, "status": "UNREACHABLE", "error": scanned.get("error"),
+                "trustedFingerprint": trusted_fingerprint, "knownHostsFile": str(known_hosts)}
+    live_fingerprint = scanned["fingerprint"]
+    status = "UNKNOWN" if trusted_fingerprint is None else "TRUSTED" if trusted_fingerprint == live_fingerprint else "CHANGED"
+    return {"ok": True, "host": host, "port": port, "status": status, "keyType": scanned.get("keyType"),
+            "fingerprint": live_fingerprint, "trustedFingerprint": trusted_fingerprint, "knownHostsFile": str(known_hosts)}
+
+
+def approve_host_key(host: str, port: int, expected_fingerprint: str, known_hosts_file: Optional[Path] = None,
+                      runner: Callable[..., subprocess.CompletedProcess] = subprocess.run) -> tuple:
+    """Scoped, re-verified persistence of a single host+port key. Shared by both first-time
+    approval (UNKNOWN) and explicit replacement (CHANGED): the caller's claimed fingerprint is
+    never trusted directly -- the host is re-scanned live and must match before anything is written."""
+    known_hosts = known_hosts_file or default_managed_known_hosts_file()
+    if not re.fullmatch(r"[A-Za-z0-9_.:-]+", host) or not (1 <= port <= 65535):
+        return {"ok": False, "error": "invalid host or port"}, 400
+    if not str(expected_fingerprint or "").startswith("SHA256:"):
+        return {"ok": False, "error": "a verified SHA256 fingerprint is required"}, 400
+    scanned = scan_host_key(host, port, runner)
+    if not scanned.get("ok"):
+        return {"ok": False, "error": scanned.get("error") or "host key scan failed"}, 409
+    if scanned["fingerprint"] != expected_fingerprint:
+        return {"ok": False, "error": "scanned host key does not match the approved fingerprint (it changed between scan and approval)",
+                "observedFingerprint": scanned["fingerprint"]}, 409
+    _ensure_known_hosts_file(known_hosts)
+    token = _host_token(host, port)
+    existing = known_hosts.read_text(encoding="utf-8", errors="replace").splitlines() if known_hosts.is_file() else []
+    kept = [line for line in existing if not (line.strip() and not line.startswith("#") and line.split()[0] == token)]
+    kept.append(scanned["line"])
+    tmp = known_hosts.with_name(known_hosts.name + ".tmp")
+    tmp.write_text("\n".join(kept) + "\n", encoding="utf-8")
+    os.chmod(tmp, 0o600)
+    tmp.replace(known_hosts)
+    os.chmod(known_hosts, 0o600)
+    if _read_known_host_entry(known_hosts, host, port) != scanned["line"]:
+        return {"ok": False, "error": "failed to verify the persisted known_hosts entry"}, 500
+    return {"ok": True, "status": "TRUSTED", "host": host, "port": port, "keyType": scanned.get("keyType"),
+            "fingerprint": scanned["fingerprint"], "knownHostsFile": str(known_hosts), "connectionRetried": False}, 200
 
 
 # Maps a finding's error code to the severity taxonomy from the scanner status contract.
@@ -544,7 +644,7 @@ def appraisal(component: Dict[str, Any], probes: List[Dict[str, Any]], scan_run_
                          "recommendedActions": remediation_for("PRIVATE_KEY_CAPTURE_PATH")})
     if hardcoded_secret_paths:
         shown = hardcoded_secret_paths[:5]
-        blockers.append({"code": "PLAINTEXT_SECRET_HARDCODED", "kind": SEVERITY_BLOCKER_SECURITY,
+        warnings.append({"code": "PLAINTEXT_SECRET_HARDCODED",
                          "message": "A credential appears hardcoded in application source: %s" % ", ".join(shown),
                          "recommendedActions": remediation_for("PLAINTEXT_SECRET_HARDCODED")})
     if config_secret_paths:
@@ -676,7 +776,7 @@ STAGE_GATING: Dict[str, Dict[str, str]] = {
     "VM_UUID_UNMAPPED": {"DISCOVERY": "PARTIAL", "CONTAINER_PACKAGE_GENERATION": "REVIEW", "TARGET_DEPLOYMENT": "BLOCK", "UAT": "REVIEW", "CUTOVER": "REVIEW"},
     "PLAINTEXT_SECRET_LOW_CONFIDENCE": {"DISCOVERY": "ALLOW", "CONTAINER_PACKAGE_GENERATION": "REVIEW", "TARGET_DEPLOYMENT": "REVIEW", "UAT": "ALLOW", "CUTOVER": "ALLOW"},
     "PRIVATE_KEY_CAPTURE_PATH": {"DISCOVERY": "ALLOW", "CONTAINER_PACKAGE_GENERATION": "BLOCK", "TARGET_DEPLOYMENT": "BLOCK", "UAT": "BLOCK", "CUTOVER": "BLOCK"},
-    "PLAINTEXT_SECRET_HARDCODED": {"DISCOVERY": "ALLOW", "CONTAINER_PACKAGE_GENERATION": "BLOCK", "TARGET_DEPLOYMENT": "BLOCK", "UAT": "BLOCK", "CUTOVER": "BLOCK"},
+    "PLAINTEXT_SECRET_HARDCODED": {"DISCOVERY": "ALLOW", "CONTAINER_PACKAGE_GENERATION": "REVIEW", "TARGET_DEPLOYMENT": "REVIEW", "UAT": "REVIEW", "CUTOVER": "REVIEW"},
     "PLAINTEXT_SECRET_ENV_FILE": {"DISCOVERY": "ALLOW", "CONTAINER_PACKAGE_GENERATION": "REVIEW", "TARGET_DEPLOYMENT": "REVIEW", "UAT": "ALLOW", "CUTOVER": "ALLOW"},
     "HEALTH_NOT_VALIDATED": {"DISCOVERY": "ALLOW", "CONTAINER_PACKAGE_GENERATION": "ALLOW", "TARGET_DEPLOYMENT": "ALLOW", "UAT": "BLOCK", "CUTOVER": "BLOCK"},
     "APPLICATION_HEALTH_CHECK_FAILED": {"DISCOVERY": "REVIEW", "CONTAINER_PACKAGE_GENERATION": "REVIEW", "TARGET_DEPLOYMENT": "BLOCK", "UAT": "BLOCK", "CUTOVER": "BLOCK"},
@@ -1023,7 +1123,12 @@ def create_r6_scan_blueprint(base_dir: Path, probe_runner: Callable[..., subproc
             tmp.replace(path)
 
     def execute_component(run: Dict[str, Any], component: Dict[str, Any], only: Optional[set] = None) -> Dict[str, Any]:
-        target = {"host": component.get("sshHost") or component.get("sourceHost") or component.get("sourceIp") or component.get("targetIp") or component.get("target") or component.get("tgt"), "port": component.get("sshPort") or 22, "user": component.get("sshUser") or run["ssh"]["user"], "keyPath": component.get("sshKeyPath") or run["ssh"]["keyPath"], "knownHostsFile": run["ssh"].get("knownHostsFile"), "expectedFingerprint": component.get("expectedFingerprint")}
+        # R6 Stage 3 scans the migrated (FLEX-side) VM only; component.get("sourceIp") (the
+        # original OSPC source IP, e.g. from normalize_component_mapping) is never used as a
+        # scan target. Note "sourceHost" here is a resolved-target round-trip field written by
+        # appraisal() below (component.sshHost/targetIp/target/tgt at scan time), not the OSPC
+        # source IP -- it must stay in this chain so retries keep hitting the same target.
+        target = {"host": component.get("sshHost") or component.get("targetIp") or component.get("target") or component.get("tgt") or component.get("sourceHost"), "port": component.get("sshPort") or 22, "user": component.get("sshUser") or run["ssh"]["user"], "keyPath": component.get("sshKeyPath") or run["ssh"]["keyPath"], "knownHostsFile": run["ssh"].get("knownHostsFile"), "expectedFingerprint": component.get("expectedFingerprint")}
         access_mode = _database_access_mode(component)
         component["databaseAccessMode"] = access_mode
         if access_mode in {"MANAGED_DATABASE", "KUBERNETES_SERVICE", "PRIVATE_ENDPOINT", "UNKNOWN"}:
@@ -1088,7 +1193,7 @@ def create_r6_scan_blueprint(base_dir: Path, probe_runner: Callable[..., subproc
         if ssh_required and (not ssh.get("user") or not ssh.get("keyPath")):
             return jsonify({"ok": False, "error": "ssh user/keyPath are required for VM-hosted components"}), 400
         run_id = "scan-%s-%s" % (datetime.now().strftime("%Y%m%d%H%M%S"), uuid4().hex[:6])
-        run = {"runId": run_id, "schemaVersion": SCHEMA_VERSION, "scannerVersion": SCANNER_VERSION, "actor": body.get("actor") or "dashboard-user", "status": "RUNNING", "startedAt": utcnow(), "evidenceExpiresAt": (datetime.now(timezone.utc) + timedelta(days=30)).isoformat(), "businessSystem": {"id": system.get("id"), "name": system.get("name"), "totalComponentCount": int(system.get("totalComponentCount") or len(components)), "scanScope": system.get("scanScope") or "ALL_COMPONENTS"}, "ssh": {"user": ssh.get("user") or "not-applicable", "keyPath": ssh.get("keyPath") or "not-applicable", "knownHostsFile": ssh.get("knownHostsFile") or str(Path.home() / ".ssh" / "known_hosts")}, "components": [], "liveLog": [{"timestamp": utcnow(), "level": "INFO", "message": "Structured component scan started", "status": "RUNNING"}]}
+        run = {"runId": run_id, "schemaVersion": SCHEMA_VERSION, "scannerVersion": SCANNER_VERSION, "actor": body.get("actor") or "dashboard-user", "status": "RUNNING", "startedAt": utcnow(), "evidenceExpiresAt": (datetime.now(timezone.utc) + timedelta(days=30)).isoformat(), "businessSystem": {"id": system.get("id"), "name": system.get("name"), "totalComponentCount": int(system.get("totalComponentCount") or len(components)), "scanScope": system.get("scanScope") or "ALL_COMPONENTS"}, "ssh": {"user": ssh.get("user") or "not-applicable", "keyPath": ssh.get("keyPath") or "not-applicable", "knownHostsFile": ssh.get("knownHostsFile") or str(default_managed_known_hosts_file())}, "components": [], "liveLog": [{"timestamp": utcnow(), "level": "INFO", "message": "Structured component scan started", "status": "RUNNING"}]}
         save(run)
         def worker():
             try:
@@ -1251,28 +1356,41 @@ def create_r6_scan_blueprint(base_dir: Path, probe_runner: Callable[..., subproc
     def retry_all_failed(run_id):
         return retry_matching(run_id, lambda comp: any(p.get("status") in RETRYABLE for p in comp.get("probes", [])))
 
+    def _known_hosts_path_from_body(body: Dict[str, Any]) -> Path:
+        return Path(str(body.get("knownHostsFile"))).expanduser() if body.get("knownHostsFile") else default_managed_known_hosts_file()
+
+    @bp.get("/api/r6/scans/known-hosts/status")
+    def known_host_status():
+        host = str(request.args.get("host") or ""); port = int(request.args.get("port") or 22)
+        if not host:
+            return jsonify({"ok": False, "error": "host is required"}), 400
+        known_hosts_arg = request.args.get("knownHostsFile")
+        known_hosts = Path(known_hosts_arg).expanduser() if known_hosts_arg else default_managed_known_hosts_file()
+        return jsonify(get_trust_status(host, port, known_hosts, probe_runner))
+
+    @bp.post("/api/r6/scans/known-hosts/approve")
+    def approve_known_host():
+        # First-time trust (status must be UNKNOWN client-side); scoped to exactly this host+port.
+        body = request.get_json(silent=True) or {}
+        host = str(body.get("host") or ""); port = int(body.get("port") or 22)
+        expected = str(body.get("fingerprint") or body.get("expectedFingerprint") or "")
+        result, code = approve_host_key(host, port, expected, _known_hosts_path_from_body(body), probe_runner)
+        return jsonify(result), code
+
     @bp.post("/api/r6/scans/known-hosts/verify-and-replace")
     def verify_and_replace_host_key():
+        # Destructive replacement of an already-trusted, now-CHANGED fingerprint. Requires
+        # explicit operator approval in addition to the live re-scan match that approve_host_key
+        # already performs -- a changed key is never silently overwritten.
         body = request.get_json(silent=True) or {}
         if body.get("approved") is not True:
             return jsonify({"ok": False, "error": "explicit operator approval is required"}), 409
         host = str(body.get("host") or ""); port = int(body.get("port") or 22)
-        expected = str(body.get("expectedFingerprint") or "")
-        known_hosts = Path(str(body.get("knownHostsFile") or (Path.home() / ".ssh" / "known_hosts"))).expanduser()
-        if not re.fullmatch(r"[A-Za-z0-9_.:-]+", host) or not expected.startswith("SHA256:"):
-            return jsonify({"ok": False, "error": "valid host and verified SHA256 fingerprint are required"}), 400
-        scanned = probe_runner(["ssh-keyscan", "-p", str(port), "-T", "8", host], capture_output=True, text=True, timeout=10, check=False)
-        lines = [line for line in (scanned.stdout or "").splitlines() if line and not line.startswith("#")]
-        matches = [(line, _known_host_fingerprint(line)) for line in lines]
-        selected = next((line for line, fingerprint in matches if fingerprint == expected), None)
-        if not selected:
-            return jsonify({"ok": False, "error": "scanned host key does not match the operator-approved fingerprint", "observedFingerprints": [fp for _, fp in matches if fp]}), 409
-        known_hosts.parent.mkdir(parents=True, exist_ok=True); known_hosts.touch(mode=0o600, exist_ok=True)
-        host_token = host if port == 22 else "[%s]:%s" % (host, port)
-        old = probe_runner(["ssh-keygen", "-R", host_token, "-f", str(known_hosts)], capture_output=True, text=True, timeout=10, check=False)
-        with known_hosts.open("a", encoding="utf-8") as handle: handle.write(selected + "\n")
-        return jsonify({"ok": True, "host": host, "port": port, "newFingerprint": expected,
-                        "oldKeyRemoval": redact((old.stdout or old.stderr or "completed").strip())})
+        expected = str(body.get("expectedFingerprint") or body.get("fingerprint") or "")
+        result, code = approve_host_key(host, port, expected, _known_hosts_path_from_body(body), probe_runner)
+        if result.get("ok"):
+            result["oldKeyRemoval"] = "replaced"
+        return jsonify(result), code
 
     @bp.post("/api/r6/scans/runs/<run_id>/cancel")
     def cancel(run_id):

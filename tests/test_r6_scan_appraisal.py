@@ -182,13 +182,14 @@ def test_plaintext_secret_in_config_is_review_required_not_a_hard_block():
     assert any(x["code"] == "PLAINTEXT_SECRET_ENV_FILE" for x in value["reviewRequired"])
 
 
-def test_plaintext_secret_hardcoded_in_source_blocks_packaging():
-    # A confirmed secret matched inside an actual source file is high-confidence and
-    # would be baked into the image: BLOCKER_SECURITY, not just a review item.
+def test_plaintext_secret_hardcoded_in_source_is_a_warning_not_a_blocker():
+    # Explicit operator override: hardcoded-in-source secrets are surfaced as a warning
+    # for review, not a hard block on the component/business system.
     probes = complete_probes({"SCAN-018": result("SCAN-018", stdout="PLAINTEXT_SECRET_FILE:/opt/app/settings.py")})
     value = appraisal({"name": "API", "vmId": "vm-1"}, probes, "run-1")
-    assert value["componentVerdict"] == "BLOCKED_SECURITY"
-    assert any(x["code"] == "PLAINTEXT_SECRET_HARDCODED" for x in value["blockers"])
+    assert value["componentVerdict"] != "BLOCKED_SECURITY"
+    assert not any(x["code"] == "PLAINTEXT_SECRET_HARDCODED" for x in value["blockers"])
+    assert any(x["code"] == "PLAINTEXT_SECRET_HARDCODED" for x in value["warnings"])
 
 
 def test_plaintext_secret_file_marker_in_env_file_is_review_required():
