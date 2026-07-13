@@ -265,3 +265,5 @@ Scores are evidence-based. Known gaps, unverified behavior, unrelated failures, 
 | 2026-07-13 | Fix Stage 3 failed-check root-cause table | 9 min | 8/10 | Backend root causes now fall back to remediation catalog; UI retry controls stack cleanly; focused syntax and sanity checks passed. Broader scanner tests still have pre-existing refactor failures unrelated to this table. |
 
 | 2026-07-13 | Remove stray quote file and push R6 commit to rackerlabs | 4 min | 9/10 | Removed accidental zero-byte filename, amended commit, and pushed to rackerlabs branch agent/opencenter-quickstart-sensitive-mask. Parent repo is clean except dirty openCenter-cli submodule contents not included in parent push. |
+
+| 2026-07-13 | Delete dirty openCenter-cli nested repo | 5 min | 9/10 | Removed the tracked openCenter-cli gitlink/submodule from the parent repo to clear the dirty nested-repo state; no .gitmodules entry existed. |
