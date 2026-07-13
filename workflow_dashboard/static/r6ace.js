@@ -236,6 +236,24 @@ window.r6pRenderCachedScanRun=function(run){
   r6pRenderProductionAppraisal(run);
   return true;
 };
+window.r6pFetchLatestScanRunFromServer=function(){
+  var qs=[];
+  if(R6P.bs&&R6P.bs.id)qs.push('businessSystemId='+encodeURIComponent(R6P.bs.id));
+  if(R6P.bs&&R6P.bs.name)qs.push('businessSystemName='+encodeURIComponent(R6P.bs.name));
+  return fetch('/api/r6/scans/latest'+(qs.length?'?'+qs.join('&'):''),{cache:'no-store',headers:{'Cache-Control':'no-cache','Accept':'application/json'}})
+    .then(function(r){if(!r.ok)return null;return r.json();})
+    .then(function(run){
+      if(!run||!run.ok||!run.runId)return null;
+      if(R6P.bs&&run.businessSystem&&run.businessSystem.id&&String(run.businessSystem.id)!==String(R6P.bs.id))return null;
+      r6pCacheScanRun(run);
+      R6P.scanRunId=run.runId;R6P.structuredAppraisal=run;
+      r6pSetProductionScanLog(r6pFormatProductionScanLog(run));
+      r6pRenderProductionAppraisal(run);
+      r6pPersistScanView(run);
+      if(run.status==='RUNNING')r6pPollProductionScan();
+      return run;
+    }).catch(function(){return null;});
+};
 window.r6pRestoreScanRun=function(){
   var cached=r6pLoadCachedScanRun(),id=null;
   try{id=localStorage.getItem(r6pScanRunStorageKey())||localStorage.getItem('r6p_latest_scan_run');}catch(e){}
@@ -246,6 +264,7 @@ window.r6pRestoreScanRun=function(){
   R6P.scanRunId=id||null;R6P.appraisalReviewed=false;
   var status=(cached&&cached.status)||(cachedView&&cachedView.status)||'';
   if(id&&status==='RUNNING')r6pPollProductionScan();
+  if(typeof r6pFetchLatestScanRunFromServer==='function')r6pFetchLatestScanRunFromServer();
   return id;
 };
 window.r6pSyncSelectedBusinessSystem=function(force){
@@ -2879,7 +2898,7 @@ window.r6pPollProductionScan=function(){
     r6pCacheScanRun(run);
     var p=run.progress||{},out=document.getElementById('r6p-production-scan-status');
     r6pSetProductionScanLog(r6pFormatProductionScanLog(run));
-    R6P.structuredAppraisal=run;r6pRenderProductionAppraisal(run);
+    R6P.structuredAppraisal=run;r6pRenderProductionAppraisal(run);r6pPersistScanView(run);
     if(run.status==='RUNNING'){window.clearTimeout(R6P.scanPollTimer);R6P.scanPollTimer=window.setTimeout(r6pPollProductionScan,1500);return;}
     var button=document.getElementById('r6p-full-scan-btn'),stop=document.getElementById('r6p-stop-scan-btn');if(button)button.disabled=false;if(stop)stop.disabled=true;
     if(run.appraisal){R6P.structuredAppraisal=run;r6pAdoptStructuredEvidence(run);r6pRenderProductionAppraisal(run);}

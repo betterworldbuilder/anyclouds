@@ -761,3 +761,27 @@ def test_scan_start_network_retry_is_idempotent(monkeypatch, tmp_path):
     assert first.status_code == second.status_code == 202
     assert first.get_json()["runId"] == second.get_json()["runId"]
     assert second.get_json()["deduplicated"] is True
+
+
+def test_latest_scan_endpoint_returns_newest_matching_business_system(monkeypatch, tmp_path):
+    monkeypatch.setenv("R6_SCAN_STATE_DIR", str(tmp_path))
+    app = Flask(__name__)
+    app.register_blueprint(create_r6_scan_blueprint(pathlib.Path.cwd()))
+    old_dir = tmp_path / "scan-old"
+    new_dir = tmp_path / "scan-new"
+    other_dir = tmp_path / "scan-other"
+    for d in (old_dir, new_dir, other_dir):
+        d.mkdir(parents=True)
+    (old_dir / "summary.json").write_text(json.dumps({"ok": True, "runId": "scan-old", "status": "COMPLETE", "businessSystem": {"id": "sys", "name": "System"}, "components": []}), encoding="utf-8")
+    (new_dir / "summary.json").write_text(json.dumps({"ok": True, "runId": "scan-new", "status": "COMPLETE", "businessSystem": {"id": "sys", "name": "System"}, "components": [{"componentName": "API"}]}), encoding="utf-8")
+    (other_dir / "summary.json").write_text(json.dumps({"ok": True, "runId": "scan-other", "status": "COMPLETE", "businessSystem": {"id": "other", "name": "Other"}, "components": []}), encoding="utf-8")
+    import os, time
+    now = time.time()
+    os.utime(old_dir / "summary.json", (now - 20, now - 20))
+    os.utime(new_dir / "summary.json", (now - 10, now - 10))
+    os.utime(other_dir / "summary.json", (now, now))
+    response = app.test_client().get("/api/r6/scans/latest?businessSystemId=sys")
+    assert response.status_code == 200
+    data = response.get_json()
+    assert data["runId"] == "scan-new"
+    assert data["businessSystem"]["id"] == "sys"

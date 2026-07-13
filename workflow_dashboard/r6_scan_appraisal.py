@@ -1338,6 +1338,27 @@ def create_r6_scan_blueprint(base_dir: Path, probe_runner: Callable[..., subproc
         threading.Thread(target=worker, name="r6-scan-" + run_id, daemon=True).start()
         return jsonify({"ok": True, "runId": run_id, "status": "RUNNING", "progress": {"completedComponents": 0, "totalComponents": len(components)}}), 202
 
+    @bp.get("/api/r6/scans/latest")
+    def get_latest_scan():
+        wanted_id = str(request.args.get("businessSystemId") or "").strip()
+        wanted_name = str(request.args.get("businessSystemName") or "").strip()
+        summaries = sorted(root.glob("*/summary.json"), key=lambda path: path.stat().st_mtime, reverse=True)
+        for summary in summaries:
+            try:
+                run = json.loads(summary.read_text(encoding="utf-8"))
+            except Exception:
+                continue
+            system = run.get("businessSystem") or {}
+            if wanted_id and str(system.get("id") or "") != wanted_id:
+                continue
+            if wanted_name and not wanted_id and str(system.get("name") or "") != wanted_name:
+                continue
+            response = jsonify({"ok": True, **run})
+            response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+            response.headers["Pragma"] = "no-cache"
+            return response
+        return jsonify({"ok": False, "error": "no saved scan run found"}), 404
+
     @bp.get("/api/r6/scans/runs/<run_id>")
     def get_run(run_id):
         try:

@@ -92,6 +92,9 @@ def test_scan_progress_restores_after_page_refresh():
     assert "r6pPersistScanView(run)" in V1
     assert "r6pRenderCachedScanView(cachedView)" in V1
     assert "sessionStorage.setItem('r6p_cached_scan_run'" in V1
+    assert "r6pFetchLatestScanRunFromServer" in V1
+    assert "/api/r6/scans/latest" in V1
+    assert "r6pFetchLatestScanRunFromServer();" in V1
     has("if(global.R6P.scanRunId)global.r6pPollProductionScan()")
 
 
