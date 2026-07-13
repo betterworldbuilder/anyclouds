@@ -189,16 +189,45 @@ window.r6pCacheScanRun=function(run){
   if(!run||!run.runId)return;
   r6pRememberScanRun(run.runId);
   try{localStorage.setItem('r6p_cached_scan_run',JSON.stringify(run));if(R6P.bs&&R6P.bs.id)localStorage.setItem(r6pScanRunCacheKey(),JSON.stringify(run));return true;}catch(e){}
-  try{var compact=r6pCompactScanRunForCache(run);localStorage.setItem('r6p_cached_scan_run',JSON.stringify(compact));if(R6P.bs&&R6P.bs.id)localStorage.setItem(r6pScanRunCacheKey(),JSON.stringify(compact));return true;}catch(e2){return false;}
+  try{sessionStorage.setItem('r6p_cached_scan_run',JSON.stringify(run));if(R6P.bs&&R6P.bs.id)sessionStorage.setItem(r6pScanRunCacheKey(),JSON.stringify(run));return true;}catch(eS){}
+  try{var compact=r6pCompactScanRunForCache(run);localStorage.setItem('r6p_cached_scan_run',JSON.stringify(compact));if(R6P.bs&&R6P.bs.id)localStorage.setItem(r6pScanRunCacheKey(),JSON.stringify(compact));return true;}catch(e2){}
+  try{var compact2=r6pCompactScanRunForCache(run);sessionStorage.setItem('r6p_cached_scan_run',JSON.stringify(compact2));if(R6P.bs&&R6P.bs.id)sessionStorage.setItem(r6pScanRunCacheKey(),JSON.stringify(compact2));return true;}catch(e3){return false;}
 };
 window.r6pLoadCachedScanRun=function(){
   try{
-    var raw=localStorage.getItem(r6pScanRunCacheKey())||localStorage.getItem('r6p_cached_scan_run');
+    var raw=localStorage.getItem(r6pScanRunCacheKey())||sessionStorage.getItem(r6pScanRunCacheKey())||localStorage.getItem('r6p_cached_scan_run')||sessionStorage.getItem('r6p_cached_scan_run');
     var run=raw?JSON.parse(raw):null;
     if(!run||!run.runId)return null;
     if(R6P.bs&&run.businessSystem&&run.businessSystem.id&&String(run.businessSystem.id)!==String(R6P.bs.id))return null;
     return run;
   }catch(e){return null;}
+};
+window.r6pScanViewCacheKey=function(){return 'r6p_cached_scan_view:'+(R6P.bs&&(R6P.bs.id||R6P.bs.name)?String(R6P.bs.id||R6P.bs.name):'none');};
+window.r6pPersistScanView=function(run){
+  var root=document.getElementById('r6p-scan-appraisal'),verdict=document.getElementById('r6p-scan-final-verdict'),failed=document.getElementById('r6p-scan-failed-checks');
+  if(!run||!run.runId||!root)return false;
+  var view={runId:run.runId,businessSystem:run.businessSystem||R6P.bs||{},savedAt:new Date().toISOString(),productionScanLog:R6P.productionScanLog||'',appraisalHtml:root.innerHTML,verdictHtml:verdict?verdict.innerHTML:'',failedHtml:failed?failed.innerHTML:''};
+  try{localStorage.setItem('r6p_cached_scan_view',JSON.stringify(view));if(R6P.bs)localStorage.setItem(r6pScanViewCacheKey(),JSON.stringify(view));return true;}catch(e){}
+  try{sessionStorage.setItem('r6p_cached_scan_view',JSON.stringify(view));if(R6P.bs)sessionStorage.setItem(r6pScanViewCacheKey(),JSON.stringify(view));return true;}catch(e2){return false;}
+};
+window.r6pLoadCachedScanView=function(){
+  try{
+    var raw=(R6P.bs&&(localStorage.getItem(r6pScanViewCacheKey())||sessionStorage.getItem(r6pScanViewCacheKey())))||localStorage.getItem('r6p_cached_scan_view')||sessionStorage.getItem('r6p_cached_scan_view');
+    var view=raw?JSON.parse(raw):null;
+    if(!view||!view.runId)return null;
+    if(R6P.bs&&view.businessSystem&&view.businessSystem.id&&String(view.businessSystem.id)!==String(R6P.bs.id))return null;
+    return view;
+  }catch(e){return null;}
+};
+window.r6pRenderCachedScanView=function(view){
+  if(!view||!view.runId)return false;
+  R6P.scanRunId=view.runId;R6P.productionScanLog=view.productionScanLog||R6P.productionScanLog||'';
+  var out=document.getElementById('r6p-production-scan-status');if(out){out.textContent=R6P.productionScanLog;out.scrollTop=out.scrollHeight;}
+  var root=document.getElementById('r6p-scan-appraisal'),verdict=document.getElementById('r6p-scan-final-verdict'),failed=document.getElementById('r6p-scan-failed-checks');
+  if(root&&view.appraisalHtml)root.innerHTML=view.appraisalHtml;
+  if(verdict&&view.verdictHtml)verdict.innerHTML=view.verdictHtml;
+  if(failed&&view.failedHtml)failed.innerHTML=view.failedHtml;
+  return true;
 };
 window.r6pRenderCachedScanRun=function(run){
   if(!run||!run.runId)return false;
@@ -210,7 +239,7 @@ window.r6pRenderCachedScanRun=function(run){
 window.r6pRestoreScanRun=function(){
   var cached=r6pLoadCachedScanRun(),id=null;
   try{id=localStorage.getItem(r6pScanRunStorageKey())||localStorage.getItem('r6p_latest_scan_run');}catch(e){}
-  if(cached){id=cached.runId;r6pRenderCachedScanRun(cached);}else{R6P.structuredAppraisal=null;}
+  if(cached){id=cached.runId;r6pRenderCachedScanRun(cached);}else{var cachedView=r6pLoadCachedScanView();if(cachedView){id=cachedView.runId;r6pRenderCachedScanView(cachedView);}else{R6P.structuredAppraisal=null;}}
   R6P.scanRunId=id||null;R6P.appraisalReviewed=false;
   if(id)r6pPollProductionScan();
   return id;
@@ -1105,16 +1134,7 @@ window.r6pContent=function(n){
       +'</div>';
     var pendingResults='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:12px;">'+pendingCards+'</div>';
     return '<div class="r6p-info-box"><strong>Component Scan Appraisal</strong><br>Evaluate the runtime, services, application files, dependencies, storage, health, security and containerization constraints of every Business Apps System component. Twenty independent, allowlisted probes preserve exit code, stdout, stderr, timeout and truncation evidence. No snapshots are created.</div>'
-      +'<div style="background:#f8fafc;border:1px solid #bfdbfe;border-radius:10px;padding:12px 14px;margin-bottom:14px;">'
-    +'<div style="font-size:14px;font-weight:900;color:#0f172a;margin-bottom:4px;">Stage 9A — Build VM Snapshots</div>'
-    +'<div style="font-size:11px;color:#475569;margin-bottom:10px;">Create or reuse OpenStack VM image / Cinder volume snapshots for approved container-source VMs only. Stage 9A records the exact OpenStack snapshot IDs from the CLI, verifies them with image/volume snapshot show, then hands those IDs to container build.</div>'
-    +'<button class="r6p-btn primary" onclick="r6pGenRealDockerfiles(true)" style="padding:8px 16px;font-size:12px;">&#9654; Build VM Snapshots</button>'
-    +'<div id="r6p-snapshot-status" style="font-size:12px;font-weight:600;color:#64748b;margin-top:8px;line-height:1.7;"></div>'
-    +'</div>'
-    +'<div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:10px;padding:12px 14px;margin-bottom:14px;">'
-    +'<div style="font-size:14px;font-weight:900;color:#0f172a;margin-bottom:4px;">Stage 9B — Build Containers</div>'
-    +'<div style="font-size:11px;color:#475569;margin-bottom:10px;">After snapshot lineage is available, extract approved application paths read-only, sanitize context, build/test/scan/sign/push images and record final registry digests.</div>'
-    +'<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px;">'
+      +'<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px;">'
       +'<div><label style="font-size:11px;font-weight:700;color:#334155;display:block;margin-bottom:4px;">Component scan scope</label><select id="r6p-scan-comp" onchange="r6pScanScopeChanged()" style="padding:7px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;min-width:310px;">'+scanOptions+'</select></div>'
       +'<div><label style="font-size:11px;font-weight:700;color:#334155;display:block;margin-bottom:4px;">SSH User</label><input id="r6p-scan-user" value="'+r6pHtml(defaultScanConnection.sshUser||'ubuntu')+'" style="padding:7px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;width:100px;"></div>'
       +'<div><label style="font-size:11px;font-weight:700;color:#334155;display:block;margin-bottom:4px;">SSH Private Key Path / Secret Ref</label><input id="r6p-scan-key" value="'+r6pHtml(defaultScanConnection.sshKeyPath||'~/.ssh/id_rsa')+'" style="padding:7px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;width:190px;"></div>'
@@ -1162,16 +1182,7 @@ window.r6pContent=function(n){
     var comps7=(R6P.components||[]).filter(function(c){return c.tgt;});
     var opts7=comps7.length?comps7.map(function(c,i){return '<option value="'+i+'">'+c.name+' ('+c.tgt+')</option>';}).join(''):'<option value="">No components have a FLEX Target IP yet - go to Step 1, click Inspect on the selected system, and fill in Target IP for each component</option>';
     return '<div class="r6p-info-box">Identify real application content. Classify files into app content, config, secrets, logs, data, and excluded system files.</div>'
-      +'<div style="background:#f8fafc;border:1px solid #bfdbfe;border-radius:10px;padding:12px 14px;margin-bottom:14px;">'
-    +'<div style="font-size:14px;font-weight:900;color:#0f172a;margin-bottom:4px;">Stage 9A — Build VM Snapshots</div>'
-    +'<div style="font-size:11px;color:#475569;margin-bottom:10px;">Create or reuse OpenStack VM image / Cinder volume snapshots for approved container-source VMs only. Stage 9A records the exact OpenStack snapshot IDs from the CLI, verifies them with image/volume snapshot show, then hands those IDs to container build.</div>'
-    +'<button class="r6p-btn primary" onclick="r6pGenRealDockerfiles(true)" style="padding:8px 16px;font-size:12px;">&#9654; Build VM Snapshots</button>'
-    +'<div id="r6p-snapshot-status" style="font-size:12px;font-weight:600;color:#64748b;margin-top:8px;line-height:1.7;"></div>'
-    +'</div>'
-    +'<div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:10px;padding:12px 14px;margin-bottom:14px;">'
-    +'<div style="font-size:14px;font-weight:900;color:#0f172a;margin-bottom:4px;">Stage 9B — Build Containers</div>'
-    +'<div style="font-size:11px;color:#475569;margin-bottom:10px;">After snapshot lineage is available, extract approved application paths read-only, sanitize context, build/test/scan/sign/push images and record final registry digests.</div>'
-    +'<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px;">'
+      +'<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px;">'
       +'<div><label style="font-size:11px;font-weight:700;color:#334155;display:block;margin-bottom:4px;">Component</label><select id="r6p-classify-comp" style="padding:7px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;min-width:260px;">'+opts7+'</select></div>'
       +'<div><label style="font-size:11px;font-weight:700;color:#334155;display:block;margin-bottom:4px;">SSH User</label><input id="r6p-classify-user" value="root" style="padding:7px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;width:100px;"></div>'
       +'<div><label style="font-size:11px;font-weight:700;color:#334155;display:block;margin-bottom:4px;">SSH Key Path</label><input id="r6p-classify-key" value="~/.ssh/id_rsa" style="padding:7px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;width:160px;"></div>'
@@ -2913,6 +2924,7 @@ window.r6pRenderProductionAppraisal=function(run){
   root.innerHTML='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:12px;">'+cards+'</div>';
   if(failedRoot){failedRoot.innerHTML=r6pFailedChecksTable(run);}
   document.querySelectorAll('#r6p-scan-failed-checks').forEach(function(el,index){if(index>0)el.innerHTML='';});
+  r6pPersistScanView(run);
 };
 window.r6pViewAppraisal=function(id){
   var c=R6P.structuredAppraisal&&R6P.structuredAppraisal.components&&R6P.structuredAppraisal.components.find(function(x){return x.componentId===id;}),drawer=document.getElementById('r6p-appraisal-drawer'),detail=document.getElementById('r6p-appraisal-detail');if(!c||!drawer||!detail)return;

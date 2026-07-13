@@ -88,7 +88,20 @@ def test_scan_progress_restores_after_page_refresh():
     assert "r6pCacheScanRun(run)" in V1
     assert "r6pLoadCachedScanRun" in V1
     assert "r6pRenderCachedScanRun" in V1
+    assert "r6p_cached_scan_view" in V1
+    assert "r6pPersistScanView(run)" in V1
+    assert "r6pRenderCachedScanView(cachedView)" in V1
+    assert "sessionStorage.setItem('r6p_cached_scan_run'" in V1
     has("if(global.R6P.scanRunId)global.r6pPollProductionScan()")
+
+
+def test_stage9_snapshot_controls_are_not_rendered_in_stage3_or_stage7():
+    stage3 = V1.split("if(n===3){", 1)[1].split("if(n===4){", 1)[0]
+    stage7 = V1.split("if(n===7){", 1)[1].split("if(n===8){", 1)[0]
+    assert "Stage 9A — Build VM Snapshots" not in stage3
+    assert "Stage 9B — Build Containers" not in stage3
+    assert "Stage 9A — Build VM Snapshots" not in stage7
+    assert "Stage 9B — Build Containers" not in stage7
 
 
 def test_v1_and_v2_share_a_persistent_visible_scan_terminal():
@@ -201,10 +214,11 @@ def test_scan_results_follow_terminal_cards_verdict_failed_checks_order():
     assert render_line.index("sharedControls()") < render_line.index("r6v2-components")
     assert render_line.index("r6v2-components") < render_line.index("+verdict()")
     assert render_line.index("+verdict()") < render_line.index("global.r6pFailedChecksTable(state.run)")
-    assert "r6p-scan-final-verdict" in V1
-    assert V1.index("+r6pProductionScanTerminal()") < V1.index("r6p-scan-appraisal")
-    assert V1.index("r6p-scan-appraisal") < V1.index("r6p-scan-final-verdict")
-    assert V1.index("r6p-scan-final-verdict") < V1.index("r6p-scan-failed-checks")
+    stage3 = V1.split("if(n===3){", 1)[1].split("if(n===4){", 1)[0]
+    assert "r6p-scan-final-verdict" in stage3
+    assert stage3.index("+r6pProductionScanTerminal()") < stage3.index("r6p-scan-appraisal")
+    assert stage3.index("r6p-scan-appraisal") < stage3.index("r6p-scan-final-verdict")
+    assert stage3.index("r6p-scan-final-verdict") < stage3.index("r6p-scan-failed-checks")
     assert "Recommended fix / next action:" in V1
 
 
