@@ -1831,16 +1831,6 @@ window.r6pGenRealDockerfiles=function(snapshotOnly){
     if(!val&&R6P.creds&&R6P.creds.cloud)val=R6P.creds.cloud[key]||'';
     return val;
   }
-  function r6pStage9SourceRegion(fallback){
-    var candidates=[R6P.bs&&R6P.bs.region,R6P.bs&&R6P.bs.flexRegion,R6P.bs&&R6P.bs.sourceRegion,R6P.bs&&R6P.bs.targetRegion,fallback];
-    for(var i=0;i<candidates.length;i++){
-      var txt=String(candidates[i]||'').trim();
-      var m=txt.match(/\b(DFW3|IAD3|ORD|LON|SYD|HKG)\b/i);
-      if(m)return m[1].toUpperCase();
-      if(txt&&/^[A-Za-z0-9_-]{2,12}$/.test(txt))return txt;
-    }
-    return 'iad3';
-  }
   var cloudCreds={
     authUrl:r6pStage9Cred('r6p-c-authurl','authUrl'),
     authType:r6pStage9Cred('r6p-c-authtype','authType')||'password',
@@ -1852,8 +1842,7 @@ window.r6pGenRealDockerfiles=function(snapshotOnly){
     domain:r6pStage9Cred('r6p-c-domain','domain')||'rackspace_cloud_domain',
     region:r6pStage9Cred('r6p-c-region','region')
   };
-  var stage9Region=r6pStage9SourceRegion(cloudCreds.region);
-  cloudCreds.region=stage9Region;
+  var stage9Region=cloudCreds.region||'iad3';
   /* Automatic mode makes the whole R6-to-production-OpenCenter transfer fully automatic in
      one action: build+push images (client-side chain below) AND commit+push the GitOps
      overlay for real (auto_commit:true) in the same generate-bundle call. Manual mode never

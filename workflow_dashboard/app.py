@@ -21273,6 +21273,10 @@ def _r6_openstack_json(args: List[str]) -> Any:
     env.update(_r6_openstack_auth_env())
     try:
         proc = subprocess.run(cmd, text=True, capture_output=True, timeout=120, check=False, env=env)
+        if proc.returncode and env.get("OS_REGION_NAME") and "endpoint" in (proc.stderr or proc.stdout).lower() and "region not found" in (proc.stderr or proc.stdout).lower():
+            retry_env = dict(env)
+            retry_env.pop("OS_REGION_NAME", None)
+            proc = subprocess.run(cmd, text=True, capture_output=True, timeout=120, check=False, env=retry_env)
     except FileNotFoundError as exc:
         raise RuntimeError("OpenStack CLI not found for Stage 9A. Install python-openstackclient or set OPENSTACK_CLI/PATH for the Flask process, then restart Flask.") from exc
     if proc.returncode:

@@ -177,8 +177,8 @@ def test_stage9_button_filters_capture_payload_after_stage8_only():
     assert "sourceVmId:c.vmId||c.serverId||c.instanceId||''" in func
     assert "volumeIds:c.volumes||c.volumeIds||[]" in func
     assert "var cloudCreds={" in func
-    assert "r6pStage9SourceRegion" in func
-    assert "cloudCreds.region=stage9Region" in func
+    assert "r6pStage9SourceRegion" not in func
+    assert "var stage9Region=cloudCreds.region||'iad3'" in func
     assert "region:stage9Region" in func and "cloud:cloudCreds" in func
     assert "cloud:cloudCreds" in func
 
@@ -287,3 +287,11 @@ def test_stage9_backend_prefers_source_vm_id_over_target_ip(fake_openstack):
     response = app.test_client().post("/api/r6/capture-sources-build", json=payload)
     assert response.status_code == 200
     assert any(call[:3] == ["server", "image", "create"] and call[-1] == "server-from-workload" for call in fake_openstack)
+
+
+
+def test_openstack_json_has_invalid_region_retry_path():
+    source = (pathlib.Path(__file__).parent.parent / "workflow_dashboard" / "app.py").read_text()
+    assert "retry_env.pop(\"OS_REGION_NAME\", None)" in source
+    assert "region not found" in source
+    assert "endpoint" in source
