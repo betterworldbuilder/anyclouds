@@ -663,6 +663,65 @@ def final_appraisal(run_id: str, system: Dict[str, Any], components: List[Dict[s
     return {"businessSystemId": system.get("id"), "businessSystemName": system.get("name"), "scanRunId": run_id, "scanScope": system.get("scanScope") or "ALL_COMPONENTS", "finalVerdict": final, "discoveryCoveragePercent": coverage, "infrastructureAccessStatus": infrastructure, "applicationReadiness": application, "databaseReadiness": database, "snapshotReadiness": snapshot, "containerizationReadiness": containerization, "reason": "Several source VMs could not be accessed; no application incompatibility is inferred." if infrastructure == "BLOCKED" else "Assessment is based on applicable completed checks.", "overallEvidenceScore": coverage, "evidenceCoverage": {"completed": len(completed), "applicable": len(applicable), "blocked": len(root_probes), "skipped": len(skipped), "notApplicable": len(not_applicable)}, "rootCauses": root_causes, "summary": {"sourceVms": len(set(c.get("sourceVmId") for c in components if c.get("sourceVmId"))), "components": len(components), "totalComponents": int(system.get("totalComponentCount") or len(components)), "ready": n("READY_FOR_STAGE_8"), "readyWithWarnings": n("READY_FOR_STAGE_8_WITH_WARNINGS"), "databaseNative": n("DB_NATIVE_REQUIRED"), "retainVm": n("RETAIN_VM_RECOMMENDED"), "needsReview": n("NEEDS_MORE_EVIDENCE", "MANUAL_REVIEW_REQUIRED", "REVIEW_REQUIRED"), "blocked": n("BLOCKED", "BLOCKED_INFRASTRUCTURE", "BLOCKED_SECURITY", "BLOCKED_APPLICATION"), "scanFailed": n("SCAN_FAILED")}, "systemWarnings": [w["message"] for c in components for w in c["warnings"]] + mapping_warnings + scope_warning, "mappingWarnings": mapping_warnings, "systemBlockers": [b["message"] for c in components for b in c["blockers"]], "nextAction": next_action}
 
 
+# --- Stage-specific gating -------------------------------------------------
+# A finding must not block every migration stage equally (see design-template
+# scanner status contract). This table and the two functions below are the
+# real, callable implementation Stage 4-7 code can invoke; nothing here is
+# hypothetical/unused -- it is wired to /api/r6/scans/runs/<id>/stage-gate/<stage>.
+MIGRATION_STAGES = ("DISCOVERY", "CONTAINER_PACKAGE_GENERATION", "TARGET_DEPLOYMENT", "UAT", "CUTOVER")
+
+STAGE_GATING: Dict[str, Dict[str, str]] = {
+    "SSH_ACCESS_FAILED": {"DISCOVERY": "BLOCK", "CONTAINER_PACKAGE_GENERATION": "REVIEW", "TARGET_DEPLOYMENT": "REVIEW", "UAT": "REVIEW", "CUTOVER": "BLOCK"},
+    "COMPONENT_VM_MAPPING_MISSING": {"DISCOVERY": "PARTIAL", "CONTAINER_PACKAGE_GENERATION": "REVIEW", "TARGET_DEPLOYMENT": "BLOCK", "UAT": "REVIEW", "CUTOVER": "REVIEW"},
+    "VM_UUID_UNMAPPED": {"DISCOVERY": "PARTIAL", "CONTAINER_PACKAGE_GENERATION": "REVIEW", "TARGET_DEPLOYMENT": "BLOCK", "UAT": "REVIEW", "CUTOVER": "REVIEW"},
+    "PLAINTEXT_SECRET_LOW_CONFIDENCE": {"DISCOVERY": "ALLOW", "CONTAINER_PACKAGE_GENERATION": "REVIEW", "TARGET_DEPLOYMENT": "REVIEW", "UAT": "ALLOW", "CUTOVER": "ALLOW"},
+    "PRIVATE_KEY_CAPTURE_PATH": {"DISCOVERY": "ALLOW", "CONTAINER_PACKAGE_GENERATION": "BLOCK", "TARGET_DEPLOYMENT": "BLOCK", "UAT": "BLOCK", "CUTOVER": "BLOCK"},
+    "PLAINTEXT_SECRET_HARDCODED": {"DISCOVERY": "ALLOW", "CONTAINER_PACKAGE_GENERATION": "BLOCK", "TARGET_DEPLOYMENT": "BLOCK", "UAT": "BLOCK", "CUTOVER": "BLOCK"},
+    "PLAINTEXT_SECRET_ENV_FILE": {"DISCOVERY": "ALLOW", "CONTAINER_PACKAGE_GENERATION": "REVIEW", "TARGET_DEPLOYMENT": "REVIEW", "UAT": "ALLOW", "CUTOVER": "ALLOW"},
+    "HEALTH_NOT_VALIDATED": {"DISCOVERY": "ALLOW", "CONTAINER_PACKAGE_GENERATION": "ALLOW", "TARGET_DEPLOYMENT": "ALLOW", "UAT": "BLOCK", "CUTOVER": "BLOCK"},
+    "APPLICATION_HEALTH_CHECK_FAILED": {"DISCOVERY": "REVIEW", "CONTAINER_PACKAGE_GENERATION": "REVIEW", "TARGET_DEPLOYMENT": "BLOCK", "UAT": "BLOCK", "CUTOVER": "BLOCK"},
+    "PERSISTENCE_UNKNOWN": {"DISCOVERY": "ALLOW", "CONTAINER_PACKAGE_GENERATION": "REVIEW", "TARGET_DEPLOYMENT": "BLOCK", "UAT": "BLOCK", "CUTOVER": "BLOCK"},
+    "DATABASE_NATIVE_ASSESSMENT_MISSING": {"DISCOVERY": "PARTIAL", "CONTAINER_PACKAGE_GENERATION": "REVIEW", "TARGET_DEPLOYMENT": "BLOCK", "UAT": "BLOCK", "CUTOVER": "BLOCK"},
+}
+
+
+def _stage_gate_key(finding_code: Optional[str]) -> str:
+    code = finding_code or ""
+    return "SSH_ACCESS_FAILED" if code.startswith("SSH_") else code
+
+
+def blocks_current_stage(finding_code: str, stage: str, component_required: bool) -> bool:
+    if stage not in MIGRATION_STAGES:
+        raise ValueError("unknown migration stage: %s" % stage)
+    if STAGE_GATING.get(_stage_gate_key(finding_code), {}).get(stage) != "BLOCK":
+        return False
+    return component_required
+
+
+def evaluate_stage_gate(components: List[Dict[str, Any]], stage: str) -> Dict[str, Any]:
+    """Real, callable stage gate: walk every component's blockers/reviewRequired/warnings
+    and decide whether `stage` can proceed, honoring the critical-path rule (an optional
+    component's finding is surfaced for review but never blocks the stage)."""
+    if stage not in MIGRATION_STAGES:
+        raise ValueError("unknown migration stage: %s" % stage)
+    blocking, review = [], []
+    for component in components:
+        required = _required_for_business_transaction(component)
+        findings = list(component.get("blockers") or []) + list(component.get("reviewRequired") or []) + list(component.get("warnings") or [])
+        for finding in findings:
+            code = finding.get("code")
+            action = STAGE_GATING.get(_stage_gate_key(code), {}).get(stage)
+            if action is None or action == "ALLOW":
+                continue
+            entry = {"componentId": component.get("componentId"), "componentName": component.get("componentName"),
+                     "code": code, "action": action, "message": finding.get("message"), "requiredForBusinessTransaction": required}
+            if action == "BLOCK" and required:
+                blocking.append(entry)
+            else:
+                review.append(entry)
+    return {"stage": stage, "blocked": bool(blocking), "blockingFindings": blocking, "reviewFindings": review}
+
+
 def _runtime(text: str) -> Dict[str, Any]:
     first = next((x.strip() for x in text.splitlines() if x.strip()), "")
     kind = next((k for k in ("python", "java", "node", "php", "dotnet", "go") if k in first.lower()), "unknown")
@@ -915,6 +974,8 @@ def create_r6_scan_blueprint(base_dir: Path, probe_runner: Callable[..., subproc
 
     def save(run: Dict[str, Any]) -> None:
         with state_lock:
+            run["persistedAt"] = utcnow()  # when evidence artifacts were actually closed to disk,
+            # distinct from executionCompletedAt (probes finished) and appraisalCompletedAt (verdict computed)
             folder = root / run["runId"]
             (folder / "component-appraisals").mkdir(parents=True, exist_ok=True)
             (folder / "probes").mkdir(exist_ok=True)
@@ -1047,15 +1108,26 @@ def create_r6_scan_blueprint(base_dir: Path, probe_runner: Callable[..., subproc
                         vm_evidence[target_key] = assessed["probes"]
                     run["components"].append(assessed)
                     run["liveLog"].append({"timestamp": utcnow(), "level": "ERROR" if assessed.get("componentVerdict") in {"BLOCKED", "SCAN_FAILED"} else "INFO", "component": assessed.get("componentName"), "message": "Component appraisal complete", "status": assessed.get("componentVerdict"), "remediation": "; ".join(assessed.get("recommendedActions", []))})
+                # "status: COMPLETE" means probe execution finished, not that the system is
+                # migration-ready -- that is appraisal.finalVerdict. executionState makes the
+                # distinction explicit without changing the `status` value existing UI polls on.
                 run["status"] = "CANCELLED" if run_id in cancelled else "COMPLETE"
-                run["completedAt"] = utcnow()
+                run["executionState"] = "CANCELLED" if run_id in cancelled else "EXECUTION_COMPLETE"
+                run["currentComponent"] = None  # scan finished; no component is "current" anymore
+                execution_completed_at = utcnow()
+                run["executionCompletedAt"] = execution_completed_at
+                run["completedAt"] = execution_completed_at
                 run["progress"] = {"completedComponents": len(run["components"]), "totalComponents": len(components)}
                 run["appraisal"] = final_appraisal(run_id, system, run["components"])
+                run["appraisalCompletedAt"] = utcnow()
                 run["liveLog"].append({"timestamp": utcnow(), "level": "INFO", "message": "Business System scan complete", "status": run["appraisal"].get("finalVerdict")})
             except Exception as exc:
                 run["status"] = "SCAN_FAILED"
+                run["executionState"] = "SCAN_FAILED"
+                run["currentComponent"] = None
                 run["error"] = redact(str(exc))
                 run["completedAt"] = utcnow()
+                run["executionCompletedAt"] = run["completedAt"]
             finally:
                 run.pop("ssh", None)  # never persist credentials/key configuration in final evidence
                 save(run)
@@ -1089,6 +1161,16 @@ def create_r6_scan_blueprint(base_dir: Path, probe_runner: Callable[..., subproc
     def get_appraisal(run_id):
         try: return jsonify({"ok": True, "appraisal": load(run_id).get("appraisal")})
         except FileNotFoundError: return jsonify({"ok": False, "error": "scan run not found"}), 404
+
+    @bp.get("/api/r6/scans/runs/<run_id>/stage-gate/<stage>")
+    def get_stage_gate(run_id, stage):
+        try: run = load(run_id)
+        except FileNotFoundError: return jsonify({"ok": False, "error": "scan run not found"}), 404
+        stage_key = stage.upper().replace("-", "_")
+        if stage_key not in MIGRATION_STAGES:
+            return jsonify({"ok": False, "error": "unknown stage", "validStages": list(MIGRATION_STAGES)}), 400
+        result = evaluate_stage_gate(run.get("components", []), stage_key)
+        return jsonify({"ok": True, "runId": run_id, **result})
 
     @bp.get("/api/r6/scans/runs/<run_id>/appraisals.csv")
     def export_all_appraisals_csv(run_id):
