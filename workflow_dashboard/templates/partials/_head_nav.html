@@ -226,7 +226,7 @@
     .stage-bar {
       display: flex; gap: 4px; padding: 6px 10px;
       background: #ffffff14; border-bottom: 1px solid var(--border);
-      flex-shrink: 0; overflow-x: auto; flex-wrap: nowrap; align-items: stretch;
+      flex-shrink: 0; overflow: visible; flex-wrap: nowrap; align-items: stretch;
     }
     .stage-btn {
       flex: 1 1 0; min-width: 0; border: 2px solid #00f3ff;
@@ -263,7 +263,8 @@
     #stageBar .green-roll-stage[data-stage="s9"] { --green-roll-delay: 4.5s; }
     #stageBar .green-roll-stage[data-stage="s10"] { --green-roll-delay: 4.95s; }
     #stageBar .green-roll-stage[data-stage="sai"] { --green-roll-delay: 5.4s; }
-    .stage-btn small {
+    .stage-btn small,
+    .top-stage-dropdown-trigger small {
         font-size: 12px; font-weight: normal; text-shadow: none; opacity: 0.8;
     }
     .stage-promo-btn {
@@ -359,12 +360,70 @@
       flex-direction: column;
       gap: 6px;
     }
-    .ospc-dropdown:hover .ospc-dropdown-content {
+    .ospc-dropdown:hover .ospc-dropdown-content, .ospc-dropdown:focus-within .ospc-dropdown-content {
       display: flex;
     }
     .ospc-dropdown-content .sub-btn {
       width: 100%;
       text-align: left;
+    }
+    .nav-stage-group > .sub-btn-dropdown {
+      height: 100%;
+    }
+    .nav-stage-group:has(.sub-btn.active) > .sub-btn-dropdown {
+      background: linear-gradient(135deg, #bbf7d0, #86efac) !important;
+      border-color: #22c55e !important;
+      color: #064e3b !important;
+      box-shadow: 0 0 18px rgba(34,197,94,.45), inset 0 0 12px rgba(255,255,255,.42) !important;
+    }
+    .top-stage-dropdown {
+      position: relative;
+      display: flex;
+      flex: 1 1 0;
+      min-width: 0;
+    }
+    .top-stage-dropdown-trigger {
+      width: 100%;
+      min-width: 0;
+    }
+    .top-stage-dropdown-content {
+      display: none;
+      position: absolute;
+      top: calc(100% + 4px);
+      left: 0;
+      min-width: 300px;
+      padding: 8px;
+      flex-direction: column;
+      gap: 6px;
+      background: #0f1e3e;
+      border: 1px solid rgba(125,211,252,.55);
+      border-radius: 8px;
+      box-shadow: 0 12px 28px rgba(0,0,0,.4);
+      z-index: 500;
+    }
+    .top-stage-dropdown:hover .top-stage-dropdown-content,
+    .top-stage-dropdown:focus-within .top-stage-dropdown-content { display: flex; }
+    .top-stage-dropdown-content .stage-btn {
+      width: 100%;
+      min-width: 280px;
+      flex: none;
+      font-size: 14px;
+      text-align: left;
+    }
+    .top-stage-dropdown-section {
+      margin: 3px 2px 0;
+      padding: 6px 8px 4px;
+      border-bottom: 1px solid rgba(125,211,252,.34);
+      color: #7dd3fc;
+      font-size: 10px;
+      font-weight: 900;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+    }
+    .top-stage-dropdown:has(.stage-btn.active) .top-stage-dropdown-trigger {
+      background: linear-gradient(135deg, #bbf7d0, #86efac) !important;
+      border-color: #22c55e !important;
+      color: #064e3b !important;
     }
 
     .appdep-tab-btn {
@@ -946,6 +1005,31 @@
         /* Inheriting from global .sub-btn.active for consistency */
     }
 
+    /* Stage 2 is a single horizontal sub-stage rail; dropdown menus may overflow vertically. */
+    #subBar2,
+    body.flex-skyline-mode #subBar2 {
+      flex-wrap: nowrap !important;
+      align-items: stretch !important;
+      overflow-x: auto !important;
+      overflow-y: visible !important;
+      gap: 6px !important;
+      padding: 9px 14px !important;
+    }
+    #subBar2 > .sub-btn,
+    #subBar2 > .nav-stage-group {
+      flex: 0 1 auto;
+      min-width: 0;
+      margin: 0 !important;
+    }
+    #subBar2 > .sub-btn,
+    #subBar2 > .nav-stage-group > .sub-btn-dropdown {
+      padding: 8px 12px !important;
+      font-size: 12px !important;
+      line-height: 1.15 !important;
+    }
+    #subBar2 > .migration-hub-substage > .sub-btn-dropdown {
+      padding-inline: 11px !important;
+    }
     .gov-page .gov-title-area h2, .gov-page .gov-section h3 { color: #00d4ff; }
     .gov-page .gov-section h3 { border-color: #00d4ff; }
     .gov-page .gov-table th { border-bottom-color: rgba(0, 212, 255, 0.5); color: #00d4ff; text-shadow: 0 0 5px rgba(0, 212, 255, 0.3); }
@@ -1164,12 +1248,13 @@
       gap: 6px !important;
     }
     body.flex-skyline-mode .stage-btn,
+    body.flex-skyline-mode .top-stage-dropdown-trigger,
     body.flex-skyline-mode .stage-tracker-btn,
     body.flex-skyline-mode .stage-tour-btn,
     body.flex-skyline-mode .sub-btn,
     body.flex-skyline-mode .sub-btn-dropdown {
-      background: #2b3039 !important;
-      border: 1px solid #3b424e !important;
+      background: linear-gradient(135deg, #0f3d78, #001846) !important;
+      border: 1px solid #22c55e !important;
       color: #eef1f5 !important;
       border-radius: 3px !important;
       box-shadow: none !important;
@@ -1178,10 +1263,12 @@
       font-size: 13px !important;
       letter-spacing: 0 !important;
     }
-    body.flex-skyline-mode .stage-btn {
+    body.flex-skyline-mode .stage-btn,
+    body.flex-skyline-mode .top-stage-dropdown-trigger {
       padding: 10px 8px !important;
     }
-    body.flex-skyline-mode .stage-btn small {
+    body.flex-skyline-mode .stage-btn small,
+    body.flex-skyline-mode .top-stage-dropdown-trigger small {
       color: #c6ccd6 !important;
       opacity: 1 !important;
       font-size: 11px !important;
@@ -1196,6 +1283,7 @@
       transform: none !important;
     }
     body.flex-skyline-mode .stage-btn.active small,
+    body.flex-skyline-mode .top-stage-dropdown:has(.stage-btn.active) .top-stage-dropdown-trigger small,
     body.flex-skyline-mode .stage-tracker-btn.active small {
       color: #064e3b !important;
     }
@@ -1207,6 +1295,19 @@
       box-shadow: inset 0 0 8px rgba(125, 211, 252, .18) !important;
     }
     body.flex-skyline-mode .sub-btn:hover,
+    #stageBar .stage-btn[data-stage="s2"].active {
+      background: linear-gradient(135deg, #166534, #14532d) !important;
+      border-color: #22c55e !important;
+      color: #ffffff !important;
+      box-shadow: 0 0 18px rgba(34,197,94,.55), inset 0 0 12px rgba(255,255,255,.12) !important;
+    }
+    #stageBar .stage-btn[data-stage="s2"] small {
+      color: #ffffff !important;
+      font-size: 14px !important;
+      font-weight: 800 !important;
+      letter-spacing: .2px !important;
+    }
+
     body.flex-skyline-mode .sub-btn-dropdown:hover {
       background: linear-gradient(135deg, #1d76c9, #155da8) !important;
       border-color: #7dd3fc !important;
@@ -1272,7 +1373,7 @@
       box-shadow: none !important;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif !important;
     }
-body.flex-skyline-mode button:not(#top-theme-trigger):not(.global-theme-option):not(.sub-btn):not(.sub-btn-dropdown):not(.uat-s1-template-tab):not(.oc-card):not(.oc-arrow),
+body.flex-skyline-mode button:not(#top-theme-trigger):not(.global-theme-option):not(.stage-btn):not(.stage-tracker-btn):not(.stage-tour-btn):not(.sub-btn):not(.sub-btn-dropdown):not(.top-stage-dropdown-trigger):not(.uat-s1-template-tab):not(.oc-card):not(.oc-arrow),
     body.flex-skyline-mode .gov-btn,
     body.flex-skyline-mode .uat-btn {
       background: #a33e3e !important;
@@ -1681,8 +1782,214 @@ body.flex-skyline-mode button:not(#top-theme-trigger):not(.global-theme-option):
       color: #d1fae5 !important;
       opacity: 1 !important;
     }
+    /* Keep every primary stage in one compact row. */
+    #stageBar {
+      display: grid !important;
+      grid-template-columns: repeat(10, minmax(0, 1fr)) !important;
+      gap: 4px !important;
+      padding: 5px 8px !important;
+      align-items: stretch !important;
+      flex-wrap: nowrap !important;
+    }
+    #stageBar > .stage-btn,
+    #stageBar > .top-stage-dropdown,
+    #stageBar > .top-stage-dropdown > .top-stage-dropdown-trigger {
+      width: 100% !important;
+      min-width: 0 !important;
+      box-sizing: border-box !important;
+    }
+    #stageBar > .stage-btn,
+    #stageBar > .top-stage-dropdown > .top-stage-dropdown-trigger {
+      padding: 6px 4px !important;
+      font-size: 11px !important;
+      line-height: 1.15 !important;
+    }
+    #stageBar > .stage-btn small,
+    #stageBar > .top-stage-dropdown > .top-stage-dropdown-trigger small {
+      font-size: 9px !important;
+      line-height: 1.1 !important;
+    }
+    #stageBar > .stage-btn[data-stage="s2"] small { font-size: 11px !important; }
 
+    /* Equal-width numbered stages: utilities use one column; Stages 1-4 use two. */
+    #stageBar { grid-template-columns: repeat(12, minmax(0, 1fr)) !important; }
+    #stageBar > .stage-btn[data-stage="s1"],
+    #stageBar > .stage-btn[data-stage="s2"],
+    #stageBar > .top-stage-dropdown {
+      grid-column: span 2;
+    }
+    #stageBar > .stage-btn.ai-now-stage,
+    #stageBar > .stage-btn.ai-now-stage.active,
+    body.flex-skyline-mode #stageBar > .stage-btn.ai-now-stage,
+    body.flex-skyline-mode #stageBar > .stage-btn.ai-now-stage.active {
+      grid-column: span 2;
+      border: 2px solid #fb923c !important;
+      background: linear-gradient(135deg, #7c2d12 0%, #c2410c 42%, #f97316 68%, #9a3412 100%) !important;
+      background-size: 200% 200% !important;
+      color: #fff7ed !important;
+      font-size: 15.4px !important;
+      font-weight: 900 !important;
+      letter-spacing: .04em;
+      text-shadow: 0 0 5px #fff7ed, 0 0 12px #fdba74 !important;
+      box-shadow: 0 0 8px #f97316, 0 0 20px rgba(249,115,22,.9), 0 0 36px rgba(251,146,60,.62), inset 0 0 14px rgba(255,237,213,.35) !important;
+      animation: aiNowOrangeLed 1.65s ease-in-out infinite !important;
+      transform: none !important;
+      overflow: visible !important;
+    }
+    #stageBar > .stage-btn.ai-now-stage small,
+    body.flex-skyline-mode #stageBar > .stage-btn.ai-now-stage small {
+      color: #fff7ed !important;
+      font-size: 14.3px !important;
+      font-weight: 900 !important;
+      opacity: 1 !important;
+      letter-spacing: .06em;
+    }
+    #stageBar > .stage-btn.ai-now-stage::before {
+      content: '';
+      position: absolute;
+      top: 6px;
+      right: 7px;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #ffedd5;
+      box-shadow: 0 0 5px #fff, 0 0 11px #fb923c, 0 0 20px #f97316;
+    }
+    /* Final navigation polish: keep dropdowns above the page and normalize stage type. */
+    #stageBar > .stage-btn,
+    #stageBar > .top-stage-dropdown > .top-stage-dropdown-trigger {
+      font-size: 11px !important;
+      letter-spacing: 0 !important;
+    }
+    #stageBar > .stage-btn small,
+    #stageBar > .top-stage-dropdown > .top-stage-dropdown-trigger small,
+    #stageBar > .stage-btn.ai-now-stage small {
+      font-size: 9px !important;
+      letter-spacing: 0 !important;
+      line-height: 1.1 !important;
+    }
+    #stageBar > .stage-btn.ai-now-stage,
+    #stageBar > .stage-btn.ai-now-stage.active,
+    body.flex-skyline-mode #stageBar > .stage-btn.ai-now-stage,
+    body.flex-skyline-mode #stageBar > .stage-btn.ai-now-stage.active {
+      font-size: 11px !important;
+      letter-spacing: 0 !important;
+    }
+    @keyframes aiNowOrangeLed {
+      0%, 100% { background-position: 0% 50%; filter: brightness(.92); }
+      50% { background-position: 100% 50%; filter: brightness(1.22); box-shadow: 0 0 12px #fb923c, 0 0 28px #f97316, 0 0 50px rgba(251,146,60,.82), inset 0 0 18px rgba(255,247,237,.48); }
+    }
 /* ── UAT Step 1 light-theme components ─────────────────────────────── */
+.nav-stage-group > .ospc-dropdown-content {
+      z-index: 2000 !important;
+    }
+    #subBar2 {
+      position: relative !important;
+      z-index: 1000 !important;
+      overflow: visible !important;
+    }
+    #subBar2 > .ospc-dropdown {
+      position: relative !important;
+      z-index: 1001 !important;
+    }
+    #subBar2 > .ospc-dropdown > .ospc-dropdown-content {
+      z-index: 2000 !important;
+      top: calc(100% + 2px) !important;
+    }
+    #stageBar > .stage-btn,
+    #stageBar > .top-stage-dropdown > .top-stage-dropdown-trigger {
+      font-size: 11px !important;
+      letter-spacing: 0 !important;
+    }
+    #stageBar > .stage-btn small,
+    #stageBar > .top-stage-dropdown > .top-stage-dropdown-trigger small,
+    #stageBar > .stage-btn.ai-now-stage small {
+      font-size: 9px !important;
+      letter-spacing: 0 !important;
+      line-height: 1.1 !important;
+    }
+    #stageBar > .stage-btn.ai-now-stage,
+    #stageBar > .stage-btn.ai-now-stage.active,
+    body.flex-skyline-mode #stageBar > .stage-btn.ai-now-stage,
+    body.flex-skyline-mode #stageBar > .stage-btn.ai-now-stage.active {
+      font-size: 11px !important;
+      letter-spacing: 0 !important;
+    }
+/* Flex Skyline: keep navigation/dropdowns above the page content. */
+body.flex-skyline-mode #stageBar,
+body.flex-skyline-mode #subBar2 {
+  position: relative !important;
+  z-index: 10000 !important;
+  overflow: visible !important;
+}
+body.flex-skyline-mode .panel-area {
+  position: relative !important;
+  z-index: 0 !important;
+}
+body.flex-skyline-mode #subBar2 > .ospc-dropdown {
+  position: relative !important;
+  z-index: 10001 !important;
+}
+body.flex-skyline-mode #subBar2 > .ospc-dropdown > .ospc-dropdown-content {
+  position: absolute !important;
+  z-index: 10002 !important;
+}
+/* Uniform primary-stage typography: 20 percent larger and bold. */
+#stageBar > .stage-btn,
+#stageBar > .top-stage-dropdown > .top-stage-dropdown-trigger,
+#stageBar > .stage-btn.ai-now-stage,
+body.flex-skyline-mode #stageBar > .stage-btn,
+body.flex-skyline-mode #stageBar > .top-stage-dropdown > .top-stage-dropdown-trigger,
+body.flex-skyline-mode #stageBar > .stage-btn.ai-now-stage {
+  font-family: "Segoe UI", Tahoma, sans-serif !important;
+  font-size: 13.2px !important;
+  font-weight: 900 !important;
+  letter-spacing: 0 !important;
+}
+#stageBar > .stage-btn small,
+#stageBar > .top-stage-dropdown > .top-stage-dropdown-trigger small,
+#stageBar > .stage-btn.ai-now-stage small {
+  font-family: "Segoe UI", Tahoma, sans-serif !important;
+  font-size: 10.8px !important;
+  font-weight: 900 !important;
+  letter-spacing: 0 !important;
+  line-height: 1.1 !important;
+}
+#stageBar > .top-stage-dropdown.ai-now-dropdown > .ai-now-stage,
+body.flex-skyline-mode #stageBar > .top-stage-dropdown.ai-now-dropdown > .ai-now-stage {
+  border: 2px solid #fb923c !important;
+  background: linear-gradient(135deg, #7c2d12 0%, #c2410c 42%, #f97316 68%, #9a3412 100%) !important;
+  background-size: 200% 200% !important;
+  color: #fff7ed !important;
+  font-family: "Segoe UI", Tahoma, sans-serif !important;
+  font-size: 13.2px !important;
+  font-weight: 900 !important;
+  letter-spacing: 0 !important;
+  text-shadow: 0 0 5px #fff7ed, 0 0 12px #fdba74 !important;
+  box-shadow: 0 0 8px #f97316, 0 0 20px rgba(249,115,22,.9), 0 0 36px rgba(251,146,60,.62), inset 0 0 14px rgba(255,237,213,.35) !important;
+  animation: aiNowOrangeLed 1.65s ease-in-out infinite !important;
+  transform: none !important;
+  overflow: visible !important;
+}
+#stageBar > .top-stage-dropdown.ai-now-dropdown > .ai-now-stage small {
+  color: #fff7ed !important;
+  font-family: "Segoe UI", Tahoma, sans-serif !important;
+  font-size: 10.8px !important;
+  font-weight: 900 !important;
+  letter-spacing: 0 !important;
+  opacity: 1 !important;
+}
+#stageBar > .top-stage-dropdown.ai-now-dropdown > .ai-now-stage::before {
+  content: '';
+  position: absolute;
+  top: 6px;
+  right: 7px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ffedd5;
+  box-shadow: 0 0 5px #fff, 0 0 11px #fb923c, 0 0 20px #f97316;
+}
 .uat-s1-wrap { padding:18px 0; }
 .uat-s1-topbar { display:flex;justify-content:space-between;gap:14px;align-items:flex-start;margin-bottom:16px;flex-wrap:wrap; }
 .uat-s1-title h2 { margin:0;font-size:22px;font-weight:800;color:#0f172a; }
@@ -2271,15 +2578,22 @@ body.flex-skyline-mode .uat-s1-template-tab.active {
   <button class="stage-btn stage-tour-btn sky-top-stage" data-stage="s_tour">🎓 Quick Tour</button>
   <button class="stage-btn stage-tracker-btn green-roll-stage" data-stage="s0">📋 Migration Log</button>
   <button class="stage-btn green-roll-stage" data-stage="s1">Stage 1<br><small>Discovery &amp; Assessment</small></button>
-  <button class="stage-btn green-roll-stage" data-stage="s2">Stage 2<br><small>Migration Strategies Hub</small></button>
-  <button class="stage-btn green-roll-stage" data-stage="s4">Stage 3<br><small>Validation &amp; UAT</small></button>
-  <button class="stage-btn green-roll-stage" data-stage="s7">Stage 3a<br><small>Cost Optimization</small></button>
-  <button class="stage-btn green-roll-stage" data-stage="s7a">Stage 3b<br><small>Performance Gain</small></button>
-  <button class="stage-btn green-roll-stage" data-stage="s5">Stage 4<br><small>Servers Cut Over</small></button>
-  <button class="stage-btn green-roll-stage" data-stage="s5c">Stage 4<br><small>Business System Cut Over</small></button>
-  <button class="stage-btn green-roll-stage" data-stage="s8">Stage 5<br><small>IaC Backup, DR &amp; Restore</small></button>
-  <button class="stage-btn green-roll-stage" data-stage="s6">Stage 6<br><small>Handover and Deliverable</small></button>
-  <button class="stage-btn green-roll-stage" data-stage="s9" style="display:none;">Stage 7<br><small>OPENCENTER Migration</small></button>
+  <button class="stage-btn green-roll-stage" style="--green-roll-delay:.9s" data-stage="s2">Stage 2<br><small>Migration HUB</small></button>
+  <div class="top-stage-dropdown">
+    <button class="stage-btn green-roll-stage top-stage-dropdown-trigger" style="--green-roll-delay:3.6s" type="button" aria-haspopup="true">Stage 3<br><small>FLEX AI Powered Mgt Tools &#9662;</small></button>
+    <div class="top-stage-dropdown-content">
+      <button class="stage-btn green-roll-stage" data-stage="s8">IaC Backup, DR &amp; Restore</button>
+      <button class="stage-btn green-roll-stage" data-stage="s10">AIOps &amp; Continuous Operations</button>
+      <button class="stage-btn green-roll-stage" data-stage="s9">OpenCenter GitOps</button>
+    </div>
+  </div>
+  <div class="top-stage-dropdown ai-now-dropdown">
+    <button class="stage-btn ai-now-stage top-stage-dropdown-trigger" type="button" aria-haspopup="true">Stage 4<br><small>SWITCH AI NOW &#9662;</small></button>
+    <div class="top-stage-dropdown-content">
+      <button class="stage-btn green-roll-stage" data-stage="sai_readiness">AI Enhancement Readiness Assessment</button>
+      <button class="stage-btn green-roll-stage" data-stage="sai">Which FLEX Business System do you want to improve with AI?</button>
+    </div>
+  </div>
 </div>
 
 <!-- ── Sub-tabs for Stage 1 ─────────────────────────── -->
@@ -2326,23 +2640,50 @@ body.flex-skyline-mode .uat-s1-template-tab.active {
 <!-- ── Sub-tabs for Stage 2 ─────────────────────────── -->
 <div class="sub-bar" id="subBar2">
   <button class="sub-btn" data-sub="s2migstrategy">🗺 Migration Strategy</button>
-  <button class="sub-btn r1r2r7-btn" data-sub="s2retain">⏸ R1 Retain — Keep on OSPC</button>
-  <button class="sub-btn r1r2r7-btn" data-sub="s2retire">🗑 R2 Retire — Decommission</button>
-  <button class="sub-btn r1r2r7-btn" data-sub="s2repurchase">🛒 R7 Repurchase — Replace with SaaS/Product</button>
-
-  <button class="sub-btn" data-sub="s2rehost_p1">🛠 Infrastructure Migration</button>
-  <button class="sub-btn" data-sub="s2fullmig">🏢 Full Business System Rehost</button>
-  <button class="sub-btn" data-sub="s2vmware">💠 VMware to FLEX Migration</button>
-  <button class="sub-btn active" data-sub="s2image">☁️ 🌈 ☁️ R3 : OSPC 2 FLEX VM Rehost</button>
-  <button class="sub-btn" data-sub="s2flexanywhere">☁️ AWS · ☁️ GCP · ☁️ Azure 🌈 ☁️ FLEX — R3 HYPER FLEX</button>
-  <button class="sub-btn" data-sub="s2flex2flex">🌐 R3 FLEX2FLEX-Region Cloning</button>
-  <button class="sub-btn" data-sub="s2rehost_p2_1">⚙️ R5 Replatform — App & DB Replication</button>
+  <div class="ospc-dropdown nav-stage-group">
+    <button class="sub-btn-dropdown" type="button" aria-haspopup="true">What Does Not Migrate to FLEX &#9662;</button>
+    <div class="ospc-dropdown-content">
+      <button class="sub-btn r1r2r7-btn" data-sub="s2retain">⏸ R1 Retain — Keep on OSPC</button>
+      <button class="sub-btn r1r2r7-btn" data-sub="s2retire">🗑 R2 Retire — Decommission</button>
+      <button class="sub-btn r1r2r7-btn" data-sub="s2repurchase">🛒 R7 Repurchase — Replace with SaaS/Product</button>
+    </div>
+  </div>
+  <div class="ospc-dropdown nav-stage-group">
+    <button class="sub-btn-dropdown" type="button" aria-haspopup="true">What We Migrate to FLEX &#9662;</button>
+    <div class="ospc-dropdown-content">
+      <button class="sub-btn" data-sub="s2rehost_p1">🛠 Infrastructure Migration</button>
+      <button class="sub-btn" data-sub="s2fullmig">🏢 Full Business System Rehost</button>
+      <button class="sub-btn" data-sub="s2vmware">💠 VMware to FLEX Migration</button>
+      <button class="sub-btn active" data-sub="s2image">☁️ 🌈 ☁️ R3 : OSPC 2 FLEX VM Rehost</button>
+      <button class="sub-btn" data-sub="s2flexanywhere">☁️ AWS · ☁️ GCP · ☁️ Azure 🌈 ☁️ FLEX — R3 HYPER FLEX</button>
+      <button class="sub-btn" data-sub="s2flex2flex">🌐 R3 FLEX2FLEX-Region Cloning</button>
+      <button class="sub-btn" data-sub="s2rehost_p2_1">⚙️ R5 Replatform — App &amp; DB Replication</button>
+    </div>
+  </div>
   <!-- R5 Data Replatform / Full Manual Runbook removed — see Stage 2 migration tools -->
-  <button class="sub-btn" data-sub="s2rehost_p2_2">&#128640; APPS to Container Refactor Engine</button>
-  <button class="sub-btn" data-sub="s2r6v2">&#128640; Refactor Apps Container V2</button>
-  <button class="sub-btn" data-sub="s2opencenter">🚀 OpenCenter K8s Cluster Migration</button>
-  <button class="sub-btn" data-stage-target="s10">Stage 8<br><small>AIOps &amp; Continuous Operations</small></button>
-  <button class="sub-btn" data-stage-target="sai">Stage 9<br><small>AI Power Up</small></button>
+  <div class="ospc-dropdown nav-stage-group">
+    <button class="sub-btn-dropdown" type="button" aria-haspopup="true">What Apps We Transform to K8 Containers &#9662;</button>
+    <div class="ospc-dropdown-content">
+      <button class="sub-btn" data-sub="s2rehost_p2_2">&#128640; APPS to Container Refactor Engine</button>
+      <button class="sub-btn" data-sub="s2opencenter">🚀 OpenCenter K8s Cluster Migration</button>
+    </div>
+  </div>
+  <div class="ospc-dropdown nav-stage-group migration-hub-substage">
+    <button class="sub-btn-dropdown" type="button" aria-haspopup="true">Validation &amp; UAT &#9662;</button>
+    <div class="ospc-dropdown-content">
+      <button class="sub-btn" data-stage-target="s4">Validation &amp; UAT</button>
+      <button class="sub-btn" data-stage-target="s7">Cost Optimization</button>
+      <button class="sub-btn" data-stage-target="s7a">Performance Gain</button>
+    </div>
+  </div>
+  <div class="ospc-dropdown nav-stage-group migration-hub-substage">
+    <button class="sub-btn-dropdown" type="button" aria-haspopup="true">Cut Over Strategy &#9662;</button>
+    <div class="ospc-dropdown-content">
+      <button class="sub-btn" data-stage-target="s5">Servers Cut Over</button>
+      <button class="sub-btn" data-stage-target="s5c">Business System Cut Over</button>
+      <button class="sub-btn" data-stage-target="s6">Handover and Deliverable</button>
+    </div>
+  </div>
 </div>
 
 <!-- ── Panels ─────────────────────────────────────────── -->

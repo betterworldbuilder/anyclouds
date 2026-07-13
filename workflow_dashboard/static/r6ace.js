@@ -1,7 +1,7 @@
 /* APPS to Container Refactor Engine v4 */
 var R6P={current:0,status:{},bs:null,components:[],captureMethod:'smart',compatConfirmed:false,yaml:'',bundle:null,artifacts:{},preflight:{},continueBlocked:true,captureRun:null,creds:{cloud:{status:'not_configured',authUrl:'',region:'',credId:'',projectId:''},opencenter:{status:'not_configured',clusterRef:'rackspace-flex/flex-prod-k8s',gitDir:''},gitops:{status:'not_configured',localPath:'',branch:'main',method:'existing'}}};
-var R6_SCAN_UI_VERSIONS=[{id:'scan-ui-v1',label:'Scan UI v1'},{id:'scan-ui-v2',label:'Scan UI v2'}];
-try{R6P.scanUiVersion=localStorage.getItem('r6p_scan_ui_version')||'scan-ui-v1';}catch(e){R6P.scanUiVersion='scan-ui-v1';}
+var R6_SCAN_UI_VERSIONS=[{id:'scan-ui-v1',label:'Scan UI v1'}];
+R6P.scanUiVersion='scan-ui-v1';try{localStorage.setItem('r6p_scan_ui_version','scan-ui-v1');}catch(e){}
 /* Device-type badges for Stage 13 UAT rows - mirrors Stage 4's Component Test Lab
    (panel-s5c) classification/icon language so a component reads the same way
    (e.g. a Web/Mobile/Frontend component always shows the 📱 Mobile UI badge)
@@ -172,6 +172,9 @@ window.r6pRenderHybridDeltaChart=function(){
 };
 var R6P_BS_STORAGE_SIG='';
 var R6P_SELECTED_BS_KEY='r6p_selected_business_system_id';
+window.r6pScanRunStorageKey=function(){return 'r6p_latest_scan_run:'+(R6P.bs&&R6P.bs.id?String(R6P.bs.id):'none');};
+window.r6pRememberScanRun=function(runId){if(!runId)return;localStorage.setItem('r6p_latest_scan_run',runId);if(R6P.bs&&R6P.bs.id)localStorage.setItem(r6pScanRunStorageKey(),runId);};
+window.r6pRestoreScanRun=function(){var id=null;try{id=localStorage.getItem(r6pScanRunStorageKey())||localStorage.getItem('r6p_latest_scan_run');}catch(e){}R6P.scanRunId=id||null;R6P.structuredAppraisal=null;R6P.appraisalReviewed=false;if(id)r6pPollProductionScan();return id;};
 window.r6pSyncSelectedBusinessSystem=function(force){
   var raw='[]';
   try{raw=localStorage.getItem('uatS1_systems')||'[]';}catch(e){}
@@ -217,6 +220,40 @@ window.r6pComponentTarget=function(c){
   return String(c.tgt||c.targetIp||c.targetIP||c.target_ip||c.flexIp||c.flexIP||
     c.flex_ip||c.vmIp||c.vm_ip||c.ip||c.endpoint||c.host||
     nested.ip||nested.address||nested.endpoint||'').trim();
+};
+window.r6pInputConnectionFor=function(c){
+  c=c||{};
+  var target=r6pComponentTarget(c),targetHost='';
+  try{targetHost=new URL(target.indexOf('://')>=0?target:'ssh://'+target).hostname;}catch(e){targetHost=target.replace(/^[a-z][a-z0-9+.-]*:\/\//i,'').split('/')[0].split(':')[0];}
+  var directUser=String(c.sshUser||c.ssh_user||'').trim();
+  var directKey=String(c.sshKeyPath||c.ssh_key_path||c.sshKey||c.ssh_key||'').trim();
+  var matched=null,standalones=[];
+  try{standalones=JSON.parse(localStorage.getItem('uatS1_standalones')||'[]')||[];}catch(e2){}
+  var bsId=R6P.bs&&R6P.bs.id,compName=String(c.name||'').toLowerCase();
+  var candidates=standalones.filter(function(item){
+    if(item.mappedBsId&&bsId&&String(item.mappedBsId)!==String(bsId))return false;
+    var itemTarget=String(item.target||''),itemHost='';
+    try{itemHost=new URL(itemTarget.indexOf('://')>=0?itemTarget:'ssh://'+itemTarget).hostname;}catch(e3){itemHost=itemTarget.replace(/^[a-z][a-z0-9+.-]*:\/\//i,'').split('/')[0].split(':')[0];}
+    return (targetHost&&itemHost===targetHost)||String(item.name||'').toLowerCase()===compName||
+      (item.itemType==='db'&&/database|\bdb\b/i.test((c.type||c.role||'')+' '+(c.name||'')));
+  });
+  if(candidates.length===1)matched=candidates[0];
+  else if(candidates.length>1)matched=candidates.find(function(item){
+    return targetHost&&String(item.target||'').indexOf(targetHost)>=0;
+  })||null;
+  var scopeMatch=null,scope=[];
+  try{scope=JSON.parse(localStorage.getItem('uat_scope')||'[]')||[];}catch(e4){}
+  scopeMatch=scope.find(function(row){return targetHost&&String(row.target_ip||row.target||'').indexOf(targetHost)>=0;})||null;
+  var sshUser=directUser||String((matched&&matched.sshUser)||(scopeMatch&&scopeMatch.ssh_user)||(R6P.bs&&(R6P.bs.sshUser||R6P.bs.ssh_user))||'').trim();
+  var sshKeyPath=directKey||String((matched&&(matched.sshKeyPath||matched.sshKey))||(scopeMatch&&scopeMatch.ssh_key_path)||(R6P.bs&&(R6P.bs.sshKeyPath||R6P.bs.ssh_key_path||R6P.bs.sshKey))||'').trim();
+  var dbEngine=String(c.dbEngine||c.databaseEngine||(matched&&matched.dbEngine)||(scopeMatch&&scopeMatch.db_engine)||'').trim();
+  var dbPort=String(c.dbPort||c.databasePort||(matched&&matched.dbPort)||(scopeMatch&&scopeMatch.db_port)||'').trim();
+  var explicitEndpoint=String(c.databaseEndpoint||c.database_endpoint||'').trim();
+  var scheme=/postgre/i.test(dbEngine)?'postgresql':/maria/i.test(dbEngine)?'mariadb':/mysql/i.test(dbEngine)?'mysql':/mongo/i.test(dbEngine)?'mongodb':/redis/i.test(dbEngine)?'redis':'';
+  if(!scheme){var sm=explicitEndpoint.match(/^([a-z][a-z0-9+.-]*):\/\//i);scheme=sm?sm[1].toLowerCase():'';}
+  /* Ignore legacy databaseEndpoint hosts: executable endpoints use only the FLEX target. */
+  var databaseEndpoint=scheme&&targetHost?scheme+'://'+targetHost+':'+(dbPort||({postgresql:'5432',mysql:'3306',mariadb:'3306',mongodb:'27017',redis:'6379'}[scheme])||''):'';
+  return {sshUser:sshUser,sshKeyPath:sshKeyPath,sshConfigured:!!(sshUser&&sshKeyPath),databaseEngine:dbEngine,databaseEndpoint:databaseEndpoint,matchedInput:matched||scopeMatch};
 };
 window.r6pResolveComponentVm=function(c){
   c=c||{};var direct=c.sourceVmId||c.source_vm_id||c.vmId||c.vm_id||c.openstackServerId||c.serverId||c.flexVmId;
@@ -352,7 +389,7 @@ window.r6pGoTo=function(n){
   });
   r6pRenderProgress();
   if(n===1){setTimeout(r6pLoadBiz,200);}
-  if(n===3){setTimeout(function(){r6pApplyScanUiVersion();R6P.scanRunId=R6P.scanRunId||localStorage.getItem('r6p_latest_scan_run');if(R6P.scanRunId)r6pPollProductionScan();},200);}
+  if(n===3){setTimeout(function(){r6pApplyScanUiVersion();r6pRestoreScanRun();},200);}
 };
 window.r6pToggle=function(n){
   var b=document.getElementById('r6p-body-'+n);
@@ -373,7 +410,9 @@ window.r6pToggle=function(n){
   r6pRenderProgress();
 };
 
-function r6pFoot(n,extra){var nextN=r6pAdjacentStep(n,1);return '<div class="r6p-stage-footer">'+(extra||'')+'<button class="r6p-btn success" onclick="r6pMarkDone('+n+')">Mark Complete</button>'+(nextN!==undefined?'<button class="r6p-btn primary" onclick="r6pGoTo('+nextN+')">Continue</button>':'')+'</div>';}
+function r6pFoot(n,extra){var nextN=r6pAdjacentStep(n,1),complete=n===3?'r6pCompleteScanStage()':'r6pMarkDone('+n+')',next=n===3?'r6pCompleteScanStage()':'r6pGoTo('+nextN+')';return '<div class="r6p-stage-footer">'+(extra||'')+'<button class="r6p-btn success" onclick="'+complete+'">Mark Complete</button>'+(nextN!==undefined?'<button class="r6p-btn primary" onclick="'+next+'">Continue</button>':'')+'</div>';}
+window.r6pScanStageCanContinue=function(){var run=R6P.structuredAppraisal,a=run&&run.appraisal;if(!run||!a){alert('Run or refresh the component scan before continuing.');return false;}if(run.status==='RUNNING'){alert('The scan is still running.');return false;}if(['BLOCKED','BLOCKED_INFRASTRUCTURE','BLOCKED_SECURITY','BLOCKED_APPLICATION','SCAN_FAILED','SCAN_ERROR','NOT_TESTED'].indexOf(a.finalVerdict)>=0||a.databaseReadiness==='BLOCKED'){alert('This appraisal has unresolved blockers. Review Failed Checks and retry the affected component before continuing.');return false;}if((a.finalVerdict==='READY_WITH_WARNINGS'||a.finalVerdict==='REVIEW_REQUIRED'||(a.systemWarnings||[]).length)&&R6P.appraisalReviewed!==true){alert('Review and acknowledge the appraisal warnings before continuing.');return false;}return true;};
+window.r6pCompleteScanStage=function(){if(r6pScanStageCanContinue())r6pMarkDone(3);};
 
 /* Real migration-mode decision engine (Stage 4-5): evaluates each component against
    name/type signals and, if available, the Steps 3-6 live scan output. */
@@ -469,6 +508,12 @@ window.r6pFormFromComponentDecision=function(decision){
   if(/containerize/.test(d))return 'CONTAINERIZED';
   return 'MANUAL_REVIEW';
 };
+window.r6pFindComponentAppraisal=function(c){
+  var list=R6P.structuredAppraisal&&R6P.structuredAppraisal.components||[];
+  var id=c&&(c.id||c.componentId||c.component_id);
+  var names=[c&&c.name].concat(c&&c.previousNames||[]).filter(Boolean);
+  return list.find(function(x){return (id&&x.componentId===id)||names.indexOf(x.componentName)>=0;});
+};
 /* Real hybrid-transform decision engine (Stage 8 Transform table): assigns each real
    selected component one of the 11 target forms above, using its state/portability
    classification (r6pClassifyFor), name signals and the readiness engine's migration
@@ -477,7 +522,7 @@ window.r6pDecideTargetForm=function(c){
   var name=(c.name||'').toLowerCase();
   var savedForm=c.targetForm||r6pFormFromComponentDecision(c.containerizationDecision);
   if(savedForm)return {form:savedForm,reason:'Saved Stage 1 component decision: '+(c.containerizationDecision||savedForm)+'.'};
-  var appraisal=R6P.structuredAppraisal&&R6P.structuredAppraisal.components&&R6P.structuredAppraisal.components.find(function(x){return x.componentName===c.name;});
+  var appraisal=r6pFindComponentAppraisal(c);
   if(appraisal){
     var mapped={STRONG_CONTAINER_CANDIDATE:'CONTAINERIZED',CANDIDATE_WITH_REMEDIATION:'PARTIALLY_CONTAINERIZED',PARTIAL_CONTAINERIZATION:'PARTIALLY_CONTAINERIZED',KUBERNETES_NATIVE_REPLACEMENT:'KUBERNETES_NATIVE',OPERATOR_MANAGED:'OPERATOR_MANAGED',DB_NATIVE_MIGRATION:'DATA_MIGRATION_REQUIRED',RETAIN_FLEX_VM:'RETAINED_FLEX_VM',REDEPLOY_FLEX_VM:'REDEPLOYED_FLEX_VM',EXTERNAL_SERVICE:'EXTERNAL_SERVICE',MANUAL_REVIEW:'MANUAL_REVIEW',BLOCKED:'BLOCKED'};
     if(mapped[appraisal.containerizationRecommendation])return {form:mapped[appraisal.containerizationRecommendation],reason:'Structured scan appraisal: '+appraisal.componentVerdict+'; readiness '+appraisal.containerReadinessScore+'%.'};
@@ -587,7 +632,7 @@ window.r6pClassifyForComponent=function(c){
   if(R6P.classifyOverride&&R6P.classifyOverride[name]){
     return {state:R6P.classifyOverride[name],decision:base.decision};
   }
-  var appraisal=R6P.structuredAppraisal&&R6P.structuredAppraisal.components&&R6P.structuredAppraisal.components.find(function(x){return x.componentName===name;});
+  var appraisal=r6pFindComponentAppraisal(c);
   if(appraisal){
     var state={STATELESS:'Stateless',STATEFUL:'Stateful',MIXED:'Unknown / mixed',UNKNOWN:'Unknown / mixed'}[appraisal.stateClassification]||'Unknown / mixed';
     return {state:state,decision:appraisal.containerizationRecommendation+' ('+appraisal.containerReadinessScore+'% readiness)'};
@@ -942,16 +987,39 @@ window.r6pComponentCatalogRows=function(){
     return '<tr><td style="font-weight:700;">'+c.name+'</td><td>'+role+'</td><td style="font-family:monospace;font-size:11px;color:#0369a1;">'+(c.tgt||'Not mapped')+'</td><td>'+(ep.port||'auto')+'</td><td>'+cls.state+'</td><td>'+(scan?'runtime-inspection.json ready':'pending live scan')+'</td></tr>';
   }).join('');
 };
-window.r6pDependencyGraphRows=function(){
+window.r6pDependencyGraphModel=function(){
   var comps=R6P.components||[];
-  if(!comps.length)return '<tr><td colspan="5" style="color:#64748b;font-style:italic;">No components selected yet.</td></tr>';
-  var rows=[];
+  var role=function(c){var s=((c.type||c.role||'')+' '+(c.name||'')).toLowerCase();return /database|\bdb\b|mysql|postgres|mongo/.test(s)?'database':/cache|redis/.test(s)?'cache':/queue|rabbit|kafka/.test(s)?'queue':/gateway|\bapi\b/.test(s)?'gateway':/front|\bweb\b|mobile/.test(s)?'frontend':/backend|auth|identity|ledger|core|service/.test(s)?'backend':'service';};
+  var endpoint=function(c){return r6pComponentTarget(c)||'Not mapped';};
+  var scanned=function(c){return R6P.depScan&&R6P.depScan[c.name]&&R6P.depScan[c.name].appraisal;};
+  var port=function(c,r){var ep=r6pParseTargetEndpoint(endpoint(c)),a=scanned(c),ports=(a&&a.ports)||[];if(ep&&ep.port)return ep.port;if(r==='database'){var db=ports.find(function(p){return [3306,5432,27017,6379].indexOf(Number(p))>=0;});return db||(/postgres/i.test(endpoint(c))?5432:3306);}var app=ports.find(function(p){return Number(p)>1024&&Number(p)!==22;});return app||((r==='gateway'||r==='frontend')?443:'unknown');};
+  var groups={database:[],cache:[],queue:[],backend:[],gateway:[],frontend:[],service:[]};
+  comps.forEach(function(c){groups[role(c)].push(c);});
+  var rows=[],seen={};
+  var add=function(from,to,why){
+    if(!from||!to||from===to)return;
+    var key=from.name+'>'+to.name;if(seen[key])return;seen[key]=true;
+    var pr=role(to),p=port(to,pr),isDb=pr==='database',isTls=/^https:|sslmode=require|tls/i.test(endpoint(to));
+    rows.push({from:from.name,to:to.name,proto:isDb?'mysql/postgresql':'http'+(isTls?'s':'')+'/tcp',port:p,endpoint:endpoint(to),
+      auth:isDb?'credential/secret reference required':'application auth to confirm',
+      tls:isTls?'TLS configured':'TLS to confirm',order:(pr==='database'||pr==='cache'||pr==='queue')?'1 - data services':pr==='backend'?'2 - backend/auth':pr==='gateway'?'3 - API gateway':'4 - web frontend',
+      evidence:(scanned(from)?'live scan + ':'')+why});
+  };
+  groups.frontend.forEach(function(c){(groups.gateway.length?groups.gateway:groups.backend).forEach(function(p){add(c,p,'role topology');});});
+  groups.gateway.forEach(function(c){groups.backend.forEach(function(p){add(c,p,'role topology');});});
+  groups.backend.concat(groups.service).forEach(function(c){groups.database.concat(groups.cache,groups.queue).forEach(function(p){add(c,p,'role topology');});});
   comps.forEach(function(c){
-    var deps=(R6P.components||[]).filter(function(x){return x.name!==c.name;}).map(function(x){return x.name;});
-    if(!deps.length)rows.push({from:c.name,to:'No in-system dependency detected',proto:'n/a',port:'n/a',evidence:'Business System has one component'});
-    deps.slice(0,5).forEach(function(d){rows.push({from:c.name,to:d,proto:/database|db|postgres|mysql/i.test(d)?'tcp/db':'http/tcp',port:/database|db|postgres|mysql/i.test(d)?'5432/3306':'80/443',evidence:(R6P.depScan&&R6P.depScan[c.name])?'live scan + topology':'imported topology'});});
+    var declared=c.dependencies||c.dependsOn||c.depends_on||[];
+    if(typeof declared==='string')declared=declared.split(/[,;\n]/);
+    (declared||[]).forEach(function(name){var p=comps.find(function(x){return String(name).toLowerCase().indexOf(String(x.name).toLowerCase())>=0||String(x.name).toLowerCase().indexOf(String(name).trim().toLowerCase())>=0;});if(p)add(c,p,'declared dependency');});
   });
-  return rows.map(function(r){return '<tr><td style="font-weight:700;">'+r.from+'</td><td>'+r.to+'</td><td>'+r.proto+'</td><td>'+r.port+'</td><td style="font-size:11px;color:#64748b;">'+r.evidence+'</td></tr>';}).join('');
+  return rows;
+};
+window.r6pDependencyGraphRows=function(){
+  var rows=r6pDependencyGraphModel();
+  if(!(R6P.components||[]).length)return '<tr><td colspan="9" style="color:#64748b;font-style:italic;">No components selected yet.</td></tr>';
+  if(!rows.length)return '<tr><td colspan="9" style="color:#d97706;">No credible dependency relationship is available. Add declared dependencies or run the live scan; no full-mesh graph was assumed.</td></tr>';
+  return rows.map(function(r){return '<tr><td style="font-weight:700;">'+r.from+'</td><td>'+r.to+'</td><td>'+r.proto+'</td><td>'+r.port+'</td><td>'+r.endpoint+'</td><td>'+r.auth+'</td><td>'+r.tls+'</td><td>'+r.order+'</td><td style="font-size:11px;color:#64748b;">'+r.evidence+'</td></tr>';}).join('');
 };
 window.r6pNormalizedDiscoveryRows=function(){
   var comps=R6P.components||[];
@@ -978,6 +1046,7 @@ window.r6pContent=function(n){
   }
   if(n===3){
     var comps6=(R6P.components||[]);
+    var defaultScanConnection=r6pInputConnectionFor(comps6[0]||{});
     var scanOptions=comps6.length?'<option value="__all__">All components scan ('+comps6.length+')</option>'+comps6.map(function(c,i){return '<option value="'+i+'">'+r6pHtml(c.name)+' — '+r6pHtml(r6pComponentTarget(c)||'mapping required')+'</option>';}).join(''):'<option value="">No components</option>';
     var pendingCards=comps6.map(function(c){
       var endpoint=r6pComponentTarget(c),vm=c.vmId||c.vm_id||c.sourceVmId||c.name;
@@ -1000,8 +1069,8 @@ window.r6pContent=function(n){
       +'<div class="r6p-info-box"><strong>Component Scan Appraisal</strong><br>Evaluate the runtime, services, application files, dependencies, storage, health, security and containerization constraints of every Business Apps System component. Twenty independent, allowlisted probes preserve exit code, stdout, stderr, timeout and truncation evidence. No snapshots are created.</div>'
       +'<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px;">'
       +'<div><label style="font-size:11px;font-weight:700;color:#334155;display:block;margin-bottom:4px;">Component scan scope</label><select id="r6p-scan-comp" onchange="r6pScanScopeChanged()" style="padding:7px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;min-width:310px;">'+scanOptions+'</select></div>'
-      +'<div><label style="font-size:11px;font-weight:700;color:#334155;display:block;margin-bottom:4px;">SSH User</label><input id="r6p-scan-user" value="root" style="padding:7px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;width:100px;"></div>'
-      +'<div><label style="font-size:11px;font-weight:700;color:#334155;display:block;margin-bottom:4px;">SSH Key Path</label><input id="r6p-scan-key" value="~/.ssh/id_rsa" style="padding:7px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;width:160px;"></div>'
+      +'<div><label style="font-size:11px;font-weight:700;color:#334155;display:block;margin-bottom:4px;">SSH User</label><input id="r6p-scan-user" value="'+r6pHtml(defaultScanConnection.sshUser||'ubuntu')+'" style="padding:7px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;width:100px;"></div>'
+      +'<div><label style="font-size:11px;font-weight:700;color:#334155;display:block;margin-bottom:4px;">SSH Private Key Path / Secret Ref</label><input id="r6p-scan-key" value="'+r6pHtml(defaultScanConnection.sshKeyPath||'~/.ssh/id_rsa')+'" style="padding:7px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;width:190px;"></div>'
       +'<div><label style="font-size:11px;font-weight:700;color:#334155;display:block;margin-bottom:4px;">Managed known_hosts</label><input id="r6p-scan-known-hosts" value="./data/ssh/known_hosts" style="padding:7px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;width:180px;"></div>'
       +'<button id="r6p-full-scan-btn" class="r6p-btn primary" onclick="r6pStartProductionScan()" style="padding:8px 16px;font-size:12px;">&#9654; Run Scan</button>'
       +'<button id="r6p-stop-scan-btn" class="r6p-btn secondary" onclick="r6pStopProductionScan()" style="padding:8px 16px;font-size:12px;" disabled>Stop Scan</button>'
@@ -1025,8 +1094,8 @@ window.r6pContent=function(n){
   }
   if(n===5){
     return '<div class="r6p-info-box">Define consumer/provider relationships, protocols, ports, current endpoints, authentication/TLS placeholders and startup order. Live-scan evidence strengthens this graph when available.</div>'
-      +'<div style="overflow-x:auto;margin-bottom:14px;"><table class="r6p-table"><thead><tr><th>Consumer</th><th>Provider</th><th>Protocol</th><th>Port</th><th>Evidence</th></tr></thead><tbody>'+r6pDependencyGraphRows()+'</tbody></table></div>'
-      +'<pre style="background:#0f172a;color:#7dd3fc;border-radius:8px;padding:12px;font-size:11px;white-space:pre-wrap;max-height:180px;overflow:auto;">dependency-graph.yaml\n# generated from selected Business System and runtime inspection\n'+(R6P.components||[]).map(function(c){return '- consumer: '+c.name+'\n  providers: '+(R6P.components||[]).filter(function(x){return x.name!==c.name;}).map(function(x){return x.name;}).join(', ');}).join('\n')+'</pre>'
+      +'<div style="overflow-x:auto;margin-bottom:14px;"><table class="r6p-table"><thead><tr><th>Consumer</th><th>Provider</th><th>Protocol</th><th>Port</th><th>Current endpoint</th><th>Authentication</th><th>TLS</th><th>Startup order</th><th>Evidence</th></tr></thead><tbody>'+r6pDependencyGraphRows()+'</tbody></table></div>'
+      +'<pre style="background:#0f172a;color:#7dd3fc;border-radius:8px;padding:12px;font-size:11px;white-space:pre-wrap;max-height:180px;overflow:auto;">dependency-graph.yaml\n# directional graph; unknowns are explicit\n'+r6pDependencyGraphModel().map(function(r){return '- consumer: '+r.from+'\n  provider: '+r.to+'\n  protocol: '+r.proto+'\n  port: '+r.port+'\n  endpoint: '+r.endpoint+'\n  authentication: '+r.auth+'\n  tls: '+r.tls+'\n  startup_order: '+r.order;}).join('\n')+'</pre>'
       +r6pFoot(n);
   }
   if(n===6){
@@ -1454,7 +1523,7 @@ window.r6pMarkStep1Selected=function(){
   var pEl=document.getElementById('r6p-pct');if(pEl)pEl.textContent=pct+'%';
   r6pRenderProgress();
 };
-window.r6pSelectBS=function(id){document.querySelectorAll('[id^="r6p-bsc-"]').forEach(function(el){el.classList.remove('selected');});var c=document.getElementById('r6p-bsc-'+id);if(c)c.classList.add('selected');try{var raw=localStorage.getItem('uatS1_systems')||'[]';var sys=JSON.parse(raw);var bs=sys.find(function(s){return s.id===id;});if(!bs)return;localStorage.setItem(R6P_SELECTED_BS_KEY,String(bs.id));R6P_BS_STORAGE_SIG=raw;R6P.bs=bs;R6P.components=bs.components||[];var si=document.getElementById('r6p-sum-input');if(si)si.textContent=bs.name;var sc=document.getElementById('r6p-sum-comps');if(sc)sc.textContent=(bs.components||[]).length+' components';r6pMarkStep1Selected();r6pLoadBiz();if(typeof r6pRenderContainerReadyForm==='function')r6pRenderContainerReadyForm();if(typeof r6pRefreshComponentDrivenStages==='function')r6pRefreshComponentDrivenStages();}catch(e){}};
+window.r6pSelectBS=function(id){document.querySelectorAll('[id^="r6p-bsc-"]').forEach(function(el){el.classList.remove('selected');});var c=document.getElementById('r6p-bsc-'+id);if(c)c.classList.add('selected');try{var raw=localStorage.getItem('uatS1_systems')||'[]';var sys=JSON.parse(raw);var bs=sys.find(function(s){return s.id===id;});if(!bs)return;localStorage.setItem(R6P_SELECTED_BS_KEY,String(bs.id));R6P_BS_STORAGE_SIG=raw;R6P.bs=bs;R6P.components=bs.components||[];R6P.scanRunId=null;R6P.structuredAppraisal=null;R6P.appraisalReviewed=false;var si=document.getElementById('r6p-sum-input');if(si)si.textContent=bs.name;var sc=document.getElementById('r6p-sum-comps');if(sc)sc.textContent=(bs.components||[]).length+' components';r6pMarkStep1Selected();r6pLoadBiz();if(typeof r6pRenderContainerReadyForm==='function')r6pRenderContainerReadyForm();if(typeof r6pRefreshComponentDrivenStages==='function')r6pRefreshComponentDrivenStages();r6pRestoreScanRun();}catch(e){}};
 window.r6pDeleteBS=function(id,name){
   if(!confirm('Delete business system "'+name+'"? This removes it from Migration Logs everywhere, not just here.'))return;
   try{
@@ -2561,18 +2630,32 @@ window.r6pFormatProductionScanLog=function(run){
   }
   return lines.join('\n');
 };
+window.r6pRootCauseRecommendedActions=function(x){
+  var code=x&&x.errorCode||"";
+  var defaults={
+    PRIVATE_KEY_CAPTURE_PATH:["Remove or relocate the private key out of the application/capture path.","Rotate or re-issue the key after migration; do not bake it into an image.","Exclude the path from capture and retry this component."],
+    PLAINTEXT_SECRET:["Externalize the plaintext secret into the target secret manager and rotate it.","Block container build until the secret is removed from captured source."],
+    PLAINTEXT_SECRET_HARDCODED:["Move hardcoded credentials to environment or secret manager injection.","Rotate the exposed credential before package generation."],
+    SSH_HOST_KEY_CHANGED:["Verify the new fingerprint with the infrastructure owner.","Use Verify and Replace Key to update only the managed known_hosts entry, then retry the VM."],
+    COMPONENT_VM_MAPPING_MISSING:["Open Stage 1 and map this component to the correct OpenStack server UUID.","Set FLEX Target IP/URL or source VM UUID, save the Business System, then retry this component."]
+  };
+  var summary=String((x&&x.summary)||"").trim();
+  var actions=(x&&x.recommendedActions||[]).filter(Boolean).map(function(a){return String(a).trim();}).filter(function(a){return a&&a!==summary;});
+  if(!actions.length&&defaults[code])actions=defaults[code];
+  return actions.length?actions:["Review diagnostics, correct the source configuration, then retry the affected component."];
+};
 window.r6pFailedChecksTable=function(run){
   var roots=run&&run.appraisal&&run.appraisal.rootCauses||[];
   if(!roots.length)(run&&run.components||[]).forEach(function(c){(c.probes||[]).forEach(function(p){if(p.status==='FAIL'||p.status==='BLOCKED')roots.push({componentId:c.componentId,componentName:c.componentName,sourceVmId:c.sourceVmId,probeId:p.probeId,errorCode:p.errorCode,summary:p.diagnosticSummary||p.stderr||p.stdout,recommendedActions:p.recommendedActions||[p.remediation],skippedChecks:(c.probes||[]).filter(function(s){return s.derivedFrom===p.rootCauseId;}).length});});});
-  return '<section class="r6p-failed-checks" style="margin:16px 0;border:1px solid #fecaca;border-radius:9px;padding:12px;background:#fff;"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;"><div><h3 style="margin:0;">Failed Checks by Components — Root Causes</h3><div style="font-size:11px;color:#64748b;">Prerequisite-skipped probes are collapsed beneath their root cause and are not counted as independent blockers.</div></div><div style="display:flex;gap:6px;"><button class="r6p-btn secondary" onclick="r6pRetryAllFailed()">Retry All Failed</button><button class="r6p-btn secondary" onclick="r6pExportFailedChecksCsv()">Export Root Causes CSV</button></div></div><div style="overflow:auto;margin-top:10px;"><table class="r6p-table"><thead><tr><th>Component / VM</th><th>Root cause</th><th>Details / impact</th><th>Recommended actions</th><th>Retry</th></tr></thead><tbody>'+(roots.length?roots.map(function(x){var actions=(x.recommendedActions||[]).filter(Boolean),fingerprints=x.errorCode==='SSH_HOST_KEY_CHANGED'?'<br><b>Target:</b> '+r6pHtml(x.targetHost||'unknown')+'<br><b>Old key:</b> '+r6pHtml(x.oldFingerprint||'not reported')+'<br><b>New key:</b> '+r6pHtml(x.newFingerprint||'not reported'):'';return '<tr><td><b>'+r6pHtml(x.componentName)+'</b><br>'+r6pHtml(x.sourceVmId||'unmapped')+'</td><td><b style="color:#dc2626;">'+r6pHtml(x.errorCode||x.probeId||'SCAN_FAILURE')+'</b><br>'+r6pHtml(x.probeId||'')+'</td><td style="max-width:390px;white-space:pre-wrap;">'+r6pHtml(x.summary||'No diagnostic summary returned.')+fingerprints+'<br><b>Impact:</b> '+r6pHtml(x.skippedChecks||0)+' dependent checks skipped</td><td>'+r6pHtml(actions.join(' • ')||'Review diagnostics and retry.')+'</td><td><button class="r6p-btn secondary" onclick="r6pRetryAppraisal(\''+r6pHtml(x.componentId)+'\')">Retry Component</button>'+(x.sourceVmId?'<button class="r6p-btn secondary" style="margin-top:4px;" onclick="r6pRetryVm(\''+r6pHtml(x.sourceVmId)+'\')">Retry VM</button>':'')+(x.errorCode==='SSH_HOST_KEY_CHANGED'?'<button class="r6p-btn secondary" style="margin-top:4px;" onclick="r6pVerifyReplaceHostKey(\''+r6pHtml(x.componentId)+'\')">Verify and Replace Key</button>':'')+'</td></tr>';}).join(''):'<tr><td colspan="5">No root failures or blockers.</td></tr>')+'</tbody></table></div></section>';
+  return '<section class="r6p-failed-checks" style="margin:16px 0;border:1px solid #fecaca;border-radius:9px;padding:12px;background:#fff;"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;"><div><h3 style="margin:0;">Failed Checks by Components — Root Causes</h3><div style="font-size:11px;color:#64748b;">Prerequisite-skipped probes are collapsed beneath their root cause and are not counted as independent blockers.</div></div><div style="display:flex;gap:6px;"><button class="r6p-btn secondary" onclick="r6pRetryAllFailed()">Retry All Failed</button><button class="r6p-btn secondary" onclick="r6pExportFailedChecksCsv()">Export Root Causes CSV</button></div></div><div style="overflow:auto;margin-top:10px;"><table class="r6p-table"><thead><tr><th>Component / VM</th><th>Root cause</th><th>Details / impact</th><th>Recommended actions</th><th>Retry</th></tr></thead><tbody>'+(roots.length?roots.map(function(x){var actions=r6pRootCauseRecommendedActions(x),fingerprints=x.errorCode==='SSH_HOST_KEY_CHANGED'?'<br><b>Target:</b> '+r6pHtml(x.targetHost||'unknown')+'<br><b>Old key:</b> '+r6pHtml(x.oldFingerprint||'not reported')+'<br><b>New key:</b> '+r6pHtml(x.newFingerprint||'not reported'):'';return '<tr><td><b>'+r6pHtml(x.componentName)+'</b><br>'+r6pHtml(x.sourceVmId||'unmapped')+'</td><td><b style="color:#dc2626;">'+r6pHtml(x.errorCode||x.probeId||'SCAN_FAILURE')+'</b><br>'+r6pHtml(x.probeId||'')+'</td><td style="max-width:390px;white-space:pre-wrap;">'+r6pHtml(x.summary||'No diagnostic summary returned.')+fingerprints+'<br><b>Impact:</b> '+r6pHtml(x.skippedChecks||0)+' dependent checks skipped</td><td>'+r6pHtml(actions.join(' • ')||'Review diagnostics and retry.')+'</td><td><button class="r6p-btn secondary" onclick="r6pRetryAppraisal(\''+r6pHtml(x.componentId)+'\')">Retry Component</button>'+(x.sourceVmId?'<button class="r6p-btn secondary" style="margin-top:4px;" onclick="r6pRetryVm(\''+r6pHtml(x.sourceVmId)+'\')">Retry VM</button>':'')+(x.errorCode==='SSH_HOST_KEY_CHANGED'?'<button class="r6p-btn secondary" style="margin-top:4px;" onclick="r6pVerifyReplaceHostKey(\''+r6pHtml(x.componentId)+'\')">Verify and Replace Key</button>':'')+'</td></tr>';}).join(''):'<tr><td colspan="5">No root failures or blockers.</td></tr>')+'</tbody></table></div></section>';
 };
 window.r6pAppraisalAllowsStage8=function(c){
-  var a=R6P.structuredAppraisal&&R6P.structuredAppraisal.components&&R6P.structuredAppraisal.components.find(function(x){return x.componentName===c.name;});
+  var a=r6pFindComponentAppraisal(c);
   if(!a)return false;
   return ['READY_FOR_STAGE_8','DB_NATIVE_REQUIRED','RETAIN_VM_RECOMMENDED'].indexOf(a.componentVerdict)>=0||
     (a.componentVerdict==='READY_FOR_STAGE_8_WITH_WARNINGS'&&R6P.appraisalReviewed===true);
 };
-window.r6pProductionScanPayload=function(){
+window.r6pProductionScanPayloadLegacy=function(){
   var user=((document.getElementById('r6p-scan-user')||{}).value||'').trim();
   var key=((document.getElementById('r6p-scan-key')||{}).value||'').trim();
   var known=((document.getElementById('r6p-scan-known-hosts')||{}).value||'./data/ssh/known_hosts').trim();
@@ -2580,6 +2663,33 @@ window.r6pProductionScanPayload=function(){
   var scope=(document.getElementById('r6p-scan-comp')||{}).value||'__all__';
   var selected=scope==='__all__'?all:(all[parseInt(scope,10)]?[all[parseInt(scope,10)]]:[]);
   return {businessSystem:{id:R6P.bs&&R6P.bs.id,name:R6P.bs&&R6P.bs.name,totalComponentCount:all.length,scanScope:scope==='__all__'?'ALL_COMPONENTS':'SINGLE_COMPONENT',components:selected.map(function(c){var ep=r6pParseSshTarget(r6pComponentTarget(c),c),mapped=r6pResolveComponentVm(c),vmId=mapped.id,dbMode=c.databaseAccessMode||c.database_access_mode||c.databaseTargetType||((/database|db/i.test(c.type||c.role||c.name||'')&&!vmId)?'UNKNOWN':null);return{id:c.id||c.name,name:c.name,sourceVmId:vmId,source_vm_id:vmId,sourceVmName:c.sourceVmName||c.source_vm_name||c.vmName||c.vm_name||mapped.name||null,sourceIp:(ep&&ep.host)||c.sourceIp||c.source_ip||mapped.ip||null,sshHost:ep&&ep.host,sshPort:ep&&ep.port,sshUser:c.sshUser||c.ssh_user||user,cloudRegion:c.cloudRegion||c.cloud_region||mapped.region||R6P.bs&&R6P.bs.region||null,scanTargetId:c.scanTargetId||c.scan_target_id||vmId,expectedFingerprint:c.expectedFingerprint||c.sshFingerprint||null,type:c.type||c.role||'',databaseAccessMode:dbMode,databaseEndpoint:c.databaseEndpoint||r6pComponentTarget(c),cloudInventory:c.cloudInventory||c.cloud_inventory||null,volumeIds:c.volumeIds||c.volume_ids||[]};})},ssh:{user:user,keyPath:key,knownHostsFile:known}};
+};
+window.r6pProductionScanPayload=function(){
+  var user=((document.getElementById('r6p-scan-user')||{}).value||'').trim();
+  var key=((document.getElementById('r6p-scan-key')||{}).value||'').trim();
+  var known=((document.getElementById('r6p-scan-known-hosts')||{}).value||'./data/ssh/known_hosts').trim();
+  var all=(R6P.components||[]),scope=(document.getElementById('r6p-scan-comp')||{}).value||'__all__';
+  var selected=scope==='__all__'?all:(all[parseInt(scope,10)]?[all[parseInt(scope,10)]]:[]);
+  var components=selected.map(function(c){
+    var ep=r6pParseSshTarget(r6pComponentTarget(c),c),mapped=r6pResolveComponentVm(c),vmId=mapped.id;
+    var input=r6pInputConnectionFor(c),isDb=/database|db/i.test((c.type||c.role||'')+' '+(c.name||''));
+    var serviceEndpoint=r6pParseTargetEndpoint(r6pComponentTarget(c)),healthPath=String(c.path||c.healthPath||c.health_path||'').split(',')[0];
+    var dbMode=c.databaseAccessMode||c.database_access_mode||c.databaseTargetType||(isDb&&!vmId?(input.sshConfigured?'VM_SSH':'UNKNOWN'):null);
+    /* A stale UNKNOWN saved by an older UI must not suppress newly saved Input SSH credentials. */
+    if(isDb&&input.sshConfigured&&String(dbMode||'').toUpperCase()==='UNKNOWN')dbMode='VM_SSH';
+    return {id:c.id||c.name,name:c.name,sourceVmId:vmId,source_vm_id:vmId,
+      sourceVmName:c.sourceVmName||c.source_vm_name||c.vmName||c.vm_name||mapped.name||null,
+      sourceIp:(ep&&ep.host)||c.sourceIp||c.source_ip||mapped.ip||null,sshHost:ep&&ep.host,sshPort:ep&&ep.port,
+      sshUser:input.sshUser||user,sshKeyPath:input.sshKeyPath||key,
+      cloudRegion:c.cloudRegion||c.cloud_region||mapped.region||R6P.bs&&R6P.bs.region||null,
+      scanTargetId:c.scanTargetId||c.scan_target_id||vmId,expectedFingerprint:c.expectedFingerprint||c.sshFingerprint||null,
+      type:c.type||c.role||'',databaseEngine:input.databaseEngine,databaseAccessMode:dbMode,
+      databaseEndpoint:input.databaseEndpoint||c.databaseEndpoint||r6pComponentTarget(c),
+      healthPath:healthPath&&healthPath.charAt(0)==='/'?healthPath:null,applicationPort:serviceEndpoint&&serviceEndpoint.port,
+      cloudInventory:c.cloudInventory||c.cloud_inventory||null,vmStatus:c.vmStatus||c.vm_status||null,
+      bootSource:c.bootSource||c.boot_source||null,volumeIds:c.volumeIds||c.volume_ids||[]};
+  });
+  return {businessSystem:{id:R6P.bs&&R6P.bs.id,name:R6P.bs&&R6P.bs.name,totalComponentCount:all.length,scanScope:scope==='__all__'?'ALL_COMPONENTS':'SINGLE_COMPONENT',components:components},ssh:{user:user,keyPath:key,knownHostsFile:known}};
 };
 window.r6pSetScanUiVersion=function(version){
   var known=R6_SCAN_UI_VERSIONS.some(function(v){return v.id===version;});
@@ -2607,42 +2717,77 @@ window.r6pApplySelectedScanUiTheme=function(){
 };
 window.r6pApplyScanUiVersion=function(){
   var body=document.getElementById('r6p-body-3'),host=body&&body.querySelector('.r6p-stage-body-inner');if(!host)return;
-  if(R6P.scanUiVersion==='scan-ui-v2'&&window.R6ScanUIV2){window.R6ScanUIV2.mount(host);return;}
   host.innerHTML=r6pContent(3);
   if(R6P.structuredAppraisal)r6pRenderProductionAppraisal(R6P.structuredAppraisal);
 };
 window.r6pScanScopeChanged=function(){
   var sel=document.getElementById('r6p-scan-comp'),btn=document.getElementById('r6p-full-scan-btn');if(!sel||!btn)return;
   btn.innerHTML='&#9654; Run Scan';
+  if(sel.value==='__all__')return;
+  var c=(R6P.components||[])[parseInt(sel.value,10)],input=r6pInputConnectionFor(c||{});
+  var userEl=document.getElementById('r6p-scan-user'),keyEl=document.getElementById('r6p-scan-key');
+  if(userEl&&input.sshUser)userEl.value=input.sshUser;
+  if(keyEl&&input.sshKeyPath)keyEl.value=input.sshKeyPath;
 };
 window.r6pStartProductionScan=function(){
   var payload=r6pProductionScanPayload(),out=document.getElementById('r6p-production-scan-status');
+  payload.requestId='r6-scan-'+Date.now()+'-'+Math.random().toString(16).slice(2);
   if(!payload.businessSystem.components.length){alert('Select a Business System with FLEX target IPs first.');return;}
   var requiresSsh=payload.businessSystem.components.some(function(c){return ['MANAGED_DATABASE','KUBERNETES_SERVICE','PRIVATE_ENDPOINT','UNKNOWN'].indexOf(String(c.databaseAccessMode||'').toUpperCase())<0;});
   if(requiresSsh&&(!payload.ssh.user||!payload.ssh.keyPath)){alert('SSH user and key path are required for VM-hosted components.');return;}
   r6pSetProductionScanLog('Starting structured scan...');
   var button=document.getElementById('r6p-full-scan-btn');if(button)button.disabled=true;
-  fetch('/api/r6/scans/business-system/run',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}).then(function(r){return r.json();}).then(function(data){
-    if(!data.ok)throw new Error(data.error||'scan start failed');
-    R6P.scanRunId=data.runId;localStorage.setItem('r6p_latest_scan_run',data.runId);R6P.appraisalReviewed=false;
-    var stop=document.getElementById('r6p-stop-scan-btn');if(stop)stop.disabled=false;
-    r6pPollProductionScan();
-  }).catch(function(error){r6pSetProductionScanLog('Scan start failed: '+error.message);if(button)button.disabled=false;});
+  var send=function(attempt){
+    fetch('/api/r6/scans/business-system/run',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},cache:'no-store',body:JSON.stringify(payload)})
+    .then(function(r){return r.text().then(function(text){
+      var data;
+      try{data=text?JSON.parse(text):{};}catch(e){throw new Error('Scan API returned HTTP '+r.status+' with a non-JSON response');}
+      if(!r.ok||!data.ok)throw new Error(data.error||('Scan API returned HTTP '+r.status));
+      return data;
+    });})
+    .then(function(data){
+      R6P.scanRunId=data.runId;r6pRememberScanRun(data.runId);R6P.appraisalReviewed=false;
+      var stop=document.getElementById('r6p-stop-scan-btn');if(stop)stop.disabled=false;
+      r6pPollProductionScan();
+    })
+    .catch(function(error){
+      if(attempt<2&&/Failed to fetch|NetworkError|Load failed/i.test(error.message||'')){
+        r6pSetProductionScanLog('Scan API connection interrupted; retrying '+(attempt+1)+'/2...');
+        setTimeout(function(){send(attempt+1);},600*(attempt+1));
+        return;
+      }
+      r6pSetProductionScanLog('Scan start failed at '+window.location.origin+': '+error.message);
+      if(button)button.disabled=false;
+    });
+  };
+  send(0);
 };
 window.r6pPollProductionScan=function(){
   if(!R6P.scanRunId)return;
-  fetch('/api/r6/scans/runs/'+encodeURIComponent(R6P.scanRunId),{cache:'no-store',headers:{'Cache-Control':'no-cache'}}).then(function(r){return r.json();}).then(function(run){
+  fetch('/api/r6/scans/runs/'+encodeURIComponent(R6P.scanRunId),{cache:'no-store',headers:{'Cache-Control':'no-cache','Accept':'application/json'}}).then(function(r){
+    return r.text().then(function(text){
+      var data;
+      try{data=text?JSON.parse(text):{};}catch(e){throw new Error('Scan refresh returned HTTP '+r.status+' with a non-JSON response');}
+      if(!r.ok)throw new Error(data.error||('Scan refresh returned HTTP '+r.status));
+      return data;
+    });
+  }).then(function(run){
     if(!run.ok)throw new Error(run.error||'run unavailable');
-    if(R6P.bs&&run.businessSystem&&run.businessSystem.id&&run.businessSystem.id!==R6P.bs.id){throw new Error('saved scan belongs to a different Business System');}
+    if(R6P.bs&&run.businessSystem&&run.businessSystem.id&&String(run.businessSystem.id)!==String(R6P.bs.id)){R6P.scanRunId=null;R6P.structuredAppraisal=null;throw new Error('saved scan belongs to a different Business System');}
+    r6pRememberScanRun(run.runId);
     var p=run.progress||{},out=document.getElementById('r6p-production-scan-status');
     r6pSetProductionScanLog(r6pFormatProductionScanLog(run));
-    if(run.components&&run.components.length){R6P.structuredAppraisal=run;r6pRenderProductionAppraisal(run);}
+    R6P.structuredAppraisal=run;r6pRenderProductionAppraisal(run);
     if(run.status==='RUNNING'){window.clearTimeout(R6P.scanPollTimer);R6P.scanPollTimer=window.setTimeout(r6pPollProductionScan,1500);return;}
     var button=document.getElementById('r6p-full-scan-btn'),stop=document.getElementById('r6p-stop-scan-btn');if(button)button.disabled=false;if(stop)stop.disabled=true;
     if(run.appraisal){R6P.structuredAppraisal=run;r6pAdoptStructuredEvidence(run);r6pRenderProductionAppraisal(run);}
-  }).catch(function(error){r6pSetProductionScanLog('Refresh failed: '+error.message,true);});
+  }).catch(function(error){
+    r6pSetProductionScanLog('Live refresh interrupted: '+error.message+'; retrying...',true);
+    window.clearTimeout(R6P.scanPollTimer);
+    if(R6P.scanRunId)R6P.scanPollTimer=window.setTimeout(r6pPollProductionScan,1500);
+  });
 };
-window.r6pRefreshAppraisal=function(){R6P.scanRunId=R6P.scanRunId||localStorage.getItem('r6p_latest_scan_run');if(R6P.scanRunId)r6pPollProductionScan();else alert('No saved scan run exists.');};
+window.r6pRefreshAppraisal=function(){if(!R6P.scanRunId)r6pRestoreScanRun();else r6pPollProductionScan();if(!R6P.scanRunId)alert('No saved scan run exists for this Business System.');};
 window.r6pStopProductionScan=function(){if(!R6P.scanRunId)return;fetch('/api/r6/scans/runs/'+encodeURIComponent(R6P.scanRunId)+'/cancel',{method:'POST'}).then(function(){r6pPollProductionScan();});};
 window.r6pExportProductionScan=function(){var id=R6P.scanRunId||localStorage.getItem('r6p_latest_scan_run');if(!id){alert('Run a scan first.');return;}window.location='/api/r6/scans/runs/'+encodeURIComponent(id)+'/export';};
 window.r6pExportAllAppraisalsCsv=function(){var id=R6P.scanRunId||localStorage.getItem('r6p_latest_scan_run');if(!id){alert('Run a scan first.');return;}window.location='/api/r6/scans/runs/'+encodeURIComponent(id)+'/appraisals.csv';};
@@ -2650,23 +2795,41 @@ window.r6pExportAppraisalCsv=function(componentId){var id=R6P.scanRunId||localSt
 window.r6pExportFailedChecksCsv=function(){var id=R6P.scanRunId||localStorage.getItem('r6p_latest_scan_run');if(!id){alert('Run a scan first.');return;}window.location='/api/r6/scans/runs/'+encodeURIComponent(id)+'/failed-checks.csv';};
 window.r6pAdoptStructuredEvidence=function(run){
   R6P.depScan=R6P.depScan||{};
-  (run.components||[]).forEach(function(a){R6P.depScan[a.componentName]={status:a.componentVerdict,completed:['READY_FOR_STAGE_8','DB_NATIVE_REQUIRED','RETAIN_VM_RECOMMENDED'].indexOf(a.componentVerdict)>=0,structured:true,runId:run.runId,appraisal:a,rawLog:(a.probes||[]).map(function(p){return p.probeId+' '+p.status+'\n'+(p.stdout||'')+'\n'+(p.stderr||'');}).join('\n')};});
+  (run.components||[]).forEach(function(a){
+    var source=(R6P.components||[]).find(function(c){
+      var id=c.id||c.componentId||c.component_id;
+      return (id&&id===a.componentId)||c.name===a.componentName||(c.previousNames||[]).indexOf(a.componentName)>=0;
+    });
+    var key=source&&source.name||a.componentName;
+    R6P.depScan[key]={status:a.componentVerdict,completed:['READY_FOR_STAGE_8','DB_NATIVE_REQUIRED','RETAIN_VM_RECOMMENDED'].indexOf(a.componentVerdict)>=0,structured:true,runId:run.runId,appraisal:a,rawLog:(a.probes||[]).map(function(p){return p.probeId+' '+p.status+'\n'+(p.stdout||'')+'\n'+(p.stderr||'');}).join('\n')};
+  });
   if(run.appraisal&&['READY','READY_FOR_STAGE_8'].indexOf(run.appraisal.finalVerdict)>=0)R6P.appraisalReviewed=true;
   if(typeof r6pRefreshComponentDrivenStages==='function')r6pRefreshComponentDrivenStages();
 };
 window.r6pReviewAppraisal=function(){
   var a=R6P.structuredAppraisal&&R6P.structuredAppraisal.appraisal;if(!a)return;
-  if(['BLOCKED','BLOCKED_INFRASTRUCTURE','SCAN_FAILED','SCAN_ERROR'].indexOf(a.finalVerdict)>=0){alert('Blocked or failed scans cannot be approved.');return;}
+  if(['BLOCKED','BLOCKED_INFRASTRUCTURE','BLOCKED_SECURITY','BLOCKED_APPLICATION','SCAN_FAILED','SCAN_ERROR'].indexOf(a.finalVerdict)>=0||a.databaseReadiness==='BLOCKED'){alert('Blocked or failed appraisals cannot be approved. Resolve the failed checks first.');return;}
   if(confirm('Record review of warnings/manual findings and allow eligible components to continue to classification?')){R6P.appraisalReviewed=true;r6pAdoptStructuredEvidence(R6P.structuredAppraisal);r6pRenderProductionAppraisal(R6P.structuredAppraisal);}
 };
 window.r6pRenderProductionAppraisal=function(run){
-  if(R6P.scanUiVersion==='scan-ui-v2'&&window.R6ScanUIV2){window.R6ScanUIV2.update(run);return;}
   var root=document.getElementById('r6p-scan-appraisal'),verdictRoot=document.getElementById('r6p-scan-final-verdict'),failedRoot=document.getElementById('r6p-scan-failed-checks');if(!root)return;var a=run.appraisal;
   if(!a){root.innerHTML='<div class="r6p-info-box">Scan running. Completed component appraisals appear below.</div>';}
   var color=function(v){return /BLOCKED|FAILED|ERROR/.test(v)?'#dc2626':/WARNING|PARTIAL|MORE_EVIDENCE|REVIEW/.test(v)?'#d97706':/DB_NATIVE/.test(v)?'#2563eb':/RETAIN/.test(v)?'#7c3aed':'#16a34a';};
   var dimensions=a?'<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:7px;margin-top:10px;">'+[['Discovery Coverage',a.discoveryCoveragePercent+'%'],['Infrastructure Access',a.infrastructureAccessStatus],['Application Readiness',a.applicationReadiness],['Database Readiness',a.databaseReadiness],['Snapshot Readiness',a.snapshotReadiness],['Containerization Readiness',a.containerizationReadiness]].map(function(x){return '<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:7px;padding:8px;"><span style="font-size:10px;color:#64748b;">'+x[0]+'</span><br><b>'+r6pHtml(x[1])+'</b></div>';}).join('')+'</div>':'';
-  var summary=a?'<div style="border:2px solid '+color(a.finalVerdict)+';border-radius:10px;padding:14px;margin-bottom:14px;background:#fff;"><div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start;"><div><h3 style="margin:0 0 4px;">Business System Final Verdict</h3><div style="font-size:12px;color:#64748b;">'+r6pHtml(a.businessSystemName||'Business Apps System')+'</div></div><span style="color:'+color(a.finalVerdict)+';font-weight:900;">'+r6pHtml(a.finalVerdict)+'</span></div><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;margin-top:12px;">'+[['Components',a.summary.components],['Source VMs',a.summary.sourceVms],['Completed / applicable',(a.evidenceCoverage&&a.evidenceCoverage.completed||0)+' / '+(a.evidenceCoverage&&a.evidenceCoverage.applicable||0)],['Skipped',a.evidenceCoverage&&a.evidenceCoverage.skipped||0],['N/A',a.evidenceCoverage&&a.evidenceCoverage.notApplicable||0],['DB native',a.summary.databaseNative],['Blocked',a.summary.blocked],['Coverage',a.discoveryCoveragePercent+'%']].map(function(x){return '<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:7px;padding:8px;text-align:center;"><b>'+r6pHtml(x[1])+'</b><div style="font-size:10px;color:#64748b;">'+x[0]+'</div></div>';}).join('')+'</div>'+dimensions+'<div style="margin-top:10px;font-size:12px;"><b>Reason:</b> '+r6pHtml(a.reason||'')+'</div><div style="margin-top:6px;font-size:12px;"><b>Recommended fix / next action:</b> '+r6pHtml(a.nextAction)+'</div>'+((a.systemWarnings||[]).length?'<button class="r6p-btn secondary" onclick="r6pReviewAppraisal()" style="margin-top:10px;">'+(R6P.appraisalReviewed?'Warnings Reviewed':'Review Warnings')+'</button>':'')+'</div>':'';
+  var reviewBanner=a&&((a.rootCauses||[]).length||(a.systemWarnings||[]).length||a.finalVerdict==='REVIEW_REQUIRED'||a.finalVerdict==='READY_WITH_WARNINGS')?'<div style="border:2px solid '+(a.databaseReadiness==='BLOCKED'?'#dc2626':'#d97706')+';background:'+(a.databaseReadiness==='BLOCKED'?'#fef2f2':'#fffbeb')+';border-radius:10px;padding:14px;margin-bottom:14px;"><div style="font-size:14px;font-weight:900;color:'+(a.databaseReadiness==='BLOCKED'?'#b91c1c':'#92400e')+';">'+(a.databaseReadiness==='BLOCKED'?'ACTION REQUIRED - APPRAISAL BLOCKED':'REVIEW REQUIRED BEFORE CONTINUING')+'</div><div style="font-size:12px;margin-top:6px;">'+r6pHtml(((a.rootCauses||[])[0]||{}).summary||(a.systemWarnings||[])[0]||a.reason||'Review the appraisal findings.')+'</div><div style="font-size:12px;margin-top:5px;"><b>Next action:</b> '+r6pHtml(a.nextAction||'Review findings and retry affected checks.')+'</div>'+(a.databaseReadiness!=='BLOCKED'?'<button class="r6p-btn secondary" onclick="r6pReviewAppraisal()" style="margin-top:9px;">'+(R6P.appraisalReviewed?'Review Recorded':'Review Findings')+'</button>':'')+'</div>':'';
+  var summary=a?reviewBanner+'<div style="border:2px solid '+color(a.finalVerdict)+';border-radius:10px;padding:14px;margin-bottom:14px;background:#fff;"><div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start;"><div><h3 style="margin:0 0 4px;">Business System Final Verdict</h3><div style="font-size:12px;color:#64748b;">'+r6pHtml(a.businessSystemName||'Business Apps System')+'</div></div><span style="color:'+color(a.finalVerdict)+';font-weight:900;">'+r6pHtml(a.finalVerdict)+'</span></div><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;margin-top:12px;">'+[['Components',a.summary.components],['Source VMs',a.summary.sourceVms],['Completed / applicable',(a.evidenceCoverage&&a.evidenceCoverage.completed||0)+' / '+(a.evidenceCoverage&&a.evidenceCoverage.applicable||0)],['Skipped',a.evidenceCoverage&&a.evidenceCoverage.skipped||0],['N/A',a.evidenceCoverage&&a.evidenceCoverage.notApplicable||0],['DB native',a.summary.databaseNative],['Blocked',a.summary.blocked],['Coverage',a.discoveryCoveragePercent+'%']].map(function(x){return '<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:7px;padding:8px;text-align:center;"><b>'+r6pHtml(x[1])+'</b><div style="font-size:10px;color:#64748b;">'+x[0]+'</div></div>';}).join('')+'</div>'+dimensions+'<div style="margin-top:10px;font-size:12px;"><b>Reason:</b> '+r6pHtml(a.reason||'')+'</div><div style="margin-top:6px;font-size:12px;"><b>Recommended fix / next action:</b> '+r6pHtml(a.nextAction)+'</div></div>':'';
   var cards=(run.components||[]).map(function(c){var ps=c.probeSummary||{},ssh=(c.probes||[]).find(function(p){return p.probeId==='SCAN-001';})||{};return '<div style="border:1px solid #cbd5e1;border-top:4px solid '+color(c.componentVerdict)+';border-radius:9px;background:#fff;padding:13px;"><div style="display:flex;justify-content:space-between;gap:8px;"><strong>'+r6pHtml(c.componentName)+'</strong><span style="font-size:10px;color:'+color(c.componentVerdict)+';font-weight:900;">'+r6pHtml(c.componentVerdict)+'</span></div><div style="font-size:11px;color:#475569;margin:5px 0;">Mapped source VM: <b>'+r6pHtml(c.sourceVmName||c.sourceVmId||'unmapped')+'</b><br>Target IP: '+r6pHtml(c.sourceHost||c.sourceIp||'not mapped')+'<br>Access status: '+r6pHtml(ssh.status||'NOT_TESTED')+'<br>Completed checks: '+r6pHtml((ps.completed||0)+' / '+(ps.applicable||0))+' &bull; Warnings: '+r6pHtml((ps.warning||0)+(ps.passWithWarning||0))+' &bull; Root blockers: '+r6pHtml((c.blockers||[]).length)+'<br>Last scan: '+r6pHtml(c.probes&&c.probes.length?c.probes[c.probes.length-1].completedAt:'Never')+'</div><div style="display:flex;gap:12px;font-size:12px;"><b>Readiness '+c.containerReadinessScore+'%</b><b>Coverage '+c.discoveryCoveragePercent+'%</b></div><div style="font-size:11px;margin-top:8px;">Runtime: '+r6pHtml((c.runtime&&c.runtime.type)||'unknown')+' &bull; Ports: '+r6pHtml((c.ports||[]).join(', ')||'none')+'<br>Capture: '+r6pHtml(c.captureRecommendation)+'<br>Recommendation: '+r6pHtml(c.containerizationRecommendation)+'</div><div style="font-size:11px;margin-top:7px;color:#64748b;">'+(ps.pass||0)+' pass &bull; '+((ps.warning||0)+(ps.partial||0)+(ps.passWithWarning||0))+' warnings/partial &bull; '+((ps.fail||0)+(ps.blocked||0))+' root failures &bull; '+(ps.skippedPrerequisite||0)+' skipped</div><div style="display:flex;gap:6px;margin-top:10px;"><button class="r6p-btn secondary" onclick="r6pViewAppraisal(\''+r6pHtml(c.componentId)+'\')">View Appraisal</button><button class="r6p-btn secondary" onclick="r6pRetryAppraisal(\''+r6pHtml(c.componentId)+'\')">Retry Component</button>'+(c.sourceVmId?'<button class="r6p-btn secondary" onclick="r6pRetryVm(\''+r6pHtml(c.sourceVmId)+'\')">Retry VM</button>':'')+'</div></div>';}).join('');
+  var completedNames={};
+  (run.components||[]).forEach(function(c){completedNames[String(c.componentName||'').toLowerCase()]=true;});
+  cards+=(R6P.components||[]).filter(function(c){return !completedNames[String(c.name||'').toLowerCase()];}).map(function(c){
+    var live=String(run.currentComponent||'')===String(c.name||''),p=run.progress||{},status=live?'SCANNING':'QUEUED';
+    return '<div style="border:1px solid #cbd5e1;border-top:4px solid '+(live?'#2563eb':'#94a3b8')+';border-radius:9px;background:#fff;padding:13px;">'
+      +'<div style="display:flex;justify-content:space-between;gap:8px;"><strong>'+r6pHtml(c.name||'Component')+'</strong><span style="font-size:10px;color:'+(live?'#2563eb':'#64748b')+';font-weight:900;">'+status+'</span></div>'
+      +'<div style="font-size:11px;color:#64748b;margin:6px 0;">Endpoint: '+r6pHtml(r6pComponentTarget(c)||'mapping required')+'</div>'
+      +'<div style="font-size:11px;color:#334155;">'+(live?'Current probe: '+r6pHtml((p.currentProbe||'starting')+' '+(p.currentProbeName||''))+'<br>Completed probes: '+r6pHtml((p.completedProbes||0)+' / '+(p.totalProbes||20)):'Waiting for the preceding component to complete.')+'</div>'
+      +'<div style="font-size:11px;color:#64748b;margin-top:8px;">Live evidence and readiness will populate automatically.</div>'
+      +'</div>';
+  }).join('');
   if(verdictRoot)verdictRoot.innerHTML=summary;
   root.innerHTML='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:12px;">'+cards+'</div>';
   if(failedRoot)failedRoot.innerHTML=r6pFailedChecksTable(run);
@@ -2679,6 +2842,12 @@ window.r6pViewAppraisal=function(id){
 window.r6pCloseAppraisal=function(){var d=document.getElementById('r6p-appraisal-drawer');if(d)d.style.display='none';};
 window.r6pRetryAppraisal=function(id){
   if(!R6P.scanRunId)return;var payload=r6pProductionScanPayload();
+  var scanned=R6P.structuredAppraisal&&(R6P.structuredAppraisal.components||[]).find(function(x){return x.componentId===id;});
+  var source=scanned&&(R6P.components||[]).find(function(c){return c.name===scanned.componentName;});
+  var input=r6pInputConnectionFor(source||{});
+  if(input.sshUser)payload.ssh.user=input.sshUser;
+  if(input.sshKeyPath)payload.ssh.keyPath=input.sshKeyPath;
+  payload.ssh.knownHostsFile=((document.getElementById('r6p-scan-known-hosts')||{}).value||payload.ssh.knownHostsFile||'').trim();
   fetch('/api/r6/scans/runs/'+encodeURIComponent(R6P.scanRunId)+'/components/'+encodeURIComponent(id)+'/retry',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ssh:payload.ssh})}).then(function(r){return r.json();}).then(function(d){if(!d.ok)throw new Error(d.error);r6pRefreshAppraisal();}).catch(function(e){alert('Retry failed: '+e.message);});
 };
 window.r6pRetryVm=function(vmId){

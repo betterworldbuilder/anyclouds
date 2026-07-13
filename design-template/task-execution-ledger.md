@@ -261,3 +261,5 @@ Scores are evidence-based. Known gaps, unverified behavior, unrelated failures, 
 | Additional hardening | Advanced the R6 asset cache key so deployed browsers load the corrected layout immediately. |
 | Elapsed time | Approximately 8 minutes. |
 | Score | 100/100 — both render paths, fallback behavior, cache delivery and regression coverage are complete. |
+
+| 2026-07-13 | Fix Stage 3 failed-check root-cause table | 9 min | 8/10 | Backend root causes now fall back to remediation catalog; UI retry controls stack cleanly; focused syntax and sanity checks passed. Broader scanner tests still have pre-existing refactor failures unrelated to this table. |

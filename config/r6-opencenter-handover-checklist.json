@@ -1,0 +1,432 @@
+{
+  "schemaVersion": "1.0",
+  "description": "Canonical checklist for R6 → OpenCenter Handover Readiness. Every check in this file is evaluated before the bundle is released to OpenCenter deployment.",
+  "sections": [
+    {"id": "environment-preflight", "title": "Environment Preflight", "order": 1},
+    {"id": "bundle-completeness",   "title": "R6 Bundle Completeness",   "order": 2},
+    {"id": "images-registry",       "title": "Images and Registry",       "order": 3},
+    {"id": "kubernetes",            "title": "Kubernetes Resources",       "order": 4},
+    {"id": "storage-networking",    "title": "Storage and Networking",     "order": 5},
+    {"id": "gitops-flux",           "title": "GitOps and Flux",            "order": 6},
+    {"id": "hybrid",                "title": "Hybrid VM Connectivity",     "order": 7},
+    {"id": "stage12-gate",          "title": "Bundle and Stage 12 Gate",   "order": 8},
+    {"id": "validation-operations", "title": "Validation and Rollback",    "order": 9}
+  ],
+  "checks": [
+    {
+      "id": "R6-HO-001", "section": "environment-preflight", "stage": "0",
+      "title": "Local toolchain", "description": "Verify required generation and validation tools are present and executable.",
+      "requiredInput": ["python3", "git", "kubectl", "kustomize"],
+      "expectedOutput": "Tool version inventory",
+      "blockingPolicy": "ALWAYS", "applicabilityRule": "true",
+      "executor": "check_local_toolchain", "timeoutSeconds": 30,
+      "remediation": "Install missing binaries: python3, git, kubectl, kustomize.",
+      "evidenceTypes": ["command-output", "version-inventory"]
+    },
+    {
+      "id": "R6-HO-002", "section": "environment-preflight", "stage": "0",
+      "title": "PyYAML and Kustomize available", "description": "Verify Python yaml module and kustomize CLI are callable.",
+      "requiredInput": ["python3-yaml", "kustomize"],
+      "expectedOutput": "yaml.safe_load works; kustomize version returned",
+      "blockingPolicy": "ALWAYS", "applicabilityRule": "true",
+      "executor": "check_yaml_and_kustomize", "timeoutSeconds": 20,
+      "remediation": "pip install pyyaml; install kustomize binary.",
+      "evidenceTypes": ["command-output"]
+    },
+    {
+      "id": "R6-HO-003", "section": "environment-preflight", "stage": "0",
+      "title": "Git repository accessible", "description": "Verify git status and recent commit are readable.",
+      "requiredInput": ["git"],
+      "expectedOutput": "git rev-parse HEAD returns a SHA",
+      "blockingPolicy": "ALWAYS", "applicabilityRule": "true",
+      "executor": "check_git_repo", "timeoutSeconds": 15,
+      "remediation": "Ensure the project is a git repository and HEAD is valid.",
+      "evidenceTypes": ["command-output"]
+    },
+    {
+      "id": "R6-HO-004", "section": "environment-preflight", "stage": "0",
+      "title": "Registry access", "description": "Verify the container registry is reachable (HTTP 200/401 on ping).",
+      "requiredInput": ["registry_host"],
+      "expectedOutput": "HTTP response from registry API",
+      "blockingPolicy": "PRODUCTION", "applicabilityRule": "bundle.registry.host != ''",
+      "executor": "check_registry_access", "timeoutSeconds": 30,
+      "remediation": "Check registry credentials and network connectivity.",
+      "evidenceTypes": ["http-response"]
+    },
+    {
+      "id": "R6-HO-005", "section": "environment-preflight", "stage": "0",
+      "title": "Kubernetes cluster access", "description": "Verify kubectl can contact the target cluster.",
+      "requiredInput": ["kubeconfig"],
+      "expectedOutput": "kubectl cluster-info returns server URL",
+      "blockingPolicy": "ALWAYS", "applicabilityRule": "true",
+      "executor": "check_kubernetes_access", "timeoutSeconds": 30,
+      "remediation": "Set KUBECONFIG or configure ~/.kube/config for target cluster.",
+      "evidenceTypes": ["command-output"]
+    },
+    {
+      "id": "R6-HO-006", "section": "environment-preflight", "stage": "0",
+      "title": "GitOps repository access", "description": "Verify the GitOps repo directory exists and git status is clean enough to import.",
+      "requiredInput": ["gitops_dir"],
+      "expectedOutput": "GitOps directory exists; git status exits 0",
+      "blockingPolicy": "ALWAYS", "applicabilityRule": "true",
+      "executor": "check_gitops_access", "timeoutSeconds": 20,
+      "remediation": "Clone the GitOps repository or fix the opencenter cluster directory.",
+      "evidenceTypes": ["command-output"]
+    },
+    {
+      "id": "R6-HO-007", "section": "environment-preflight", "stage": "0",
+      "title": "Storage capability discovery", "description": "List available StorageClasses in the target cluster.",
+      "requiredInput": ["kubeconfig"],
+      "expectedOutput": "List of StorageClass names",
+      "blockingPolicy": "NON_BLOCKING", "applicabilityRule": "true",
+      "executor": "check_storage_classes", "timeoutSeconds": 20,
+      "remediation": "Verify cluster has required StorageClasses provisioned.",
+      "evidenceTypes": ["command-output"]
+    },
+    {
+      "id": "R6-HO-008", "section": "environment-preflight", "stage": "0",
+      "title": "Prometheus Operator capability", "description": "Check if Prometheus Operator CRDs are installed in the cluster.",
+      "requiredInput": ["kubeconfig"],
+      "expectedOutput": "servicemonitors.monitoring.coreos.com CRD found or absent",
+      "blockingPolicy": "MONITORING_REQUIRED", "applicabilityRule": "bundle.hasMonitorableComponents",
+      "executor": "check_prometheus_operator", "timeoutSeconds": 20,
+      "remediation": "Install prometheus-operator or kube-prometheus-stack via Flux.",
+      "evidenceTypes": ["command-output"]
+    },
+    {
+      "id": "R6-HO-009", "section": "environment-preflight", "stage": "0",
+      "title": "Velero capability", "description": "Check if Velero CRDs are installed in the cluster.",
+      "requiredInput": ["kubeconfig"],
+      "expectedOutput": "schedules.velero.io CRD found or absent",
+      "blockingPolicy": "BACKUP_REQUIRED", "applicabilityRule": "bundle.hasPVCs or bundle.hasOperatorManagedStateful",
+      "executor": "check_velero", "timeoutSeconds": 20,
+      "remediation": "Install Velero operator via Flux.",
+      "evidenceTypes": ["command-output"]
+    },
+    {
+      "id": "R6-HO-010", "section": "environment-preflight", "stage": "0",
+      "title": "Baseline regression fixtures", "description": "Run the full R6 test suite (67 tests) to prove backend generation is correct.",
+      "requiredInput": ["pytest"],
+      "expectedOutput": "67 passed, 0 failed",
+      "blockingPolicy": "ALWAYS", "applicabilityRule": "true",
+      "executor": "check_r6_test_suite", "timeoutSeconds": 120,
+      "remediation": "Fix failing tests before proceeding to handover.",
+      "evidenceTypes": ["command-output", "test-results"]
+    },
+    {
+      "id": "R6-HO-011", "section": "bundle-completeness", "stage": "11",
+      "title": "Bundle directory exists", "description": "Verify the bundle_dir was provided and the directory exists on disk.",
+      "requiredInput": ["bundle_dir"],
+      "expectedOutput": "bundle_dir is a directory with expected subdirectories",
+      "blockingPolicy": "ALWAYS", "applicabilityRule": "true",
+      "executor": "check_bundle_dir", "timeoutSeconds": 10,
+      "remediation": "Generate the bundle first via POST /api/r6/generate-bundle.",
+      "evidenceTypes": ["filesystem-check"]
+    },
+    {
+      "id": "R6-HO-012", "section": "bundle-completeness", "stage": "11",
+      "title": "business-system.yaml present", "description": "Verify the OpenCenter BusinessApplicationSystem blueprint is generated.",
+      "requiredInput": ["bundle_dir"],
+      "expectedOutput": "business-system.yaml parses as valid YAML with kind=BusinessApplicationSystem",
+      "blockingPolicy": "ALWAYS", "applicabilityRule": "true",
+      "executor": "check_business_system_yaml", "timeoutSeconds": 10,
+      "remediation": "Re-generate the bundle.",
+      "evidenceTypes": ["yaml-parse"]
+    },
+    {
+      "id": "R6-HO-013", "section": "bundle-completeness", "stage": "11",
+      "title": "bundle-validation.json present", "description": "Verify the Stage 12 gate result file exists and has zero blockers.",
+      "requiredInput": ["bundle_dir"],
+      "expectedOutput": "bundle-validation.json with status PASSED or PASSED_WITH_WARNINGS",
+      "blockingPolicy": "ALWAYS", "applicabilityRule": "true",
+      "executor": "check_bundle_validation_json", "timeoutSeconds": 10,
+      "remediation": "Fix all bundle blockers and re-generate.",
+      "evidenceTypes": ["json-parse"]
+    },
+    {
+      "id": "R6-HO-014", "section": "bundle-completeness", "stage": "11",
+      "title": "image-manifest.json present", "description": "Verify the image manifest lists all component images.",
+      "requiredInput": ["bundle_dir"],
+      "expectedOutput": "image-manifest.json is valid JSON with images array",
+      "blockingPolicy": "ALWAYS", "applicabilityRule": "true",
+      "executor": "check_image_manifest", "timeoutSeconds": 10,
+      "remediation": "Re-generate the bundle.",
+      "evidenceTypes": ["json-parse"]
+    },
+    {
+      "id": "R6-HO-015", "section": "bundle-completeness", "stage": "11",
+      "title": "Rollback runbook present", "description": "Verify operations/rollback-runbook.yaml exists with all required sections.",
+      "requiredInput": ["bundle_dir"],
+      "expectedOutput": "rollback-runbook.yaml with gitRevision, images, traffic, dataLimitations",
+      "blockingPolicy": "ALWAYS", "applicabilityRule": "true",
+      "executor": "check_rollback_runbook", "timeoutSeconds": 10,
+      "remediation": "Re-generate the bundle (rollback runbook is generated unconditionally).",
+      "evidenceTypes": ["yaml-parse"]
+    },
+    {
+      "id": "R6-HO-016", "section": "bundle-completeness", "stage": "11",
+      "title": "Zero plaintext secrets in bundle", "description": "Scan all generated YAML for credential patterns.",
+      "requiredInput": ["bundle_dir"],
+      "expectedOutput": "No password/token/secret patterns found in generated YAML",
+      "blockingPolicy": "ALWAYS", "applicabilityRule": "true",
+      "executor": "check_secret_scan", "timeoutSeconds": 30,
+      "remediation": "Remove any hardcoded credentials. Use SecretContract references.",
+      "evidenceTypes": ["scan-results"]
+    },
+    {
+      "id": "R6-HO-017", "section": "bundle-completeness", "stage": "11",
+      "title": "Generation is deterministic", "description": "Generate the bundle twice with identical input and compare output structure.",
+      "requiredInput": ["bundle_dir"],
+      "expectedOutput": "Identical file list and normalized YAML on second generation",
+      "blockingPolicy": "ALWAYS", "applicabilityRule": "true",
+      "executor": "check_determinism", "timeoutSeconds": 60,
+      "remediation": "Investigate non-deterministic fields (timestamps, random IDs).",
+      "evidenceTypes": ["diff-output"]
+    },
+    {
+      "id": "R6-HO-018", "section": "images-registry", "stage": "10.3",
+      "title": "All components have a generated image tag", "description": "Verify image-manifest.json covers every deployable component.",
+      "requiredInput": ["bundle_dir"],
+      "expectedOutput": "image count equals deployable component count",
+      "blockingPolicy": "ALWAYS", "applicabilityRule": "bundle.deployableCount > 0",
+      "executor": "check_image_coverage", "timeoutSeconds": 10,
+      "remediation": "Re-generate bundle — every CONTAINERIZED component must produce an image.",
+      "evidenceTypes": ["json-parse"]
+    },
+    {
+      "id": "R6-HO-019", "section": "images-registry", "stage": "10.3",
+      "title": "Validation Job images are digest-pinned", "description": "Check that validation-jobs.yaml references images with @sha256: digest.",
+      "requiredInput": ["bundle_dir"],
+      "expectedOutput": "All Job images use @sha256: reference format",
+      "blockingPolicy": "ALWAYS", "applicabilityRule": "bundle.hasValidationJobs",
+      "executor": "check_validation_job_digests", "timeoutSeconds": 10,
+      "remediation": "Re-generate bundle — validation Job images must be digest-pinned.",
+      "evidenceTypes": ["yaml-parse"]
+    },
+    {
+      "id": "R6-HO-020", "section": "kubernetes", "stage": "10.1",
+      "title": "Namespace has PSS labels", "description": "Verify namespace.yaml carries enforce/audit/warn=restricted labels.",
+      "requiredInput": ["bundle_dir"],
+      "expectedOutput": "pod-security.kubernetes.io/enforce: restricted present",
+      "blockingPolicy": "ALWAYS", "applicabilityRule": "true",
+      "executor": "check_pss_labels", "timeoutSeconds": 10,
+      "remediation": "Re-generate bundle — PSS labels are added unconditionally.",
+      "evidenceTypes": ["yaml-parse"]
+    },
+    {
+      "id": "R6-HO-021", "section": "kubernetes", "stage": "10.3",
+      "title": "Security contexts are non-root", "description": "Verify Deployment/StatefulSet pod specs have runAsNonRoot=true.",
+      "requiredInput": ["bundle_dir"],
+      "expectedOutput": "runAsNonRoot: true in podSecurityContext",
+      "blockingPolicy": "ALWAYS", "applicabilityRule": "bundle.deployableCount > 0",
+      "executor": "check_security_contexts", "timeoutSeconds": 10,
+      "remediation": "Re-generate bundle — security context is hardened by default.",
+      "evidenceTypes": ["yaml-parse"]
+    },
+    {
+      "id": "R6-HO-022", "section": "kubernetes", "stage": "10.9",
+      "title": "HPA generated when autoscaling configured", "description": "Verify HPA is present for all components with hpa field set.",
+      "requiredInput": ["bundle_dir"],
+      "expectedOutput": "HorizontalPodAutoscaler present for each hpa-configured component",
+      "blockingPolicy": "CONDITIONAL", "applicabilityRule": "bundle.hasHPAComponents",
+      "executor": "check_hpa_generation", "timeoutSeconds": 10,
+      "remediation": "Re-generate bundle with correct hpa configuration.",
+      "evidenceTypes": ["yaml-parse"]
+    },
+    {
+      "id": "R6-HO-023", "section": "kubernetes", "stage": "10.9",
+      "title": "PDB generated for multi-replica workloads", "description": "Verify PodDisruptionBudget is present for replicas>=2 Deployment/StatefulSet.",
+      "requiredInput": ["bundle_dir"],
+      "expectedOutput": "PodDisruptionBudget present for multi-replica components",
+      "blockingPolicy": "CONDITIONAL", "applicabilityRule": "bundle.hasMultiReplicaComponents",
+      "executor": "check_pdb_generation", "timeoutSeconds": 10,
+      "remediation": "Re-generate bundle — PDB is generated automatically for replicas>=2.",
+      "evidenceTypes": ["yaml-parse"]
+    },
+    {
+      "id": "R6-HO-024", "section": "kubernetes", "stage": "10.10",
+      "title": "Operator CRs generated for OPERATOR_MANAGED components", "description": "Verify PostgreSQL/Redis/RabbitMQ/Kafka CRs are in the bundle.",
+      "requiredInput": ["bundle_dir"],
+      "expectedOutput": "operator-cr.yaml files present for all OPERATOR_MANAGED components",
+      "blockingPolicy": "OPERATOR_REQUIRED", "applicabilityRule": "bundle.hasOperatorManagedComponents",
+      "executor": "check_operator_crs", "timeoutSeconds": 10,
+      "remediation": "Re-generate bundle — operator CRs are generated automatically for OPERATOR_MANAGED.",
+      "evidenceTypes": ["yaml-parse"]
+    },
+    {
+      "id": "R6-HO-025", "section": "kubernetes", "stage": "10.11",
+      "title": "ServiceMonitor generated when Prometheus Operator available", "description": "Verify observability.yaml with ServiceMonitor exists when platform supports it.",
+      "requiredInput": ["bundle_dir"],
+      "expectedOutput": "ServiceMonitor present in observability.yaml",
+      "blockingPolicy": "MONITORING_REQUIRED", "applicabilityRule": "bundle.hasMonitorableComponents and bundle.prometheusAvailable",
+      "executor": "check_service_monitors", "timeoutSeconds": 10,
+      "remediation": "Install prometheus-operator or kube-prometheus-stack and re-generate.",
+      "evidenceTypes": ["yaml-parse"]
+    },
+    {
+      "id": "R6-HO-026", "section": "kubernetes", "stage": "10.11",
+      "title": "Velero Schedule generated for stateful namespaces", "description": "Verify velero-schedule.yaml exists when the namespace has PVCs.",
+      "requiredInput": ["bundle_dir"],
+      "expectedOutput": "velero-schedule.yaml with correct namespace and schedule",
+      "blockingPolicy": "BACKUP_REQUIRED", "applicabilityRule": "bundle.hasPVCs and bundle.veleroAvailable",
+      "executor": "check_velero_schedule", "timeoutSeconds": 10,
+      "remediation": "Install Velero and re-generate bundle.",
+      "evidenceTypes": ["yaml-parse"]
+    },
+    {
+      "id": "R6-HO-027", "section": "storage-networking", "stage": "10.6",
+      "title": "PVC StorageClass correctly set", "description": "Verify PVCs with explicit storageClass field carry the correct storageClassName.",
+      "requiredInput": ["bundle_dir"],
+      "expectedOutput": "storageClassName set on all PVCs that require a specific class",
+      "blockingPolicy": "STATEFUL_ONLY", "applicabilityRule": "bundle.hasPVCs",
+      "executor": "check_pvc_storage_class", "timeoutSeconds": 10,
+      "remediation": "Set storageClass on the component and re-generate.",
+      "evidenceTypes": ["yaml-parse"]
+    },
+    {
+      "id": "R6-HO-028", "section": "storage-networking", "stage": "10.7",
+      "title": "Default-deny NetworkPolicies present", "description": "Verify default-deny ingress and egress NetworkPolicies exist in the bundle.",
+      "requiredInput": ["bundle_dir"],
+      "expectedOutput": "NetworkPolicy with podSelector: {} for ingress and egress",
+      "blockingPolicy": "ALWAYS", "applicabilityRule": "bundle.deployableCount > 0",
+      "executor": "check_network_policies", "timeoutSeconds": 10,
+      "remediation": "Re-generate bundle — NetworkPolicies are generated unconditionally.",
+      "evidenceTypes": ["yaml-parse"]
+    },
+    {
+      "id": "R6-HO-029", "section": "storage-networking", "stage": "10.8",
+      "title": "Gateway and Certificate have renewBefore", "description": "Verify Certificate resource has renewBefore: 720h when a Gateway is configured.",
+      "requiredInput": ["bundle_dir"],
+      "expectedOutput": "Certificate.spec.renewBefore == 720h",
+      "blockingPolicy": "TLS_ONLY", "applicabilityRule": "bundle.hasExposedComponents",
+      "executor": "check_certificate_renew", "timeoutSeconds": 10,
+      "remediation": "Re-generate bundle — renewBefore is set unconditionally on certificates.",
+      "evidenceTypes": ["yaml-parse"]
+    },
+    {
+      "id": "R6-HO-030", "section": "gitops-flux", "stage": "10.14",
+      "title": "Kustomize staging overlay renders", "description": "Run kubectl kustomize on the staging overlay and verify it produces valid YAML.",
+      "requiredInput": ["bundle_dir", "kustomize"],
+      "expectedOutput": "kubectl kustomize overlays/staging exits 0",
+      "blockingPolicy": "ALWAYS", "applicabilityRule": "true",
+      "executor": "check_kustomize_staging", "timeoutSeconds": 30,
+      "prerequisites": ["R6-HO-001"],
+      "remediation": "Fix kustomization.yaml or referenced resource files.",
+      "evidenceTypes": ["command-output", "rendered-yaml"]
+    },
+    {
+      "id": "R6-HO-031", "section": "gitops-flux", "stage": "10.14",
+      "title": "Kustomize production overlay renders", "description": "Run kubectl kustomize on the production overlay and verify it produces valid YAML.",
+      "requiredInput": ["bundle_dir", "kustomize"],
+      "expectedOutput": "kubectl kustomize overlays/production exits 0",
+      "blockingPolicy": "ALWAYS", "applicabilityRule": "true",
+      "executor": "check_kustomize_production", "timeoutSeconds": 30,
+      "prerequisites": ["R6-HO-001"],
+      "remediation": "Fix kustomization.yaml or referenced resource files.",
+      "evidenceTypes": ["command-output", "rendered-yaml"]
+    },
+    {
+      "id": "R6-HO-032", "section": "gitops-flux", "stage": "10.14",
+      "title": "YAML parse — all generated documents", "description": "Parse every .yaml file in kustomize_bundle/ with yaml.safe_load_all.",
+      "requiredInput": ["bundle_dir"],
+      "expectedOutput": "All YAML files parse without error",
+      "blockingPolicy": "ALWAYS", "applicabilityRule": "true",
+      "executor": "check_yaml_parse_all", "timeoutSeconds": 20,
+      "remediation": "Fix malformed YAML in generated files.",
+      "evidenceTypes": ["yaml-parse"]
+    },
+    {
+      "id": "R6-HO-033", "section": "gitops-flux", "stage": "10.14",
+      "title": "Flux Kustomization file exists", "description": "Verify flux/<slug>-kustomization.yaml was generated with prune: true.",
+      "requiredInput": ["bundle_dir"],
+      "expectedOutput": "Flux Kustomization with prune: true and correct path",
+      "blockingPolicy": "ALWAYS", "applicabilityRule": "true",
+      "executor": "check_flux_kustomization", "timeoutSeconds": 10,
+      "remediation": "Re-generate bundle.",
+      "evidenceTypes": ["yaml-parse"]
+    },
+    {
+      "id": "R6-HO-034", "section": "gitops-flux", "stage": "10.14",
+      "title": "Kubernetes server-side dry-run", "description": "Apply generated resources with --dry-run=server to validate against live cluster CRDs.",
+      "requiredInput": ["bundle_dir", "kubeconfig"],
+      "expectedOutput": "kubectl apply --dry-run=server exits 0 for all generated resources",
+      "blockingPolicy": "ALWAYS", "applicabilityRule": "true",
+      "executor": "check_k8s_dry_run", "timeoutSeconds": 60,
+      "prerequisites": ["R6-HO-005"],
+      "remediation": "Fix schema violations identified in dry-run output.",
+      "evidenceTypes": ["command-output"]
+    },
+    {
+      "id": "R6-HO-035", "section": "hybrid", "stage": "10.5",
+      "title": "VM bindings documented for unresolved components", "description": "Verify all KEEP_ON_VM_FOR_NOW components with no IP have VMServiceBinding resources.",
+      "requiredInput": ["bundle_dir"],
+      "expectedOutput": "VMServiceBinding present for every unresolved VM component",
+      "blockingPolicy": "HYBRID_ONLY", "applicabilityRule": "bundle.hasVMComponents",
+      "executor": "check_vm_bindings", "timeoutSeconds": 10,
+      "remediation": "Re-generate bundle — VM bindings are created automatically.",
+      "evidenceTypes": ["yaml-parse"]
+    },
+    {
+      "id": "R6-HO-036", "section": "hybrid", "stage": "10.5",
+      "title": "No fabricated IPs for unresolved VMs", "description": "Verify EndpointSlices are only generated for VMs with a real target IP.",
+      "requiredInput": ["bundle_dir"],
+      "expectedOutput": "EndpointSlice present only for VMs with non-empty targetIp",
+      "blockingPolicy": "HYBRID_ONLY", "applicabilityRule": "bundle.hasVMComponents",
+      "executor": "check_no_fake_ips", "timeoutSeconds": 10,
+      "remediation": "Re-generate bundle — endpoint creation is gated on real IP.",
+      "evidenceTypes": ["yaml-parse"]
+    },
+    {
+      "id": "R6-HO-037", "section": "stage12-gate", "stage": "12",
+      "title": "Stage 12 gate: zero blockers", "description": "Confirm bundle-validation.json reports status PASSED or PASSED_WITH_WARNINGS.",
+      "requiredInput": ["bundle_dir"],
+      "expectedOutput": "bundle_validation.status != BLOCKED",
+      "blockingPolicy": "ALWAYS", "applicabilityRule": "true",
+      "executor": "check_stage12_zero_blockers", "timeoutSeconds": 10,
+      "prerequisites": ["R6-HO-013"],
+      "remediation": "Fix all items in bundle_validation.blockers and re-generate.",
+      "evidenceTypes": ["json-parse"]
+    },
+    {
+      "id": "R6-HO-038", "section": "stage12-gate", "stage": "12",
+      "title": "Secret scan: no plaintext credentials", "description": "Scan generated files for credential patterns (password=, token=, secret=).",
+      "requiredInput": ["bundle_dir"],
+      "expectedOutput": "Zero credential pattern hits in generated YAML",
+      "blockingPolicy": "ALWAYS", "applicabilityRule": "true",
+      "executor": "check_secret_scan", "timeoutSeconds": 20,
+      "remediation": "Remove all inline credentials. Use SecretContract or external secret references.",
+      "evidenceTypes": ["scan-results"]
+    },
+    {
+      "id": "R6-HO-039", "section": "validation-operations", "stage": "10.12",
+      "title": "Validation Jobs generated", "description": "Verify validation-jobs.yaml exists with HTTP, DNS, and/or database Jobs.",
+      "requiredInput": ["bundle_dir"],
+      "expectedOutput": "validation-jobs.yaml with at least one Job document",
+      "blockingPolicy": "ALWAYS", "applicabilityRule": "true",
+      "executor": "check_validation_jobs_exist", "timeoutSeconds": 10,
+      "remediation": "Re-generate bundle — validation Jobs require at least one HTTP component.",
+      "evidenceTypes": ["yaml-parse"]
+    },
+    {
+      "id": "R6-HO-040", "section": "validation-operations", "stage": "13",
+      "title": "Stage 13 execution endpoint exists", "description": "Verify POST /api/r6/run-validation responds to a health probe.",
+      "requiredInput": ["dashboard_url"],
+      "expectedOutput": "Endpoint returns 400 on empty body (not 404)",
+      "blockingPolicy": "ALWAYS", "applicabilityRule": "true",
+      "executor": "check_stage13_endpoint", "timeoutSeconds": 15,
+      "remediation": "Ensure the dashboard is running with Stage 13 endpoint registered.",
+      "evidenceTypes": ["http-response"]
+    },
+    {
+      "id": "R6-HO-041", "section": "validation-operations", "stage": "14",
+      "title": "Rollback runbook completeness", "description": "Verify all required sections exist in the rollback runbook.",
+      "requiredInput": ["bundle_dir"],
+      "expectedOutput": "gitRevision, images, traffic, vmWorkloads, dataLimitations, verificationSteps all present",
+      "blockingPolicy": "ALWAYS", "applicabilityRule": "true",
+      "executor": "check_rollback_runbook", "timeoutSeconds": 10,
+      "prerequisites": ["R6-HO-015"],
+      "remediation": "Re-generate bundle (rollback runbook is generated unconditionally).",
+      "evidenceTypes": ["yaml-parse"]
+    }
+  ]
+}

@@ -27,7 +27,7 @@ from urllib.parse import urlparse
 from flask import Blueprint, Response, jsonify, request, send_file
 
 STATUSES = frozenset({"PENDING", "RUNNING", "PASS", "PASS_WITH_WARNING", "WARNING", "PARTIAL", "FAIL", "BLOCKED", "SKIPPED_PREREQUISITE", "NOT_DETECTED", "NOT_APPLICABLE", "NOT_TESTED", "CANCELLED"})
-RETRYABLE = frozenset({"FAIL", "PASS_WITH_WARNING", "WARNING", "PARTIAL", "BLOCKED", "SKIPPED_PREREQUISITE", "NOT_TESTED"})
+RETRYABLE = frozenset({"FAIL", "PASS_WITH_WARNING", "WARNING", "PARTIAL", "BLOCKED", "SKIPPED_PREREQUISITE"})
 MAX_OUTPUT = 64 * 1024
 SCHEMA_VERSION = "r6.scan-appraisal/v2"
 SCANNER_VERSION = "2.0.0"
@@ -250,14 +250,16 @@ def remediation_for(error_code: Optional[str]) -> List[str]:
         "SSH_NETWORK_UNREACHABLE": ["Verify VM ACTIVE state, floating IP, route and network reachability."],
         "SSH_CONNECTION_REFUSED": ["Verify sshd is running and TCP/22 is allowed by the guest firewall and security group."],
         "SSH_NETWORK_TIMEOUT": ["Verify VM ACTIVE state, floating IP assignment, route, security group TCP/22, guest firewall and sshd."],
-        "SSH_HOST_KEY_CHANGED": ["Verify the replacement VM fingerprint with the infrastructure owner, then use Verify and Replace Key."],
+        "SSH_HOST_KEY_CHANGED": ["Verify the replacement VM fingerprint with the infrastructure owner, then use Verify and Replace Key.",
+                                  "Do not disable host-key checking; replace only the managed known_hosts entry for this host."],
         "SSH_HOST_KEY_UNKNOWN": ["Verify and register the server fingerprint in the managed known_hosts file."],
         "SSH_AUTHENTICATION_FAILED": ["Verify the per-VM SSH username, selected private key and authorized_keys configuration."],
         "SSH_PERMISSION_DENIED": ["Grant the scan user read-only access to the required evidence path and retry."],
         "SSH_COMMAND_TIMEOUT": ["Increase the command timeout or investigate the remote command, host load and blocked filesystem operations."],
         "SSH_REMOTE_COMMAND_FAILED": ["Review stderr, command availability and scan-user permissions, then retry the probe."],
         "DATABASE_ENDPOINT_UNREACHABLE": ["Verify database endpoint DNS, routing, firewall rules and service availability."],
-        "COMPONENT_VM_MAPPING_MISSING": ["Map the component to an OpenStack server UUID before scanning."],
+        "COMPONENT_VM_MAPPING_MISSING": ["Open Stage 1, inspect the Business System component, and map it to the correct OpenStack server UUID.",
+                                         "Set the FLEX Target IP/URL or source VM UUID, save the Business System, then retry this component."],
         "VM_UUID_UNMAPPED": ["Map the component to an OpenStack server UUID to enable snapshot-based capture; guest discovery over SSH is unaffected."],
         "TARGET_RESOLUTION_FAILED": ["Resolve the component's scan target to a real hostname or IP before scanning; a placeholder value was configured."],
         "SSH_KEY_NOT_FOUND": ["The configured SSH private key file does not exist on the scanner host. Verify the key path or provision the key."],
@@ -267,6 +269,8 @@ def remediation_for(error_code: Optional[str]) -> List[str]:
         "PRIVATE_KEY_CAPTURE_PATH": ["Remove or relocate the private key out of the application/capture path on the source VM.",
                                      "Re-issue the key pair post-migration instead of copying it, or import it into the target secret manager (e.g. OpenStack Barbican/Vault).",
                                      "Exclude the path from the capture set and retry the component."],
+        "PLAINTEXT_SECRET": ["Externalize the detected plaintext secret into the target secret manager and rotate the credential.",
+                             "Block container package generation for this component until the secret is removed from the capture path."],
         "PLAINTEXT_SECRET_HARDCODED": ["A credential appears hardcoded in application source. Move it to the environment/secret manager and rotate it before packaging.",
                                         "Block container package generation for this component until the secret is externalized."],
         "PLAINTEXT_SECRET_ENV_FILE": ["An environment file contains a confirmed credential. This is expected for local config, but do not bake the file into the container image unchanged.",
@@ -352,6 +356,13 @@ def run_probe(target: Dict[str, Any], probe_id: str, runner: Callable[..., subpr
         result.update(_error_fields(key_error, "CREDENTIAL"))
         result["remediation"] = result["recommendedActions"][0]
         return result
+    if probe_id == "SCAN-013":
+        health_path = str(target.get("healthPath") or "").strip()
+        health_port = target.get("healthPort")
+        if re.fullmatch(r"/[A-Za-z0-9_./?=&%-]*", health_path) and str(health_port or "").isdigit():
+            health_port = int(health_port)
+            if 1 <= health_port <= 65535:
+                remote += "; if command -v curl >/dev/null 2>&1; then code=$(curl -ksS -o /dev/null -w '%%{http_code}' --max-time 5 'http://127.0.0.1:%s%s' || true); printf '\\nHEALTH_CHECK_HTTP=%%s\\n' \"$code\"; fi" % (health_port, health_path)
     argv = ["ssh", "-i", str(key_path), "-p", str(port), "-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=yes", "-o", "UserKnownHostsFile=%s" % known_hosts, "-o", "ConnectTimeout=%s" % connect_timeout, "-o", "ConnectionAttempts=1", "%s@%s" % (user, host), remote]
     try:
         completed = runner(argv, capture_output=True, text=True, timeout=command_timeout, check=False)
@@ -611,6 +622,10 @@ def _application_health_status(scan013_stdout: str) -> List[str]:
     return failed
 
 
+def _configured_health_validated(scan013_stdout: str) -> bool:
+    match = re.search(r"(?m)^HEALTH_CHECK_HTTP=(\d{3})$", scan013_stdout or "")
+    return bool(match and 200 <= int(match.group(1)) < 400)
+
 def appraisal(component: Dict[str, Any], probes: List[Dict[str, Any]], scan_run_id: str) -> Dict[str, Any]:
     by_id = {p["probeId"]: p for p in probes}
     counts = {s: 0 for s in STATUSES}
@@ -644,7 +659,7 @@ def appraisal(component: Dict[str, Any], probes: List[Dict[str, Any]], scan_run_
     warnings = []
     review_required = []
     readiness = 100
-    if by_id.get("SCAN-013", {}).get("status") != "PASS" and not failed_app_units:
+    if not _configured_health_validated(by_id.get("SCAN-013", {}).get("stdout", "")) and not failed_app_units:
         readiness -= 10; warnings.append({"code": "HEALTH_NOT_VALIDATED", "message": "Application health was not independently validated."})
     if not app_paths:
         readiness -= 20; warnings.append({"code": "APPLICATION_PATH_UNKNOWN", "message": "No approved application path was discovered."})
@@ -670,7 +685,7 @@ def appraisal(component: Dict[str, Any], probes: List[Dict[str, Any]], scan_run_
         blockers.append({"code": ssh_probe.get("errorCode") or "SSH_ACCESS_FAILED", "kind": SEVERITY_BLOCKER_INFRASTRUCTURE,
                          "message": ssh_probe.get("diagnosticSummary") or ssh_probe.get("summary") or "SSH access failed.",
                          "rootCauseId": ssh_probe.get("rootCauseId"),
-                         "recommendedActions": ssh_probe.get("recommendedActions") or []})
+                         "recommendedActions": ssh_probe.get("recommendedActions") or remediation_for(probe.get("errorCode"))})
     if private_key_paths:
         shown = private_key_paths[:5]
         blockers.append({"code": "PRIVATE_KEY_CAPTURE_PATH", "kind": SEVERITY_BLOCKER_SECURITY,
@@ -766,12 +781,13 @@ def final_appraisal(run_id: str, system: Dict[str, Any], components: List[Dict[s
     elif all(status == "PASS" for status in db_native_statuses): database = "READY"
     else: database = "REVIEW_REQUIRED"
     snapshot_probes = [p for p in all_probes if p.get("probeId") == "SCAN-020"]
-    snapshot = "READY" if snapshot_probes and all(p.get("status") == "PASS" for p in snapshot_probes) else "UNKNOWN" if snapshot_probes and any(p.get("status") == "NOT_TESTED" for p in snapshot_probes) else "PARTIAL" if snapshot_probes else "UNKNOWN"
+    snapshot_applicable = [p for p in snapshot_probes if p.get("status") != "NOT_APPLICABLE"]
+    snapshot = "NOT_APPLICABLE" if snapshot_probes and not snapshot_applicable else "READY" if snapshot_applicable and all(p.get("status") == "PASS" for p in snapshot_applicable) else "UNKNOWN" if snapshot_applicable and any(p.get("status") == "NOT_TESTED" for p in snapshot_applicable) else "PARTIAL" if snapshot_applicable else "UNKNOWN"
     if infrastructure == "BLOCKED": containerization = final = "BLOCKED_INFRASTRUCTURE"
     elif security_components: containerization = final = "BLOCKED_SECURITY"
     elif application_blocked_components: containerization = final = "BLOCKED_APPLICATION"
-    elif any(p.get("status") == "FAIL" and not p.get("derivedFrom") for p in all_probes): containerization = final = "SCAN_ERROR"
     elif application in {"BLOCKED", "REVIEW_REQUIRED", "UNKNOWN"} or database in {"BLOCKED", "REVIEW_REQUIRED", "UNKNOWN"} or partial_scope or mapping_warnings: containerization = final = "REVIEW_REQUIRED"
+    elif any(p.get("status") == "FAIL" and not p.get("derivedFrom") for p in all_probes): containerization = final = "REVIEW_REQUIRED"
     elif any(c.get("componentVerdict") == "READY_FOR_STAGE_8_WITH_WARNINGS" for c in components): containerization = final = "READY_WITH_WARNINGS"
     else: containerization = final = "READY"
     def n(*values): return sum(v in values for v in verdicts)
@@ -788,13 +804,14 @@ def final_appraisal(run_id: str, system: Dict[str, Any], components: List[Dict[s
             if probe.get("status") not in {"FAIL", "BLOCKED"}: continue
             key = probe.get("rootCauseId") or "%s:%s:%s" % (component.get("componentId"), probe.get("probeId"), probe.get("errorCode"))
             if key in seen: continue
-            seen.add(key); root_causes.append({"rootCauseId": key, "componentId": component.get("componentId"), "componentName": component.get("componentName"), "sourceVmId": component.get("sourceVmId"), "targetHost": component.get("sourceHost"), "probeId": probe.get("probeId"), "errorCode": probe.get("errorCode"), "oldFingerprint": probe.get("oldFingerprint"), "newFingerprint": probe.get("newFingerprint"), "summary": probe.get("diagnosticSummary") or probe.get("summary"), "recommendedActions": probe.get("recommendedActions") or [], "skippedChecks": sum(1 for p in component.get("probes", []) if p.get("derivedFrom") == key)})
+            seen.add(key); root_causes.append({"rootCauseId": key, "componentId": component.get("componentId"), "componentName": component.get("componentName"), "sourceVmId": component.get("sourceVmId"), "targetHost": component.get("sourceHost"), "probeId": probe.get("probeId"), "errorCode": probe.get("errorCode"), "oldFingerprint": probe.get("oldFingerprint"), "newFingerprint": probe.get("newFingerprint"), "summary": probe.get("diagnosticSummary") or probe.get("summary"), "recommendedActions": probe.get("recommendedActions") or remediation_for(probe.get("errorCode")), "skippedChecks": sum(1 for p in component.get("probes", []) if p.get("derivedFrom") == key)})
         for blocker in component.get("blockers", []):
             key = blocker.get("rootCauseId") or "%s:%s" % (component.get("componentId"), blocker.get("code"))
             if key in seen: continue
-            seen.add(key); root_causes.append({"rootCauseId": key, "componentId": component.get("componentId"), "componentName": component.get("componentName"), "sourceVmId": component.get("sourceVmId"), "probeId": None, "errorCode": blocker.get("code"), "summary": blocker.get("message"), "recommendedActions": blocker.get("recommendedActions") or [blocker.get("message")], "skippedChecks": 0})
-    next_action = "Scan the remaining components before full-system approval." if partial_scope else "Resolve infrastructure access root causes, then retry only affected VMs." if infrastructure == "BLOCKED" else "Review application and database findings before Stage 8 approval." if final in {"REVIEW_REQUIRED", "SCAN_ERROR"} else "Continue to Stage 7 classification and Stage 8 approval."
-    return {"businessSystemId": system.get("id"), "businessSystemName": system.get("name"), "scanRunId": run_id, "scanScope": system.get("scanScope") or "ALL_COMPONENTS", "finalVerdict": final, "discoveryCoveragePercent": coverage, "infrastructureAccessStatus": infrastructure, "applicationReadiness": application, "databaseReadiness": database, "snapshotReadiness": snapshot, "containerizationReadiness": containerization, "reason": "Several source VMs could not be accessed; no application incompatibility is inferred." if infrastructure == "BLOCKED" else "Assessment is based on applicable completed checks.", "overallEvidenceScore": coverage, "evidenceCoverage": {"completed": len(completed), "applicable": len(applicable), "blocked": len(root_probes), "skipped": len(skipped), "notApplicable": len(not_applicable)}, "rootCauses": root_causes, "summary": {"sourceVms": len(set(c.get("sourceVmId") for c in components if c.get("sourceVmId"))), "components": len(components), "totalComponents": int(system.get("totalComponentCount") or len(components)), "ready": n("READY_FOR_STAGE_8"), "readyWithWarnings": n("READY_FOR_STAGE_8_WITH_WARNINGS"), "databaseNative": n("DB_NATIVE_REQUIRED"), "retainVm": n("RETAIN_VM_RECOMMENDED"), "needsReview": n("NEEDS_MORE_EVIDENCE", "MANUAL_REVIEW_REQUIRED", "REVIEW_REQUIRED"), "blocked": n("BLOCKED", "BLOCKED_INFRASTRUCTURE", "BLOCKED_SECURITY", "BLOCKED_APPLICATION"), "scanFailed": n("SCAN_FAILED")}, "systemWarnings": [w["message"] for c in components for w in c["warnings"]] + mapping_warnings + scope_warning, "mappingWarnings": mapping_warnings, "systemBlockers": [b["message"] for c in components for b in c["blockers"]], "nextAction": next_action}
+            seen.add(key); root_causes.append({"rootCauseId": key, "componentId": component.get("componentId"), "componentName": component.get("componentName"), "sourceVmId": component.get("sourceVmId"), "probeId": None, "errorCode": blocker.get("code"), "summary": blocker.get("message"), "recommendedActions": blocker.get("recommendedActions") or remediation_for(blocker.get("code")), "skippedChecks": 0})
+    next_action = "Scan the remaining components before full-system approval." if partial_scope else "Resolve infrastructure access root causes, then retry only affected VMs." if infrastructure == "BLOCKED" else "Restore database endpoint reachability, then retry the database component." if database == "BLOCKED" else "Review application and database findings before Stage 8 approval." if final == "REVIEW_REQUIRED" else "Continue to Stage 7 classification and Stage 8 approval."
+    reason = "Several source VMs could not be accessed; no application incompatibility is inferred." if infrastructure == "BLOCKED" else "The database-native endpoint is not ready; probe execution itself completed successfully." if database == "BLOCKED" else "Assessment is based on applicable completed checks."
+    return {"businessSystemId": system.get("id"), "businessSystemName": system.get("name"), "scanRunId": run_id, "scanScope": system.get("scanScope") or "ALL_COMPONENTS", "finalVerdict": final, "discoveryCoveragePercent": coverage, "infrastructureAccessStatus": infrastructure, "applicationReadiness": application, "databaseReadiness": database, "snapshotReadiness": snapshot, "containerizationReadiness": containerization, "reason": reason, "overallEvidenceScore": coverage, "evidenceCoverage": {"completed": len(completed), "applicable": len(applicable), "blocked": len(root_probes), "skipped": len(skipped), "notApplicable": len(not_applicable)}, "rootCauses": root_causes, "summary": {"sourceVms": len(set(c.get("sourceVmId") for c in components if c.get("sourceVmId"))), "components": len(components), "totalComponents": int(system.get("totalComponentCount") or len(components)), "ready": n("READY_FOR_STAGE_8"), "readyWithWarnings": n("READY_FOR_STAGE_8_WITH_WARNINGS"), "databaseNative": n("DB_NATIVE_REQUIRED"), "retainVm": n("RETAIN_VM_RECOMMENDED"), "needsReview": n("NEEDS_MORE_EVIDENCE", "MANUAL_REVIEW_REQUIRED", "REVIEW_REQUIRED"), "blocked": n("BLOCKED", "BLOCKED_INFRASTRUCTURE", "BLOCKED_SECURITY", "BLOCKED_APPLICATION"), "scanFailed": n("SCAN_FAILED")}, "systemWarnings": [w["message"] for c in components for w in c["warnings"]] + mapping_warnings + scope_warning, "mappingWarnings": mapping_warnings, "systemBlockers": [b["message"] for c in components for b in c["blockers"]] + [p.get("diagnosticSummary") or p.get("summary") for p in root_probes], "nextAction": next_action}
 
 
 # --- Stage-specific gating -------------------------------------------------
@@ -1020,12 +1037,27 @@ def _cloud_snapshot_probe(component: Dict[str, Any]) -> Dict[str, Any]:
                 "imageVisible": cloud.get("imageVisible"), "snapshotCapable": cloud.get("snapshotCapable")}
     # Missing VM UUID makes snapshot readiness genuinely UNKNOWN (not a failure): the
     # scanner has no evidence either way, so it must not be reported as PASS or FAIL.
-    status = "NOT_TESTED" if not vm_id else "PASS" if evidence["snapshotCapable"] is not False else "PASS_WITH_WARNING"
+    capability = evidence["snapshotCapable"]
+    access_mode = _database_access_mode(component)
+    if access_mode in {"MANAGED_DATABASE", "KUBERNETES_SERVICE", "PRIVATE_ENDPOINT", "UNKNOWN"}:
+        result = _probe_result("SCAN-020", "Snapshot Source Readiness (cloud control plane)", started_at, started, 0,
+                               json.dumps(evidence, sort_keys=True), "", False, False, "NOT_APPLICABLE")
+        result.update({"evidence": evidence, "summary": "VM snapshot capture is not applicable to this database-native endpoint.",
+                       "recommendedActions": [], "remediation": ""})
+        return result
+
+    status = "NOT_TESTED" if not vm_id or capability is None else "PASS" if capability is True else "PASS_WITH_WARNING"
     result = _probe_result("SCAN-020", "Snapshot Source Readiness (cloud control plane)", started_at, started, 0,
                            json.dumps(evidence, sort_keys=True), "", False, False, status)
-    actions = ["Map the component to an OpenStack server UUID to enable snapshot-based capture."] if not vm_id else [] if status == "PASS" else ["Confirm image and volume snapshot capability in OpenStack."]
+    actions = (["Map the component to an OpenStack server UUID to enable snapshot-based capture."] if not vm_id else
+               ["Load OpenStack inventory for this VM before claiming snapshot readiness."] if capability is None else
+               [] if status == "PASS" else ["Confirm image and volume snapshot capability in OpenStack."])
     result.update({"evidence": evidence, "summary": "Cloud-side snapshot readiness assessed independently of guest SSH." if vm_id else "Snapshot readiness is unknown: no OpenStack server UUID is mapped for this component.",
                    "recommendedActions": actions, "remediation": actions[0] if actions else ""})
+    if vm_id and capability is None:
+        result.update(_error_fields("SNAPSHOT_CAPABILITY_UNKNOWN", "CLOUD_INVENTORY"))
+        result["operatorActionRequired"] = False
+        result["severity"] = "WARNING"
     if not vm_id:
         result.update(_error_fields("VM_UUID_UNMAPPED", "MAPPING"))
         result["operatorActionRequired"] = False
@@ -1042,16 +1074,24 @@ def _database_access_mode(component: Dict[str, Any]) -> str:
     endpoint = str(component.get("target") or component.get("tgt") or component.get("sshHost") or "").lower()
     if "database" not in kind and not re.match(r"^(postgres(?:ql)?|mysql|mongodb|redis)://", endpoint):
         return "VM_SSH"
-    return "VM_SSH" if component.get("vmId") or component.get("sourceVmId") else "UNKNOWN"
+    if component.get("vmId") or component.get("sourceVmId"):
+        return "VM_SSH"
+    ssh_key = component.get("sshKeyPath") or component.get("ssh_key_path") or component.get("sshKey")
+    ssh_user = component.get("sshUser") or component.get("ssh_user")
+    return "VM_SSH" if endpoint and ssh_key and ssh_user else "UNKNOWN"
 
 
 def normalize_component_mapping(component: Dict[str, Any], default_ssh_user: Optional[str] = None) -> Dict[str, Any]:
     item = dict(component)
     vm_id = next((item.get(key) for key in ("sourceVmId", "source_vm_id", "vmId", "vm_id", "openstackServerId", "serverId", "flexVmId") if item.get(key)), None)
     vm_name = next((item.get(key) for key in ("sourceVmName", "source_vm_name", "vmName", "vm_name", "serverName") if item.get(key)), None)
-    source_ip = next((item.get(key) for key in ("sourceIp", "source_ip", "sshHost", "targetIp", "target_ip") if item.get(key)), None)
+    source_ip = next((item.get(key) for key in ("sourceIp", "source_ip") if item.get(key)), None)
+    target_ip = next((item.get(key) for key in ("sshHost", "targetHost", "targetIp", "target_ip", "target", "tgt") if item.get(key)), None)
+    source_ip = source_ip or target_ip  # response compatibility only; never selected as an executable target
     item.update({"sourceVmId": vm_id, "source_vm_id": vm_id, "sourceVmName": vm_name,
                  "source_vm_name": vm_name, "sourceIp": source_ip, "source_ip": source_ip,
+                 "targetIp": target_ip, "target_ip": target_ip,
+                 "targetHost": target_ip, "sshHost": target_ip,
                  "sshUser": item.get("sshUser") or item.get("ssh_user") or default_ssh_user,
                  "ssh_user": item.get("sshUser") or item.get("ssh_user") or default_ssh_user,
                  "cloudRegion": item.get("cloudRegion") or item.get("cloud_region"),
@@ -1100,6 +1140,8 @@ def create_r6_scan_blueprint(base_dir: Path, probe_runner: Callable[..., subproc
     root = Path(os.environ.get("R6_SCAN_STATE_DIR", str(Path.home() / ".config" / "opencenter" / "reports" / "scans")))
     cancelled = set()
     state_lock = threading.RLock()
+    request_runs: Dict[str, str] = {}
+    active_runs = set()
 
     def load(run_id: str) -> Dict[str, Any]:
         path = root / _slug(run_id) / "summary.json"
@@ -1157,17 +1199,15 @@ def create_r6_scan_blueprint(base_dir: Path, probe_runner: Callable[..., subproc
             tmp.replace(path)
 
     def execute_component(run: Dict[str, Any], component: Dict[str, Any], only: Optional[set] = None) -> Dict[str, Any]:
-        # R6 Stage 3 scans the migrated (FLEX-side) VM only; component.get("sourceIp") (the
-        # original OSPC source IP, e.g. from normalize_component_mapping) is never used as a
-        # scan target. Note "sourceHost" here is a resolved-target round-trip field written by
-        # appraisal() below (component.sshHost/targetIp/target/tgt at scan time), not the OSPC
-        # source IP -- it must stay in this chain so retries keep hitting the same target.
-        target = {"host": component.get("sshHost") or component.get("targetIp") or component.get("target") or component.get("tgt") or component.get("sourceHost"), "port": component.get("sshPort") or 22, "user": component.get("sshUser") or run["ssh"]["user"], "keyPath": component.get("sshKeyPath") or run["ssh"]["keyPath"], "knownHostsFile": run["ssh"].get("knownHostsFile"), "expectedFingerprint": component.get("expectedFingerprint")}
+        # OSPC source fields are lineage only; executable operations use FLEX target fields.
+        target = {"host": component.get("targetHost") or component.get("sshHost") or component.get("targetIp") or component.get("target") or component.get("tgt") or (component.get("sourceHost") if component.get("scanStatus") == "COMPLETE" else None), "port": component.get("sshPort") or 22, "user": component.get("sshUser") or run["ssh"]["user"], "keyPath": component.get("sshKeyPath") or run["ssh"]["keyPath"], "knownHostsFile": run["ssh"].get("knownHostsFile"), "expectedFingerprint": component.get("expectedFingerprint"), "healthPath": component.get("healthPath") or component.get("health_path"), "healthPort": component.get("healthPort") or component.get("applicationPort")}
         access_mode = _database_access_mode(component)
         component["databaseAccessMode"] = access_mode
         if access_mode in {"MANAGED_DATABASE", "KUBERNETES_SERVICE", "PRIVATE_ENDPOINT", "UNKNOWN"}:
             results = _managed_database_probes(component)
             component["probeResults"] = results
+            for index, result in enumerate(results, 1):
+                _record_live_probe(run, component, result, index, len(results), save_live)
             return appraisal(component, results, run["runId"])
         old = {p["probeId"]: p for p in component.get("probeResults", [])}
         results = []
@@ -1217,6 +1257,17 @@ def create_r6_scan_blueprint(base_dir: Path, probe_runner: Callable[..., subproc
     @bp.post("/api/r6/scans/business-system/run")
     def start_scan():
         body = request.get_json(silent=True) or {}
+        request_id = str(body.get("requestId") or "").strip()[:128]
+        if request_id:
+            with state_lock:
+                existing_id = request_runs.get(request_id)
+            if existing_id:
+                try:
+                    existing = load(existing_id)
+                    return jsonify({"ok": True, "runId": existing_id, "status": existing.get("status", "RUNNING"), "deduplicated": True, "progress": existing.get("progress", {})}), 202
+                except FileNotFoundError:
+                    with state_lock:
+                        request_runs.pop(request_id, None)
         system = body.get("businessSystem") or {}
         components = system.get("components") or []
         ssh = body.get("ssh") or {}
@@ -1228,7 +1279,12 @@ def create_r6_scan_blueprint(base_dir: Path, probe_runner: Callable[..., subproc
             return jsonify({"ok": False, "error": "ssh user/keyPath are required for VM-hosted components"}), 400
         run_id = "scan-%s-%s" % (datetime.now().strftime("%Y%m%d%H%M%S"), uuid4().hex[:6])
         run = {"runId": run_id, "schemaVersion": SCHEMA_VERSION, "scannerVersion": SCANNER_VERSION, "actor": body.get("actor") or "dashboard-user", "status": "RUNNING", "startedAt": utcnow(), "evidenceExpiresAt": (datetime.now(timezone.utc) + timedelta(days=30)).isoformat(), "businessSystem": {"id": system.get("id"), "name": system.get("name"), "totalComponentCount": int(system.get("totalComponentCount") or len(components)), "scanScope": system.get("scanScope") or "ALL_COMPONENTS"}, "ssh": {"user": ssh.get("user") or "not-applicable", "keyPath": ssh.get("keyPath") or "not-applicable", "knownHostsFile": ssh.get("knownHostsFile") or str(default_managed_known_hosts_file())}, "components": [], "liveLog": [{"timestamp": utcnow(), "level": "INFO", "message": "Structured component scan started", "status": "RUNNING"}]}
+        with state_lock:
+            active_runs.add(run_id)
         save(run)
+        if request_id:
+            with state_lock:
+                request_runs[request_id] = run_id
         def worker():
             try:
                 vm_evidence = {}
@@ -1238,7 +1294,7 @@ def create_r6_scan_blueprint(base_dir: Path, probe_runner: Callable[..., subproc
                     run["progress"] = {"completedComponents": len(run["components"]), "totalComponents": len(components)}
                     run["liveLog"].append({"timestamp": utcnow(), "level": "INFO", "component": component.get("name"), "message": "Component scan started", "status": "RUNNING"})
                     save(run)
-                    target_key = component.get("sourceVmId") or component.get("scanTargetId") or "%s:%s" % (component.get("sshHost") or component.get("sourceIp") or component.get("targetIp") or component.get("target") or component.get("tgt"), component.get("sshPort") or 22)
+                    target_key = component.get("sourceVmId") or component.get("scanTargetId") or "%s:%s" % (component.get("targetHost") or component.get("sshHost") or component.get("targetIp") or component.get("target") or component.get("tgt"), component.get("sshPort") or 22)
                     if target_key in vm_evidence:
                         assessed = appraisal(dict(component), vm_evidence[target_key], run_id)
                         run["liveLog"].append({"timestamp": utcnow(), "level": "INFO", "component": component.get("name"), "message": "Reused probe evidence from the same source VM", "status": assessed.get("componentVerdict")})
@@ -1271,13 +1327,35 @@ def create_r6_scan_blueprint(base_dir: Path, probe_runner: Callable[..., subproc
                 run.pop("ssh", None)  # never persist credentials/key configuration in final evidence
                 save(run)
                 cancelled.discard(run_id)
+                with state_lock:
+                    active_runs.discard(run_id)
         threading.Thread(target=worker, name="r6-scan-" + run_id, daemon=True).start()
         return jsonify({"ok": True, "runId": run_id, "status": "RUNNING", "progress": {"completedComponents": 0, "totalComponents": len(components)}}), 202
 
     @bp.get("/api/r6/scans/runs/<run_id>")
     def get_run(run_id):
         try:
-            response = jsonify({"ok": True, **load(run_id)})
+            run = load(run_id)
+            with state_lock:
+                is_active = run_id in active_runs
+            if run.get("status") == "RUNNING" and not is_active:
+                interrupted_at = utcnow()
+                run.update({
+                    "status": "INTERRUPTED",
+                    "executionState": "INTERRUPTED",
+                    "currentComponent": None,
+                    "completedAt": interrupted_at,
+                    "executionCompletedAt": interrupted_at,
+                    "error": "The scan worker stopped during a service restart. Retry the scan to continue.",
+                })
+                run.setdefault("liveLog", []).append({
+                    "timestamp": interrupted_at,
+                    "level": "ERROR",
+                    "message": "Scan interrupted by service restart; retry is required",
+                    "status": "INTERRUPTED",
+                })
+                save_live(run)
+            response = jsonify({"ok": True, **run})
             response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
             response.headers["Pragma"] = "no-cache"
             return response

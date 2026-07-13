@@ -233,11 +233,20 @@ def test_assets_are_served_by_dashboard():
     page = client.get("/")
     assert page.status_code == 200
     assert b"r6-scan-ui-v2.css?v=20260713a" in page.data
-    assert b"r6-ios-light.css?v=20260713a" in page.data
-    assert b"r6ace.js?v=20260713zh" in page.data
-    assert b"r6-scan-ui-v2.js?v=20260713i" in page.data
+    assert b"r6-ios-light.css?v=20260713c" in page.data
+    assert b"r6ace.js?v=20260713zi" in page.data
+    assert b"r6-scan-ui-v2.js?v=20260713j" in page.data
     assert client.get("/static/r6-scan-ui-v2.js?v=20260713f").status_code == 200
-    assert client.get("/static/r6-ios-light.css?v=20260713a").status_code == 200
+    assert client.get("/static/r6-ios-light.css?v=20260713c").status_code == 200
+
+
+def test_apple_light_scan_cards_and_host_theme_override_are_scoped():
+    assert "#s2r6ace-pane #r6p-scan-appraisal>div" in IOS_CSS
+    assert "grid-template-columns:repeat(3,minmax(0,1fr))!important" in IOS_CSS
+    assert "body.flex-skyline-mode #s2r6ace-pane button" in IOS_CSS
+    assert "#s2r6ace-pane #r6p-appraisal-drawer" in IOS_CSS
+    assert "#s2r6ace-pane#s2r6ace-pane button" in IOS_CSS
+    assert "display:flex!important;flex-wrap:wrap!important" in IOS_CSS
 
 
 def test_containerization_guidelines_are_pipeline_level_peer():

@@ -110,6 +110,12 @@ if create_uat_blueprint:
 else:
     print(f"[STARTUP] UAT module disabled (import failed): {_uat_import_error}")
 
+try:
+    from workflow_dashboard.r6_scan_appraisal import create_r6_scan_blueprint
+except ImportError:
+    from r6_scan_appraisal import create_r6_scan_blueprint
+app.register_blueprint(create_r6_scan_blueprint(BASE_DIR))
+
 # ── Template caching: reload once at startup, then serve from cache ──────────
 # TEMPLATES_AUTO_RELOAD=False stops Jinja2 re-parsing combined.html (1.35 MB)
 # mid-traffic whenever its mtime changes — that re-parse blocks Flask for
@@ -3511,6 +3517,14 @@ def ai_powerup_ui():
     # Shares the _ai_powerup.html + _ai_powerup_js.html partials with Stage 9 (panel-sai).
     return render_template("ai_powerup.html", cache_bust=_CACHE_BUST)
 
+
+@app.get("/downloads/FLEX_Enterprise_Ready_Assessment_Workbook.xlsx")
+def download_flex_assessment_workbook():
+    return send_from_directory(
+        str(BASE_DIR / "static" / "downloads"),
+        "FLEX_Enterprise_Ready_Assessment_Workbook.xlsx",
+        as_attachment=True,
+    )
 
 @app.get("/business-system-template-das/")
 def business_system_template_das():
@@ -20921,6 +20935,488 @@ def openstack_networks():
         return jsonify({"error": str(e)}), 500
     return jsonify(result)
 
+def _r6v2_slug(value):
+    return re.sub(r"[^a-z0-9-]+", "-", str(value or "").lower()).strip("-") or "app"
+
+
+def _r6v2_component_decision(component):
+    name = str((component or {}).get("name") or "component").strip() or "component"
+    ctype = str((component or {}).get("type") or (component or {}).get("role") or "").lower()
+    hay = ("%s %s" % (name, ctype)).lower()
+    endpoint = str((component or {}).get("tgt") or (component or {}).get("target") or "")
+    health = str((component or {}).get("path") or "")
+    start_command = str((component or {}).get("startCommand") or (component or {}).get("cmd") or "").strip()
+
+    state = "UNKNOWN_MIXED"
+    runtime = "Unknown - requires live scan"
+    target = "MANUAL_REVIEW"
+    reason = "Insufficient runtime evidence; review before deployment."
+    gate = "Manual owner approval and live scan evidence"
+    persistent = "Unknown - confirm with live scan"
+
+    if any(k in hay for k in ("mysql", "postgres", "oracle", "mongo", "database", " db")):
+        state, target = "STATEFUL", "DATA_MIGRATION_REQUIRED"
+        runtime = "Database"
+        reason = "Database/stateful component should not be packed into an application image."
+        gate = "Data migration plan, backup, restore test, application connectivity test"
+        persistent = "/var/lib/ database data path"
+    elif any(k in hay for k in ("redis", "cache")):
+        state, target = "STATEFUL", "OPERATOR_MANAGED"
+        runtime = "Redis/cache"
+        reason = "Cache/session tier should be rebuilt or operator-managed with explicit data disposition."
+        gate = "Operator present or disposable-cache approval"
+        persistent = "Disposable or /data - confirm"
+    elif any(k in hay for k in ("rabbit", "queue", "kafka", "event stream")):
+        state, target = "STATEFUL", "OPERATOR_MANAGED"
+        runtime = "Queue/event stream"
+        reason = "Messaging tier requires drain/replication and operator-managed deployment."
+        gate = "Queue drain/replication plan and operator present"
+        persistent = "/var/lib queue data path"
+    elif any(k in hay for k in ("file storage", "object storage", "upload", "document")):
+        state, target = "STATEFUL", "EXTERNAL_SERVICE"
+        runtime = "File/object storage"
+        reason = "Persistent files must move to object/shared storage, not container disk."
+        gate = "Object/PVC mapping and data copy validation"
+        persistent = "/srv or external object storage"
+    elif any(k in hay for k in ("windows", "license", "hardware", "dongle")):
+        state, target = "UNKNOWN_MIXED", "RETAINED_FLEX_VM"
+        runtime = "Legacy or machine-bound workload"
+        reason = "Potential OS/license/hardware binding makes VM retention safer until proven portable."
+        gate = "VM connectivity, backup, and vendor/license approval"
+    elif any(k in hay for k in ("gateway", "ingress")):
+        state, target = "STATELESS", "KUBERNETES_NATIVE"
+        runtime = "Gateway/API routing"
+        reason = "Gateway-shaped component maps better to Kubernetes Gateway/API resources."
+        gate = "Gateway class, hostname, certificate, DNS/LB intent"
+        persistent = "None - stateless"
+    elif any(k in hay for k in ("frontend", "web", "api", "backend", "worker", "service", "app")):
+        state, target = "STATELESS", "CONTAINERIZED"
+        runtime = "Application process"
+        reason = "Stateless application component is a good containerization candidate."
+        gate = "Start command, health check, non-root runtime, config/secrets externalized"
+        persistent = "None expected - verify writable paths"
+
+    blocker = None
+    if target in ("CONTAINERIZED", "PARTIALLY_CONTAINERIZED") and not start_command:
+        blocker = "%s: startCommand is missing; run live scan or set it manually before generating a production image." % name
+
+    return {
+        "name": name,
+        "sourceType": ctype or "Application",
+        "endpoint": endpoint,
+        "healthPath": health or "/health",
+        "startCommand": start_command,
+        "state": state,
+        "runtime": runtime,
+        "targetForm": target,
+        "reason": reason,
+        "requiredGate": gate,
+        "persistentPath": persistent,
+        "blocker": blocker,
+    }
+
+
+@app.post("/api/r6v2/analyze")
+def r6v2_analyze():
+    """Create a backend-authored R6 V2 analysis run from a Stage 1 business system."""
+    import json as _json, time as _time
+    data = request.get_json(silent=True) or {}
+    bs = data.get("businessSystem") or {}
+    comps = bs.get("components") or []
+    decisions = [_r6v2_component_decision(c) for c in comps]
+    blockers = [d["blocker"] for d in decisions if d.get("blocker")]
+    summary = {
+        "components": len(decisions),
+        "containerized": sum(1 for d in decisions if d["targetForm"] in ("CONTAINERIZED", "PARTIALLY_CONTAINERIZED")),
+        "vmOrExternal": sum(1 for d in decisions if d["targetForm"] in ("RETAINED_FLEX_VM", "REDEPLOYED_FLEX_VM", "EXTERNAL_SERVICE", "DATA_MIGRATION_REQUIRED")),
+        "operatorManaged": sum(1 for d in decisions if d["targetForm"] == "OPERATOR_MANAGED"),
+        "manualReview": sum(1 for d in decisions if d["targetForm"] == "MANUAL_REVIEW"),
+    }
+    run = {
+        "runId": "r6v2-%s" % _time.strftime("%Y%m%d%H%M%S"),
+        "engine": "Refactor_Apps_Container_V2",
+        "businessSystemId": bs.get("id") or "",
+        "businessSystemName": bs.get("name") or "app",
+        "sourcePlatform": "FLEX",
+        "createdAt": _time.strftime("%Y-%m-%dT%H:%M:%SZ", _time.gmtime()),
+        "status": "BLOCKED" if blockers else "READY_FOR_BUNDLE",
+        "summary": summary,
+        "components": decisions,
+        "blockers": blockers,
+        "warnings": [
+            "V2 uses backend decisions, but live SSH scan evidence is still recommended before production cutover.",
+            "VM provisioning for retained/redeployed VM components remains an OpenCenter/FLEX handoff, not automated here.",
+        ],
+    }
+    p = Path(os.path.expanduser("~")) / ".config" / "opencenter" / "r6v2" / "runs" / "latest.json"
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(_json.dumps(run, indent=2), encoding="utf-8")
+    return jsonify({"ok": True, "run": run})
+
+
+@app.post("/api/r6v2/generate")
+def r6v2_generate():
+    """Generate real R6/OpenCenter artifacts from a V2 backend run."""
+    data = request.get_json(silent=True) or {}
+    run = data.get("run") or {}
+    comps = run.get("components") or []
+    if not comps:
+        return jsonify({"ok": False, "error": "run.components is required; run /api/r6v2/analyze first"}), 400
+    if run.get("blockers"):
+        return jsonify({"ok": False, "error": "V2 run is blocked", "blockers": run.get("blockers")}), 400
+
+    def _readiness(form):
+        return "READY" if form in ("CONTAINERIZED", "PARTIALLY_CONTAINERIZED", "KUBERNETES_NATIVE", "OPERATOR_MANAGED") else "KEEP_ON_VM_FOR_NOW"
+
+    source_host = ""
+    workloads = []
+    for c in comps:
+        endpoint = str(c.get("endpoint") or "")
+        m = re.search(r"(\d{1,3}(?:\.\d{1,3}){3})", endpoint)
+        if m and not source_host:
+            source_host = m.group(1)
+        form = str(c.get("targetForm") or "MANUAL_REVIEW")
+        workloads.append({
+            "component": c.get("name"),
+            "image": "docker.io/library/debian:stable-slim",
+            "replicas": 2 if form in ("CONTAINERIZED", "PARTIALLY_CONTAINERIZED") else 1,
+            "readiness": _readiness(form),
+            "targetForm": form,
+            "layer": "API",
+            "sourcePath": "/opt/app",
+            "startCommand": c.get("startCommand") or "",
+            "healthPath": c.get("healthPath") or "/health",
+            "dependencies": [],
+            "targetIp": source_host,
+            "targetPort": 80,
+            "persistentPath": c.get("persistentPath") or "",
+        })
+
+    payload = {
+        "org": data.get("org") or "rackspace-flex",
+        "cluster": data.get("cluster") or "flex-prod-k8s",
+        "region": data.get("region") or "iad3",
+        "registry": data.get("registry") or {"type": "harbor", "project": "flex-apps"},
+        "source_vm": {"host": source_host, "user": (data.get("source_vm") or {}).get("user") or "root"},
+        "auto_commit": bool(data.get("auto_commit")),
+        "import_to_gitops": True,
+        "bundle": {
+            "id": run.get("runId"),
+            "businessSystemName": run.get("businessSystemName") or "app",
+            "sourceBusinessSystemId": run.get("businessSystemId") or "",
+            "workloads": workloads,
+        },
+    }
+    with app.test_request_context("/api/r6/generate-bundle", method="POST", json=payload):
+        generated = r6_generate_bundle()
+    if isinstance(generated, tuple):
+        resp, status = generated
+        body = resp.get_json(silent=True) if hasattr(resp, "get_json") else None
+        return jsonify(body or {"ok": False, "error": "bundle generation failed"}), status
+    body = generated.get_json(silent=True) if hasattr(generated, "get_json") else None
+    if body:
+        body["r6v2_run"] = run
+        return jsonify(body)
+    return generated
+
+
+def _r6_capture_slug(value: Any) -> str:
+    return re.sub(r"[^a-z0-9-]+", "-", str(value or "component").lower()).strip("-") or "component"
+
+
+def _r6_capture_paths(workload: Dict[str, Any], component: Dict[str, Any]) -> List[str]:
+    raw: List[Any] = []
+    for key in ("applicationPaths", "appPaths", "paths"):
+        val = workload.get(key) if key in workload else component.get(key)
+        if isinstance(val, list):
+            raw.extend(val)
+    for key in ("sourcePath", "path"):
+        val = workload.get(key) if key in workload else component.get(key)
+        if val:
+            raw.extend(str(val).split(","))
+    paths: List[str] = []
+    for item in raw:
+        p = str(item or "").strip()
+        if p.startswith("/") and p not in paths:
+            paths.append(p)
+    return paths
+
+
+def _r6_capture_has_blocked_path(paths: List[str]) -> Optional[str]:
+    blocked = (
+        "/var/lib/postgresql", "/var/lib/mysql", "/var/lib/mongodb", "/var/lib/redis",
+        "/var/lib/oracle", "/etc/ssh", "/root/.ssh", "/home/", "/var/backups",
+    )
+    for p in paths:
+        low = p.lower().rstrip("/")
+        for b in blocked:
+            if low == b or low.startswith(b.rstrip("/") + "/"):
+                if b == "/home/" and "/.ssh" not in low:
+                    continue
+                return p
+    return None
+
+
+def _r6_capture_secret_signal(workload: Dict[str, Any], component: Dict[str, Any]) -> Optional[str]:
+    text = json.dumps({"workload": workload, "component": component}, default=str).lower()
+    patterns = (
+        "-----begin private key-----", "id_rsa", "id_dsa", "id_ecdsa", "id_ed25519",
+        "aws_secret_access_key", "private_key", "client_secret", "password=",
+        "secret_key=", "api_key=", "token=",
+    )
+    for pat in patterns:
+        if pat in text:
+            return pat
+    return None
+
+
+def _r6_capture_snapshot_kind(component: Dict[str, Any], paths: List[str]) -> str:
+    disks = component.get("volumes") or component.get("attachedVolumes") or component.get("volumeIds") or []
+    if isinstance(disks, str):
+        disks = [disks]
+    if disks or any(p.startswith(("/srv", "/data", "/mnt", "/opt")) for p in paths):
+        return "volume_snapshot"
+    return "vm_image_snapshot"
+
+
+def _r6_openstack_json(args: List[str]) -> Any:
+    """Run an OpenStack CLI command and return its JSON output.
+
+    Kept behind one small function so Stage 9 can be tested without a cloud and so it
+    uses the same authenticated CLI environment as the existing image scanner.
+    """
+    cmd = ["openstack"] + list(args) + ["-f", "json"]
+    proc = subprocess.run(cmd, text=True, capture_output=True, timeout=120, check=False)
+    if proc.returncode:
+        raise RuntimeError("OpenStack CLI failed (%s): %s" % (" ".join(cmd), (proc.stderr or proc.stdout).strip()))
+    try:
+        return json.loads(proc.stdout or "{}")
+    except json.JSONDecodeError as exc:
+        raise RuntimeError("OpenStack CLI returned invalid JSON for %s" % " ".join(cmd)) from exc
+
+
+def _r6_snapshot_status(snapshot_id: str, kind: str) -> str:
+    noun = ["volume", "snapshot", "show"] if kind == "volume_snapshot" else ["image", "show"]
+    result = _r6_openstack_json(noun + [snapshot_id])
+    return str(result.get("status") or result.get("Status") or "").upper()
+
+
+def _r6_wait_snapshot(snapshot_id: str, kind: str) -> None:
+    deadline = time.monotonic() + int(os.environ.get("R6_SNAPSHOT_WAIT_SECONDS", "900"))
+    while time.monotonic() < deadline:
+        status = _r6_snapshot_status(snapshot_id, kind)
+        if status == "AVAILABLE" or (kind == "vm_image_snapshot" and status == "ACTIVE"):
+            return
+        if status in {"ERROR", "ERROR_DELETING", "KILLED", "DELETED"}:
+            raise RuntimeError("snapshot %s entered terminal status %s" % (snapshot_id, status))
+        time.sleep(2)
+    raise RuntimeError("timed out waiting for snapshot %s to become AVAILABLE" % snapshot_id)
+
+
+def _r6_create_snapshots(vm_id: str, volume_ids: List[str], name: str) -> Tuple[str, List[str]]:
+    ids: List[str] = []
+    if volume_ids:
+        for index, volume_id in enumerate(volume_ids, 1):
+            result = _r6_openstack_json(["volume", "snapshot", "create", "--force", "--volume", volume_id,
+                                         "%s-vol-%s" % (name, index)])
+            snapshot_id = str(result.get("id") or result.get("ID") or "")
+            if not snapshot_id:
+                raise RuntimeError("volume snapshot create did not return an ID")
+            ids.append(snapshot_id)
+        kind = "volume_snapshot"
+    else:
+        result = _r6_openstack_json(["server", "image", "create", "--name", name, vm_id])
+        snapshot_id = str(result.get("id") or result.get("ID") or "")
+        if not snapshot_id:
+            raise RuntimeError("server image create did not return an ID")
+        ids.append(snapshot_id)
+        kind = "vm_image_snapshot"
+    for snapshot_id in ids:
+        _r6_wait_snapshot(snapshot_id, kind)
+    return kind, ids
+
+
+@app.post("/api/r6/capture-sources-build")
+def r6_capture_sources_build():
+    """Stage 9 gate: capture only Stage-8-approved container sources, then reuse the
+    existing R6 bundle generator. A VM snapshot is recorded as source lineage, never as
+    a container image."""
+    import hashlib as _hashlib, json as _json, time as _time
+
+    data = request.get_json(silent=True) or {}
+    if not data.get("stage8Approved"):
+        return jsonify({"ok": False, "error": "Stage 8 approval is required before source snapshots can be captured."}), 400
+
+    bundle = data.get("bundle") or {}
+    workloads = bundle.get("workloads") or []
+    business_system = data.get("businessSystem") or {}
+    components = business_system.get("components") or []
+    comp_by_name = {str(c.get("name") or ""): c for c in components if isinstance(c, dict)}
+    if not workloads:
+        return jsonify({"ok": False, "error": "No workloads were supplied for Stage 9 capture."}), 400
+
+    approved_forms = {"CONTAINERIZED", "PARTIALLY_CONTAINERIZED"}
+    excluded_forms = {
+        "KUBERNETES_NATIVE", "OPERATOR_MANAGED", "RETAINED_FLEX_VM", "REDEPLOYED_FLEX_VM",
+        "EXTERNAL_SERVICE", "DATA_MIGRATION_REQUIRED", "MANUAL_REVIEW", "BLOCKED", "EXCLUDED",
+    }
+    excluded_paths = list(dict.fromkeys([
+        "/var/log", "/tmp", "/etc/ssh", "/root/.ssh", "/home/*/.ssh", "/var/lib/postgresql",
+        "/var/lib/mysql", "/var/lib/mongodb", "/var/lib/redis", "/var/backups",
+    ] + [str(x) for x in ((data.get("capture") or {}).get("excludePaths") or [])]))
+
+    state_root = Path(os.environ.get("R6_CAPTURE_STATE_DIR") or (Path(os.path.expanduser("~")) / ".config" / "opencenter" / "r6" / "source-captures"))
+    state_root.mkdir(parents=True, exist_ok=True)
+    snapshots_path = state_root / "snapshot-index.json"
+    try:
+        snapshot_index = _json.loads(snapshots_path.read_text(encoding="utf-8")) if snapshots_path.exists() else {}
+    except Exception:
+        snapshot_index = {}
+
+    stamp = _time.strftime("%Y%m%d_%H%M%S")
+    capture_rows: List[Dict[str, Any]] = []
+    sanitized_workloads: List[Dict[str, Any]] = []
+    blockers: List[str] = []
+    approved_count = reused_count = created_count = 0
+
+    for w in workloads:
+        if not isinstance(w, dict):
+            continue
+        name = str(w.get("component") or w.get("name") or "component").strip()
+        form = str(w.get("targetForm") or "").strip().upper()
+        component = comp_by_name.get(name, {})
+        paths = _r6_capture_paths(w, component)
+        source_vm = str(w.get("vmId") or component.get("vmId") or component.get("serverId") or w.get("targetIp") or component.get("targetIp") or component.get("tgt") or component.get("ip") or (data.get("source_vm") or {}).get("host") or "").strip()
+        row: Dict[str, Any] = {
+            "component": name, "targetForm": form, "sourceVm": source_vm,
+            "applicationPaths": paths, "excludedPaths": excluded_paths,
+            "containerizationApproved": form in approved_forms,
+            "captureMode": "LIVE_PLUS_SNAPSHOT", "snapshotStatus": "NOT_APPLICABLE",
+            "snapshotIds": [], "extractionStatus": "N/A", "buildStatus": "N/A",
+            "sourceChecksum": None, "lineage": {},
+        }
+        if form in excluded_forms or form not in approved_forms:
+            row["reason"] = "not a Stage 8 container-source target"
+            capture_rows.append(row)
+            sanitized_workloads.append(dict(w, readiness="KEEP_ON_VM_FOR_NOW") if form not in approved_forms else dict(w))
+            continue
+
+        approved_count += 1
+        row.update({"snapshotStatus": "PENDING", "extractionStatus": "PENDING", "buildStatus": "WAITING"})
+        if not source_vm:
+            row.update({"snapshotStatus": "BLOCKED", "extractionStatus": "BLOCKED", "buildStatus": "BLOCKED", "reason": "source VM/IP is missing"})
+            blockers.append("%s: source VM/IP is missing" % name)
+            capture_rows.append(row)
+            continue
+        bad_path = _r6_capture_has_blocked_path(paths)
+        if bad_path:
+            row.update({"snapshotStatus": "BLOCKED", "extractionStatus": "BLOCKED", "buildStatus": "BLOCKED", "reason": "blocked database/secret/system path: %s" % bad_path})
+            blockers.append("%s: blocked path in applicationPaths: %s" % (name, bad_path))
+            capture_rows.append(row)
+            continue
+        secret_signal = _r6_capture_secret_signal(w, component)
+        if secret_signal:
+            row.update({"snapshotStatus": "BLOCKED", "extractionStatus": "BLOCKED", "buildStatus": "BLOCKED", "reason": "secret-like material detected in metadata: %s" % secret_signal})
+            blockers.append("%s: secret-like material detected before build: %s" % (name, secret_signal))
+            capture_rows.append(row)
+            continue
+
+        volumes = component.get("relevantVolumeIds") or w.get("relevantVolumeIds") or component.get("volumeIds") or component.get("volumes") or component.get("attachedVolumes") or []
+        if isinstance(volumes, str):
+            volumes = [volumes]
+        volumes = [str(v.get("id") if isinstance(v, dict) else v) for v in volumes if (v.get("id") if isinstance(v, dict) else v)]
+        lineage_seed = {
+            "component": name, "sourceVm": source_vm, "targetForm": form,
+            "applicationPaths": paths, "excludedPaths": excluded_paths,
+            "volumes": volumes,
+        }
+        checksum = _hashlib.sha256(_json.dumps(lineage_seed, sort_keys=True, default=str).encode("utf-8")).hexdigest()
+        cache_key = "%s:%s:%s" % (source_vm, name, checksum[:16])
+        cached = snapshot_index.get(cache_key) or {}
+        snapshot_ids = cached.get("snapshotIds") or []
+        snap_kind = cached.get("snapshotKind") or _r6_capture_snapshot_kind(component, paths)
+        reusable = bool(cached and cached.get("sourceChecksum") == checksum and snapshot_ids)
+        if reusable:
+            try:
+                reusable = all(_r6_snapshot_status(sid, snap_kind) in ({"AVAILABLE"} if snap_kind == "volume_snapshot" else {"ACTIVE", "AVAILABLE"}) for sid in snapshot_ids)
+            except Exception:
+                reusable = False
+        try:
+            if reusable:
+                reused_count += 1
+                snapshot_status = "REUSED"
+            else:
+                snap_name = "r6-%s-%s" % (_r6_capture_slug(name), checksum[:12])
+                snap_kind, snapshot_ids = _r6_create_snapshots(source_vm, volumes, snap_name)
+                created_count += len(snapshot_ids)
+                snapshot_status = "AVAILABLE"
+            snapshot_index[cache_key] = {
+                "component": name, "sourceVm": source_vm, "snapshotKind": snap_kind,
+                "snapshotIds": snapshot_ids, "sourceChecksum": checksum,
+                "createdAt": stamp, "status": "AVAILABLE",
+            }
+        except Exception as exc:
+            row.update({"snapshotStatus": "BLOCKED", "extractionStatus": "BLOCKED", "buildStatus": "BLOCKED", "reason": str(exc)})
+            blockers.append("%s: %s" % (name, exc))
+            capture_rows.append(row)
+            continue
+        if not paths:
+            row.update({"snapshotStatus": "BLOCKED", "extractionStatus": "BLOCKED", "buildStatus": "BLOCKED",
+                        "reason": "live scan did not define applicationPaths"})
+            blockers.append("%s: live scan applicationPaths are required" % name)
+            capture_rows.append(row)
+            continue
+        row.update({
+            "snapshotStatus": snapshot_status, "snapshotIds": snapshot_ids,
+            "snapshotMode": "OPENSTACK_CLI",
+            "extractionStatus": "READY", "buildStatus": "READY", "sourceChecksum": checksum,
+            "lineage": {"sourceVm": source_vm, "volumeIds": lineage_seed["volumes"], "snapshotIds": snapshot_ids, "sourceChecksum": checksum},
+        })
+        capture_rows.append(row)
+        clean = dict(w)
+        clean.update({"sourcePath": paths[0], "applicationPaths": paths, "excludedPaths": excluded_paths, "sourceChecksum": checksum, "sourceLineage": row["lineage"]})
+        sanitized_workloads.append(clean)
+
+    if approved_count == 0:
+        return jsonify({"ok": False, "error": "Stage 8 has no CONTAINERIZED or PARTIALLY_CONTAINERIZED components to capture.", "capture": {"components": capture_rows}}), 400
+    if blockers:
+        return jsonify({"ok": False, "error": "Source capture blocked: %s" % "; ".join(blockers), "capture": {"components": capture_rows, "blockers": blockers}}), 400
+
+    snapshots_path.write_text(_json.dumps(snapshot_index, indent=2), encoding="utf-8")
+    capture = {
+        "id": "r6-source-capture-%s" % stamp, "generatedAt": stamp,
+        "approvedCount": approved_count, "reusedSnapshots": reused_count,
+        "createdSnapshots": created_count, "components": capture_rows, "blockers": [],
+        "snapshotMode": "OPENSTACK_CLI",
+        "snapshotIndexPath": str(snapshots_path),
+    }
+    payload = dict(data)
+    payload["bundle"] = dict(bundle, workloads=sanitized_workloads, sourceCapture=capture)
+    with app.test_request_context("/api/r6/generate-bundle", method="POST", json=payload):
+        generated = r6_generate_bundle()
+        body = generated.get_json(silent=True) if hasattr(generated, "get_json") else None
+        status = getattr(generated, "status_code", 200)
+    if not isinstance(body, dict):
+        return jsonify({"ok": False, "error": "bundle generation failed after source capture", "capture": capture}), status
+    body["capture"] = capture
+    bundle_dir = body.get("bundle_dir")
+    if bundle_dir:
+        out_dir = Path(bundle_dir)
+        try:
+            (out_dir / "source-capture-manifest.json").write_text(_json.dumps(capture, indent=2), encoding="utf-8")
+            (out_dir / "source-lineage.json").write_text(_json.dumps({
+                "businessSystem": bundle.get("businessSystemName"),
+                "components": [{"component": r["component"], "lineage": r.get("lineage", {})} for r in capture_rows if r.get("containerizationApproved")],
+            }, indent=2), encoding="utf-8")
+            files = body.setdefault("files", [])
+            for rel in ("source-capture-manifest.json", "source-lineage.json"):
+                if rel not in files:
+                    files.append(rel)
+        except Exception as exc:
+            body.setdefault("bundle_validation", {}).setdefault("warnings", []).append("source capture evidence write failed: %s" % exc)
+    return jsonify(body), status
+
+
 @app.post("/api/r6/generate-bundle")
 def r6_generate_bundle():
     """Write the R6 refactoring bundle as real files + Dockerfiles + build/push script,
@@ -21085,11 +21581,11 @@ def r6_generate_bundle():
         else:
             # No detected or manually supplied start command - fail loudly and immediately
             # instead of silently running the base image's default process (which looks
-            # "Running" in Kubernetes while doing nothing). Detected via Live Scan (Step 3/6)
+            # "Running" in Kubernetes while doing nothing). Detected via Live Scan (Step 3)
             # parsing real `ps aux` output, or set manually in Step 9.
             cmd_line = (
                 'CMD ["sh", "-c", "echo \'[R6] No start command detected for %s - run Live Scan '
-                "(Step 3/6) so R6 can detect it from the running process, or set one manually in "
+                "(Step 3) so R6 can detect it from the running process, or set one manually in "
                 'Step 9 before rebuilding.\' >&2; exit 1"]' % comp
             )
         df_lines = [
@@ -21107,13 +21603,40 @@ def r6_generate_bundle():
                       "    ports: [8080]", "    healthcheck: /healthz"]
         (out_dir / "dockerfiles" / comp / "app").mkdir(parents=True, exist_ok=True)
         (out_dir / "dockerfiles" / comp / "app" / ".gitkeep").write_text("", encoding="utf-8")
-        src_path = str(w.get("sourcePath") or layer_paths.get(str(w.get("layer")), "/opt/app/"))
-        extract_lines += ['echo "== extract %s from $VM_HOST:%s =="' % (comp, src_path),
-                          'rsync -az -e "ssh -i $SSH_KEY -o StrictHostKeyChecking=no" '
-                          '"$VM_USER@$VM_HOST:%s" "dockerfiles/%s/app/"' % (src_path, comp)]
+        app_paths = w.get("applicationPaths") or [w.get("sourcePath") or layer_paths.get(str(w.get("layer")), "/opt/app/")]
+        app_paths = [str(p) for p in app_paths if str(p).startswith("/")]
+        exclude_args = " ".join(
+            "--exclude=%s" % shlex.quote(pattern) for pattern in (
+                "var/log/***", "tmp/***", "etc/ssh/***", ".ssh/***", "*.pem", "*.key",
+                "*.p12", "*.pfx", "*.bak", "*.backup", "*~", "var/lib/postgresql/***",
+                "var/lib/mysql/***", "var/lib/mongodb/***", "var/lib/redis/***",
+            )
+        )
+        extract_lines += ['echo "== extract approved application paths for %s =="' % comp,
+                          'rm -rf "dockerfiles/%s/app" && mkdir -p "dockerfiles/%s/app"' % (comp, comp)]
+        for src_path in app_paths:
+            extract_lines.append(
+                'rsync -a --relative %s -e "ssh -i $SSH_KEY -o StrictHostKeyChecking=no" '
+                '"$VM_USER@$VM_HOST:%s" "dockerfiles/%s/app/"' % (exclude_args, src_path, comp)
+            )
+        extract_lines += [
+            'if grep -RIlE --exclude-dir=.git \'-----BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY-----|'
+            '(password|client_secret|secret_key|api_key)[[:space:]]*[:=][[:space:]]*[^$[:space:]]\' '
+            '"dockerfiles/%s/app"; then echo "[BLOCKED] secret material remains in %s build context" >&2; exit 41; fi' % (comp, comp),
+            'if find "dockerfiles/%s/app" -type f \\( -name "PG_VERSION" -o -name "ibdata*" -o '
+            '-name "ib_logfile*" -o -name "WiredTiger*" -o -name "*.db-wal" \\) -print -quit | grep -q .; '
+            'then echo "[BLOCKED] active database files remain in %s build context" >&2; exit 42; fi' % (comp, comp),
+            'find "dockerfiles/%s/app" -type f -print0 | sort -z | xargs -0 sha256sum | sha256sum | '
+            'awk \'{print $1}\' > "dockerfiles/%s/source.sha256"' % (comp, comp),
+        ]
         sbom_path = "evidence/images/%s-sbom.spdx.json" % comp
+        source_lineage = w.get("sourceLineage") or {}
+        lineage_vm = str(source_lineage.get("sourceVm") or "")
+        lineage_volumes = _json.dumps(source_lineage.get("volumeIds") or [], separators=(",", ":"))
+        lineage_snapshots = _json.dumps(source_lineage.get("snapshotIds") or [], separators=(",", ":"))
         build_lines += [
             'echo "== build %s =="' % comp,
+            'test -s "dockerfiles/%s/source.sha256" || { echo "[BLOCKED] sanitized source checksum is missing" >&2; exit 43; }' % comp,
             "docker build -t %s dockerfiles/%s" % (image, comp),
             'echo "== startup/health test %s =="' % comp,
             # Foreground run with the health check as the container's own command - avoids
@@ -21153,8 +21676,12 @@ def r6_generate_bundle():
             "esac" % (image, "%s/%s" % (prefix, comp), comp, comp, comp, comp),
             '[ $_first -eq 0 ] && echo "," >> image-manifest.json',
             "_first=0",
-            'printf \'{"component":"%s","registry":"%s","repository":"%s","tag":"%s","digest":"%%s","buildStatus":"PASSED","pushStatus":"%%s","signatureStatus":"%%s"}\' "$_digest" "$_push_status" "$_sign_status" >> image-manifest.json'
-            % (comp, reg_host, "%s/%s" % (project, comp), tag),
+            '_source_checksum=$(cat "dockerfiles/%s/source.sha256")' % comp,
+            'printf \'{"component":"%s","registry":"%s","repository":"%s","tag":"%s","digest":"%%s",'
+            '"sourceChecksum":"%%s","sourceLineage":{"vmId":%s,"volumeIds":%s,"snapshotIds":%s},'
+            '"buildStatus":"PASSED","pushStatus":"%%s","signatureStatus":"%%s"}\' '
+            '"$_digest" "$_source_checksum" "$_push_status" "$_sign_status" >> image-manifest.json'
+            % (comp, reg_host, "%s/%s" % (project, comp), tag, _json.dumps(lineage_vm), lineage_volumes, lineage_snapshots),
         ]
         deps = [str(d).strip() for d in (w.get("dependencies") or []) if str(d).strip()]
         dep_slugs = [re.sub(r"[^a-z0-9-]+", "-", d.lower()).strip("-") for d in deps]
@@ -22268,7 +22795,7 @@ def r6_generate_bundle():
         if not str(w.get("startCommand") or "").strip():
             validation_blockers.append(
                 "%s: field 'startCommand' is not set - image will not run its application. "
-                "Remediation: run Live Scan (Step 3/6) so R6 can detect it from the running "
+                "Remediation: run Live Scan (Step 3) so R6 can detect it from the running "
                 "process, or set it manually in Step 9's Start Command Review." % _comp(w))
     known_component_names = {str(w.get("component") or "").strip().lower() for w in workloads}
     for w in workloads:
@@ -22621,6 +23148,99 @@ def r6_run_validation():
     evidence_path.write_text(_json.dumps(evidence, indent=2), encoding="utf-8")
     return jsonify({"ok": True, "evidence_path": str(evidence_path),
                     "all_passed": all_passed, "results": results, "evidence": evidence})
+
+
+@app.post("/api/r6/handover-checks/run")
+def r6_handover_run():
+    """Start a new handover readiness check run."""
+    import json as _json
+    from workflow_dashboard.r6.handover import execution_engine as _he
+    data = request.get_json(silent=True) or {}
+    bundle_dir = data.get("bundle_dir", "")
+    mode = data.get("mode", "safe")
+    params = data.get("params", {})
+    if not bundle_dir:
+        return jsonify({"ok": False, "error": "bundle_dir required"}), 400
+    if mode not in ("safe", "full"):
+        return jsonify({"ok": False, "error": "mode must be 'safe' or 'full'"}), 400
+    run_id = _he.start_run(bundle_dir, mode=mode, params=params)
+    return jsonify({"ok": True, "runId": run_id}), 202
+
+
+@app.get("/api/r6/handover-checks/runs/<run_id>")
+def r6_handover_run_status(run_id):
+    """Get the current status of a handover check run."""
+    from workflow_dashboard.r6.handover import execution_engine as _he
+    run = _he.get_run(run_id)
+    if run is None:
+        # Try loading from disk
+        from workflow_dashboard.r6.handover import evidence_store as _es
+        saved = _es.load_run(run_id)
+        if saved is None:
+            return jsonify({"ok": False, "error": "run not found"}), 404
+        return jsonify({"ok": True, **saved})
+    return jsonify({"ok": True, **run.to_dict()})
+
+
+@app.post("/api/r6/handover-checks/runs/<run_id>/cancel")
+def r6_handover_cancel(run_id):
+    """Cancel a running handover check run."""
+    from workflow_dashboard.r6.handover import execution_engine as _he
+    ok = _he.cancel_run(run_id)
+    if not ok:
+        return jsonify({"ok": False, "error": "run not found or not running"}), 404
+    return jsonify({"ok": True, "runId": run_id, "status": "CANCELLED"})
+
+
+@app.post("/api/r6/handover-checks/runs/<run_id>/retry")
+def r6_handover_retry(run_id):
+    """Retry a completed or failed handover check run with the same parameters."""
+    from workflow_dashboard.r6.handover import execution_engine as _he, evidence_store as _es
+    existing = _he.get_run(run_id)
+    if existing is None:
+        saved = _es.load_run(run_id)
+        if saved is None:
+            return jsonify({"ok": False, "error": "run not found"}), 404
+        bundle_dir = saved.get("bundleDir", "")
+        mode = saved.get("mode", "safe")
+        params = {}
+    else:
+        bundle_dir = existing.bundle_dir
+        mode = existing.mode
+        params = existing.params
+    new_run_id = _he.start_run(bundle_dir, mode=mode, params=params)
+    return jsonify({"ok": True, "runId": new_run_id}), 202
+
+
+@app.post("/api/r6/handover-checks/runs/<run_id>/checks/<check_id>/approve-warning")
+def r6_handover_approve_warning(run_id, check_id):
+    """Approve a WARNING result so it no longer blocks the READY verdict."""
+    from workflow_dashboard.r6.handover import execution_engine as _he
+    ok = _he.approve_warning(run_id, check_id)
+    if not ok:
+        return jsonify({"ok": False, "error": "run or check not found, or not in WARNING state"}), 404
+    return jsonify({"ok": True, "runId": run_id, "checkId": check_id, "approved": True})
+
+
+@app.get("/api/r6/handover-checks/runs/<run_id>/export")
+def r6_handover_export(run_id):
+    """Export the full handover check run as a downloadable JSON report."""
+    from workflow_dashboard.r6.handover import execution_engine as _he, evidence_store as _es
+    run = _he.get_run(run_id)
+    if run is not None:
+        data = run.to_dict()
+    else:
+        data = _es.load_run(run_id)
+        if data is None:
+            return jsonify({"ok": False, "error": "run not found"}), 404
+    import json as _json
+    response = app.response_class(
+        response=_json.dumps(data, indent=2, default=str),
+        status=200,
+        mimetype="application/json",
+    )
+    response.headers["Content-Disposition"] = f'attachment; filename="handover-run-{run_id[:8]}.json"'
+    return response
 
 
 @app.get("/api/r6/state")

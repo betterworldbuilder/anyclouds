@@ -454,7 +454,7 @@ def test_one_ssh_failure_has_one_root_and_eighteen_skips(monkeypatch, tmp_path):
     assert sum(p["status"] == "SKIPPED_PREREQUISITE" for p in component["probes"]) == 18
     assert component["probes"][0]["errorCode"] == "SSH_NETWORK_TIMEOUT"
     assert run["appraisal"]["finalVerdict"] == "BLOCKED_INFRASTRUCTURE"
-    assert run["appraisal"]["snapshotReadiness"] in {"PARTIAL", "READY"}
+    assert run["appraisal"]["snapshotReadiness"] == "UNKNOWN"
 
 
 def test_no_vm_mapping_and_no_endpoint_is_explicit_root_blocker(monkeypatch, tmp_path):
@@ -706,3 +706,36 @@ def test_13_invalid_host_cannot_trigger_command_injection(tmp_path):
     status = get_trust_status("$(whoami)", 22, known_hosts, runner)
     assert status["status"] == "UNREACHABLE"
     assert not calls
+
+def test_normalization_never_promotes_ospc_source_to_executable_target():
+    mapped = normalize_component_mapping({
+        "name": "Database",
+        "sourceIp": "10.60.0.66",
+        "targetIp": "174.143.59.28",
+        "sshUser": "ubuntu",
+    })
+    assert mapped["sourceIp"] == "10.60.0.66"
+    assert mapped["targetIp"] == "174.143.59.28"
+    assert mapped["targetHost"] == "174.143.59.28"
+    assert mapped["sshHost"] == "174.143.59.28"
+    assert mapped["sshHost"] != mapped["sourceIp"]
+
+def test_scan_start_network_retry_is_idempotent(monkeypatch, tmp_path):
+    monkeypatch.setenv("R6_SCAN_STATE_DIR", str(tmp_path))
+    app = Flask(__name__)
+    app.register_blueprint(create_r6_scan_blueprint(pathlib.Path.cwd()))
+    client = app.test_client()
+    payload = {
+        "requestId": "browser-request-1",
+        "businessSystem": {"id": "sys", "components": [{
+            "name": "Database", "type": "Database",
+            "targetIp": "127.0.0.1", "databaseAccessMode": "UNKNOWN",
+            "databaseEndpoint": "mysql://127.0.0.1:1",
+        }]},
+        "ssh": {},
+    }
+    first = client.post("/api/r6/scans/business-system/run", json=payload)
+    second = client.post("/api/r6/scans/business-system/run", json=payload)
+    assert first.status_code == second.status_code == 202
+    assert first.get_json()["runId"] == second.get_json()["runId"]
+    assert second.get_json()["deduplicated"] is True

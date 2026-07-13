@@ -1,0 +1,4 @@
+{"action": "APPROVE", "actor": "dashboard-user", "fingerprint": "SHA256:FJFe6J3Z9JbhykRUau8DjrSDRTxTpfTBK5YWcx+FjkE", "host": "50.56.159.92", "port": 22, "result": "TRUSTED", "timestamp": "2026-07-13T10:21:09.103411+00:00", "vmId": null}
+{"action": "APPROVE", "actor": "dashboard-user", "fingerprint": "SHA256:s1oOOrZhA0fUfOPkme+f7Y7V37H43kI4uq13udG331I", "host": "174.143.59.106", "port": 22, "result": "TRUSTED", "timestamp": "2026-07-13T10:21:12.407119+00:00", "vmId": null}
+{"action": "APPROVE", "actor": "dashboard-user", "fingerprint": "SHA256:GoxurRMJmbDIEm2ZZOXZF6RNSKbzaPwfrjPj4/agWNs", "host": "174.143.59.142", "port": 22, "result": "TRUSTED", "timestamp": "2026-07-13T10:21:15.860981+00:00", "vmId": null}
+{"action": "APPROVE", "actor": "dashboard-user", "fingerprint": "SHA256:qFnKrK4BrSQtS1WqvGia5lqrsPzsYrLNufxKArTd0lM", "host": "174.143.59.70", "port": 22, "result": "TRUSTED", "timestamp": "2026-07-13T10:21:19.208543+00:00", "vmId": null}

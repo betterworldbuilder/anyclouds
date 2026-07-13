@@ -1,0 +1,141 @@
+<div id="s2r6v2-pane" class="gov-page" style="display:none;overflow:auto;padding:0;background:#f8fafc;">
+  <style>
+    #s2r6v2-pane * { box-sizing:border-box; }
+    .r6v2-hero { background:#0f172a; color:#f8fafc; padding:26px 34px; border-bottom:1px solid #1e293b; }
+    .r6v2-kicker { font-size:11px; font-weight:900; letter-spacing:.14em; text-transform:uppercase; color:#38bdf8; margin-bottom:8px; }
+    .r6v2-title { margin:0; font-size:30px; font-weight:900; letter-spacing:0; color:#f8fafc; }
+    .r6v2-sub { margin:8px 0 0; max-width:920px; color:#cbd5e1; font-size:13px; line-height:1.65; }
+    .r6v2-body { padding:22px 34px 70px; }
+    .r6v2-grid { display:grid; grid-template-columns:320px minmax(0,1fr); gap:18px; align-items:start; }
+    .r6v2-card { background:#fff; border:1px solid #dbeafe; border-radius:8px; box-shadow:0 2px 10px rgba(15,23,42,.05); overflow:hidden; }
+    .r6v2-card-hd { padding:13px 15px; background:#eff6ff; border-bottom:1px solid #dbeafe; font-weight:900; color:#0f172a; display:flex; justify-content:space-between; gap:10px; align-items:center; }
+    .r6v2-card-bd { padding:14px 15px; }
+    .r6v2-system { border:1px solid #e2e8f0; border-radius:8px; padding:10px 12px; margin-bottom:8px; cursor:pointer; background:#fff; }
+    .r6v2-system:hover, .r6v2-system.active { border-color:#0284c7; background:#f0f9ff; }
+    .r6v2-system b { display:block; color:#0f172a; font-size:13px; }
+    .r6v2-system span { display:block; color:#64748b; font-size:11px; margin-top:3px; }
+    .r6v2-btn { border:0; border-radius:6px; padding:8px 13px; font-size:12px; font-weight:900; cursor:pointer; }
+    .r6v2-btn.primary { background:#0369a1; color:#fff; }
+    .r6v2-btn.good { background:#16a34a; color:#fff; }
+    .r6v2-btn.dark { background:#0f172a; color:#fff; }
+    .r6v2-btn.ghost { background:#f1f5f9; color:#334155; border:1px solid #cbd5e1; }
+    .r6v2-btn:disabled { opacity:.45; cursor:not-allowed; }
+    .r6v2-metrics { display:grid; grid-template-columns:repeat(5,minmax(100px,1fr)); gap:8px; margin-bottom:14px; }
+    .r6v2-metric { background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:10px 12px; }
+    .r6v2-metric strong { display:block; font-size:20px; color:#0f172a; }
+    .r6v2-metric span { display:block; font-size:10px; color:#64748b; font-weight:900; text-transform:uppercase; margin-top:2px; }
+    .r6v2-table { width:100%; border-collapse:collapse; font-size:12px; }
+    .r6v2-table th { text-align:left; padding:8px 10px; background:#f8fafc; color:#0369a1; font-size:10px; text-transform:uppercase; letter-spacing:.06em; border-bottom:1px solid #dbeafe; }
+    .r6v2-table td { padding:8px 10px; border-bottom:1px solid #eef2f7; color:#334155; vertical-align:top; }
+    .r6v2-pill { display:inline-flex; border-radius:999px; padding:2px 8px; font-size:10px; font-weight:900; white-space:nowrap; }
+    .r6v2-terminal { background:#020617; color:#7dd3fc; border-radius:8px; padding:12px; font-family:monospace; font-size:11px; white-space:pre-wrap; overflow:auto; max-height:310px; min-height:72px; }
+    .r6v2-actions { display:flex; gap:8px; flex-wrap:wrap; margin:12px 0; }
+    .r6v2-form { display:flex; gap:8px; flex-wrap:wrap; align-items:end; margin-bottom:10px; }
+    .r6v2-form label { display:block; font-size:10px; font-weight:900; color:#475569; margin-bottom:4px; text-transform:uppercase; }
+    .r6v2-form input, .r6v2-form select { height:32px; border:1px solid #cbd5e1; border-radius:6px; padding:5px 8px; font-size:12px; background:#fff; }
+    .r6v2-pipeline { margin-bottom:18px; }
+    .r6v2-progress { display:flex; gap:4px; overflow:auto; padding:10px; background:#fff; border:1px solid #dbeafe; border-radius:8px; margin-bottom:12px; }
+    .r6v2-step-chip { border:1px solid #e2e8f0; border-radius:999px; background:#f8fafc; color:#475569; padding:5px 10px; font-size:10px; font-weight:900; white-space:nowrap; cursor:pointer; }
+    .r6v2-step-chip.current { background:#eff6ff; border-color:#0284c7; color:#0369a1; }
+    .r6v2-step-chip.done { background:#dcfce7; border-color:#86efac; color:#15803d; }
+    .r6v2-step-chip.blocked { background:#fee2e2; border-color:#fca5a5; color:#dc2626; }
+    .r6v2-stage-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:10px; }
+    .r6v2-stage-card { background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:11px 12px; cursor:pointer; min-height:118px; }
+    .r6v2-stage-card.current { border-color:#0284c7; box-shadow:0 0 0 3px rgba(2,132,199,.12); }
+    .r6v2-stage-card.done { border-left:4px solid #16a34a; }
+    .r6v2-stage-card.blocked { border-left:4px solid #dc2626; }
+    .r6v2-stage-top { display:flex; gap:8px; align-items:center; margin-bottom:6px; }
+    .r6v2-stage-num { width:26px; height:26px; border-radius:50%; background:#0369a1; color:#fff; display:grid; place-items:center; font-size:11px; font-weight:900; flex:none; }
+    .r6v2-stage-title { font-size:13px; font-weight:900; color:#0f172a; }
+    .r6v2-stage-desc { font-size:11px; line-height:1.45; color:#64748b; }
+    .r6v2-stage-state { display:inline-flex; margin-top:8px; border-radius:999px; background:#f1f5f9; color:#64748b; padding:2px 8px; font-size:10px; font-weight:900; }
+    .r6v2-stage-card.done .r6v2-stage-state { background:#dcfce7; color:#15803d; }
+    .r6v2-stage-card.blocked .r6v2-stage-state { background:#fee2e2; color:#dc2626; }
+    @media(max-width:1000px){ .r6v2-grid{grid-template-columns:1fr;} .r6v2-metrics{grid-template-columns:repeat(2,1fr);} }
+  </style>
+
+  <div class="r6v2-hero">
+    <div class="r6v2-kicker">Stage 2 / R6 V2 / Server-authored refactor pipeline</div>
+    <h1 class="r6v2-title">Refactor Apps Container V2</h1>
+    <p class="r6v2-sub">A production-oriented clone of the R6 refactor stage. V2 keeps the original page intact, but moves the analysis, target decisions, validation gates, and artifact generation to backend endpoints so the UI reflects a real run state instead of browser-only assumptions.</p>
+  </div>
+
+  <div class="r6v2-body">
+    <section class="r6v2-card r6v2-pipeline">
+      <div class="r6v2-card-hd">
+        <span>R6 V2 Hybrid Refactor Pipeline (15 stages)</span>
+        <div>
+          <button class="r6v2-btn ghost" onclick="r6v2ResetStages()">Reset</button>
+          <button class="r6v2-btn primary" onclick="r6v2RunCurrentStage()">Run Current Stage</button>
+        </div>
+      </div>
+      <div class="r6v2-card-bd">
+        <div id="r6v2-progress" class="r6v2-progress"></div>
+        <div id="r6v2-stage-grid" class="r6v2-stage-grid"></div>
+      </div>
+    </section>
+
+    <div class="r6v2-grid">
+      <section class="r6v2-card">
+        <div class="r6v2-card-hd">Business Systems <button class="r6v2-btn ghost" onclick="r6v2Init()">Refresh</button></div>
+        <div class="r6v2-card-bd">
+          <div id="r6v2-system-list">Loading systems...</div>
+        </div>
+      </section>
+
+      <main>
+        <div class="r6v2-metrics">
+          <div class="r6v2-metric"><strong id="r6v2-m-components">0</strong><span>Components</span></div>
+          <div class="r6v2-metric"><strong id="r6v2-m-container">0</strong><span>Container</span></div>
+          <div class="r6v2-metric"><strong id="r6v2-m-vm">0</strong><span>VM / External</span></div>
+          <div class="r6v2-metric"><strong id="r6v2-m-blockers">0</strong><span>Blockers</span></div>
+          <div class="r6v2-metric"><strong id="r6v2-m-status">Idle</strong><span>Status</span></div>
+        </div>
+
+        <section class="r6v2-card">
+          <div class="r6v2-card-hd">
+            <span>Server Decision Plan</span>
+            <div>
+              <button class="r6v2-btn primary" onclick="r6v2Analyze()">Analyze Selected</button>
+              <button class="r6v2-btn ghost" onclick="r6v2DownloadRun()">Evidence</button>
+            </div>
+          </div>
+          <div class="r6v2-card-bd">
+            <div id="r6v2-selected-note" style="font-size:12px;color:#64748b;margin-bottom:10px;">Select a business system on the left.</div>
+            <div style="overflow:auto;">
+              <table class="r6v2-table">
+                <thead><tr><th>Component</th><th>State</th><th>Target Form</th><th>Runtime</th><th>Start Command</th><th>Gate / Reason</th></tr></thead>
+                <tbody id="r6v2-decision-body"><tr><td colspan="6">No analysis yet.</td></tr></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <section class="r6v2-card" style="margin-top:14px;">
+          <div class="r6v2-card-hd">Generate Real OpenCenter Bundle</div>
+          <div class="r6v2-card-bd">
+            <div class="r6v2-form">
+              <div><label>Registry</label><select id="r6v2-reg-type"><option value="harbor">Harbor</option><option value="dockerhub">Docker Hub</option><option value="ghcr">GHCR</option><option value="gitlab">GitLab</option><option value="quay">Quay</option><option value="ecr">ECR</option><option value="gcp">GCP</option><option value="custom">Custom</option></select></div>
+              <div><label>Registry URL</label><input id="r6v2-reg-url" placeholder="registry.example.com"></div>
+              <div><label>Project</label><input id="r6v2-reg-project" value="flex-apps"></div>
+              <div><label>Org</label><input id="r6v2-org" value="rackspace-flex"></div>
+              <div><label>Cluster</label><input id="r6v2-cluster" value="flex-prod-k8s"></div>
+              <div><label>Region</label><input id="r6v2-region" value="iad3"></div>
+              <div><label>VM User</label><input id="r6v2-vm-user" value="root"></div>
+              <div><label>Auto Commit</label><select id="r6v2-auto-commit"><option value="false">No</option><option value="true">Yes</option></select></div>
+            </div>
+            <div class="r6v2-actions">
+              <button class="r6v2-btn good" id="r6v2-generate-btn" onclick="r6v2Generate()" disabled>Generate Backend Bundle</button>
+              <button class="r6v2-btn dark" onclick="r6v2RunCmd('extract_cmd')">Run Extract</button>
+              <button class="r6v2-btn dark" onclick="r6v2RunCmd('build_cmd')">Run Build + Push</button>
+              <button class="r6v2-btn dark" onclick="r6v2RunCmd('push_cmd')">Run GitOps Push</button>
+              <button class="r6v2-btn primary" onclick="r6v2SendToOpenCenter()">Send to OpenCenter</button>
+            </div>
+            <div id="r6v2-output" class="r6v2-terminal">Waiting for analysis.</div>
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+  <script src="/static/r6v2.js?v=20260712b"></script>
+</div>

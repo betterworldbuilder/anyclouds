@@ -138,6 +138,27 @@
       <!-- Generated Cutover Pairing Matrix removed (2026-07-09): derived view duplicating the matrix above. -->
 
       <!-- ══════════════════════════════════════════════════════════════
+           SECTION 3 — Component Test Lab
+           ══════════════════════════════════════════════════════════════ -->
+      <div class="section-card" id="s5c-test-lab-card" style="display:none;">
+        <div class="section-header">
+          <div class="section-header-left">
+            <div class="section-icon"><i class="fas fa-flask"></i></div>
+            <div class="section-title-group">
+              <h3>Component Test Lab</h3>
+              <p>Run source-vs-target terminal tests for each business system component and save cutover evidence. Device mockup matches the component type.</p>
+            </div>
+          </div>
+          <div class="section-actions">
+            <button class="btn btn-secondary" onclick="s5cTestLabRunAll()"><i class="fas fa-play"></i> Run All Health</button>
+          </div>
+        </div>
+        <div class="section-body" style="padding:0;">
+          <div id="s5c-test-lab-rows"></div>
+        </div>
+      </div>
+
+      <!-- ══════════════════════════════════════════════════════════════
            SECTION 4 — Cutover Gates From Business System Matrix
            ══════════════════════════════════════════════════════════════ -->
       <details class="section-card" id="s5c-gates-card" style="display:none;padding:0;">
@@ -548,6 +569,7 @@
         C.selectedId=id;
         _renderCards();
         _renderMatrix();
+        _renderTestLab();
         _renderPairing();
         _renderGates();
         _applySectionsVisibility();
@@ -612,17 +634,185 @@
       }
       window.s5cToggleComponent = function(id, checked){
         var sys=_sys(); var c=sys.components.find(function(x){return x.id===id;}); if(!c) return;
-        c.selected=checked; _renderMatrix(); _renderPairing(); _renderGates(); _renderCards();
+        c.selected=checked; _renderMatrix(); _renderTestLab(); _renderPairing(); _renderGates(); _renderCards();
       };
       window.s5cEditField = function(id, field, value){
         var sys=_sys(); var c=sys.components.find(function(x){return x.id===id;}); if(!c) return;
-        c[field]=value; _renderMatrix(); _renderPairing();
+        c[field]=value; _renderMatrix(); _renderTestLab(); _renderPairing();
       };
       window.s5cClassifyDb = function(id, role){
         var sys=_sys(); var c=sys.components.find(function(x){return x.id===id;}); if(!c) return;
         c.dbRole=role;
         if (sys.components.filter(function(x){return x.type==='database';}).every(function(x){return x.dbRole;})) sys.dupDbUnclassified=false;
         _renderMatrix(); _renderGates();
+      };
+
+      /* ── Component Test Lab ── */
+      var _tlResults = {};
+      var _tlCmdCache = {};
+      try { _tlResults = JSON.parse(localStorage.getItem('s5c_tl_results')||'{}'); } catch(e){}
+
+      var TL_DEVICE_META = {
+        mobile_phone:        { icon:'📱', color:'#1d4ed8', label:'Mobile UI',       isHttp:true  },
+        api_console_tablet:  { icon:'📶', color:'#7c3aed', label:'API Console',     isHttp:true  },
+        service_console:     { icon:'🖥️',  color:'#0891b2', label:'Service Console', isHttp:true  },
+        backend_engine_rack: { icon:'⚙️',  color:'#475569', label:'Backend Engine',  isHttp:true  },
+        auth_security_device:{ icon:'🔒', color:'#b45309', label:'Auth Device',      isHttp:true  },
+        database_console:    { icon:'🗄️',  color:'#b91c1c', label:'DB Console',      isHttp:false },
+        cache_memory_chip:   { icon:'⚡', color:'#c2410c', label:'Cache Chip',       isHttp:false },
+        queue_conveyor:      { icon:'📦', color:'#6d28d9', label:'Queue Belt',       isHttp:false },
+        worker_factory:      { icon:'🏭', color:'#334155', label:'Worker Factory',   isHttp:false },
+        monitoring_noc_wall: { icon:'📊', color:'#047857', label:'NOC Dashboard',   isHttp:false }
+      };
+      function _tlDeviceType(c) {
+        var r=((c.role||'')+' '+(c.name||'')).toLowerCase();
+        if(r.indexOf('frontend')>=0||r.indexOf('mobile')>=0||(r.indexOf('web')>=0&&r.indexOf('gateway')<0)) return 'mobile_phone';
+        if(r.indexOf('gateway')>=0) return 'api_console_tablet';
+        if(r.indexOf('auth')>=0||r.indexOf('sso')>=0||r.indexOf('identity')>=0) return 'auth_security_device';
+        if(r.indexOf('backend')>=0||r.indexOf('core')>=0||r.indexOf('ledger')>=0) return 'backend_engine_rack';
+        if(r.indexOf('database')>=0||r.indexOf('postgres')>=0||r.indexOf('mysql')>=0||r.indexOf('db')>=0) return 'database_console';
+        if(r.indexOf('cache')>=0||r.indexOf('redis')>=0) return 'cache_memory_chip';
+        if(r.indexOf('queue')>=0||r.indexOf('rabbit')>=0||r.indexOf('kafka')>=0) return 'queue_conveyor';
+        if(r.indexOf('worker')>=0||r.indexOf('cron')>=0||r.indexOf('batch')>=0) return 'worker_factory';
+        if(r.indexOf('monitor')>=0||r.indexOf('observ')>=0||r.indexOf('logging')>=0) return 'monitoring_noc_wall';
+        if(r.indexOf('api')>=0||r.indexOf('service')>=0) return 'service_console';
+        return 'service_console';
+      }
+      function _tlStatus(compId) { return (_tlResults[(C.selectedId||'')+'::'+compId]||{}).status||'NOT_RUN'; }
+      function _tlPill(st) {
+        var map={NOT_RUN:'#e2e8f0|#475569',PASS:'#dcfce7|#166534',WARNING:'#fef9c3|#92400e',BLOCKED:'#fee2e2|#b91c1c',RUNNING:'#dbeafe|#1d4ed8'};
+        var p=(map[st]||map.NOT_RUN).split('|');
+        return '<span style="font-size:10px;font-weight:900;padding:2px 8px;border-radius:8px;background:'+p[0]+';color:'+p[1]+';">'+st.replace(/_/g,' ')+'</span>';
+      }
+      function _tlManualCmd(c, dt) {
+        var sh=c.source||'SOURCE-HOST', th=c.target||'TARGET-HOST', port=c.port||'';
+        if(dt==='database_console') return 'PGPASSWORD="$DB_PASSWORD" psql -h "'+sh+'" -p "'+(port||5432)+'" -U "$DB_USER" -c "SELECT 1;"\nPGPASSWORD="$DB_PASSWORD" psql -h "'+th+'" -p "'+(port||5432)+'" -U "$DB_USER" -c "SELECT 1;"';
+        if(dt==='cache_memory_chip') return 'redis-cli -h "'+sh+'" -p "'+(port||6379)+'" PING\nredis-cli -h "'+th+'" -p "'+(port||6379)+'" PING\nredis-cli -h "'+th+'" -p "'+(port||6379)+'" SET cutover:test ok\nredis-cli -h "'+th+'" -p "'+(port||6379)+'" GET cutover:test';
+        if(dt==='queue_conveyor') return 'nc -vz "'+th+'" "'+(port||5672)+'"\ncurl -u "$RABBIT_USER:$RABBIT_PASS" "http://'+th+':15672/api/queues" | jq \'.[] | {name,messages,consumers}\'';
+        if(dt==='worker_factory') return 'ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no ubuntu@'+th+' \'\n  systemctl --type=service --state=running | egrep "worker|celery|cron" || true\n  crontab -l || true\n\'';
+        if(dt==='monitoring_noc_wall') return 'ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no ubuntu@'+th+' \'\n  uptime; free -h; df -h\n  sudo journalctl -p warning -n 40 --no-pager || true\n\'';
+        return 'nc -vz "'+th+'" "'+(port||80)+'"';
+      }
+      function _tlDevicePanel(label, accent, meta, host, side, compId) {
+        return '<div style="border-right:1px solid #e2e8f0;padding:12px;">'
+          +'<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">'
+          +'<span style="width:20px;height:20px;border-radius:5px;background:'+accent+';color:#fff;font-size:11px;display:inline-flex;align-items:center;justify-content:center;">'+meta.icon+'</span>'
+          +'<span style="font-size:11px;font-weight:800;color:'+accent+';">'+label+'</span>'
+          +'</div>'
+          +'<div style="font-size:11px;color:#0f172a;font-weight:700;margin-bottom:2px;">'+_esc(host||'—')+'</div>'
+          +'<div style="font-size:10px;color:#64748b;margin-bottom:8px;">'+_esc(meta.label)+'</div>'
+          +'<div id="s5c-tl-ds-'+compId+'-'+side+'" style="font-size:10px;padding:3px 8px;border-radius:6px;background:#f1f5f9;color:#475569;font-weight:700;display:inline-block;">NOT RUN</div>'
+          +'</div>';
+      }
+      function _renderTestLab() {
+        var container=$id('s5c-test-lab-rows'), card=$id('s5c-test-lab-card');
+        var sys=_sys();
+        if(!sys||!sys.components||!sys.components.length){ if(card) card.style.display='none'; return; }
+        if(card) card.style.display='';
+        var inScope=sys.components.filter(function(c){ return c.selected!==false; });
+        if(!inScope.length){ if(container) container.innerHTML='<div style="color:#94a3b8;font-size:13px;padding:16px;">No components in scope.</div>'; return; }
+        if(!container) return;
+        container.innerHTML=inScope.map(function(c){
+          var dt=_tlDeviceType(c), meta=TL_DEVICE_META[dt]||TL_DEVICE_META.service_console, st=_tlStatus(c.id);
+          var quickBtns=meta.isHttp
+            ?['health','ready','smoke'].map(function(t){ return '<button onclick="s5cQuickTest(\''+c.id+'\',\''+t+'\')" style="font-size:10px;padding:3px 7px;border:1px solid #cbd5e1;border-radius:5px;background:#fff;cursor:pointer;font-weight:700;">'+t.charAt(0).toUpperCase()+t.slice(1)+'</button>'; }).join('')
+            :'<button onclick="s5cQuickTest(\''+c.id+'\',\'port\')" style="font-size:10px;padding:3px 7px;border:1px solid #cbd5e1;border-radius:5px;background:#fff;cursor:pointer;font-weight:700;">Port Check</button>';
+          return '<div id="s5c-tl-row-'+c.id+'" style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid #f1f5f9;flex-wrap:wrap;">'
+            +'<span style="width:26px;height:26px;border-radius:7px;background:'+meta.color+';color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;">'+meta.icon+'</span>'
+            +'<div style="flex:2;min-width:130px;"><div style="font-weight:700;font-size:12px;color:#0f172a;">'+_esc(c.name)+'</div>'
+            +'<div style="font-size:10px;color:#64748b;">'+_esc(meta.label)+' &middot; '+_esc(c.source||'—')+' &rarr; '+_esc(c.target||'—')+'</div></div>'
+            +'<div style="display:flex;gap:4px;flex-wrap:wrap;">'+quickBtns+'</div>'
+            +'<div id="s5c-tl-st-'+c.id+'">'+_tlPill(st)+'</div>'
+            +'<button onclick="s5cOpenBench(\''+c.id+'\')" style="font-size:11px;padding:4px 9px;border:1px solid #3b82f6;border-radius:6px;background:#eff6ff;color:#1d4ed8;cursor:pointer;font-weight:800;">Open Test Bench ▾</button>'
+            +'</div>'
+            +'<div id="s5c-tl-bench-'+c.id+'" style="display:none;"></div>';
+        }).join('');
+      }
+      window.s5cOpenBench = function(compId) {
+        var sys=_sys(); if(!sys) return;
+        var c=sys.components.find(function(x){ return x.id===compId; }); if(!c) return;
+        var bench=$id('s5c-tl-bench-'+compId); if(!bench) return;
+        if(bench.style.display!=='none'){ bench.style.display='none'; return; }
+        var dt=_tlDeviceType(c), meta=TL_DEVICE_META[dt]||TL_DEVICE_META.service_console;
+        var srcUrl=c.source?('http://'+c.source+(c.port?':'+c.port:'')):'';
+        var tgtUrl=c.target?('http://'+c.target+(c.port?':'+c.port:'')):'';
+        var hp=c.healthUrl||'/health';
+        var cmd=meta.isHttp
+          ?'SOURCE_URL="'+srcUrl+'"\nTARGET_URL="'+tgtUrl+'"\n\ncurl -k -sS -o /dev/null -w "source: HTTP=%{http_code} time=%{time_total}s\\n" "$SOURCE_URL'+hp+'"\ncurl -k -sS -o /dev/null -w "target: HTTP=%{http_code} time=%{time_total}s\\n" "$TARGET_URL'+hp+'"'
+          :_tlManualCmd(c,dt);
+        _tlCmdCache[compId]=cmd;
+        var prevLog=(_tlResults[(C.selectedId||'')+'::'+compId]||{}).log||'';
+        var actionBtns=meta.isHttp
+          ?['health','ready','smoke','perf','compare'].map(function(t){ return '<button onclick="s5cRunTest(\''+compId+'\',\''+t+'\')" style="font-size:11px;padding:4px 9px;border:1px solid #cbd5e1;border-radius:6px;background:#fff;cursor:pointer;font-weight:700;">'+t.charAt(0).toUpperCase()+t.slice(1)+'</button>'; }).join('')
+          :'<button onclick="s5cRunTest(\''+compId+'\',\'port\')" style="font-size:11px;padding:4px 9px;border:1px solid #cbd5e1;border-radius:6px;background:#fff;cursor:pointer;font-weight:700;">Port Check</button>'
+            +'<button onclick="s5cRunTest(\''+compId+'\',\'cmd\')" style="font-size:11px;padding:4px 9px;border:1px solid #cbd5e1;border-radius:6px;background:#fff;cursor:pointer;font-weight:700;">Run Cmd</button>';
+        bench.style.display='';
+        bench.innerHTML='<div style="margin:0 0 0 14px;margin-bottom:14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;">'
+          +'<div style="display:grid;grid-template-columns:1fr 1fr;">'
+          +_tlDevicePanel('Source OSPC','#2563eb',meta,c.source,'source',compId)
+          +_tlDevicePanel('Target FLEX','#16a34a',meta,c.target,'target',compId)
+          +'</div>'
+          +'<div style="padding:12px;border-top:1px solid #e2e8f0;">'
+          +'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;">'
+          +actionBtns
+          +'<button onclick="s5cSaveEv(\''+compId+'\')" style="font-size:11px;padding:4px 9px;border:1px solid #86efac;border-radius:6px;background:#f0fdf4;color:#166534;cursor:pointer;font-weight:700;">Save Evidence</button>'
+          +'<button onclick="s5cCopyCmd(\''+compId+'\')" style="font-size:11px;padding:4px 9px;border:1px solid #e2e8f0;border-radius:6px;background:#fff;cursor:pointer;font-weight:700;">Copy Cmd</button>'
+          +'</div>'
+          +'<div style="font-size:10px;color:#64748b;font-weight:700;margin-bottom:3px;">Command Preview (run on jump/cutover host)</div>'
+          +'<pre style="margin:0 0 8px;padding:8px 10px;background:#0f172a;color:#a7f3d0;border-radius:8px;font-size:10.5px;max-height:100px;overflow:auto;white-space:pre-wrap;">'+_esc(cmd)+'</pre>'
+          +'<div style="font-size:10px;color:#64748b;font-weight:700;margin-bottom:3px;">Terminal Output</div>'
+          +'<pre id="s5c-tl-log-'+compId+'" style="margin:0;padding:8px 10px;background:#020617;color:#a7f3d0;border-radius:8px;font-size:10.5px;min-height:48px;max-height:180px;overflow:auto;white-space:pre-wrap;">'+(prevLog?_esc(prevLog):'# Waiting for test...')+'</pre>'
+          +'</div></div>';
+      };
+      function _tlLog(compId, text) {
+        var out=$id('s5c-tl-log-'+compId); if(!out) return;
+        if(out.textContent==='# Waiting for test...') out.textContent='';
+        out.textContent+='['+new Date().toLocaleTimeString()+']: '+text+'\n';
+        out.scrollTop=out.scrollHeight;
+        var key=(C.selectedId||'')+'::'+compId;
+        _tlResults[key]=Object.assign(_tlResults[key]||{},{log:(out.textContent||'').slice(-2000)});
+        try{localStorage.setItem('s5c_tl_results',JSON.stringify(_tlResults));}catch(e){}
+      }
+      function _tlMarkStatus(compId, st) {
+        var key=(C.selectedId||'')+'::'+compId;
+        _tlResults[key]=Object.assign(_tlResults[key]||{},{status:st,ts:new Date().toLocaleString()});
+        try{localStorage.setItem('s5c_tl_results',JSON.stringify(_tlResults));}catch(e){}
+        var stEl=$id('s5c-tl-st-'+compId); if(stEl) stEl.innerHTML=_tlPill(st);
+        var srcDom=$id('s5c-tl-ds-'+compId+'-source'), tgtDom=$id('s5c-tl-ds-'+compId+'-target');
+        if(srcDom) srcDom.textContent=st+' ('+(((_tlResults[key]||{}).lastTest)||'test')+')';
+        if(tgtDom) tgtDom.textContent=st+' ('+(((_tlResults[key]||{}).lastTest)||'test')+')';
+      }
+      window.s5cQuickTest = function(compId, testType) {
+        var sys=_sys(); if(!sys) return;
+        var c=sys.components.find(function(x){return x.id===compId;}); if(!c) return;
+        var stEl=$id('s5c-tl-st-'+compId); if(stEl) stEl.innerHTML=_tlPill('RUNNING');
+        var key=(C.selectedId||'')+'::'+compId;
+        _tlResults[key]=Object.assign(_tlResults[key]||{},{lastTest:testType});
+        /* Simulated result — replace with real proxy call when backend is wired */
+        setTimeout(function(){
+          var simOk=Math.random()>0.12;
+          var st=simOk?'PASS':'WARNING';
+          _tlMarkStatus(compId,st);
+          _tlLog(compId,'[sim] '+testType+': '+st+' (backend proxy not yet wired — SIMULATED)');
+        },500+Math.random()*400);
+      };
+      window.s5cRunTest = function(compId, testType) { s5cQuickTest(compId, testType); };
+      window.s5cSaveEv = function(compId) {
+        var sys=_sys(); if(!sys) return;
+        var c=sys.components.find(function(x){return x.id===compId;}); if(!c) return;
+        var r=_tlResults[(C.selectedId||'')+'::'+compId]||{};
+        var ev={business_system:sys.name,component:c.name,source:c.source,target:c.target,port:c.port,health_path:c.healthUrl,status:r.status||'NOT_RUN',log:r.log||'',saved_at:new Date().toISOString()};
+        var a=document.createElement('a');
+        a.href=URL.createObjectURL(new Blob([JSON.stringify(ev,null,2)],{type:'application/json'}));
+        a.download='evidence_'+_esc(c.name).replace(/\s+/g,'_')+'_'+Date.now()+'.json'; a.click();
+      };
+      window.s5cCopyCmd = function(compId) {
+        var cmd=_tlCmdCache[compId]||''; if(!cmd) return;
+        if(navigator.clipboard) navigator.clipboard.writeText(cmd).then(function(){ _s5cToast('Command copied to clipboard.'); });
+      };
+      window.s5cTestLabRunAll = function() {
+        var sys=_sys(); if(!sys) return;
+        sys.components.filter(function(c){return c.selected!==false;}).forEach(function(c){ s5cQuickTest(c.id,'health'); });
       };
 
       /* ── Section 3: Generated Cutover Pairing Matrix ── */
@@ -900,4 +1090,5 @@
       else document.addEventListener('DOMContentLoaded', s5cRefresh);
     })();
     </script>
+
   </div>

@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OpenCenter Migration</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            display: ['Space Grotesk', 'sans-serif'],
+          },
+        }
+      }
+    }
+  </script>
+  <style>
+    :root {
+      --cyan-50: #ecfeff;
+      --cyan-100: #cffafe;
+      --cyan-200: #a5f3fc;
+      --cyan-300: #67e8f9;
+      --cyan-400: #22d3ee;
+      --cyan-500: #06b6d4;
+      --cyan-600: #0891b2;
+      --cyan-700: #0e7490;
+      --cyan-800: #155e75;
+      --cyan-900: #164e63;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: #f8fafc;
+    }
+
+    /* Rolling light beams — light theme */
+    @keyframes rollLight {
+      0% { transform: translateX(-100%) rotate(0deg); opacity: 0; }
+      8% { opacity: 0.7; }
+      92% { opacity: 0.7; }
+      100% { transform: translateX(200vw) rotate(360deg); opacity: 0; }
+    }
+
+    @keyframes rollLight2 {
+      0% { transform: translateX(-100%) rotate(0deg); opacity: 0; }
+      8% { opacity: 0.5; }
+      92% { opacity: 0.5; }
+      100% { transform: translateX(200vw) rotate(-360deg); opacity: 0; }
+    }
+
+    @keyframes floatParticle {
+      0%, 100% { transform: translateY(0) translateX(0); opacity: 0; }
+      10% { opacity: 0.6; }
+      90% { opacity: 0.6; }
+      100% { transform: translateY(-100vh) translateX(30px); opacity: 0; }
+    }
+
+    @keyframes shimmer {
+      0% { background-position: -200% center; }
+      100% { background-position: 200% center; }
+    }
+
+    @keyframes borderGlow {
+      0%, 100% { opacity: 0.2; }
+      50% { opacity: 0.8; }
+    }
+
+    @keyframes gentlePulse {
+      0%, 100% { opacity: 0.4; transform: scale(1); }
+      50% { opacity: 0.7; transform: scale(1.02); }
+    }
+
+    @keyframes gradientShift {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+
+    @keyframes floatUp {
+      0%, 100% { transform: translateY(0px); }
+      50% { transform: translateY(-8px); }
+    }
+
+    @keyframes iconBounce {
+      0%, 100% { transform: scale(1) rotate(0deg); }
+      25% { transform: scale(1.1) rotate(-3deg); }
+      75% { transform: scale(1.1) rotate(3deg); }
+    }
+
+    .rolling-light {
+      position: fixed;
+      width: 800px;
+      height: 800px;
+      border-radius: 50%;
+      filter: blur(100px);
+      pointer-events: none;
+      z-index: 0;
+      mix-blend-mode: multiply;
+    }
+
+    .light-1 {
+      background: radial-gradient(circle, rgba(6,182,212,0.12) 0%, transparent 70%);
+      top: -300px;
+      animation: rollLight 18s linear infinite;
+    }
+
+    .light-2 {
+      background: radial-gradient(circle, rgba(59,130,246,0.08) 0%, transparent 70%);
+      top: 15%;
+      animation: rollLight2 24s linear infinite;
+      animation-delay: -6s;
+    }
+
+    .light-3 {
+      background: radial-gradient(circle, rgba(16,185,129,0.07) 0%, transparent 70%);
+      top: 55%;
+      animation: rollLight 28s linear infinite;
+      animation-delay: -12s;
+    }
+
+    .light-4 {
+      background: radial-gradient(circle, rgba(245,158,11,0.06) 0%, transparent 70%);
+      top: 75%;
+      animation: rollLight2 22s linear infinite;
+      animation-delay: -3s;
+    }
+
+    .particle {
+      position: fixed;
+      border-radius: 50%;
+      pointer-events: none;
+      z-index: 0;
+      animation: floatParticle linear infinite;
+    }
+
+    /* Card shimmer effect */
+    .card-shimmer {
+      position: relative;
+      overflow: hidden;
+    }
+
+    .card-shimmer::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+      transition: left 0.6s ease;
+      pointer-events: none;
+    }
+
+    .card-shimmer:hover::before {
+      left: 100%;
+    }
+
+    /* Card hover glow */
+    .card-glow {
+      position: relative;
+      transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .card-glow::after {
+      content: '';
+      position: absolute;
+      inset: -2px;
+      border-radius: inherit;
+      background: conic-gradient(from 0deg, transparent, var(--glow-color, #22d3ee), transparent 30%);
+      opacity: 0;
+      transition: opacity 0.4s ease;
+      z-index: -1;
+      filter: blur(8px);
+    }
+
+    .card-glow:hover::after {
+      opacity: 0.5;
+      animation: borderGlow 2s ease-in-out infinite;
+    }
+
+    .card-glow:hover {
+      transform: translateY(-6px);
+      box-shadow: 0 20px 40px -12px var(--shadow-color, rgba(6,182,212,0.15));
+    }
+
+    /* Icon container animation */
+    .icon-box {
+      transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .card-glow:hover .icon-box {
+      animation: iconBounce 0.6s ease;
+    }
+
+    /* Hero gradient text */
+    .gradient-text {
+      background: linear-gradient(135deg, #0891b2 0%, #0e7490 25%, #155e75 50%, #0e7490 75%, #0891b2 100%);
+      background-size: 200% auto;
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      animation: gradientShift 4s ease infinite;
+    }
+
+    /* Tag pills */
+    .tag-pill {
+      transition: all 0.3s ease;
+    }
+
+    .tag-pill:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    }
+
+    /* Step connector */
+    .step-arrow {
+      animation: gentlePulse 2s ease-in-out infinite;
+    }
+
+    /* Grid background pattern */
+    .bg-grid {
+      background-image: 
+        linear-gradient(rgba(148, 163, 184, 0.08) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(148, 163, 184, 0.08) 1px, transparent 1px);
+      background-size: 60px 60px;
+    }
+
+    /* Dot pattern */
+    .bg-dots {
+      background-image: radial-gradient(rgba(6, 182, 212, 0.08) 1px, transparent 1px);
+      background-size: 24px 24px;
+    }
+
+    /* Smooth scroll */
+    html {
+      scroll-behavior: smooth;
+    }
+
+    /* Custom scrollbar */
+    ::-webkit-scrollbar {
+      width: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #f1f5f9;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+  </style>
+</head>
+<body class="min-h-screen relative overflow-x-hidden">
+  <!-- Background layers -->
+  <div class="fixed inset-0 bg-grid pointer-events-none"></div>
+  <div class="fixed inset-0 bg-dots pointer-events-none"></div>
+
+  <!-- Soft gradient orbs -->
+  <div class="fixed top-0 left-1/4 w-[600px] h-[600px] bg-cyan-100/40 rounded-full blur-[120px] pointer-events-none"></div>
+  <div class="fixed bottom-0 right-1/4 w-[500px] h-[500px] bg-blue-100/30 rounded-full blur-[100px] pointer-events-none"></div>
+  <div class="fixed top-1/2 left-0 w-[400px] h-[400px] bg-emerald-100/20 rounded-full blur-[100px] pointer-events-none"></div>
+
+  <!-- Rolling light beams -->
+  <div class="rolling-light light-1"></div>
+  <div class="rolling-light light-2"></div>
+  <div class="rolling-light light-3"></div>
+  <div class="rolling-light light-4"></div>
+
+  <!-- Floating particles -->
+  <div id="particles"></div>
+
+  <!-- Top Navigation Bar -->
+  <header class="relative z-20 sticky top-0">
+    <div class="mx-4 mt-4">
+      <div class="max-w-[1440px] mx-auto rounded-2xl border border-white/60 bg-white/80 backdrop-blur-xl shadow-lg shadow-slate-200/50 px-6 py-3.5 flex items-center justify-between">
+        <div class="flex items-center gap-4">
+          <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/20">
+            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M15.59 14.37a6 6 0 01-5.84 7.38v-4.8m5.84-2.58a14.98 14.98 0 006.16-12.12A14.98 14.98 0 009.631 8.41m5.96 5.96a14.926 14.926 0 01-5.841 2.58m-.119-8.54a6 6 0 00-7.381 5.84h4.8m2.581-5.84a14.927 14.927 0 00-2.58 5.84m2.699 2.7c-.103.021-.207.041-.311.06a15.09 15.09 0 01-2.448-2.448 14.9 14.9 0 01.06-.312m-2.24 2.39a4.493 4.493 0 00-1.757 4.306 4.493 4.493 0 004.306-1.758M16.5 9a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0z"/>
+            </svg>
+          </div>
+          <div>
+            <h1 class="text-lg font-bold tracking-tight text-slate-800 font-display">OpenCenter Migration</h1>
+            <p class="text-xs text-slate-500 font-medium">Stage 2 Migration Strategies Hub — R6 containerization → Kubernetes/GitOps</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-3">
+          <span class="px-4 py-2 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200 shadow-sm flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
+            AWAITING R6 BUNDLE
+          </span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="relative z-10 max-w-[1440px] mx-auto px-6 py-8 space-y-8">
+
+    <!-- ===== HERO BANNER ===== -->
+    <section class="relative rounded-3xl overflow-hidden border border-white/80 bg-white shadow-xl shadow-slate-200/40">
+      <!-- Decorative elements -->
+      <div class="absolute top-0 right-0 w-[500px] h-[500px] bg-gradient-to-bl from-cyan-100/50 to-transparent rounded-full blur-3xl -translate-y-1/3 translate-x-1/4"></div>
+      <div class="absolute bottom-0 left-0 w-[400px] h-[400px] bg-gradient-to-tr from-blue-100/40 to-transparent rounded-full blur-3xl translate-y-1/3 -translate-x-1/4"></div>
+      <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[300px] h-[300px] bg-gradient-to-r from-cyan-50/60 to-blue-50/60 rounded-full blur-3xl"></div>
+
+      <!-- Subtle pattern overlay -->
+      <div class="absolute inset-0 opacity-[0.03]" style="background-image: url('data:image/svg+xml,%3Csvg width=\'60\' height=\'60\' viewBox=\'0 0 60 60\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cg fill=\'none\' fill-rule=\'evenodd\'%3E%3Cg fill=\'%230891b2\' fill-opacity=\'1\'%3E%3Cpath d=\'M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z\'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E');"></div>
+
+      <div class="relative p-10 md:p-14">
+        <!-- Badge -->
+        <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-cyan-50 border border-cyan-200 text-cyan-700 text-xs font-bold tracking-widest uppercase mb-6 shadow-sm">
+          <span class="w-2 h-2 rounded-full bg-cyan-500 animate-ping"></span>
+          OpenCenter
+        </div>
+
+        <!-- Title -->
+        <h2 class="text-4xl md:text-5xl font-extrabold text-slate-800 mb-3 font-display tracking-tight">
+          OpenCenter — <span class="gradient-text">Cloud-Native Operating Platform</span>
+        </h2>
+
+        <!-- Strategic Message Card -->
+        <div class="mt-8 max-w-3xl rounded-2xl border border-amber-200/80 bg-gradient-to-br from-amber-50/80 to-orange-50/60 backdrop-blur-sm p-6 flex items-start gap-5 shadow-lg shadow-amber-100/50">
+          <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center shrink-0 shadow-lg shadow-amber-500/20">
+            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 18v-5.25m0 0a6.01 6.01 0 001.5-.189m-1.5.189a6.01 6.01 0 01-1.5-.189m3.75 7.478a12.06 12.06 0 01-4.5 0m3.75 2.383a14.406 14.406 0 01-3 0M14.25 18v-.192c0-.983.658-1.823 1.508-2.316a7.5 7.5 0 10-7.517 0c.85.493 1.509 1.333 1.509 2.316V18"/>
+            </svg>
+          </div>
+          <div>
+            <p class="text-xs font-bold text-amber-700 uppercase tracking-widest mb-2">Strategic Message</p>
+            <p class="text-slate-700 leading-relaxed text-[15px]">Move to <span class="text-cyan-700 font-bold">FLEX</span> to modernize the cloud foundation.</p>
+            <p class="text-slate-600 leading-relaxed text-[15px] mt-1">Use <span class="text-cyan-700 font-bold">OpenCenter</span> to modernize the applications, operations, and AI platform on top of it.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== CARDS GRID ===== -->
+    <section class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
+
+      <!-- WHY -->
+      <div class="card-shimmer card-glow group relative rounded-2xl border border-cyan-200/60 bg-white p-7 shadow-sm hover:shadow-xl overflow-hidden" style="--glow-color: #22d3ee; --shadow-color: rgba(6,182,212,0.12);">
+        <div class="absolute -top-16 -right-16 w-32 h-32 bg-cyan-100/50 rounded-full blur-2xl group-hover:bg-cyan-200/60 transition-all duration-700"></div>
+        <div class="relative">
+          <div class="icon-box w-14 h-14 rounded-2xl bg-gradient-to-br from-cyan-400 to-blue-500 flex items-center justify-center mb-5 shadow-lg shadow-cyan-500/15">
+            <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 18v-5.25m0 0a6.01 6.01 0 001.5-.189m-1.5.189a6.01 6.01 0 01-1.5-.189m3.75 7.478a12.06 12.06 0 01-4.5 0m3.75 2.383a14.406 14.406 0 01-3 0M14.25 18v-.192c0-.983.658-1.823 1.508-2.316a7.5 7.5 0 10-7.517 0c.85.493 1.509 1.333 1.509 2.316V18"/>
+            </svg>
+          </div>
+          <h3 class="text-sm font-bold text-cyan-700 uppercase tracking-widest mb-4">Why</h3>
+          <p class="text-slate-700 text-sm leading-relaxed font-medium">FLEX modernizes infrastructure.</p>
+          <p class="text-slate-500 text-sm leading-relaxed mt-3">OpenCenter modernizes how applications, Kubernetes, security, GitOps, observability, backup, and AI workloads are <span class="text-cyan-700 font-semibold">operated</span> on that infrastructure.</p>
+        </div>
+      </div>
+
+      <!-- WHAT -->
+      <div class="card-shimmer card-glow group relative rounded-2xl border border-orange-200/60 bg-white p-7 shadow-sm hover:shadow-xl overflow-hidden" style="--glow-color: #fb923c; --shadow-color: rgba(249,115,22,0.12);">
+        <div class="absolute -top-16 -right-16 w-32 h-32 bg-orange-100/50 rounded-full blur-2xl group-hover:bg-orange-200/60 transition-all duration-700"></div>
+        <div class="relative">
+          <div class="icon-box w-14 h-14 rounded-2xl bg-gradient-to-br from-orange-400 to-amber-500 flex items-center justify-center mb-5 shadow-lg shadow-orange-500/15">
+            <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M21 7.5l-9-5.25L3 7.5m18 0l-9 5.25m9-5.25v9l-9 5.25M3 7.5l9 5.25M3 7.5v9l9 5.25m0-9v9"/>
+            </svg>
+          </div>
+          <h3 class="text-sm font-bold text-orange-700 uppercase tracking-widest mb-4">What</h3>
+          <p class="text-slate-700 text-sm leading-relaxed font-medium">A declarative Kubernetes and GitOps platform.</p>
+          <p class="text-slate-500 text-sm leading-relaxed mt-3">From <span class="text-orange-700 font-semibold">one YAML file</span>, it generates and operates a production-ready platform: infrastructure-as-code, hardened services, encrypted secrets, security policies, observability, backup, registry, identity, storage, and Day-2 operations.</p>
+        </div>
+      </div>
+
+      <!-- SO WHAT -->
+      <div class="card-shimmer card-glow group relative rounded-2xl border border-emerald-200/60 bg-white p-7 shadow-sm hover:shadow-xl overflow-hidden" style="--glow-color: #34d399; --shadow-color: rgba(16,185,129,0.12);">
+        <div class="absolute -top-16 -right-16 w-32 h-32 bg-emerald-100/50 rounded-full blur-2xl group-hover:bg-emerald-200/60 transition-all duration-700"></div>
+        <div class="relative">
+          <div class="icon-box w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center mb-5 shadow-lg shadow-emerald-500/15">
+            <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z"/>
+            </svg>
+          </div>
+          <h3 class="text-sm font-bold text-emerald-700 uppercase tracking-widest mb-4">So What</h3>
+          <p class="text-slate-700 text-sm leading-relaxed font-medium">Customers move beyond basic cloud infrastructure into a <span class="text-emerald-700 font-semibold">secure, automated, auditable, repeatable</span> operating model.</p>
+          <p class="text-slate-500 text-sm leading-relaxed mt-3">Reduces Kubernetes complexity; prevents drift, improves security, supports compliance, and avoids hyperscaler lock-in.</p>
+        </div>
+      </div>
+
+      <!-- FOR WHO -->
+      <div class="card-shimmer card-glow group relative rounded-2xl border border-sky-200/60 bg-white p-7 shadow-sm hover:shadow-xl overflow-hidden" style="--glow-color: #38bdf8; --shadow-color: rgba(14,165,233,0.12);">
+        <div class="absolute -top-16 -right-16 w-32 h-32 bg-sky-100/50 rounded-full blur-2xl group-hover:bg-sky-200/60 transition-all duration-700"></div>
+        <div class="relative">
+          <div class="icon-box w-14 h-14 rounded-2xl bg-gradient-to-br from-sky-400 to-blue-500 flex items-center justify-center mb-5 shadow-lg shadow-sky-500/15">
+            <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z"/>
+            </svg>
+          </div>
+          <h3 class="text-sm font-bold text-sky-700 uppercase tracking-widest mb-4">For Who</h3>
+          <p class="text-slate-700 text-sm leading-relaxed font-medium">Platform, DevOps, cloud operations, security, application modernization, and AI platform teams.</p>
+          <p class="text-slate-500 text-sm leading-relaxed mt-3">Best for enterprises running FLEX, OpenStack, <span class="text-sky-700 font-semibold">regulated cloud, sovereign cloud, private AI</span>, or air-gapped environments.</p>
+        </div>
+      </div>
+
+      <!-- WHERE -->
+      <div class="card-shimmer card-glow group relative rounded-2xl border border-amber-200/60 bg-white p-7 shadow-sm hover:shadow-xl overflow-hidden" style="--glow-color: #fbbf24; --shadow-color: rgba(245,158,11,0.12);">
+        <div class="absolute -top-16 -right-16 w-32 h-32 bg-amber-100/50 rounded-full blur-2xl group-hover:bg-amber-200/60 transition-all duration-700"></div>
+        <div class="relative">
+          <div class="icon-box w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-400 to-yellow-500 flex items-center justify-center mb-5 shadow-lg shadow-amber-500/15">
+            <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 21a9.004 9.004 0 008.716-6.747M12 21a9.004 9.004 0 01-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 017.843 4.582M12 3a8.997 8.997 0 00-7.843 4.582m15.686 0A11.953 11.953 0 0112 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0121 12c0 .778-.099 1.533-.284 2.253m0 0A17.919 17.919 0 0112 16.5c-3.162 0-6.133-.815-8.716-2.247m0 0A9.015 9.015 0 013 12c0-1.605.42-3.113 1.157-4.418"/>
+            </svg>
+          </div>
+          <h3 class="text-sm font-bold text-amber-700 uppercase tracking-widest mb-4">Where</h3>
+          <p class="text-slate-700 text-sm leading-relaxed font-medium mb-4">Runs on:</p>
+          <div class="flex flex-wrap gap-2">
+            <span class="tag-pill px-3 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-600 font-semibold hover:border-amber-300 hover:text-amber-700 hover:bg-amber-50 cursor-default">OpenStack</span>
+            <span class="tag-pill px-3 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-600 font-semibold hover:border-amber-300 hover:text-amber-700 hover:bg-amber-50 cursor-default">FLEX</span>
+            <span class="tag-pill px-3 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-600 font-semibold hover:border-amber-300 hover:text-amber-700 hover:bg-amber-50 cursor-default">VMware vSphere</span>
+            <span class="tag-pill px-3 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-600 font-semibold hover:border-amber-300 hover:text-amber-700 hover:bg-amber-50 cursor-default">AWS</span>
+            <span class="tag-pill px-3 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-600 font-semibold hover:border-amber-300 hover:text-amber-700 hover:bg-amber-50 cursor-default">Bare Metal</span>
+            <span class="tag-pill px-3 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-600 font-semibold hover:border-amber-300 hover:text-amber-700 hover:bg-amber-50 cursor-default">Air-Gapped Sites</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== HOW SECTION ===== -->
+    <section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div class="card-shimmer card-glow lg:col-span-1 group relative rounded-2xl border border-emerald-200/60 bg-white p-7 shadow-sm hover:shadow-xl overflow-hidden" style="--glow-color: #34d399; --shadow-color: rgba(16,185,129,0.12);">
+        <div class="absolute -top-16 -right-16 w-32 h-32 bg-emerald-100/50 rounded-full blur-2xl group-hover:bg-emerald-200/60 transition-all duration-700"></div>
+        <div class="relative">
+          <div class="icon-box w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center mb-5 shadow-lg shadow-emerald-500/15">
+            <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.24-.438.613-.431.992a6.759 6.759 0 010 .255c-.007.378.138.75.43.99l1.005.828c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.212 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010-.255c.007-.378-.138-.75-.43-.99l-1.004-.828a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.281z"/>
+              <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+            </svg>
+          </div>
+          <h3 class="text-sm font-bold text-emerald-700 uppercase tracking-widest mb-5">How</h3>
+
+          <div class="flex items-center gap-2 mb-3 flex-wrap">
+            <span class="px-3.5 py-2 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-bold shadow-sm">Configure</span>
+            <svg class="step-arrow w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"/></svg>
+            <span class="px-3.5 py-2 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-bold shadow-sm">Generate</span>
+            <svg class="step-arrow w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"/></svg>
+            <span class="px-3.5 py-2 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-bold shadow-sm">Provision</span>
+          </div>
+          <div class="flex items-center gap-2 flex-wrap">
+            <span class="px-3.5 py-2 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-bold shadow-sm">Reconcile</span>
+            <svg class="step-arrow w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"/></svg>
+            <span class="px-3.5 py-2 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-bold shadow-sm">Run</span>
+          </div>
+
+          <p class="text-slate-500 text-sm leading-relaxed mt-5">OpenCenter validates one declarative configuration, generates the GitOps repo, provisions the platform, installs hardened services, and lets FluxCD <span class="text-emerald-700 font-semibold">continuously reconcile</span> the desired state.</p>
+        </div>
+      </div>
+
+      <!-- Spacer for visual balance -->
+      <div class="lg:col-span-2 hidden lg:flex items-center justify-center">
+        <div class="relative w-full h-full rounded-2xl border border-dashed border-slate-200 bg-slate-50/50 flex items-center justify-center">
+          <div class="text-center">
+            <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-cyan-100 to-blue-100 flex items-center justify-center mx-auto mb-3">
+              <svg class="w-8 h-8 text-cyan-600" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 17.25v1.007a3 3 0 01-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0115 18.257V17.25m6-12V15a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 15V5.25m18 0A2.25 2.25 0 0018.75 3H5.25A2.25 2.25 0 003 5.25m18 0V12a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 12V5.25"/>
+              </svg>
+            </div>
+            <p class="text-slate-400 text-sm font-medium">Migration Pipeline Visualization</p>
+            <p class="text-slate-300 text-xs mt-1">Ready for your custom diagram</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== BOTTOM BANNER ===== -->
+    <section class="relative rounded-3xl overflow-hidden border border-white/80 bg-gradient-to-r from-slate-50 via-white to-slate-50 shadow-xl shadow-slate-200/30">
+      <div class="absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg width=\'40\' height=\'40\' viewBox=\'0 0 40 40\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cg fill=\'%230891b2\' fill-opacity=\'0.03\' fill-rule=\'evenodd\'%3E%3Cpath d=\'M0 40L40 0H20L0 20M40 40V20L20 40\'/%3E%3C/g%3E%3C/svg%3E')] opacity-50"></div>
+
+      <!-- Animated border lines -->
+      <div class="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-transparent via-cyan-400/40 to-transparent"></div>
+      <div class="absolute bottom-0 left-0 w-full h-[2px] bg-gradient-to-r from-transparent via-cyan-400/40 to-transparent"></div>
+
+      <div class="relative p-8 flex items-center gap-6">
+        <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center shrink-0 shadow-lg shadow-cyan-500/20">
+          <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15.59 14.37a6 6 0 01-5.84 7.38v-4.8m5.84-2.58a14.98 14.98 0 006.16-12.12A14.98 14.98 0 009.631 8.41m5.96 5.96a14.926 14.926 0 01-5.841 2.58m-.119-8.54a6 6 0 00-7.381 5.84h4.8m2.581-5.84a14.927 14.927 0 00-2.58 5.84m2.699 2.7c-.103.021-.207.041-.311.06a15.09 15.09 0 01-2.448-2.448 14.9 14.9 0 01.06-.312m-2.24 2.39a4.493 4.493 0 00-1.757 4.306 4.493 4.493 0 004.306-1.758M16.5 9a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0z"/>
+          </svg>
+        </div>
+        <div>
+          <p class="text-sm font-bold text-cyan-700 mb-1.5 flex items-center gap-2">
+            <span class="w-1.5 h-1.5 rounded-full bg-cyan-500"></span>
+            One-line positioning
+          </p>
+          <p class="text-slate-600 text-[15px] leading-relaxed font-medium">OpenCenter turns FLEX and OpenStack into a secure, GitOps-native, Day-2-ready platform for modern applications, operations, and AI.</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Footer -->
+  <footer class="relative z-10 mt-8 pb-8">
+    <div class="max-w-[1440px] mx-auto px-6">
+      <div class="rounded-2xl border border-slate-200/60 bg-white/60 backdrop-blur-sm py-5 px-8 text-center">
+        <p class="text-sm text-slate-400 font-medium">OpenCenter Migration Dashboard — Stage 2</p>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    // Generate floating particles
+    const particlesContainer = document.getElementById('particles');
+    const colors = [
+      'rgba(6,182,212,0.25)',
+      'rgba(59,130,246,0.2)',
+      'rgba(16,185,129,0.15)',
+      'rgba(245,158,11,0.15)',
+      'rgba(99,102,241,0.15)'
+    ];
+
+    for (let i = 0; i < 40; i++) {
+      const p = document.createElement('div');
+      p.className = 'particle';
+      p.style.left = Math.random() * 100 + 'vw';
+      p.style.top = (100 + Math.random() * 20) + 'vh';
+      p.style.animationDuration = (15 + Math.random() * 25) + 's';
+      p.style.animationDelay = (Math.random() * 20) + 's';
+      const size = 2 + Math.random() * 3;
+      p.style.width = size + 'px';
+      p.style.height = size + 'px';
+      p.style.background = colors[Math.floor(Math.random() * colors.length)];
+      p.style.boxShadow = `0 0 ${size * 2}px ${p.style.background}`;
+      particlesContainer.appendChild(p);
+    }
+  </script>
+</body>
+</html>

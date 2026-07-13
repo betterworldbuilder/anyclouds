@@ -1,0 +1,77 @@
+{
+  "status": "ready_for_opencenter_import",
+  "sourceStage": "APPS_to_Container_Refactor_Engine",
+  "bundleName": "opencenter-ready-app-bundle",
+  "bundlePath": "./opencenter-ready-app-bundle/automatic-business-system-from-existing-vms",
+  "bundleArchivePath": "./opencenter-ready-app-bundle.tar.gz",
+  "businessSystemName": "Automatic Business System from Existing VMs",
+  "businessSystemId": "bs-1783525470093-1379",
+  "customerName": "",
+  "sourcePlatform": "flex",
+  "captureMethod": "SMART_SNAPSHOT_CAPTURE",
+  "cloudNativeStatus": "CLOUD_NATIVE_READY",
+  "targetCluster": "rackspace-flex/flex-prod-k8s",
+  "namespace": "automatic-business-system-from-existing-vms-prod",
+  "packageContents": {
+    "opencenter_import_manifest.json": "found",
+    "k8s/": "found",
+    "helm/": "found",
+    "kustomize/": "found",
+    "flux/": "found",
+    "Dockerfile": "found",
+    "image_build_plan.yaml": "found",
+    "app_capture_manifest.json": "found",
+    "container_readiness_report.json": "found",
+    "container_readiness_report.md": "found",
+    "externalization_plan.yaml": "found",
+    "compatibility_warnings.json": "not_required"
+  },
+  "manifest": {
+    "sourcePlatform": "flex",
+    "conversionEngine": "APPS_to_Container_Refactor_Engine",
+    "captureMethod": "SMART_SNAPSHOT_CAPTURE",
+    "cloudNativeStatus": "CLOUD_NATIVE_READY",
+    "businessSystem": "Automatic Business System from Existing VMs",
+    "businessSystemId": "bs-1783525470093-1379",
+    "targetCluster": "rackspace-flex/flex-prod-k8s",
+    "namespace": "automatic-business-system-from-existing-vms-prod",
+    "workloads": [
+      {
+        "name": "API Gateway — linsnap-API_Gateway_Mobile_AP-20260703-0014",
+        "kind": "Deployment"
+      },
+      {
+        "name": "Web Frontend — linsnap-bankappfrontend-20260703-0007",
+        "kind": "Deployment"
+      },
+      {
+        "name": "Database — flexpostgresql",
+        "kind": "Deployment"
+      }
+    ],
+    "externalServices": [],
+    "keptOnFlexVm": [],
+    "warnings": [],
+    "blockers": [],
+    "createdAt": "2026-07-11T09:46:01.312Z"
+  },
+  "workloads": [
+    {
+      "name": "API Gateway — linsnap-API_Gateway_Mobile_AP-20260703-0014",
+      "kind": "Deployment"
+    },
+    {
+      "name": "Web Frontend — linsnap-bankappfrontend-20260703-0007",
+      "kind": "Deployment"
+    },
+    {
+      "name": "Database — flexpostgresql",
+      "kind": "Deployment"
+    }
+  ],
+  "externalServices": [],
+  "keptOnFlexVm": [],
+  "warnings": [],
+  "blockers": [],
+  "createdAt": "2026-07-11T09:46:01.312Z"
+}

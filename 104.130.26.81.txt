@@ -1,0 +1,85 @@
+104.130.26.81
+50.56.158.21
+
+bank mobile 
+23.253.159.71
+174.143.59.106
+
+
+ID/Name
+Image	Fixed IP	Floating IP	Flavor	Status	Tags	
+Locked
+Created At
+Action	
+
+linsnap-API_Gateway_Mobile_AP-20260703-0014
+API_Gateway_Mobile_AP-linsnap-flex	
+10.60.0.86
+50.56.159.92
+gp.5.2.2	
+Active
+-	unlock	4 days ago	
+
+linsnap-bankappfrontend-20260703-0007
+bankappfrontend-linsnap-flex	
+10.60.0.157
+174.143.59.106
+gp.5.2.2	
+Active
+-	unlock	4 days ago	
+
+linsnap-3Auth_Identity_Service_Core_Banking_Backend-20260701-2027
+3Auth_Identity_Service_Core_Banking_Backend-linsnap-flex	-	-	gp.5.2.2	
+Error
+-	unlock	5 days ago	
+
+flexpostgresql
+Ubuntu 22.04	
+10.60.0.33
+50.56.158.21
+mo.6.2.16	
+Active
+-	unlock	12 days ago	
+
+linsnap-u24_green_server-20260624-0806
+u24_green_server-linsnap-flex	
+10.60.0.170
+50.56.158.89
+gp.5.2.2	
+Active
+-	unlock	13 days ago	
+
+FlexDFWjumphost
+	
+10.60.0.32
+-	gp.5.8.32	
+Active
+-	unlock	a month ago	
+
+IADjumphostu24
+	
+10.60.0.182
+-	gp.5.4.16	
+Active
+-	unlock	a month ago	
+
+Windows_Server_2019Re-snap-20260416211842-snapwin-safe-ide-img-snapwin-safe-ide-img-r3-f2f-DFW3-to-IAD3-snapwin-final-virtio
+	
+10.60.0.79
+-	gp.5.4.4	
+Active
+-	unlock	a month ago	
+
+FlexDFWjumphost
+	
+10.60.0.236
+-	gp.5.8.32	
+Active
+-	unlock	a month ago	
+
+opscwin2016-20260509-150218-snap-202605091502-snapwin-virtio-ready-img-snapwin-safe-ide-img-r3-f2f-DFW3-to-IAD3-snapwin-final-virtio
+	
+10.60.0.147
+-	gp.5.4.4	
+Active
+-	unlock	a month ago	

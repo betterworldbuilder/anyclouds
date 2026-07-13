@@ -6389,8 +6389,10 @@ ${certContent}
       const themeDD = document.getElementById('top-theme-dropdown');
       if (themeDD) themeDD.style.display = '';
     }
+    const migrationHubStages = ['s2','s4','s7','s7a','s5','s5c','s6'];
     stageBtns.forEach(b => {
-      const isActive = b.dataset.stage === stageId;
+      const isActive = b.dataset.stage === stageId ||
+        (b.dataset.stage === 's2' && migrationHubStages.includes(stageId));
       b.classList.toggle('active', isActive);
       if (isActive) {
         b.style.setProperty('background', 'linear-gradient(135deg, #bbf7d0, #86efac)', 'important');
@@ -6408,8 +6410,8 @@ ${certContent}
     });
     panels.forEach(p => p.classList.toggle('active', p.id === 'panel-' + stageId));
     if(subBar1) subBar1.classList.toggle('visible', stageId === 's1');
-    if(subBar2) subBar2.classList.toggle('visible', stageId === 's2');
-    if (stageId === 's1' || stageId === 's2') {
+    if(subBar2) subBar2.classList.toggle('visible', migrationHubStages.includes(stageId));
+    if (stageId === 's1' || migrationHubStages.includes(stageId)) {
       try {
         setTimeout(() => reloadStage12CredentialsFromCache(), 100);
         setTimeout(() => reloadStage12CredentialsFromCache(), 700);
@@ -9477,8 +9479,7 @@ ${certContent}
       </div>
     </div>
     <div class="uat-s1-modal-foot">
-      <button class="uat-s1-btn-muted" id="uatS1SaveDraftBtn" onclick="uatS1SaveDraft()">Save Draft</button>
-      <button class="uat-s1-btn-primary" onclick="uatS1SaveSystem()">Add Business System</button>
+      <button class="uat-s1-btn-muted" id="uatS1SaveDraftBtn" onclick="uatS1SaveDraft()">Save</button>
     </div>
   </div>
 </div>
@@ -9534,7 +9535,7 @@ ${certContent}
           <div class="uat-s1-field"><label>Source IP / Host</label><input id="uatS1SaSrc" value="" placeholder="23.253.159.2" /></div>
           <div class="uat-s1-field"><label>Target IP / Host</label><input id="uatS1SaTgt" value="" placeholder="50.56.158.89" /></div>
           <div class="uat-s1-field"><label>SSH User</label><input id="uatS1SaSshUser" value="ubuntu" /></div>
-          <div class="uat-s1-field"><label>SSH Key / Secret Ref</label><input id="uatS1SaSshKey" value="~/.ssh/id_rsa" /></div>
+          <div class="uat-s1-field"><label>SSH Private Key Path / Secret Ref</label><input id="uatS1SaSshKey" value="~/.ssh/id_rsa" /></div>
           <div class="uat-s1-field"><label>App / Service Port</label><input id="uatS1SaAppPort" value="80" /></div>
           <div class="uat-s1-field uatS1DbField" style="display:none;"><label>DB Port</label><input id="uatS1SaDbPort" value="3306" /></div>
           <div class="uat-s1-field uatS1AppField"><label>Health URL / Path</label><input id="uatS1SaHealth" value="/health" /></div>
@@ -9709,6 +9710,11 @@ ${certContent}
     _renderCustomerTemplates();
     if (window.uatS1PopulateCompareTargets) window.uatS1PopulateCompareTargets();
     if (window.uatLivePopulateComponents) try { window.uatLivePopulateComponents(); } catch(e) {}
+    if (typeof window.r6pBusinessSystemsChanged === 'function') {
+      try { window.r6pBusinessSystemsChanged(); } catch(e) {}
+    } else {
+      try { window.dispatchEvent(new CustomEvent('uatS1:businessSystemsChanged')); } catch(e) {}
+    }
   }
   window.uatS1ReloadFromStorage = function() {
     try { var d = localStorage.getItem('uatS1_systems'); _state.systems = d ? (JSON.parse(d) || []) : []; } catch(e) { _state.systems = []; }
@@ -9749,7 +9755,7 @@ ${certContent}
   function _setTemplateMode(on) {
     _state.templateMode = !!on;
     var draftBtn = document.getElementById('uatS1SaveDraftBtn');
-    if (draftBtn) draftBtn.textContent = on ? 'Save Customer Template' : 'Save Draft';
+    if (draftBtn) draftBtn.textContent = on ? 'Save Customer Template' : 'Save';
   }
   window.uatS1OpenModal = function(editId, presetArch) {
     _setTemplateMode(false);
@@ -9803,25 +9809,43 @@ ${certContent}
     'Backup Service','Secrets Manager','Policy Engine','Metrics Exporter','Log Processor',
     'Tracing','External Partner Connector','Legacy Adapter'
   ];
+  function _componentId(value) {
+    return value || ('cmp-' + Date.now() + '-' + Math.floor(Math.random()*1000000));
+  }
+  function _uatS1EscAttr(value) {
+    return String(value == null ? '' : value).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+  function _uatS1EscHtml(value) {
+    return String(value == null ? '' : value).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+  }
+
 
   /* Build a single component editor row with Remove button + 3 inputs */
   function _buildCompRow(name, saved) {
-    var col = name.includes('Database')?'green':name.includes('Queue')?'purple':'blue';
-    var sv = (saved && saved.src)  || _sSrc(name);
-    var tv = (saved && saved.tgt)  || _sTgt(name);
-    var pv = (saved && saved.path) || _sPath(name);
-    return '<div class="uat-s1-comp-row" data-comp="'+name+'">'
-      +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">'
-      +'<div><strong>'+name+'</strong><small style="margin-left:8px;">'+_sType(name)+'</small></div>'
-      +'<button data-comp="'+name+'" onclick="uatS1ToggleComp(this.dataset.comp)" style="background:none;border:1px solid #dc2626;color:#dc2626;border-radius:4px;padding:2px 8px;font-size:10px;cursor:pointer;flex-shrink:0;">&#10005; Remove</button>'
+    saved = saved || {};
+    var role = saved.catalogName || saved.componentRole || saved.originalName || name || 'Custom Component';
+    /* Legacy records used the component name as the scan ID; keep that value on first save. */
+    var id = _componentId(saved.id || saved.componentId || saved.component_id || saved.name);
+    var originalName = saved.originalName || saved.name || name;
+    var col = role.includes('Database')?'green':role.includes('Queue')?'purple':'blue';
+    var sv = saved.src || _sSrc(role);
+    var tv = saved.tgt || _sTgt(role);
+    var pv = saved.path || _sPath(role);
+    return '<div class="uat-s1-comp-row" data-comp="'+_uatS1EscAttr(name)+'" data-comp-id="'+_uatS1EscAttr(id)+'" data-catalog-name="'+_uatS1EscAttr(role)+'" data-original-name="'+_uatS1EscAttr(originalName)+'" style="display:block;">'
+      +'<div style="display:grid;grid-template-columns:minmax(220px,1fr) auto;align-items:end;gap:12px;margin-bottom:9px;">'
+      +'<div class="uat-s1-field" style="margin:0;"><label>Component Name</label><input data-field="name" maxlength="100" value="'+_uatS1EscAttr(name)+'" onchange="uatS1RenameComp(this)" aria-label="Component name" /></div>'
+      +'<small style="padding-bottom:9px;color:#64748b;">'+_uatS1EscHtml(saved.type || _sType(role))+'</small>'
       +'</div>'
       +'<div class="uat-s1-form-grid" style="grid-template-columns:1fr 1fr 1fr;">'
-      +'<div class="uat-s1-field"><label>OSPC Source IP / URL</label><input data-field="src" placeholder="http://OSPC-IP:PORT" value="'+sv+'" /></div>'
-      +'<div class="uat-s1-field"><label>FLEX Target IP / URL</label><input data-field="tgt" placeholder="http://FLEX-IP:PORT" value="'+tv+'" /></div>'
-      +'<div class="uat-s1-field"><label>Health / Test Path</label><input data-field="path" value="'+pv+'" /></div>'
+      +'<div class="uat-s1-field"><label>OSPC Source IP / URL</label><input data-field="src" placeholder="http://OSPC-IP:PORT" value="'+_uatS1EscAttr(sv)+'" /></div>'
+      +'<div class="uat-s1-field"><label>FLEX Target IP / URL</label><input data-field="tgt" placeholder="http://FLEX-IP:PORT" value="'+_uatS1EscAttr(tv)+'" /></div>'
+      +'<div class="uat-s1-field"><label>Health / Test Path</label><input data-field="path" value="'+_uatS1EscAttr(pv)+'" /></div>'
       +'</div>'
       +'<span class="uat-s1-pill '+col+'">In Scope</span>'
-      +_buildContainerReadyBlock(name, saved)
+      +_buildContainerReadyBlock(role, saved)
+      +'<div style="display:flex;justify-content:flex-end;margin-top:12px;">'
+      +'<button onclick="uatS1RemoveCompRow(this)" title="Remove component" aria-label="Remove '+_uatS1EscAttr(name)+'" style="background:#fee2e2;border:1px solid #fecaca;color:#dc2626;border-radius:5px;padding:5px 10px;font-size:10px;font-weight:800;line-height:1;cursor:pointer;box-shadow:0 1px 3px rgba(220,38,38,.12);">&#10005; Remove</button>'
+      +'</div>'
       +'</div>';
   }
 
@@ -9829,11 +9853,21 @@ ${certContent}
   function _captureInputs() {
     var out = [];
     document.querySelectorAll('#uatS1CompEditor .uat-s1-comp-row').forEach(function(row) {
-      var n = (row.querySelector('strong')||{textContent:''}).textContent;
-      out.push({ name:n,
+      var n = (row.querySelector('[data-field="name"]')||{value:''}).value.trim();
+      var id = row.getAttribute('data-comp-id') || _componentId();
+      out.push({ id:id, componentId:id, name:n,
+        catalogName:row.getAttribute('data-catalog-name') || n,
+        originalName:row.getAttribute('data-original-name') || n,
         src:  (row.querySelector('[data-field="src"]') ||{value:''}).value,
         tgt:  (row.querySelector('[data-field="tgt"]') ||{value:''}).value,
-        path: (row.querySelector('[data-field="path"]')||{value:''}).value });
+        path: (row.querySelector('[data-field="path"]')||{value:''}).value,
+        runtime:(row.querySelector('[data-field="runtime"]')||{value:''}).value,
+        state:(row.querySelector('[data-field="state"]')||{value:''}).value,
+        containerizationDecision:(row.querySelector('[data-field="containerizationDecision"]')||{value:''}).value,
+        targetRuntimeResource:(row.querySelector('[data-field="targetRuntimeResource"]')||{value:''}).value,
+        persistentDataPath:(row.querySelector('[data-field="persistentDataPath"]')||{value:''}).value,
+        dependencies:(row.querySelector('[data-field="dependencies"]')||{value:''}).value,
+        targetForm:_decisionTargetForm((row.querySelector('[data-field="containerizationDecision"]')||{value:''}).value) });
     });
     return out;
   }
@@ -9849,18 +9883,20 @@ ${certContent}
           return _buildCompRow(name, sv);
         }).join('')
       : '<div style="padding:16px 0;color:#94a3b8;font-size:13px;">No components in scope. Click <b>+ Add component</b> badges below to build your stack.</div>';
-    /* Library palette: show all components NOT yet in _activeComps */
-    var libItems = _compLib.filter(function(n){ return _activeComps.indexOf(n) < 0; });
-    var libHtml = libItems.length
-      ? '<div style="margin-top:14px;padding:12px 14px;background:#f8fafc;border-radius:8px;border:1px dashed #94a3b8;">'
+    /* Library palette: hide catalog roles already represented, even after display-name edits. */
+    var activeRoles = sl.map(function(x){ return x.catalogName || x.componentRole || x.name; });
+    var libItems = _compLib.filter(function(n){ return _activeComps.indexOf(n) < 0 && activeRoles.indexOf(n) < 0; });
+    var libHtml = '<div style="margin-top:14px;padding:12px 14px;background:#f8fafc;border-radius:8px;border:1px dashed #94a3b8;">'
         +'<div style="font-size:11px;font-weight:700;color:#475569;margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em;">&#43; Add component</div>'
         +'<div style="display:flex;flex-wrap:wrap;gap:6px;">'
         +libItems.map(function(n) {
             var c = n.includes('Database')?'green':n.includes('Queue')||n.includes('Cache')?'purple':'blue';
-            return '<span class="uat-s1-pill '+c+'" data-comp="'+n+'" onclick="uatS1ToggleComp(this.dataset.comp)" style="cursor:pointer;opacity:.55;user-select:none;border-style:dashed;" title="Add '+n+'">&#43; '+n+'</span>';
+            return '<span class="uat-s1-pill '+c+'" data-comp="'+_uatS1EscAttr(n)+'" onclick="uatS1ToggleComp(this.dataset.comp)" style="cursor:pointer;opacity:.55;user-select:none;border-style:dashed;" title="Add '+_uatS1EscAttr(n)+'">&#43; '+_uatS1EscHtml(n)+'</span>';
           }).join('')
-        +'</div></div>'
-      : '';
+        +'</div><div style="display:flex;gap:7px;align-items:end;margin-top:12px;padding-top:10px;border-top:1px solid #dbe4f0;">'
+        +'<div class="uat-s1-field" style="margin:0;max-width:360px;flex:1;"><label>Custom Component Name</label><input id="uatS1CustomCompName" maxlength="100" placeholder="e.g. Customer Loyalty Engine" onkeydown="if(event.key===\'Enter\'){event.preventDefault();uatS1AddCustomComp();}" /></div>'
+        +'<button type="button" class="uat-s1-btn-primary" onclick="uatS1AddCustomComp()" style="height:34px;white-space:nowrap;">&#43; Custom Component</button>'
+        +'</div></div>';
     editor.innerHTML = rowsHtml + libHtml;
   }
 
@@ -9871,7 +9907,7 @@ ${certContent}
     preview.innerHTML = _activeComps.length
       ? _activeComps.map(function(n) {
           var c = n.includes('Database')?'green':n.includes('Queue')||n.includes('Cache')?'purple':'blue';
-          return '<span class="uat-s1-pill '+c+'" data-comp="'+n+'" onclick="uatS1ToggleComp(this.dataset.comp)" style="cursor:pointer;" title="Click to remove from scope">'+n+' &#10005;</span>';
+          return '<span class="uat-s1-pill '+c+'" data-comp="'+_uatS1EscAttr(n)+'" onclick="uatS1RemoveCompByName(this.dataset.comp)" style="cursor:pointer;" title="Click to remove from scope">'+_uatS1EscHtml(n)+' &#10005;</span>';
         }).join('')
       : '<span class="uat-s1-pill gray">No components selected</span>';
   }
@@ -9895,9 +9931,61 @@ ${certContent}
   /* Toggle a component in/out of scope, preserving existing input values */
   window.uatS1ToggleComp = function(name) {
     var saved = _captureInputs();
+    _activeComps = saved.map(function(x){ return x.name; });
     var idx = _activeComps.indexOf(name);
-    if (idx >= 0) _activeComps.splice(idx, 1);
-    else _activeComps.push(name);
+    if (idx >= 0) { _activeComps.splice(idx, 1); saved.splice(idx, 1); }
+    else { _activeComps.push(name); saved.push({id:_componentId(), name:name, catalogName:name, originalName:name}); }
+    _rebuildEditor(saved);
+    _rebuildPreview();
+  };
+
+  window.uatS1AddCustomComp = function() {
+    var input = document.getElementById('uatS1CustomCompName');
+    var name = input ? input.value.trim() : '';
+    var saved = _captureInputs();
+    if (!name) { alert('Enter a Custom Component Name.'); if (input) input.focus(); return; }
+    if (saved.some(function(x){ return x.name.toLowerCase() === name.toLowerCase(); })) { alert('Component names must be unique. "' + name + '" already exists.'); return; }
+    saved.push({id:_componentId(), name:name, catalogName:'Custom Component', originalName:name, type:'Component Type: Custom Application'});
+    _activeComps = saved.map(function(x){ return x.name; });
+    _rebuildEditor(saved);
+    _rebuildPreview();
+  };
+
+  window.uatS1RenameComp = function(input) {
+    var row = input && input.closest('.uat-s1-comp-row');
+    if (!row) return;
+    var oldName = row.getAttribute('data-comp') || row.getAttribute('data-original-name') || '';
+    var name = input.value.trim();
+    var rows = Array.from(document.querySelectorAll('#uatS1CompEditor .uat-s1-comp-row'));
+    if (!name) { alert('Component Name cannot be empty.'); input.value = oldName; input.focus(); return; }
+    if (rows.some(function(other){ var otherInput=other.querySelector('[data-field="name"]'); return other!==row && otherInput && otherInput.value.trim().toLowerCase()===name.toLowerCase(); })) {
+      alert('Component names must be unique. "' + name + '" already exists.'); input.value = oldName; input.focus(); return;
+    }
+    if (oldName && oldName !== name) {
+      rows.forEach(function(other){ var dep=other.querySelector('[data-field="dependencies"]'); if(dep && dep.value.indexOf(oldName)>=0) dep.value=dep.value.split(oldName).join(name); });
+    }
+    row.setAttribute('data-comp', name);
+    input.value = name;
+    var saved = _captureInputs();
+    _activeComps = saved.map(function(x){ return x.name; });
+    _rebuildPreview();
+  };
+
+  window.uatS1RemoveCompRow = function(button) {
+    var row = button && button.closest('.uat-s1-comp-row');
+    if (!row) return;
+    var id = row.getAttribute('data-comp-id');
+    var saved = _captureInputs().filter(function(x){ return x.id !== id; });
+    _activeComps = saved.map(function(x){ return x.name; });
+    _rebuildEditor(saved);
+    _rebuildPreview();
+  };
+
+  window.uatS1RemoveCompByName = function(name) {
+    var saved = _captureInputs();
+    var idx = saved.findIndex(function(x){ return x.name === name; });
+    if (idx >= 0) saved.splice(idx, 1);
+    _activeComps = saved.map(function(x){ return x.name; });
     _rebuildEditor(saved);
     _rebuildPreview();
   };
@@ -9941,10 +10029,11 @@ ${certContent}
      collide with the wrong rule. */
   var _COMP_DECISION_TABLE = {
     'Web Frontend':          {state:'Stateless',       decision:'Containerize',                                   k8s:'Deployment + Service',                        path:'None - stateless',                                    risk:'Low'},
-    'API Gateway':           {state:'Unknown / mixed',  decision:'Replace with Gateway API',                       k8s:'Gateway API',                                 path:'None - stateless',                                    risk:'Low'},
+    'API Gateway':           {state:'Stateless',        decision:'Replace with Gateway API',                       k8s:'Gateway API',                                 path:'None - stateless',                                    risk:'Low'},
     'API Server':            {state:'Stateless',        decision:'Containerize',                                   k8s:'Deployment + Service',                        path:'None - stateless',                                    risk:'Low'},
     'Auth / SSO':            {state:'Unknown / mixed',  decision:'Containerize with external database',            k8s:'Deployment + Service + external DB',          path:'None in image - session/identity data stays external', risk:'Medium - identity data is sensitive'},
     'Core Banking Backend':  {state:'Unknown / mixed',  decision:'Containerize after assessment',                  k8s:'Deployment + Service (after assessment)',     path:'Verify no local writes during Live Scan',             risk:'Medium - core business logic, assess before cutover'},
+    'Backend App Server':    {state:'Unknown / mixed',  decision:'Containerize after assessment',                  k8s:'Deployment + Service (after assessment)',     path:'Verify no local writes during Live Scan',             risk:'Medium - inspect local state before containerization'},
     'Backend Worker':        {state:'Stateless',        decision:'Containerize',                                   k8s:'Deployment (worker)',                         path:'None - stateless',                                    risk:'Low'},
     'Worker':                {state:'Stateless',        decision:'Containerize',                                   k8s:'Deployment (worker)',                         path:'None - stateless',                                    risk:'Low'},
     'Database':              {state:'Stateful',         decision:'Keep external initially',                        k8s:'None in-cluster - Service alias to external/VM DB', path:'/var/lib/ (database engine data directory)',     risk:'Medium - stateful, requires a planned data migration'},
@@ -9967,6 +10056,8 @@ ${certContent}
   };
   function _compEntry(n) {
     if (_COMP_DECISION_TABLE[n]) return _COMP_DECISION_TABLE[n];
+    var base=String(n||'').split(/\s+[—–-]\s+/)[0].trim();
+    if (_COMP_DECISION_TABLE[base]) return _COMP_DECISION_TABLE[base];
     if (n.includes('Database')) return _COMP_DECISION_TABLE['Database'];
     if (n.includes('Cache'))    return {state:'Unknown / mixed',decision:'Deploy with operator',k8s:'Custom Resource via operator',path:'None required - disposable',risk:'Low'};
     if (n.includes('Queue'))    return {state:'Stateful',decision:'Deploy with operator',k8s:'Custom Resource via operator',path:'/var/lib/queue-data',risk:'Medium'};
@@ -9985,6 +10076,20 @@ ${certContent}
     if(n.includes('Gateway'))  return 'API Gateway / reverse proxy';
     return 'Unknown - run Live Scan to confirm';
   }
+  function _decisionTargetForm(decision) {
+    var d=String(decision||'').toLowerCase();
+    if(/exclude/.test(d))return 'EXCLUDED';
+    if(/block/.test(d))return 'BLOCKED';
+    if(/redeploy.*vm/.test(d))return 'REDEPLOYED_FLEX_VM';
+    if(/retain.*vm|keep external/.test(d))return 'RETAINED_FLEX_VM';
+    if(/deploy with operator/.test(d))return 'OPERATOR_MANAGED';
+    if(/replace with|convert to cronjob|use platform/.test(d))return 'KUBERNETES_NATIVE';
+    if(/migrate separately/.test(d))return 'DATA_MIGRATION_REQUIRED';
+    if(/external service|connect as external/.test(d))return 'EXTERNAL_SERVICE';
+    if(/external database|after assessment|partially/.test(d))return 'PARTIALLY_CONTAINERIZED';
+    if(/containerize/.test(d))return 'CONTAINERIZED';
+    return 'MANUAL_REVIEW';
+  }
   var _STATE_PILL = {'Stateless':'green','Stateful':'red','Unknown / mixed':'orange'};
   var _DECISION_PILL_WORDS = {
     'Containerize':'blue','Deploy with operator':'purple','Keep external initially':'orange',
@@ -10002,24 +10107,34 @@ ${certContent}
     return '<div class="uat-s1-field"><label>'+label+'</label>'
       +'<div style="padding:9px;border:1px solid #e2e8f0;border-radius:8px;background:#f8fafc;color:#0f172a;font-size:12px;">'+val+'</div></div>';
   }
+  function _editableField(label, field, val) {
+    return '<div class="uat-s1-field"><label>'+label+'</label>'
+      +'<input data-field="'+field+'" value="'+_h(val||'')+'" style="width:100%;padding:9px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;color:#0f172a;font-size:12px;"></div>';
+  }
+  function _editableSelect(label, field, val, options) {
+    return '<div class="uat-s1-field"><label>'+label+'</label><select data-field="'+field+'" style="width:100%;padding:9px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;color:#0f172a;font-size:12px;">'
+      +options.map(function(o){return '<option value="'+_h(o)+'"'+(o===val?' selected':'')+'>'+_h(o)+'</option>';}).join('')
+      +'</select></div>';
+  }
   /* Container-Ready Profile: the 6 fields not already shown elsewhere in this row
      (name, category subtitle, OSPC/FLEX endpoints and health path already exist above).
      Same visual language as the existing OSPC/FLEX/Health grid - .uat-s1-field labels,
      bordered boxes, and the same .uat-s1-pill badge style used by the In Scope pill. */
   function _buildContainerReadyBlock(name, saved) {
-    var dep = (saved&&saved._siblings) ? saved._siblings : 'See other components in this system';
-    var state = _sState(name), decision = _sDecision(name);
+    var dep = (saved&&saved.dependencies)||(saved&&saved._siblings)||'See other components in this system';
+    var state = (saved&&saved.state)||_sState(name), decision = (saved&&saved.containerizationDecision)||_sDecision(name);
+    var decisions=Array.from(new Set(Object.keys(_COMP_DECISION_TABLE).map(function(k){return _COMP_DECISION_TABLE[k].decision;}))).concat(['Partially containerize','Retain FLEX VM','Redeploy FLEX VM','External service','Block','Exclude']);
     return '<div style="margin-top:10px;padding-top:10px;border-top:1px dashed #dbe4f0;">'
       +'<div style="font-size:10px;font-weight:800;color:#475569;text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px;">Container Readiness</div>'
       +'<div class="uat-s1-form-grid" style="grid-template-columns:1fr 1fr 1fr;margin-bottom:10px;">'
-      +_textField('Runtime / Product', _sRuntime(name))
-      +_pillField('State', state, _STATE_PILL[state]||'gray')
-      +_pillField('Containerization Decision', decision, _DECISION_PILL_WORDS[decision]||'blue')
+      +_editableField('Runtime / Product', 'runtime', (saved&&saved.runtime)||_sRuntime(name))
+      +_editableSelect('State', 'state', state, ['Stateless','Stateful','Unknown / mixed'])
+      +_editableSelect('Containerization Decision', 'containerizationDecision', decision, decisions)
       +'</div>'
       +'<div class="uat-s1-form-grid" style="grid-template-columns:1fr 1fr 1fr;">'
-      +_textField('Target Runtime Resource', _sK8sResource(name))
-      +_textField('Persistent Data Path', _sDataPath(name))
-      +_textField('Dependencies', dep)
+      +_editableField('Target Runtime Resource', 'targetRuntimeResource', (saved&&saved.targetRuntimeResource)||_sK8sResource(name))
+      +_editableField('Persistent Data Path', 'persistentDataPath', (saved&&saved.persistentDataPath)||_sDataPath(name))
+      +_editableField('Dependencies', 'dependencies', dep)
       +'</div></div>';
   }
 
@@ -10126,12 +10241,32 @@ ${certContent}
       /* Same VM -> same IP for every role that VM's name resolves to. */
       var ip = m.row.public_ip || m.row.private_ip || m.row.ip || '';
       var tgt = _uatS1TgtWithIp(m.component, ip);
+      var decision = _sDecision(m.component);
+      var sourceVmId = m.row.id || m.row.vm_id || m.row.server_id || m.row.uuid || '';
+      var sourceVmName = m.row.name || sourceVmId;
       return {
         name: m.component + ' — ' + (m.row.name || m.row.id || 'vm'),
         type: _sType(m.component),
+        sourceVmId: sourceVmId,
+        source_vm_id: sourceVmId,
+        sourceVmName: sourceVmName,
+        source_vm_name: sourceVmName,
+        sourceIp: ip,
+        source_ip: ip,
+        sshUser: m.row.ssh_user || m.row.sshUser || 'ubuntu',
+        sshKeyPath: m.row.ssh_key_path || m.row.sshKeyPath || m.row.ssh_key || '~/.ssh/id_rsa',
+        cloudRegion: m.row.region || m.row.cloud_region || '',
+        scanTargetId: sourceVmId,
         src:  _uatS1SrcWithIp(m.component, srcRoleIp[m.component] || ''),
         tgt:  tgt,
-        path: _sPath(m.component)
+        path: _sPath(m.component),
+        runtime:_sRuntime(m.component),
+        state:_sState(m.component),
+        containerizationDecision:decision,
+        targetForm:_decisionTargetForm(decision),
+        targetRuntimeResource:_sK8sResource(m.component),
+        persistentDataPath:_sDataPath(m.component),
+        dependencies:'See other components in this system'
       };
     });
     var sysName = 'Automatic Business System from Existing VMs';
@@ -10161,15 +10296,57 @@ ${certContent}
   function _collectModalComponents() {
     var _editor = document.getElementById('uatS1CompEditor');
     var _rows = _editor ? Array.from(_editor.querySelectorAll('.uat-s1-comp-row')) : [];
+    var _editingSystem = (_state.systems || []).find(function(system){ return system.id === _state.editId; });
     return _rows.length ? _rows.map(function(row) {
-      var n = (row.querySelector('strong')||{textContent:''}).textContent;
-      return { name:n, type:_sType(n),
+      var n = (row.querySelector('[data-field="name"]')||{value:''}).value.trim();
+      var componentId = row.getAttribute('data-comp-id') || _componentId();
+      var originalName = row.getAttribute('data-original-name') || n;
+      var catalogName = row.getAttribute('data-catalog-name') || n;
+      var existing = _editingSystem && (_editingSystem.components || []).find(function(component){
+        return (component.id||component.componentId||component.component_id) === componentId || component.name === originalName;
+      }) || {};
+      var previousNames = (existing.previousNames || []).slice();
+      if (originalName && originalName !== n && previousNames.indexOf(originalName) < 0) previousNames.push(originalName);
+      return { id:componentId, componentId:componentId, name:n, catalogName:catalogName, previousNames:previousNames, type:existing.type||_sType(catalogName),
+        sourceVmId:existing.sourceVmId||existing.source_vm_id||existing.vmId||null,
+        source_vm_id:existing.sourceVmId||existing.source_vm_id||existing.vmId||null,
+        sourceVmName:existing.sourceVmName||existing.source_vm_name||existing.vmName||null,
+        source_vm_name:existing.sourceVmName||existing.source_vm_name||existing.vmName||null,
+        sourceIp:existing.sourceIp||existing.source_ip||null,
+        source_ip:existing.sourceIp||existing.source_ip||null,
+        sshUser:existing.sshUser||existing.ssh_user||'ubuntu',
+        sshKeyPath:existing.sshKeyPath||existing.ssh_key_path||existing.sshKey||'',
+        dbEngine:existing.dbEngine||existing.databaseEngine||'',
+        dbPort:existing.dbPort||existing.databasePort||'',
+        cloudRegion:existing.cloudRegion||existing.cloud_region||'',
+        scanTargetId:existing.scanTargetId||existing.scan_target_id||existing.sourceVmId||existing.source_vm_id||null,
         src:  (row.querySelector('[data-field="src"]') ||{value:''}).value,
         tgt:  (row.querySelector('[data-field="tgt"]') ||{value:''}).value,
-        path: (row.querySelector('[data-field="path"]')||{value:''}).value };
+        path: (row.querySelector('[data-field="path"]')||{value:''}).value,
+        runtime:(row.querySelector('[data-field="runtime"]')||{value:''}).value,
+        state:(row.querySelector('[data-field="state"]')||{value:''}).value,
+        containerizationDecision:(row.querySelector('[data-field="containerizationDecision"]')||{value:''}).value,
+        targetRuntimeResource:(row.querySelector('[data-field="targetRuntimeResource"]')||{value:''}).value,
+        persistentDataPath:(row.querySelector('[data-field="persistentDataPath"]')||{value:''}).value,
+        dependencies:(row.querySelector('[data-field="dependencies"]')||{value:''}).value,
+        targetForm:_decisionTargetForm((row.querySelector('[data-field="containerizationDecision"]')||{value:''}).value) };
     }) : _activeComps.map(function(n){
-      return { name:n, type:_sType(n), src:_sSrc(n), tgt:_sTgt(n), path:_sPath(n) };
+      var componentId = _componentId();
+      return { id:componentId, componentId:componentId, name:n, catalogName:n, previousNames:[], type:_sType(n), src:_sSrc(n), tgt:_sTgt(n), path:_sPath(n) };
     });
+  }
+
+  function _validateModalComponents(comps) {
+    if (!comps.length) { alert('Add at least one component.'); return false; }
+    var seen = {};
+    for (var i=0; i<comps.length; i++) {
+      var name = String(comps[i].name || '').trim();
+      if (!name) { alert('Every component must have a Component Name.'); return false; }
+      var key = name.toLowerCase();
+      if (seen[key]) { alert('Component names must be unique. Duplicate: "' + name + '".'); return false; }
+      seen[key] = true;
+    }
+    return true;
   }
 
   window.uatS1OpenCustomerTemplate = function(templateId) {
@@ -10212,6 +10389,7 @@ ${certContent}
       components: _collectModalComponents(),
       updatedAt: new Date().toLocaleString()
     };
+    if (!_validateModalComponents(tpl.components)) return;
     var idx = (_customerTemplates || []).findIndex(function(t){ return t.id === tpl.id; });
     if (idx >= 0) _customerTemplates[idx] = tpl;
     else _customerTemplates.push(tpl);
@@ -10226,6 +10404,7 @@ ${certContent}
     if (!name) { alert('Please enter a Business System Name.'); return; }
     var arch  = _gv('uatS1ArchSel')||'banking';
     var comps = _collectModalComponents();
+    if (!_validateModalComponents(comps)) return;
     var existingByName = null;
     if (!_state.editId) {
       var newKey = String(name).trim().toLowerCase().replace(/[^a-z0-9]+/g, '');
@@ -10251,7 +10430,7 @@ ${certContent}
       var targetId = _state.editId || existingByName.id;
       var idx = _state.systems.findIndex(function(s){ return s.id===_state.editId; });
       if (idx < 0 && existingByName) idx = _state.systems.findIndex(function(s){ return s.id===targetId; });
-      if (idx >= 0) _state.systems[idx] = Object.assign({}, _state.systems[idx], sys, { components: _mergeComponents((_state.systems[idx] || {}).components, sys.components) });
+      if (idx >= 0) _state.systems[idx] = Object.assign({}, _state.systems[idx], sys, { components: sys.components });
       else _state.systems.push(sys);
     } else {
       _state.systems.push(sys);
@@ -10260,9 +10439,10 @@ ${certContent}
     /* R6 renders its own separate business-system list (#r6p-biz-list via r6pLoadBiz),
        independent from this engine's #uatS1Cards. Without this, a newly saved system
        only appeared after a full page reload. Refresh whichever list is present. */
-    if (typeof window.r6pLoadBiz === 'function') window.r6pLoadBiz();
+    if (typeof window.r6pBusinessSystemsChanged === 'function') window.r6pBusinessSystemsChanged();
+    else if (typeof window.r6pLoadBiz === 'function') window.r6pLoadBiz();
   };
-  window.uatS1SaveDraft    = function(){ if (_state.templateMode) uatS1SaveCustomerTemplate(); else uatS1SaveSystem(true); };
+  window.uatS1SaveDraft    = function(){ if (_state.templateMode) uatS1SaveCustomerTemplate(); else uatS1SaveSystem(false); };
   window.uatS1ExportPackage= function(){ alert('Export UAT Package: coming soon.'); };
   window.uatS1ImportJSON   = function(){ alert('Import JSON: coming soon.'); };
   window.uatS1ExportSystems= function(){ alert('Export Systems: coming soon.'); };
@@ -10308,7 +10488,8 @@ ${certContent}
         var did = this.getAttribute('data-bz-del');
         _state.systems = _state.systems.filter(function(s){ return s.id!==did; });
         _save(); _render();
-        if (typeof window.r6pLoadBiz === 'function') window.r6pLoadBiz();
+        if (typeof window.r6pBusinessSystemsChanged === 'function') window.r6pBusinessSystemsChanged();
+        else if (typeof window.r6pLoadBiz === 'function') window.r6pLoadBiz();
       });
       el.appendChild(div);
     });
@@ -10724,8 +10905,8 @@ ${certContent}
         id: _id().replace('bs-','sa-'), name: row.business_system_name||row.name||(isDB?'standalone-db':'standalone-app'),
         itemType: isDB?'db':'server', componentRole: isDB?'Database':'Web Frontend',
         criticality: row.criticality||'High', source: row.source_host||'', target: row.target_ip||'',
-        sshUser:'ubuntu', sshKey:'~/.ssh/id_rsa', appPort: row.app_port||'80', dbEngine:'MySQL / MariaDB',
-        dbPort:'3306', readQuery:'SELECT 1', status:'Active', _rawId: existId, createdAt: new Date().toLocaleString()
+        sshUser:row.ssh_user||'ubuntu', sshKey:row.ssh_key_path||'~/.ssh/id_rsa', appPort: row.app_port||'80', dbEngine:row.db_engine||(isDB?'MySQL / MariaDB':''),
+        dbPort:row.db_port||(isDB?'3306':''), readQuery:'SELECT 1', status:'Active', _rawId: existId, createdAt: new Date().toLocaleString()
       });
       added++;
     });
@@ -13206,7 +13387,7 @@ ${certContent}
     return { label: 'Linux Snapshot Migration', sub: 's2image', engine: 'linux', badge: 'LINUX', workload: 'Linux VM', color: '#2563eb', snapshot: 'Default VM snapshot route; confirm OS if Windows' };
   }
   function fsmOpenComponentEngine(engine, sub) {
-    fsmShowEngine(engine || 'linux');
+    fsmShowEngine(engine || 'ospc2flex');
     if (sub && typeof stage2OpenPath === 'function') {
       try { localStorage.setItem('fsm_last_engine_substage', sub); } catch(e) {}
     }
@@ -14147,31 +14328,24 @@ ${certContent}
   }
 
 
-  var _fsmEngineLoaded = {};
-  var _fsmEngineOrder = ['linux', 'windows', 'vol', 'db'];
+  var _fsmEngineLoaded = { ospc2flex: true };  // ospc2flex iframe has src set in HTML; flex2flex is lazy
+  var _fsmEngineOrder = ['ospc2flex', 'flex2flex'];
+  var _fsmActiveEngine = 'ospc2flex';
   var _fsmEngineLabels = {
-    linux: 'Linux Snapshot engine selected',
-    windows: 'Windows Snapshot engine selected',
-    vol: 'Volume Snapshot engine selected',
-    db: 'App & DB Replication engine selected'
-  };
-  var _fsmEngineUrls = {
-    linux: '/image_migrator/?mode=linux',
-    windows: '/image_migrator/?mode=windows',
-    vol:   '/image_migrator/?mode=volume',
-    db:    '/agent1/'
+    ospc2flex: 'OSPC 2 FLEX migration engine selected',
+    flex2flex: 'FLEX to FLEX migration engine selected'
   };
 
   function fsmShowEngine(engine) {
-    if (_fsmEngineOrder.indexOf(engine) < 0) engine = 'linux';
-    // Switch tab highlight
+    if (_fsmEngineOrder.indexOf(engine) < 0) engine = 'ospc2flex';
+    // Switch button highlight
     var tabs = document.querySelectorAll('.fsm-etab');
     for (var i = 0; i < tabs.length; i++) {
       var id = tabs[i].id;
       var isActive = id === 'fsm-etab-' + engine;
-      tabs[i].style.background    = isActive ? '#1e3a5f' : '#0f172a';
-      tabs[i].style.color         = isActive ? '#7dd3fc' : '#64748b';
-      tabs[i].style.borderBottom  = isActive ? '2px solid #7dd3fc' : '2px solid transparent';
+      tabs[i].style.background    = isActive ? '#1e3a5f' : '#f1f5f9';
+      tabs[i].style.color         = isActive ? '#7dd3fc' : '#475569';
+      tabs[i].style.borderBottom  = isActive ? '3px solid #38bdf8' : '3px solid transparent';
     }
     // Show/hide engine panels
     var panels = _fsmEngineOrder;
@@ -14179,15 +14353,14 @@ ${certContent}
       var panel = document.getElementById('fsm-engine-' + panels[pi]);
       if (panel) panel.style.display = panels[pi] === engine ? '' : 'none';
     }
-    var slider = document.getElementById('fsm-engine-slider');
-    if (slider) slider.value = _fsmEngineOrder.indexOf(engine);
-    var label = document.getElementById('fsm-engine-active-label');
-    if (label) label.textContent = _fsmEngineLabels[engine] || 'Migration engine selected';
+    _fsmActiveEngine = engine;
+    // no slider in 2-button layout
     fsmUpdateEndpointMapBar();
-    // Lazy-load iframe on first open
+    // Lazy-load iframe on first open — src is in data-src attribute for non-linux engines
     if (!_fsmEngineLoaded[engine]) {
       var iframe = document.getElementById('fsm-iframe-' + engine);
-      if (iframe && _fsmEngineUrls[engine]) {
+      var lazySrc = iframe && (iframe.getAttribute('data-src') || '');
+      if (iframe && lazySrc) {
         if (!iframe._fsmEndpointBridgeInstalled) {
           iframe.addEventListener('load', function() {
             fsmDecorateEndpointEngine(engine);
@@ -14195,7 +14368,7 @@ ${certContent}
           });
           iframe._fsmEndpointBridgeInstalled = true;
         }
-        iframe.src = _fsmEngineUrls[engine];
+        iframe.src = lazySrc;
         _fsmEngineLoaded[engine] = true;
       }
     } else {
@@ -14212,10 +14385,10 @@ ${certContent}
   }
 
   function fsmSlideEngine(delta) {
-    var slider = document.getElementById('fsm-engine-slider');
-    var current = slider ? parseInt(slider.value, 10) || 0 : 0;
+    var current = _fsmEngineOrder.indexOf(_fsmActiveEngine);
+    if (current < 0) current = 0;
     var next = Math.max(0, Math.min(_fsmEngineOrder.length - 1, current + delta));
-    fsmSetEngineFromSlider(next);
+    fsmShowEngine(_fsmEngineOrder[next]);
   }
 
   function fsmSetEngineHeight(px) {
@@ -14232,16 +14405,13 @@ ${certContent}
     }
   }
 
-  // Load Linux snapshot engine immediately when FSM pane activates (first touch)
+  // Restore saved console height on FSM pane activation.
+  // Linux iframe src is set directly in HTML; no JS needed to load it.
   function fsmInitEngines() {
     try {
       var savedHeight = localStorage.getItem('fsm_engine_height');
       if (savedHeight) fsmSetEngineHeight(savedHeight);
     } catch(e) {}
-    if (!_fsmEngineLoaded['linux']) {
-      var iframe = document.getElementById('fsm-iframe-linux');
-      if (iframe) { iframe.src = _fsmEngineUrls['linux']; _fsmEngineLoaded['linux'] = true; }
-    }
   }
 
 	  function fsmGoToOntology() {
@@ -14491,6 +14661,8 @@ ${certContent}
 </script>
 
 {% include "_ai_powerup_js.html" %}
+<script src="/static/cred-cache.js?v=20260713b"></script>
+<script src="/static/terminal-copy.js?v=20260713a"></script>
 
 </body>
 </html>
