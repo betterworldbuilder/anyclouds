@@ -206,7 +206,7 @@ window.r6pScanViewCacheKey=function(){return 'r6p_cached_scan_view:'+(R6P.bs&&(R
 window.r6pPersistScanView=function(run){
   var root=document.getElementById('r6p-scan-appraisal'),verdict=document.getElementById('r6p-scan-final-verdict'),failed=document.getElementById('r6p-scan-failed-checks');
   if(!run||!run.runId||!root)return false;
-  var view={runId:run.runId,businessSystem:run.businessSystem||R6P.bs||{},savedAt:new Date().toISOString(),productionScanLog:R6P.productionScanLog||'',appraisalHtml:root.innerHTML,verdictHtml:verdict?verdict.innerHTML:'',failedHtml:failed?failed.innerHTML:''};
+  var view={runId:run.runId,status:run.status||'',progress:run.progress||{},businessSystem:run.businessSystem||R6P.bs||{},savedAt:new Date().toISOString(),productionScanLog:R6P.productionScanLog||'',appraisalHtml:root.innerHTML,verdictHtml:verdict?verdict.innerHTML:'',failedHtml:failed?failed.innerHTML:''};
   try{localStorage.setItem('r6p_cached_scan_view',JSON.stringify(view));if(R6P.bs)localStorage.setItem(r6pScanViewCacheKey(),JSON.stringify(view));return true;}catch(e){}
   try{sessionStorage.setItem('r6p_cached_scan_view',JSON.stringify(view));if(R6P.bs)sessionStorage.setItem(r6pScanViewCacheKey(),JSON.stringify(view));return true;}catch(e2){return false;}
 };
@@ -239,9 +239,13 @@ window.r6pRenderCachedScanRun=function(run){
 window.r6pRestoreScanRun=function(){
   var cached=r6pLoadCachedScanRun(),id=null;
   try{id=localStorage.getItem(r6pScanRunStorageKey())||localStorage.getItem('r6p_latest_scan_run');}catch(e){}
-  if(cached){id=cached.runId;r6pRenderCachedScanRun(cached);}else{var cachedView=r6pLoadCachedScanView();if(cachedView){id=cachedView.runId;r6pRenderCachedScanView(cachedView);}else{R6P.structuredAppraisal=null;}}
+  var cachedView=r6pLoadCachedScanView();
+  if(cachedView){id=cachedView.runId;r6pRenderCachedScanView(cachedView);}
+  else if(cached){id=cached.runId;r6pRenderCachedScanRun(cached);}
+  else{R6P.structuredAppraisal=null;}
   R6P.scanRunId=id||null;R6P.appraisalReviewed=false;
-  if(id)r6pPollProductionScan();
+  var status=(cached&&cached.status)||(cachedView&&cachedView.status)||'';
+  if(id&&status==='RUNNING')r6pPollProductionScan();
   return id;
 };
 window.r6pSyncSelectedBusinessSystem=function(force){
@@ -2679,6 +2683,7 @@ window.r6pSetProductionScanLog=function(value,append){
   R6P.productionScanLog=append&&R6P.productionScanLog?R6P.productionScanLog+'\n'+String(value||''):String(value||'');
   var out=document.getElementById('r6p-production-scan-status');
   if(out){out.style.display='block';out.textContent=R6P.productionScanLog;out.scrollTop=out.scrollHeight;}
+  if(R6P.structuredAppraisal&&R6P.structuredAppraisal.runId)r6pPersistScanView(R6P.structuredAppraisal);
 };
 window.r6pFormatProductionScanLog=function(run){
   var p=run.progress||{},events=run.liveLog||[],lines=['=== R6 VERBOSE COMPONENT SCAN ===','Run: '+run.runId,'Business System: '+((run.businessSystem&&run.businessSystem.name)||'unknown'),'Status: '+run.status,'Started: '+(run.startedAt||'unknown'),'Updated: '+new Date().toISOString(),'Components: '+(p.completedComponents||0)+' / '+(p.totalComponents||0),'Diagnostic events: '+events.length];

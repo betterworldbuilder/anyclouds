@@ -305,3 +305,12 @@ def test_stage9_instructional_clutter_removed_from_main_ui():
     assert "Approved Container Source Capture" in V1
     assert "Stage 9A — Build VM Snapshots" in V1
     assert "Stage 9B — Build Containers" in V1
+
+
+def test_stage3_restore_prefers_rendered_cache_and_does_not_always_poll():
+    restore = V1.split("window.r6pRestoreScanRun=function(){", 1)[1].split("window.r6pSyncSelectedBusinessSystem", 1)[0]
+    assert "var cachedView=r6pLoadCachedScanView();" in restore
+    assert restore.index("r6pRenderCachedScanView(cachedView)") < restore.index("r6pRenderCachedScanRun(cached)")
+    assert "if(id&&status==='RUNNING')r6pPollProductionScan();" in restore
+    assert "if(id)r6pPollProductionScan();" not in restore
+    assert "status:run.status||''" in V1
