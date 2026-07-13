@@ -218,3 +218,34 @@ def test_openstack_bin_reports_missing_cli_cleanly(monkeypatch):
         dashboard._r6_openstack_bin()
     assert "OpenStack CLI not found for Stage 9A" in str(exc.value)
     assert "set OPENSTACK_CLI/PATH" in str(exc.value)
+
+
+
+def test_openstack_auth_env_uses_saved_r6_cloud_credentials(monkeypatch):
+    monkeypatch.delenv("OS_AUTH_URL", raising=False)
+    monkeypatch.setattr(dashboard, "_r6_saved_cloud_credentials", lambda: {
+        "authUrl": "https://keystone.api.iad3.rackspacecloud.com/v3/",
+        "authType": "password",
+        "username": "demo-user",
+        "password": "demo-pass",
+        "proj": "project-id-123",
+        "domain": "rackspace_cloud_domain",
+        "region": "IAD3 -- Northern Virginia (US)",
+    })
+    env = dashboard._r6_openstack_auth_env()
+    assert env["OS_AUTH_URL"] == "https://keystone.api.iad3.rackspacecloud.com/v3"
+    assert env["OS_USERNAME"] == "demo-user"
+    assert env["OS_PASSWORD"] == "demo-pass"
+    assert env["OS_PROJECT_ID"] == "project-id-123"
+    assert env["OS_USER_DOMAIN_NAME"] == "rackspace_cloud_domain"
+    assert env["OS_PROJECT_DOMAIN_NAME"] == "rackspace_cloud_domain"
+    assert env["OS_AUTH_TYPE"] == "password"
+
+
+def test_openstack_auth_env_reports_missing_stage9a_auth(monkeypatch):
+    monkeypatch.delenv("OS_AUTH_URL", raising=False)
+    monkeypatch.setattr(dashboard, "_r6_saved_cloud_credentials", lambda: {})
+    with pytest.raises(RuntimeError) as exc:
+        dashboard._r6_openstack_auth_env()
+    assert "OpenStack auth is not configured for Stage 9A" in str(exc.value)
+    assert "Preflight > Test Cloud Login" in str(exc.value)

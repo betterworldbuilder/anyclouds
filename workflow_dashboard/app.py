@@ -21193,6 +21193,74 @@ def _r6_openstack_bin() -> str:
     raise RuntimeError("OpenStack CLI not found for Stage 9A. Install python-openstackclient or set OPENSTACK_CLI/PATH for the Flask process, then restart Flask.")
 
 
+
+def _r6_saved_cloud_credentials() -> Dict[str, Any]:
+    path = Path(os.path.expanduser("~")) / ".config" / "opencenter" / "r6" / "creds.json"
+    if not path.is_file():
+        return {}
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+    cloud = payload.get("cloud") if isinstance(payload, dict) else {}
+    return cloud if isinstance(cloud, dict) else {}
+
+
+def _r6_openstack_auth_env() -> Dict[str, str]:
+    """Return OpenStack auth variables for Stage 9A CLI calls.
+
+    Flask does not inherit the browser-tested Keystone context, so Stage 9A
+    hydrates the OpenStack CLI from the same server-side R6 credential cache used
+    by Preflight/Test Cloud Login. Existing OS_* process variables still win.
+    """
+    if os.environ.get("OS_AUTH_URL"):
+        return {}
+    cloud = _r6_saved_cloud_credentials()
+    auth_url = str(cloud.get("authUrl") or cloud.get("OS_AUTH_URL") or "").strip()
+    auth_type = str(cloud.get("authType") or "password").strip().lower()
+    project = str(cloud.get("proj") or cloud.get("projectId") or cloud.get("OS_PROJECT_ID") or cloud.get("OS_TENANT_ID") or "").strip()
+    domain = str(cloud.get("domain") or cloud.get("OS_USER_DOMAIN_NAME") or cloud.get("OS_PROJECT_DOMAIN_NAME") or "rackspace_cloud_domain").strip()
+    region = str(cloud.get("region") or cloud.get("OS_REGION_NAME") or "").strip()
+    if " — " in region:
+        region = region.split(" — ", 1)[0].strip()
+    env: Dict[str, str] = {}
+    if auth_url:
+        env["OS_AUTH_URL"] = auth_url.rstrip("/")
+    if region:
+        env["OS_REGION_NAME"] = region
+    if project:
+        env["OS_PROJECT_ID"] = project
+    if domain:
+        env["OS_USER_DOMAIN_NAME"] = domain
+        env["OS_PROJECT_DOMAIN_NAME"] = domain
+    env["OS_IDENTITY_API_VERSION"] = "3"
+    env["OS_INTERFACE"] = str(cloud.get("interface") or "public")
+    if auth_type == "appcred":
+        cred_id = str(cloud.get("credId") or cloud.get("OS_APPLICATION_CREDENTIAL_ID") or "").strip()
+        secret = str(cloud.get("secret") or cloud.get("OS_APPLICATION_CREDENTIAL_SECRET") or "").strip()
+        if cred_id:
+            env["OS_APPLICATION_CREDENTIAL_ID"] = cred_id
+        if secret:
+            env["OS_APPLICATION_CREDENTIAL_SECRET"] = secret
+        env["OS_AUTH_TYPE"] = "v3applicationcredential"
+    else:
+        username = str(cloud.get("username") or cloud.get("OS_USERNAME") or "").strip()
+        password = str(cloud.get("password") or cloud.get("OS_PASSWORD") or "")
+        if username:
+            env["OS_USERNAME"] = username
+        if password:
+            env["OS_PASSWORD"] = password
+        env["OS_AUTH_TYPE"] = "password"
+    missing = [key for key in ("OS_AUTH_URL",) if not env.get(key)]
+    if auth_type == "appcred":
+        missing += [key for key in ("OS_APPLICATION_CREDENTIAL_ID", "OS_APPLICATION_CREDENTIAL_SECRET") if not env.get(key)]
+    else:
+        missing += [key for key in ("OS_USERNAME", "OS_PASSWORD") if not env.get(key)]
+    if missing:
+        raise RuntimeError("OpenStack auth is not configured for Stage 9A (%s missing). Run Preflight > Test Cloud Login or import an OpenRC file, save credentials, then retry Build VM Snapshots." % ", ".join(missing))
+    return env
+
+
 def _r6_openstack_json(args: List[str]) -> Any:
     """Run an OpenStack CLI command and return its JSON output.
 
@@ -21201,8 +21269,10 @@ def _r6_openstack_json(args: List[str]) -> Any:
     """
     openstack_bin = _r6_openstack_bin()
     cmd = [openstack_bin] + list(args) + ["-f", "json"]
+    env = os.environ.copy()
+    env.update(_r6_openstack_auth_env())
     try:
-        proc = subprocess.run(cmd, text=True, capture_output=True, timeout=120, check=False)
+        proc = subprocess.run(cmd, text=True, capture_output=True, timeout=120, check=False, env=env)
     except FileNotFoundError as exc:
         raise RuntimeError("OpenStack CLI not found for Stage 9A. Install python-openstackclient or set OPENSTACK_CLI/PATH for the Flask process, then restart Flask.") from exc
     if proc.returncode:
