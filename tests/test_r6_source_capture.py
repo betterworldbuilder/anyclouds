@@ -177,8 +177,9 @@ def test_stage9_button_filters_capture_payload_after_stage8_only():
     assert "sourceVmId:c.vmId||c.serverId||c.instanceId||''" in func
     assert "volumeIds:c.volumes||c.volumeIds||[]" in func
     assert "var cloudCreds={" in func
-    assert "r6pStage9SourceRegion" not in func
-    assert "var stage9Region=cloudCreds.region||'iad3'" in func
+    assert "r6pStage9ManualSourceRegion" in func
+    assert "R6P.bs&&(R6P.bs.region||R6P.bs.flexRegion||R6P.bs.sourceRegion)" in func
+    assert "var stage9Region=cloudCreds.region" in func
     assert "region:stage9Region" in func and "cloud:cloudCreds" in func
     assert "cloud:cloudCreds" in func
 
