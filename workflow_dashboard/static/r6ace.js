@@ -1636,7 +1636,7 @@ window.r6pGenFlux=function(){
       dependencies:siblingDeps,targetIp:endpoint.ip,targetPort:endpoint.port,
       persistentPath:r6pPersistentPathFor(c)};
   });
-  var payload={org:org,cluster:cluster,region:'iad3',
+  var payload={org:org,cluster:cluster,region:'iad3',cloud:cloudCreds,
     registry:{type:'harbor',project:'flex-apps'},
     source_vm:{host:(srcComp&&srcComp.tgt)||'',user:'root'},
     auto_commit:false,import_to_gitops:false,
@@ -1806,6 +1806,23 @@ window.r6pGenRealDockerfiles=function(snapshotOnly){
   var skipped=(R6P.components||[]).filter(function(c){return !r6pIsContainerCaptureTarget(c);}).map(function(c){return {component:c.name,targetForm:r6pStage9DecisionFor(c)};});
   if(!snapshotOnly&&!R6P.captureRun){if(st){st.textContent='Build VM Snapshots first. Container build uses the snapshot lineage produced by Stage 9A.';st.style.color='#dc2626';}return;}
   var mode=(document.querySelector('input[name="r6p-build-mode"]:checked')||{}).value||'manual';
+  function r6pStage9Cred(id,key){
+    var el=document.getElementById(id);
+    var val=el?(el.value||''):'';
+    if(!val&&R6P.creds&&R6P.creds.cloud)val=R6P.creds.cloud[key]||'';
+    return val;
+  }
+  var cloudCreds={
+    authUrl:r6pStage9Cred('r6p-c-authurl','authUrl'),
+    authType:r6pStage9Cred('r6p-c-authtype','authType')||'password',
+    username:r6pStage9Cred('r6p-c-username','username'),
+    password:r6pStage9Cred('r6p-c-password','password'),
+    credId:r6pStage9Cred('r6p-c-credid','credId'),
+    secret:r6pStage9Cred('r6p-c-secret','secret'),
+    proj:r6pStage9Cred('r6p-c-proj','proj')||r6pStage9Cred('r6p-c-proj','projectId'),
+    domain:r6pStage9Cred('r6p-c-domain','domain')||'rackspace_cloud_domain',
+    region:r6pStage9Cred('r6p-c-region','region')
+  };
   /* Automatic mode makes the whole R6-to-production-OpenCenter transfer fully automatic in
      one action: build+push images (client-side chain below) AND commit+push the GitOps
      overlay for real (auto_commit:true) in the same generate-bundle call. Manual mode never

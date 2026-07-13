@@ -293,3 +293,5 @@ Scores are evidence-based. Known gaps, unverified behavior, unrelated failures, 
 | 2026-07-14 | Fix Stage 9A OpenStack credential reuse | 10 min | 9/10 | Stage 9A OpenStack CLI calls now hydrate OS_* auth variables from the saved R6 cloud credential cache used by Preflight/Test Cloud Login, eliminating the missing auth-url failure when Flask lacks shell OpenStack env. Source-capture regression tests and Python compile passed. |
 
 | 2026-07-14 | Send live cloud credentials with Stage 9A snapshot request | 3 min | 9/10 | Stage 9A now includes the currently visible R6 cloud credential fields in the snapshot request and backend merges them into the secure R6 credential cache before invoking OpenStack CLI. This fixes stale/empty server cache causing missing auth-url errors. Python compile, source-capture tests and JS syntax passed. |
+
+| 2026-07-14 | Correctly wire current cloud credentials into Stage 9A | 3 min | 8/10 | Fixed the earlier incomplete push: Stage 9A request now carries current cloud credential fields and backend merges them into the R6 credential cache before OpenStack CLI calls. Python compile, source-capture tests and JS syntax passed. |

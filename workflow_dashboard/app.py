@@ -21332,6 +21332,24 @@ def r6_capture_sources_build():
     import hashlib as _hashlib, json as _json, time as _time
 
     data = request.get_json(silent=True) or {}
+    incoming_cloud = data.get("cloud") if isinstance(data.get("cloud"), dict) else {}
+    if incoming_cloud:
+        try:
+            creds_path = Path(os.path.expanduser("~")) / ".config" / "opencenter" / "r6" / "creds.json"
+            creds_path.parent.mkdir(parents=True, exist_ok=True)
+            current = json.loads(creds_path.read_text(encoding="utf-8")) if creds_path.is_file() else {}
+            if not isinstance(current, dict):
+                current = {}
+            cloud_current = current.get("cloud") if isinstance(current.get("cloud"), dict) else {}
+            cloud_current.update({k: v for k, v in incoming_cloud.items() if v is not None})
+            current["cloud"] = cloud_current
+            creds_path.write_text(json.dumps(current, indent=2), encoding="utf-8")
+            try:
+                os.chmod(creds_path, 0o600)
+            except Exception:
+                pass
+        except Exception:
+            pass
     if not data.get("stage8Approved"):
         return jsonify({"ok": False, "error": "Stage 8 approval is required before source snapshots can be captured."}), 400
 
