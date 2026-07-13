@@ -251,3 +251,36 @@ def test_openstack_auth_env_reports_missing_stage9a_auth(monkeypatch):
         dashboard._r6_openstack_auth_env()
     assert "OpenStack auth is not configured for Stage 9A" in str(exc.value)
     assert "Preflight > Test Cloud Login" in str(exc.value)
+
+
+def test_vm_snapshot_resolves_target_ip_to_openstack_server_id(monkeypatch):
+    calls = []
+    def run(args):
+        calls.append(list(args))
+        if args[:3] == ["server", "list", "--long"]:
+            return [{"ID": "server-123", "Name": "web", "Networks": "public=174.143.59.106, private=10.0.0.5"}]
+        if args[:3] == ["server", "image", "create"]:
+            return {"id": "snapshot-ip-resolved"}
+        return {"status": "active"}
+    monkeypatch.setattr(dashboard, "_r6_openstack_json", run)
+    payload = _payload()
+    payload["businessSystem"]["components"][0]["volumes"] = []
+    payload["businessSystem"]["components"][0].pop("vmId", None)
+    payload["businessSystem"]["components"][0]["tgt"] = "174.143.59.106"
+    payload["bundle"]["workloads"][0].pop("sourceVmId", None)
+    payload["bundle"]["workloads"][0].pop("vmId", None)
+    payload["bundle"]["workloads"][0]["targetIp"] = "174.143.59.106"
+    response = app.test_client().post("/api/r6/capture-sources-build", json=payload)
+    assert response.status_code == 200
+    assert any(call[:3] == ["server", "list", "--long"] for call in calls)
+    assert any(call[:3] == ["server", "image", "create"] and call[-1] == "server-123" for call in calls)
+
+
+def test_stage9_backend_prefers_source_vm_id_over_target_ip(fake_openstack):
+    payload = _payload()
+    payload["businessSystem"]["components"][0]["volumes"] = []
+    payload["bundle"]["workloads"][0]["sourceVmId"] = "server-from-workload"
+    payload["bundle"]["workloads"][0]["targetIp"] = "174.143.59.106"
+    response = app.test_client().post("/api/r6/capture-sources-build", json=payload)
+    assert response.status_code == 200
+    assert any(call[:3] == ["server", "image", "create"] and call[-1] == "server-from-workload" for call in fake_openstack)

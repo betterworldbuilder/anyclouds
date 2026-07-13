@@ -21301,6 +21301,35 @@ def _r6_wait_snapshot(snapshot_id: str, kind: str) -> None:
     raise RuntimeError("timed out waiting for snapshot %s to become AVAILABLE" % snapshot_id)
 
 
+def _r6_ref_is_ip(value: str) -> bool:
+    try:
+        ipaddress.ip_address(str(value).strip())
+        return True
+    except Exception:
+        return False
+
+
+def _r6_resolve_openstack_server_id(server_ref: str) -> str:
+    ref = str(server_ref or "").strip()
+    if not ref or not _r6_ref_is_ip(ref):
+        return ref
+    rows = _r6_openstack_json(["server", "list", "--long"])
+    if not isinstance(rows, list):
+        rows = []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        text = " ".join(str(row.get(k) or "") for k in (
+            "ID", "Id", "id", "Name", "Networks", "Addresses", "AccessIPv4", "accessIPv4", "Public Networks", "Private Networks"
+        ))
+        if ref in text:
+            server_id = str(row.get("ID") or row.get("Id") or row.get("id") or "").strip()
+            if server_id:
+                return server_id
+    raise RuntimeError("No OpenStack server found for source IP %s. Stage 9A needs the OpenStack server ID; refresh FLEX inventory or set the component VM ID before building snapshots." % ref)
+
+
+
 def _r6_create_snapshots(vm_id: str, volume_ids: List[str], name: str) -> Tuple[str, List[str]]:
     ids: List[str] = []
     if volume_ids:
@@ -21313,7 +21342,8 @@ def _r6_create_snapshots(vm_id: str, volume_ids: List[str], name: str) -> Tuple[
             ids.append(snapshot_id)
         kind = "volume_snapshot"
     else:
-        result = _r6_openstack_json(["server", "image", "create", "--name", name, vm_id])
+        resolved_vm_id = _r6_resolve_openstack_server_id(vm_id)
+        result = _r6_openstack_json(["server", "image", "create", "--name", name, resolved_vm_id])
         snapshot_id = str(result.get("id") or result.get("ID") or "")
         if not snapshot_id:
             raise RuntimeError("server image create did not return an ID")
@@ -21392,7 +21422,7 @@ def r6_capture_sources_build():
         form = str(w.get("targetForm") or "").strip().upper()
         component = comp_by_name.get(name, {})
         paths = _r6_capture_paths(w, component)
-        source_vm = str(w.get("vmId") or component.get("vmId") or component.get("serverId") or w.get("targetIp") or component.get("targetIp") or component.get("tgt") or component.get("ip") or (data.get("source_vm") or {}).get("host") or "").strip()
+        source_vm = str(w.get("sourceVmId") or w.get("vmId") or component.get("vmId") or component.get("serverId") or component.get("instanceId") or w.get("targetIp") or component.get("targetIp") or component.get("tgt") or component.get("ip") or (data.get("source_vm") or {}).get("host") or "").strip()
         row: Dict[str, Any] = {
             "component": name, "targetForm": form, "sourceVm": source_vm,
             "applicationPaths": paths, "excludedPaths": excluded_paths,
