@@ -257,7 +257,9 @@ def remediation_for(error_code: Optional[str]) -> List[str]:
         "SSH_PERMISSION_DENIED": ["Grant the scan user read-only access to the required evidence path and retry."],
         "SSH_COMMAND_TIMEOUT": ["Increase the command timeout or investigate the remote command, host load and blocked filesystem operations."],
         "SSH_REMOTE_COMMAND_FAILED": ["Review stderr, command availability and scan-user permissions, then retry the probe."],
-        "DATABASE_ENDPOINT_UNREACHABLE": ["Verify database endpoint DNS, routing, firewall rules and service availability."],
+        "DATABASE_ENDPOINT_UNREACHABLE": ["Verify the database service is listening on the configured host and port from the scanner network.",
+                                          "Check FLEX/security-group/firewall rules for TCP database access, then retry the database component.",
+                                          "If this is an externally managed database, switch the component to a managed/native database access mode and provide reachability metadata."],
         "COMPONENT_VM_MAPPING_MISSING": ["Open Stage 1, inspect the Business System component, and map it to the correct OpenStack server UUID.",
                                          "Set the FLEX Target IP/URL or source VM UUID, save the Business System, then retry this component."],
         "VM_UUID_UNMAPPED": ["Map the component to an OpenStack server UUID to enable snapshot-based capture; guest discovery over SSH is unaffected."],
@@ -653,15 +655,17 @@ def appraisal(component: Dict[str, Any], probes: List[Dict[str, Any]], scan_run_
     config_value_matches = sorted(set(x.strip() for x in by_id.get("SCAN-011", {}).get("stdout", "").splitlines() if SECRET_VALUE.search(x)))
     config_secret_paths = sorted(set(x for x in plaintext_file_paths if not SOURCE_FILE_EXTENSION.search(x)) | set(env_secret_paths) | set(config_value_matches))
     db_output = by_id.get("SCAN-019", {}).get("stdout", "")
-    db_detected = bool(re.search(r"(?i)\b(postgres(?:ql)?|mysqld|mariadbd|mongod|redis-server)\b|:(5432|3306|33060|27017|6379)\b", db_output) or any(DB_PATH.search(x) for x in persistent))
+    db_probe = by_id.get("SCAN-019", {})
+    db_native_component = bool(str(component.get("databaseAccessMode") or "").upper() in {"MANAGED_DATABASE", "KUBERNETES_SERVICE", "PRIVATE_ENDPOINT", "UNKNOWN"} or by_id.get("SCAN-001", {}).get("status") == "NOT_APPLICABLE" or db_probe.get("status") in {"PASS", "FAIL", "PASS_WITH_WARNING", "NOT_DETECTED"})
+    db_detected = bool(db_native_component or re.search(r"(?i)\b(postgres(?:ql)?|mysqld|mariadbd|mongod|redis-server)\b|:(5432|3306|33060|27017|6379)\b", db_output) or any(DB_PATH.search(x) for x in persistent))
     failed_app_units = _application_health_status(by_id.get("SCAN-013", {}).get("stdout", ""))
     blockers = []
     warnings = []
     review_required = []
     readiness = 100
-    if not _configured_health_validated(by_id.get("SCAN-013", {}).get("stdout", "")) and not failed_app_units:
+    if not db_native_component and not _configured_health_validated(by_id.get("SCAN-013", {}).get("stdout", "")) and not failed_app_units:
         readiness -= 10; warnings.append({"code": "HEALTH_NOT_VALIDATED", "message": "Application health was not independently validated."})
-    if not app_paths:
+    if not db_native_component and not app_paths:
         readiness -= 20; warnings.append({"code": "APPLICATION_PATH_UNKNOWN", "message": "No approved application path was discovered."})
     if by_id.get("SCAN-012", {}).get("status") in {"PARTIAL", "FAIL", "BLOCKED"}:
         readiness -= 10; warnings.append({"code": "DEPENDENCY_EVIDENCE_INCOMPLETE", "message": "Outbound dependency evidence is incomplete."})
@@ -1128,8 +1132,10 @@ def _managed_database_probes(component: Dict[str, Any]) -> List[Dict[str, Any]]:
     native = _probe_result("SCAN-019", "Database Native Readiness", utcnow(), time.monotonic(), 0,
                            json.dumps(native_evidence, sort_keys=True), reachability_error, False, False, native_status)
     native.update({"evidence": native_evidence, "summary": "Database-native metadata assessed without SSH.",
-                   "recommendedActions": ["Verify database endpoint routing, firewall and service availability."] if reachability == "UNREACHABLE" else ["Supply a least-privilege database credential to validate version and TLS."] if native_status != "PASS" else []})
-    if native_status == "FAIL": native.update(_error_fields("DATABASE_ENDPOINT_UNREACHABLE", "DATABASE"))
+                   "recommendedActions": remediation_for("DATABASE_ENDPOINT_UNREACHABLE") if reachability == "UNREACHABLE" else ["Supply a least-privilege database credential to validate version and TLS."] if native_status != "PASS" else []})
+    if native_status == "FAIL":
+        native.update(_error_fields("DATABASE_ENDPOINT_UNREACHABLE", "DATABASE"))
+        native["recommendedActions"] = remediation_for("DATABASE_ENDPOINT_UNREACHABLE")
     native["remediation"] = (native.get("recommendedActions") or [""])[0]
     snapshot = _cloud_snapshot_probe(component)
     return [ssh, native, snapshot]

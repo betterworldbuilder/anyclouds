@@ -271,3 +271,5 @@ Scores are evidence-based. Known gaps, unverified behavior, unrelated failures, 
 | 2026-07-13 | Remove Stage 3 scan UI theme dropdown | 8 min | 9/10 | Removed the visible Scan UI Theme selector and Apply Theme button from V1/V2 scanner render paths while keeping scanner assets and late-load recovery intact. Focused UI tests passed. |
 
 | 2026-07-13 | Cache last Stage 3 scan run | 9 min | 9/10 | Added per-Business-System cached scan payload restoration so terminal, cards, verdict and failed checks repopulate immediately after refresh; includes compact fallback for localStorage quota and asset cache bump. Focused UI tests passed. |
+
+| 2026-07-13 | Fix last database scan issues | 10 min | 9/10 | DB-native components no longer receive application health/path warnings, unreachable database root causes show DB-specific remediation, and duplicate failed-check blocks are suppressed. Focused DB/UI regression tests passed. |

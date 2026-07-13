@@ -2675,11 +2675,12 @@ window.r6pRootCauseRecommendedActions=function(x){
     PLAINTEXT_SECRET:["Externalize the plaintext secret into the target secret manager and rotate it.","Block container build until the secret is removed from captured source."],
     PLAINTEXT_SECRET_HARDCODED:["Move hardcoded credentials to environment or secret manager injection.","Rotate the exposed credential before package generation."],
     SSH_HOST_KEY_CHANGED:["Verify the new fingerprint with the infrastructure owner.","Use Verify and Replace Key to update only the managed known_hosts entry, then retry the VM."],
-    COMPONENT_VM_MAPPING_MISSING:["Open Stage 1 and map this component to the correct OpenStack server UUID.","Set FLEX Target IP/URL or source VM UUID, save the Business System, then retry this component."]
+    COMPONENT_VM_MAPPING_MISSING:["Open Stage 1 and map this component to the correct OpenStack server UUID.","Set FLEX Target IP/URL or source VM UUID, save the Business System, then retry this component."],
+    DATABASE_ENDPOINT_UNREACHABLE:["Verify the database service is listening on the configured host and port from the scanner network.","Check FLEX/security-group/firewall rules for TCP database access, then retry the database component.","If this is an externally managed database, switch the component to a managed/native database access mode and provide reachability metadata."]
   };
   var summary=String((x&&x.summary)||"").trim();
   var actions=(x&&x.recommendedActions||[]).filter(Boolean).map(function(a){return String(a).trim();}).filter(function(a){return a&&a!==summary;});
-  if(!actions.length&&defaults[code])actions=defaults[code];
+  if((!actions.length||code==='DATABASE_ENDPOINT_UNREACHABLE')&&defaults[code])actions=defaults[code];
   return actions.length?actions:["Review diagnostics, correct the source configuration, then retry the affected component."];
 };
 window.r6pFailedChecksTable=function(run){
@@ -2863,7 +2864,8 @@ window.r6pRenderProductionAppraisal=function(run){
   }).join('');
   if(verdictRoot)verdictRoot.innerHTML=summary;
   root.innerHTML='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:12px;">'+cards+'</div>';
-  if(failedRoot)failedRoot.innerHTML=r6pFailedChecksTable(run);
+  if(failedRoot){failedRoot.innerHTML=r6pFailedChecksTable(run);}
+  document.querySelectorAll('#r6p-scan-failed-checks').forEach(function(el,index){if(index>0)el.innerHTML='';});
 };
 window.r6pViewAppraisal=function(id){
   var c=R6P.structuredAppraisal&&R6P.structuredAppraisal.components&&R6P.structuredAppraisal.components.find(function(x){return x.componentId===id;}),drawer=document.getElementById('r6p-appraisal-drawer'),detail=document.getElementById('r6p-appraisal-detail');if(!c||!drawer||!detail)return;

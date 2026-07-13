@@ -169,6 +169,28 @@ def test_database_detection_returns_db_native_required():
     assert value["captureRecommendation"] == "DB_NATIVE"
 
 
+
+def test_db_native_appraisal_does_not_emit_application_warnings():
+    db_probe = result("SCAN-019", status="FAIL", stdout='{"engine":"mysql","endpointReachability":"UNREACHABLE"}', stderr="[Errno 111] Connection refused")
+    db_probe["errorCode"] = "DATABASE_ENDPOINT_UNREACHABLE"
+    db_probe["recommendedActions"] = []
+    probes = [result("SCAN-001", status="NOT_APPLICABLE"), db_probe, result("SCAN-020", status="NOT_APPLICABLE")]
+    value = appraisal({"name": "Database", "type": "Database", "databaseAccessMode": "MANAGED_DATABASE"}, probes, "run-1")
+    warning_codes = {w["code"] for w in value["warnings"]}
+    assert "HEALTH_NOT_VALIDATED" not in warning_codes
+    assert "APPLICATION_PATH_UNKNOWN" not in warning_codes
+    assert value["componentVerdict"] == "DB_NATIVE_REQUIRED"
+
+
+def test_db_endpoint_unreachable_root_cause_has_specific_remediation():
+    probe = result("SCAN-019", status="FAIL", stdout='{"engine":"mysql","endpointReachability":"UNREACHABLE"}', stderr="[Errno 111] Connection refused")
+    probe["errorCode"] = "DATABASE_ENDPOINT_UNREACHABLE"
+    probe["recommendedActions"] = []
+    component = appraisal({"name": "Database", "type": "Database", "databaseAccessMode": "MANAGED_DATABASE"}, [result("SCAN-001", status="NOT_APPLICABLE"), probe, result("SCAN-020", status="NOT_APPLICABLE")], "run-1")
+    value = final_appraisal("run-1", {"id": "sys"}, [component])
+    root = next(x for x in value["rootCauses"] if x["errorCode"] == "DATABASE_ENDPOINT_UNREACHABLE")
+    assert "database service is listening" in root["recommendedActions"][0]
+
 def test_private_key_detection_blocks_container_readiness():
     # A confirmed private key in the capture path is a BLOCKER_SECURITY: the migrated
     # artifact would carry a credential, so it blocks packaging, not just "readiness".

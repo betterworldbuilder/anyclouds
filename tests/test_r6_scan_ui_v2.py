@@ -190,6 +190,9 @@ def test_failed_checks_table_and_csv_are_available():
     assert "Failed Checks by Component" in V1
     assert "Export Root Causes CSV" in V1
     assert "/failed-checks.csv" in V1
+    assert "DATABASE_ENDPOINT_UNREACHABLE" in V1
+    assert "database service is listening" in V1
+    assert "querySelectorAll('#r6p-scan-failed-checks')" in V1
     has("global.r6pFailedChecksTable(state.run)")
 
 
