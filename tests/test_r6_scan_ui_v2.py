@@ -84,6 +84,10 @@ def test_scan_progress_updates_without_page_reload():
 
 def test_scan_progress_restores_after_page_refresh():
     assert "r6p_latest_scan_run" in V1
+    assert "r6p_cached_scan_run" in V1
+    assert "r6pCacheScanRun(run)" in V1
+    assert "r6pLoadCachedScanRun" in V1
+    assert "r6pRenderCachedScanRun" in V1
     has("if(global.R6P.scanRunId)global.r6pPollProductionScan()")
 
 
@@ -232,7 +236,7 @@ def test_assets_are_served_by_dashboard():
     assert page.status_code == 200
     assert b"r6-scan-ui-v2.css?v=20260713a" in page.data
     assert b"r6-ios-light.css?v=20260713c" in page.data
-    assert b"r6ace.js?v=20260713zl" in page.data
+    assert b"r6ace.js?v=20260713zm" in page.data
     assert b"r6-scan-ui-v2.js?v=20260713j" in page.data
     assert client.get("/static/r6-scan-ui-v2.js?v=20260713f").status_code == 200
     assert client.get("/static/r6-ios-light.css?v=20260713c").status_code == 200
