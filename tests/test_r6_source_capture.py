@@ -176,6 +176,8 @@ def test_stage9_button_filters_capture_payload_after_stage8_only():
     assert "var comps=R6P.components.filter(function(c){return c.tgt;});" not in func
     assert "sourceVmId:c.vmId||c.serverId||c.instanceId||''" in func
     assert "volumeIds:c.volumes||c.volumeIds||[]" in func
+    assert "var cloudCreds={" in func
+    assert "cloud:cloudCreds" in func
 
 
 def test_stage9_ui_excludes_database_like_components_from_capture_targets():

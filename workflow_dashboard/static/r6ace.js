@@ -1846,7 +1846,7 @@ window.r6pGenRealDockerfiles=function(snapshotOnly){
      one action: build+push images (client-side chain below) AND commit+push the GitOps
      overlay for real (auto_commit:true) in the same generate-bundle call. Manual mode never
      commits/pushes without a separate explicit action (Step 12's Deploy button). */
-  var payload={org:org,cluster:cluster,region:'iad3',
+  var payload={org:org,cluster:cluster,region:'iad3',cloud:cloudCreds,
     registry:{type:(document.getElementById('r6p-build-regtype')||{}).value||'harbor',
       url:(document.getElementById('r6p-build-regurl')||{}).value||'',
       project:(document.getElementById('r6p-build-project')||{}).value||'flex-apps',
@@ -2469,8 +2469,14 @@ window.r6pLoadCredCache=function(){
   }
   /* restore R6P state */
   R6P.creds.cloud.authUrl=c.authUrl||'';
+  R6P.creds.cloud.authType=c.authType||R6P.creds.cloud.authType||'';
+  R6P.creds.cloud.username=c.username||R6P.creds.cloud.username||'';
+  R6P.creds.cloud.password=c.password||R6P.creds.cloud.password||'';
   R6P.creds.cloud.credId=c.credId||'';
+  R6P.creds.cloud.secret=c.secret||R6P.creds.cloud.secret||'';
   R6P.creds.cloud.projectId=c.proj||'';
+  R6P.creds.cloud.proj=c.proj||'';
+  R6P.creds.cloud.domain=c.domain||R6P.creds.cloud.domain||'';
   R6P.creds.cloud.region=c.region||'';
   setTimeout(r6pRefreshCloudBadge,0);
 };
