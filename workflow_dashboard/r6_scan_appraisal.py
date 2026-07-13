@@ -480,34 +480,68 @@ def get_trust_status(host: str, port: int, known_hosts_file: Optional[Path] = No
             "fingerprint": live_fingerprint, "trustedFingerprint": trusted_fingerprint, "knownHostsFile": str(known_hosts)}
 
 
+_KNOWN_HOSTS_LOCK = threading.RLock()
+
+
+def _audit_log_path(known_hosts: Path) -> Path:
+    return known_hosts.parent / "known_hosts_audit.jsonl"
+
+
+def _record_host_key_audit(known_hosts: Path, actor: str, action: str, host: str, port: int,
+                            fingerprint: Optional[str], result: str, vm_id: Optional[str] = None) -> None:
+    """Append-only audit trail for fingerprint trust decisions. Never logs credentials --
+    only host/port/fingerprint/actor/action/result, matching the same fields shown in the UI."""
+    entry = {"timestamp": utcnow(), "actor": actor or "dashboard-user", "action": action, "vmId": vm_id,
+              "host": host, "port": port, "fingerprint": fingerprint, "result": result}
+    try:
+        path = _audit_log_path(known_hosts)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with _KNOWN_HOSTS_LOCK, path.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(entry, sort_keys=True) + "\n")
+    except OSError:
+        pass  # audit logging must never block the underlying trust decision
+
+
 def approve_host_key(host: str, port: int, expected_fingerprint: str, known_hosts_file: Optional[Path] = None,
-                      runner: Callable[..., subprocess.CompletedProcess] = subprocess.run) -> tuple:
+                      runner: Callable[..., subprocess.CompletedProcess] = subprocess.run,
+                      actor: str = "dashboard-user", action: str = "APPROVE", vm_id: Optional[str] = None) -> tuple:
     """Scoped, re-verified persistence of a single host+port key. Shared by both first-time
     approval (UNKNOWN) and explicit replacement (CHANGED): the caller's claimed fingerprint is
     never trusted directly -- the host is re-scanned live and must match before anything is written."""
     known_hosts = known_hosts_file or default_managed_known_hosts_file()
     if not re.fullmatch(r"[A-Za-z0-9_.:-]+", host) or not (1 <= port <= 65535):
+        _record_host_key_audit(known_hosts, actor, action, host, port, None, "REJECTED_INVALID_TARGET", vm_id)
         return {"ok": False, "error": "invalid host or port"}, 400
     if not str(expected_fingerprint or "").startswith("SHA256:"):
+        _record_host_key_audit(known_hosts, actor, action, host, port, None, "REJECTED_NO_FINGERPRINT", vm_id)
         return {"ok": False, "error": "a verified SHA256 fingerprint is required"}, 400
     scanned = scan_host_key(host, port, runner)
     if not scanned.get("ok"):
+        _record_host_key_audit(known_hosts, actor, action, host, port, expected_fingerprint, "SCAN_FAILED: %s" % scanned.get("error"), vm_id)
         return {"ok": False, "error": scanned.get("error") or "host key scan failed"}, 409
     if scanned["fingerprint"] != expected_fingerprint:
+        _record_host_key_audit(known_hosts, actor, action, host, port, scanned["fingerprint"], "REJECTED_FINGERPRINT_MISMATCH", vm_id)
         return {"ok": False, "error": "scanned host key does not match the approved fingerprint (it changed between scan and approval)",
                 "observedFingerprint": scanned["fingerprint"]}, 409
-    _ensure_known_hosts_file(known_hosts)
-    token = _host_token(host, port)
-    existing = known_hosts.read_text(encoding="utf-8", errors="replace").splitlines() if known_hosts.is_file() else []
-    kept = [line for line in existing if not (line.strip() and not line.startswith("#") and line.split()[0] == token)]
-    kept.append(scanned["line"])
-    tmp = known_hosts.with_name(known_hosts.name + ".tmp")
-    tmp.write_text("\n".join(kept) + "\n", encoding="utf-8")
-    os.chmod(tmp, 0o600)
-    tmp.replace(known_hosts)
-    os.chmod(known_hosts, 0o600)
+    try:
+        with _KNOWN_HOSTS_LOCK:
+            _ensure_known_hosts_file(known_hosts)
+            token = _host_token(host, port)
+            existing = known_hosts.read_text(encoding="utf-8", errors="replace").splitlines() if known_hosts.is_file() else []
+            kept = [line for line in existing if not (line.strip() and not line.startswith("#") and line.split()[0] == token)]
+            kept.append(scanned["line"])
+            tmp = known_hosts.with_name(known_hosts.name + ".%s.tmp" % uuid4().hex[:8])
+            tmp.write_text("\n".join(kept) + "\n", encoding="utf-8")
+            os.chmod(tmp, 0o600)
+            tmp.replace(known_hosts)
+            os.chmod(known_hosts, 0o600)
+    except OSError as exc:
+        _record_host_key_audit(known_hosts, actor, action, host, port, scanned["fingerprint"], "WRITE_FAILED: %s" % redact(str(exc)), vm_id)
+        return {"ok": False, "error": "managed known_hosts file is not writable: %s" % redact(str(exc))}, 500
     if _read_known_host_entry(known_hosts, host, port) != scanned["line"]:
+        _record_host_key_audit(known_hosts, actor, action, host, port, scanned["fingerprint"], "VERIFY_FAILED", vm_id)
         return {"ok": False, "error": "failed to verify the persisted known_hosts entry"}, 500
+    _record_host_key_audit(known_hosts, actor, action, host, port, scanned["fingerprint"], "TRUSTED", vm_id)
     return {"ok": True, "status": "TRUSTED", "host": host, "port": port, "keyType": scanned.get("keyType"),
             "fingerprint": scanned["fingerprint"], "knownHostsFile": str(known_hosts), "connectionRetried": False}, 200
 
@@ -1374,7 +1408,8 @@ def create_r6_scan_blueprint(base_dir: Path, probe_runner: Callable[..., subproc
         body = request.get_json(silent=True) or {}
         host = str(body.get("host") or ""); port = int(body.get("port") or 22)
         expected = str(body.get("fingerprint") or body.get("expectedFingerprint") or "")
-        result, code = approve_host_key(host, port, expected, _known_hosts_path_from_body(body), probe_runner)
+        result, code = approve_host_key(host, port, expected, _known_hosts_path_from_body(body), probe_runner,
+                                         actor=str(body.get("actor") or "dashboard-user"), action="APPROVE", vm_id=body.get("vmId"))
         return jsonify(result), code
 
     @bp.post("/api/r6/scans/known-hosts/verify-and-replace")
@@ -1387,10 +1422,28 @@ def create_r6_scan_blueprint(base_dir: Path, probe_runner: Callable[..., subproc
             return jsonify({"ok": False, "error": "explicit operator approval is required"}), 409
         host = str(body.get("host") or ""); port = int(body.get("port") or 22)
         expected = str(body.get("expectedFingerprint") or body.get("fingerprint") or "")
-        result, code = approve_host_key(host, port, expected, _known_hosts_path_from_body(body), probe_runner)
+        result, code = approve_host_key(host, port, expected, _known_hosts_path_from_body(body), probe_runner,
+                                         actor=str(body.get("actor") or "dashboard-user"), action="REPLACE", vm_id=body.get("vmId"))
         if result.get("ok"):
             result["oldKeyRemoval"] = "replaced"
         return jsonify(result), code
+
+    @bp.post("/api/r6/scans/known-hosts/connection-test")
+    def known_host_connection_test():
+        # Reuses the same probe path the live scan uses (SSH -o StrictHostKeyChecking=yes
+        # against the managed known_hosts) so "automatically retry the connection" after an
+        # approval is a real re-verification, not a client-side status re-read.
+        body = request.get_json(silent=True) or {}
+        host = str(body.get("host") or "")
+        if not host:
+            return jsonify({"ok": False, "error": "host is required"}), 400
+        target = {"host": host, "port": int(body.get("port") or 22), "user": str(body.get("user") or ""),
+                   "keyPath": body.get("keyPath") or "~/.ssh/id_rsa", "knownHostsFile": str(_known_hosts_path_from_body(body)),
+                   "expectedFingerprint": body.get("expectedFingerprint") or ""}
+        result = run_probe(target, "SCAN-001", probe_runner)
+        return jsonify({"ok": True, "status": result.get("status"), "errorCode": result.get("errorCode"),
+                        "summary": result.get("summary"), "connectionResult": "PASS" if result.get("status") in
+                        {"PASS", "PASS_WITH_WARNING"} else "FAIL"})
 
     @bp.post("/api/r6/scans/runs/<run_id>/cancel")
     def cancel(run_id):

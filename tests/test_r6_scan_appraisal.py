@@ -1,3 +1,4 @@
+import json
 import pathlib
 import base64
 import hashlib
@@ -5,6 +6,7 @@ import os
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 
 import pytest
@@ -16,13 +18,16 @@ from workflow_dashboard.r6_scan_appraisal import (
     PROBE_REGISTRY,
     appraisal,
     appraisal_csv,
+    approve_host_key,
     create_r6_scan_blueprint,
     classify_ssh_failure,
     filter_application_paths,
     failed_checks_csv,
     final_appraisal,
+    get_trust_status,
     normalize_component_mapping,
     run_probe,
+    scan_host_key,
 )
 
 # A real, readable, 0600 private-key-shaped file so the SSH key preflight
@@ -533,3 +538,171 @@ def test_host_key_replacement_requires_approval_and_matching_fingerprint(tmp_pat
     approved = client.post("/api/r6/scans/known-hosts/verify-and-replace", json={"approved": True, "host": "10.0.0.2", "expectedFingerprint": fingerprint, "knownHostsFile": str(known_hosts)})
     assert approved.status_code == 200
     assert line in known_hosts.read_text()
+
+
+# ---------------------------------------------------------------------------
+# Approve Fingerprint workflow -- 13-case matrix from the design spec.
+# ---------------------------------------------------------------------------
+
+def _keyscan_line(host, key_material=b"key-material-a", key_type="ssh-ed25519"):
+    return "%s %s %s" % (host, key_type, base64.b64encode(key_material).decode())
+
+
+def _fingerprint_of(key_material=b"key-material-a"):
+    return "SHA256:" + base64.b64encode(hashlib.sha256(key_material).digest()).decode().rstrip("=")
+
+
+def _keyscan_runner(line):
+    def runner(argv, **kwargs):
+        if argv[0] == "ssh-keyscan":
+            return subprocess.CompletedProcess(argv, 0, line + "\n", "")
+        return subprocess.CompletedProcess(argv, 0, "", "")
+    return runner
+
+
+def test_1_unknown_host_is_scanned_and_displayed(tmp_path):
+    runner = _keyscan_runner(_keyscan_line("10.1.1.1"))
+    status = get_trust_status("10.1.1.1", 22, tmp_path / "known_hosts", runner)
+    assert status["status"] == "UNKNOWN"
+    assert status["fingerprint"] == _fingerprint_of()
+    assert status["keyType"] == "ssh-ed25519"
+
+
+def test_2_approving_a_fingerprint_adds_exactly_one_entry(tmp_path):
+    known_hosts = tmp_path / "known_hosts"
+    runner = _keyscan_runner(_keyscan_line("10.1.1.2"))
+    result, code = approve_host_key("10.1.1.2", 22, _fingerprint_of(), known_hosts, runner)
+    assert code == 200 and result["ok"] is True
+    lines = [l for l in known_hosts.read_text().splitlines() if l.strip()]
+    assert len(lines) == 1
+    assert lines[0].startswith("10.1.1.2 ")
+
+
+def test_3_reapproving_the_same_fingerprint_does_not_duplicate(tmp_path):
+    known_hosts = tmp_path / "known_hosts"
+    runner = _keyscan_runner(_keyscan_line("10.1.1.3"))
+    approve_host_key("10.1.1.3", 22, _fingerprint_of(), known_hosts, runner)
+    approve_host_key("10.1.1.3", 22, _fingerprint_of(), known_hosts, runner)
+    lines = [l for l in known_hosts.read_text().splitlines() if l.strip()]
+    assert len(lines) == 1
+
+
+def test_4_non_default_port_uses_bracket_port_syntax(tmp_path):
+    known_hosts = tmp_path / "known_hosts"
+    # Real ssh-keyscan itself emits the [host]:port token as the line's host field for
+    # non-default ports; the fake runner mirrors that so the assertion reflects reality.
+    runner = _keyscan_runner(_keyscan_line("[10.1.1.4]:2222"))
+    result, code = approve_host_key("10.1.1.4", 2222, _fingerprint_of(), known_hosts, runner)
+    assert code == 200
+    assert known_hosts.read_text().startswith("[10.1.1.4]:2222 ")
+
+
+def test_5_existing_trusted_fingerprint_is_recognized(tmp_path):
+    known_hosts = tmp_path / "known_hosts"
+    runner = _keyscan_runner(_keyscan_line("10.1.1.5"))
+    approve_host_key("10.1.1.5", 22, _fingerprint_of(), known_hosts, runner)
+    status = get_trust_status("10.1.1.5", 22, known_hosts, runner)
+    assert status["status"] == "TRUSTED"
+
+
+def test_6_changed_fingerprint_returns_changed_and_is_not_overwritten(tmp_path):
+    known_hosts = tmp_path / "known_hosts"
+    runner_a = _keyscan_runner(_keyscan_line("10.1.1.6", b"key-a"))
+    approve_host_key("10.1.1.6", 22, _fingerprint_of(b"key-a"), known_hosts, runner_a)
+    original = known_hosts.read_text()
+    runner_b = _keyscan_runner(_keyscan_line("10.1.1.6", b"key-b"))
+    status = get_trust_status("10.1.1.6", 22, known_hosts, runner_b)
+    assert status["status"] == "CHANGED"
+    assert status["trustedFingerprint"] == _fingerprint_of(b"key-a")
+    assert status["fingerprint"] == _fingerprint_of(b"key-b")
+    assert known_hosts.read_text() == original  # a read-only status check must never write
+
+
+def test_7_explicit_replacement_removes_only_the_matching_host_port_entry(tmp_path):
+    known_hosts = tmp_path / "known_hosts"
+    approve_host_key("10.1.1.7", 22, _fingerprint_of(b"key-a"), known_hosts, _keyscan_runner(_keyscan_line("10.1.1.7", b"key-a")))
+    approve_host_key("10.1.1.8", 22, _fingerprint_of(b"key-x"), known_hosts, _keyscan_runner(_keyscan_line("10.1.1.8", b"key-x")))
+    approve_host_key("10.1.1.7", 22, _fingerprint_of(b"key-b"), known_hosts, _keyscan_runner(_keyscan_line("10.1.1.7", b"key-b")))
+    lines = [l for l in known_hosts.read_text().splitlines() if l.strip()]
+    assert len(lines) == 2
+    assert any(l.startswith("10.1.1.8 ") for l in lines)
+    host7 = [l for l in lines if l.startswith("10.1.1.7 ")]
+    assert len(host7) == 1
+    assert _known_host_fp(host7[0]) == _fingerprint_of(b"key-b")
+
+
+def _known_host_fp(line):
+    fields = line.split()
+    return "SHA256:" + base64.b64encode(hashlib.sha256(base64.b64decode(fields[2])).digest()).decode().rstrip("=")
+
+
+def test_8_concurrent_approvals_do_not_corrupt_known_hosts(tmp_path):
+    known_hosts = tmp_path / "known_hosts"
+    hosts = ["10.2.0.%d" % i for i in range(1, 9)]
+    def worker(host):
+        approve_host_key(host, 22, _fingerprint_of(host.encode()), known_hosts, _keyscan_runner(_keyscan_line(host, host.encode())))
+    threads = [threading.Thread(target=worker, args=(h,)) for h in hosts]
+    for t in threads: t.start()
+    for t in threads: t.join()
+    text = known_hosts.read_text()
+    lines = [l for l in text.splitlines() if l.strip()]
+    assert len(lines) == len(hosts)  # no torn writes, no lost/duplicated entries
+    for h in hosts:
+        assert sum(1 for l in lines if l.startswith(h + " ")) == 1
+
+
+def test_9_file_permissions_are_0600(tmp_path):
+    if os.name == "nt":
+        pytest.skip("POSIX permission bits are not meaningful on Windows")
+    known_hosts = tmp_path / "sub" / "known_hosts"
+    approve_host_key("10.1.1.9", 22, _fingerprint_of(), known_hosts, _keyscan_runner(_keyscan_line("10.1.1.9")))
+    assert oct(known_hosts.stat().st_mode)[-3:] == "600"
+    assert oct(known_hosts.parent.stat().st_mode)[-3:] == "700"
+
+
+def test_10_ssh_retry_uses_strict_host_key_checking_yes():
+    captured = {}
+    def runner(argv, **kwargs):
+        captured["argv"] = argv
+        return subprocess.CompletedProcess(argv, 0, "", "")
+    run_probe({"host": "10.1.1.10", "user": "scanner", "keyPath": DUMMY_KEY}, "SCAN-001", runner)
+    assert "-o" in captured["argv"] and "StrictHostKeyChecking=yes" in captured["argv"]
+    assert "UserKnownHostsFile=/dev/null" not in " ".join(captured["argv"])
+
+
+def test_11_ui_never_disables_host_key_checking_or_uses_dev_null():
+    script = (pathlib.Path(__file__).parent.parent / "workflow_dashboard" / "static" / "r6ace.js").read_text()
+    start = script.index("=== SSH HOST IDENTITY / APPROVE FINGERPRINT WORKFLOW ===")
+    end = script.index("=== END SSH HOST IDENTITY WORKFLOW ===")
+    section = script[start:end]
+    assert "StrictHostKeyChecking=no" not in section
+    assert "UserKnownHostsFile=/dev/null" not in section
+    assert "r6pApproveFingerprint" in section
+    assert "r6pCopyHostIdentityLog" in section
+
+
+def test_12_audit_log_never_contains_credentials(tmp_path):
+    known_hosts = tmp_path / "known_hosts"
+    approve_host_key("10.1.1.12", 22, _fingerprint_of(), known_hosts, _keyscan_runner(_keyscan_line("10.1.1.12")),
+                      actor="alice", action="APPROVE", vm_id="vm-42")
+    audit_path = known_hosts.parent / "known_hosts_audit.jsonl"
+    entries = [json.loads(l) for l in audit_path.read_text().splitlines() if l.strip()]
+    assert len(entries) == 1
+    entry = entries[0]
+    assert set(entry) == {"timestamp", "actor", "action", "vmId", "host", "port", "fingerprint", "result"}
+    assert entry["actor"] == "alice" and entry["vmId"] == "vm-42" and entry["result"] == "TRUSTED"
+    assert "keyPath" not in entry and "password" not in json.dumps(entry).lower()
+
+
+def test_13_invalid_host_cannot_trigger_command_injection(tmp_path):
+    calls = []
+    def runner(argv, **kwargs):
+        calls.append(argv)
+        return subprocess.CompletedProcess(argv, 0, "", "")
+    known_hosts = tmp_path / "known_hosts"
+    result, code = approve_host_key("10.0.0.2; rm -rf /", 22, _fingerprint_of(), known_hosts, runner)
+    assert code == 400 and result["ok"] is False
+    assert not calls  # the malicious host string must never reach a subprocess argv
+    status = get_trust_status("$(whoami)", 22, known_hosts, runner)
+    assert status["status"] == "UNREACHABLE"
+    assert not calls

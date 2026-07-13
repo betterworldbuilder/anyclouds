@@ -1002,9 +1002,10 @@ window.r6pContent=function(n){
       +'<div><label style="font-size:11px;font-weight:700;color:#334155;display:block;margin-bottom:4px;">Component scan scope</label><select id="r6p-scan-comp" onchange="r6pScanScopeChanged()" style="padding:7px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;min-width:310px;">'+scanOptions+'</select></div>'
       +'<div><label style="font-size:11px;font-weight:700;color:#334155;display:block;margin-bottom:4px;">SSH User</label><input id="r6p-scan-user" value="root" style="padding:7px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;width:100px;"></div>'
       +'<div><label style="font-size:11px;font-weight:700;color:#334155;display:block;margin-bottom:4px;">SSH Key Path</label><input id="r6p-scan-key" value="~/.ssh/id_rsa" style="padding:7px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;width:160px;"></div>'
-      +'<div><label style="font-size:11px;font-weight:700;color:#334155;display:block;margin-bottom:4px;">Managed known_hosts</label><input id="r6p-scan-known-hosts" value="~/.ssh/known_hosts" style="padding:7px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;width:180px;"></div>'
+      +'<div><label style="font-size:11px;font-weight:700;color:#334155;display:block;margin-bottom:4px;">Managed known_hosts</label><input id="r6p-scan-known-hosts" value="./data/ssh/known_hosts" style="padding:7px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;width:180px;"></div>'
       +'<button id="r6p-full-scan-btn" class="r6p-btn primary" onclick="r6pStartProductionScan()" style="padding:8px 16px;font-size:12px;">&#9654; Run Scan</button>'
       +'<button id="r6p-stop-scan-btn" class="r6p-btn secondary" onclick="r6pStopProductionScan()" style="padding:8px 16px;font-size:12px;" disabled>Stop Scan</button>'
+      +'<button class="r6p-btn secondary" onclick="r6pCheckSelectedComponentHostIdentity()" style="padding:8px 16px;font-size:12px;">SSH Host Identity</button>'
       +'<button class="r6p-btn secondary" onclick="r6pRefreshAppraisal()" style="padding:8px 16px;font-size:12px;">Refresh Appraisal</button>'
       +'<button class="r6p-btn secondary" onclick="r6pExportProductionScan()" style="padding:8px 16px;font-size:12px;">&#11015; Export Evidence</button>'
       +'<button class="r6p-btn secondary" onclick="r6pExportAllAppraisalsCsv()" style="padding:8px 16px;font-size:12px;">&#11015; Export All Appraisal Results CSV</button>'
@@ -2574,7 +2575,7 @@ window.r6pAppraisalAllowsStage8=function(c){
 window.r6pProductionScanPayload=function(){
   var user=((document.getElementById('r6p-scan-user')||{}).value||'').trim();
   var key=((document.getElementById('r6p-scan-key')||{}).value||'').trim();
-  var known=((document.getElementById('r6p-scan-known-hosts')||{}).value||'~/.ssh/known_hosts').trim();
+  var known=((document.getElementById('r6p-scan-known-hosts')||{}).value||'./data/ssh/known_hosts').trim();
   var all=(R6P.components||[]);
   var scope=(document.getElementById('r6p-scan-comp')||{}).value||'__all__';
   var selected=scope==='__all__'?all:(all[parseInt(scope,10)]?[all[parseInt(scope,10)]]:[]);
@@ -2693,11 +2694,194 @@ window.r6pVerifyReplaceHostKey=function(componentId){
   var probe=component&&(component.probes||[]).find(function(p){return p.errorCode==='SSH_HOST_KEY_CHANGED';});
   if(!component||!probe){alert('Host-key evidence is unavailable.');return;}
   var fingerprint=probe.newFingerprint||probe.hostFingerprint;if(!fingerprint){alert('A verified replacement fingerprint is required before this key can be changed.');return;}
-  var message='Verify replacement SSH host key\n\nHost: '+component.sourceHost+'\nOld: '+(probe.oldFingerprint||'not reported')+'\nNew: '+fingerprint+'\n\nOnly approve after independently verifying the new fingerprint.';
-  if(!confirm(message))return;
-  var known=((document.getElementById('r6p-scan-known-hosts')||{}).value||'~/.ssh/known_hosts').trim();
-  fetch('/api/r6/scans/known-hosts/verify-and-replace',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({approved:true,host:component.sourceHost,port:component.sshPort||22,expectedFingerprint:fingerprint,knownHostsFile:known})}).then(function(r){return r.json();}).then(function(d){if(!d.ok)throw new Error(d.error);alert('Trusted host key replaced. Retry the VM prerequisite.');r6pRetryVm(component.sourceVmId);}).catch(function(e){alert('Host-key replacement failed: '+e.message);});
+  var known=((document.getElementById('r6p-scan-known-hosts')||{}).value||'').trim();
+  r6pOpenHostIdentityPanel(component.sourceHost,component.sshPort||22,{componentId:componentId,vmId:component.sourceVmId,
+    sshUser:((document.getElementById('r6p-scan-user')||{}).value||'').trim(),
+    sshKeyPath:((document.getElementById('r6p-scan-key')||{}).value||'').trim(),knownHostsFile:known,
+    onConnected:function(){r6pRetryVm(component.sourceVmId);}});
 };
+
+/* === SSH HOST IDENTITY / APPROVE FINGERPRINT WORKFLOW ===
+   GOAL: when the scanner encounters an unknown or changed SSH host fingerprint, let the
+   operator inspect it and either approve (first trust) or explicitly replace (changed key)
+   it, persisting into the app-managed known_hosts file. Never disables host-key checking. */
+R6P.hostIdentity={};
+function r6pHostIdentityKey(host,port){return host+':'+(port||22);}
+function r6pHostIdentityLogAppend(key,text){
+  var s=R6P.hostIdentity[key]=R6P.hostIdentity[key]||{log:[]};
+  var ts=new Date().toISOString().substr(11,8);
+  s.log.push('['+ts+'] '+text);
+}
+function r6pHostIdentityLogText(key){var s=R6P.hostIdentity[key];return s&&s.log?s.log.join('\n'):'';}
+
+window.r6pOpenHostIdentityPanel=function(host,port,opts){
+  opts=opts||{};port=port||22;
+  var key=r6pHostIdentityKey(host,port);
+  var prior=R6P.hostIdentity[key];
+  R6P.hostIdentity[key]={log:(prior&&prior.log)||[],host:host,port:port,componentId:opts.componentId||null,
+    vmId:opts.vmId||null,sshUser:opts.sshUser||'',sshKeyPath:opts.sshKeyPath||'',
+    knownHostsFile:opts.knownHostsFile||'',onConnected:opts.onConnected||null};
+  r6pRenderHostIdentityOverlay(key);
+  r6pRefreshHostIdentityStatus(key);
+};
+
+function r6pRenderHostIdentityOverlay(key){
+  var existing=document.getElementById('r6p-host-identity-overlay');if(existing)existing.remove();
+  var overlay=document.createElement('div');
+  overlay.id='r6p-host-identity-overlay';
+  overlay.style.cssText='position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:9999;display:flex;align-items:center;justify-content:center;';
+  overlay.innerHTML='<div id="r6p-a11y-live" aria-live="polite" style="position:absolute;width:1px;height:1px;overflow:hidden;"></div>'
+    +'<div id="r6p-host-identity-card" style="background:#fff;border-radius:10px;max-width:560px;width:92%;max-height:88vh;overflow:auto;padding:18px;box-shadow:0 20px 60px rgba(0,0,0,.35);"></div>';
+  overlay.addEventListener('click',function(e){if(e.target===overlay)r6pCloseHostIdentityPanel();});
+  document.body.appendChild(overlay);
+  r6pRenderHostIdentityCard(key);
+}
+
+window.r6pCloseHostIdentityPanel=function(){var el=document.getElementById('r6p-host-identity-overlay');if(el)el.remove();};
+
+function r6pRenderHostIdentityCard(key){
+  var card=document.getElementById('r6p-host-identity-card');if(!card)return;
+  var s=R6P.hostIdentity[key]||{};
+  var colors={UNKNOWN:'#d97706',TRUSTED:'#16a34a',CHANGED:'#dc2626',UNREACHABLE:'#64748b',CHECKING:'#64748b'};
+  var color=colors[s.status]||'#64748b';
+  var html='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">'
+    +'<h3 style="margin:0;font-size:15px;">SSH Host Identity</h3>'
+    +'<button onclick="r6pCloseHostIdentityPanel()" style="border:none;background:none;font-size:18px;cursor:pointer;color:#64748b;">&times;</button></div>';
+  if(s.status==='UNKNOWN')html+='<div style="font-size:12px;color:#475569;margin-bottom:10px;">This VM has not been trusted yet. Review and approve its SSH fingerprint to persist trust in the managed known_hosts file.</div>';
+  html+='<div style="font-family:monospace;font-size:12px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px;margin-bottom:10px;">'
+    +'Host: '+r6pHtml(s.host||'')+'<br>Port: '+r6pHtml(String(s.port||22))+'<br>Key type: '+r6pHtml(s.keyType||'—')
+    +'<br>Fingerprint: '+r6pHtml(s.fingerprint||(s.status==='CHECKING'?'scanning...':'—'))+'</div>'
+    +'<div style="margin-bottom:12px;"><b>Trust status: </b><span style="color:'+color+';font-weight:800;">'+r6pHtml(s.status||'CHECKING')+'</span></div>';
+  if(s.status==='CHANGED'){
+    html+='<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:10px;margin-bottom:10px;font-size:12px;">'
+      +'<b style="color:#dc2626;">⚠ SSH fingerprint changed</b><br>Previously trusted: '+r6pHtml(s.trustedFingerprint||'not reported')
+      +'<br>Newly detected: '+r6pHtml(s.fingerprint||'—')+'<br>Host: '+r6pHtml(s.host)+':'+r6pHtml(String(s.port))
+      +'<br>Detected at: '+r6pHtml(s.checkedAt||'')+'</div>'
+      +'<button class="r6p-btn secondary" style="background:#dc2626;color:#fff;" id="r6p-replace-fp-btn" onclick="r6pReplaceHostFingerprint(\''+r6pHtml(key)+'\')">Replace Trusted Fingerprint</button>';
+  }else if(s.status==='UNKNOWN'){
+    html+='<button class="r6p-btn primary" id="r6p-approve-fp-btn" onclick="r6pApproveFingerprint(\''+r6pHtml(key)+'\')">Approve Fingerprint</button>'
+      +'<div style="font-size:11px;color:#64748b;margin-top:5px;">Persist trust for this VM in the managed known_hosts file.</div>';
+  }else if(s.status==='TRUSTED'){
+    html+='<div style="color:#16a34a;font-weight:700;font-size:13px;">✓ Fingerprint approved</div><div style="font-size:11px;color:#64748b;">Stored in: '+r6pHtml(s.knownHostsFile||'')+'</div>';
+  }else if(s.status==='UNREACHABLE'){
+    html+='<div style="color:#64748b;font-size:12px;">'+r6pHtml(s.error||'Host is unreachable.')+'</div>'
+      +'<button class="r6p-btn secondary" onclick="r6pRefreshHostIdentityStatus(\''+r6pHtml(key)+'\')">Retry Scan</button>';
+  }
+  html+='<div style="margin-top:14px;border-top:1px solid #e2e8f0;padding-top:10px;">'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;">'
+    +'<b style="font-size:12px;cursor:pointer;" onclick="r6pToggleHostIdentityLog(\''+r6pHtml(key)+'\')">Operation Log '+(s.logOpen?'▾':'▸')+'</b>'
+    +'<button class="r6p-btn secondary" id="r6p-copy-log-btn" onclick="r6pCopyHostIdentityLog(\''+r6pHtml(key)+'\')">Copy Log</button></div>'
+    +'<pre id="r6p-host-identity-log" style="display:'+(s.logOpen?'block':'none')+';background:#0f172a;color:#a5f3fc;font-size:11px;padding:8px;border-radius:6px;max-height:160px;overflow:auto;margin-top:8px;white-space:pre-wrap;">'+r6pHtml(r6pHostIdentityLogText(key))+'</pre></div>';
+  card.innerHTML=html;
+}
+
+window.r6pToggleHostIdentityLog=function(key){var s=R6P.hostIdentity[key];if(!s)return;s.logOpen=!s.logOpen;r6pRenderHostIdentityCard(key);};
+
+window.r6pRefreshHostIdentityStatus=function(key){
+  var s=R6P.hostIdentity[key];if(!s)return;
+  s.status='CHECKING';r6pRenderHostIdentityCard(key);
+  r6pHostIdentityLogAppend(key,'Scanning SSH host key for '+s.host+':'+s.port);
+  var url='/api/r6/scans/known-hosts/status?host='+encodeURIComponent(s.host)+'&port='+encodeURIComponent(s.port)+(s.knownHostsFile?'&knownHostsFile='+encodeURIComponent(s.knownHostsFile):'');
+  fetch(url).then(function(r){return r.json();}).then(function(d){
+    if(!d.ok){s.status='UNREACHABLE';s.error=d.error;r6pHostIdentityLogAppend(key,'Scan failed: '+(d.error||'unknown error'));r6pRenderHostIdentityCard(key);return;}
+    s.status=d.status;s.fingerprint=d.fingerprint;s.trustedFingerprint=d.trustedFingerprint;
+    s.keyType=d.keyType;s.knownHostsFile=d.knownHostsFile;s.checkedAt=new Date().toISOString();
+    if(d.status==='UNREACHABLE'){s.error=d.error;r6pHostIdentityLogAppend(key,'Scan failed: '+(d.error||'host unreachable'));}
+    else{if(d.keyType)r6pHostIdentityLogAppend(key,d.keyType+' key discovered');if(d.fingerprint)r6pHostIdentityLogAppend(key,'Fingerprint: '+d.fingerprint);r6pHostIdentityLogAppend(key,'Trust status: '+d.status);}
+    r6pRenderHostIdentityCard(key);
+  }).catch(function(e){s.status='UNREACHABLE';s.error=e.message;r6pHostIdentityLogAppend(key,'Scan failed: '+e.message);r6pRenderHostIdentityCard(key);});
+};
+
+window.r6pApproveFingerprint=function(key){
+  var s=R6P.hostIdentity[key];if(!s||!s.fingerprint)return;
+  var btn=document.getElementById('r6p-approve-fp-btn');if(btn){btn.disabled=true;btn.textContent='Approving...';}
+  r6pHostIdentityLogAppend(key,'User approved fingerprint');
+  r6pHostIdentityLogAppend(key,'Managed known_hosts file locked');
+  fetch('/api/r6/scans/known-hosts/approve',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({host:s.host,port:s.port,fingerprint:s.fingerprint,knownHostsFile:s.knownHostsFile,vmId:s.vmId})})
+    .then(function(r){return r.json();}).then(function(d){
+      if(!d.ok)throw new Error(d.error||'approval failed');
+      s.status='TRUSTED';s.knownHostsFile=d.knownHostsFile;
+      r6pHostIdentityLogAppend(key,'Host key persisted successfully');
+      r6pHostIdentityLogAppend(key,'File permissions verified: 0600');
+      r6pRenderHostIdentityCard(key);
+      r6pRetryHostIdentityConnection(key);
+    }).catch(function(e){
+      r6pHostIdentityLogAppend(key,'Approval failed: '+e.message);
+      if(btn){btn.disabled=false;btn.textContent='Approve Fingerprint';}
+      r6pRenderHostIdentityCard(key);
+    });
+};
+
+window.r6pReplaceHostFingerprint=function(key){
+  var s=R6P.hostIdentity[key];if(!s||!s.fingerprint)return;
+  if(!confirm('Replace the trusted SSH fingerprint for '+s.host+':'+s.port+'?\n\nOnly do this after independently verifying the new fingerprint with the infrastructure owner.\n\nOld: '+(s.trustedFingerprint||'not reported')+'\nNew: '+s.fingerprint))return;
+  var btn=document.getElementById('r6p-replace-fp-btn');if(btn){btn.disabled=true;btn.textContent='Replacing...';}
+  r6pHostIdentityLogAppend(key,'User confirmed fingerprint replacement');
+  fetch('/api/r6/scans/known-hosts/verify-and-replace',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({approved:true,host:s.host,port:s.port,expectedFingerprint:s.fingerprint,knownHostsFile:s.knownHostsFile,vmId:s.vmId})})
+    .then(function(r){return r.json();}).then(function(d){
+      if(!d.ok)throw new Error(d.error||'replacement failed');
+      s.status='TRUSTED';s.knownHostsFile=d.knownHostsFile;
+      r6pHostIdentityLogAppend(key,'Trusted fingerprint replaced');
+      r6pRenderHostIdentityCard(key);
+      r6pRetryHostIdentityConnection(key);
+    }).catch(function(e){
+      r6pHostIdentityLogAppend(key,'Replacement failed: '+e.message);
+      if(btn){btn.disabled=false;btn.textContent='Replace Trusted Fingerprint';}
+      r6pRenderHostIdentityCard(key);
+    });
+};
+
+function r6pRetryHostIdentityConnection(key){
+  var s=R6P.hostIdentity[key];if(!s)return;
+  r6pHostIdentityLogAppend(key,'Retrying SSH connection with strict verification');
+  fetch('/api/r6/scans/known-hosts/connection-test',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({host:s.host,port:s.port,user:s.sshUser,keyPath:s.sshKeyPath,knownHostsFile:s.knownHostsFile})})
+    .then(function(r){return r.json();}).then(function(d){
+      r6pHostIdentityLogAppend(key,d.connectionResult==='PASS'?'SSH host identity verified':'Connection test did not pass: '+(d.summary||d.errorCode||''));
+      r6pHostIdentityLogAppend(key,'Connection test: '+(d.connectionResult||'UNKNOWN'));
+      r6pRenderHostIdentityCard(key);
+      if(d.connectionResult==='PASS'&&typeof s.onConnected==='function')s.onConnected();
+    }).catch(function(e){r6pHostIdentityLogAppend(key,'Connection retry failed: '+e.message);r6pRenderHostIdentityCard(key);});
+}
+
+window.r6pCopyHostIdentityLog=function(key){
+  var text=r6pHostIdentityLogText(key);
+  var btn=document.getElementById('r6p-copy-log-btn');
+  function done(){
+    if(btn){var original='Copy Log';btn.textContent='Copied ✓';setTimeout(function(){if(btn)btn.textContent=original;},2000);}
+    var live=document.getElementById('r6p-a11y-live');if(live)live.textContent='Log copied to clipboard';
+  }
+  if(navigator.clipboard&&navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).then(done).catch(function(){r6pCopyLogFallback(text,done);});
+  }else{
+    r6pCopyLogFallback(text,done);
+  }
+};
+
+function r6pCopyLogFallback(text,done){
+  var ta=document.createElement('textarea');
+  ta.value=text;ta.style.position='fixed';ta.style.left='-9999px';
+  document.body.appendChild(ta);ta.focus();ta.select();
+  try{document.execCommand('copy');done();}catch(e){alert('Copy failed. Select and copy the log manually.');}
+  document.body.removeChild(ta);
+}
+
+window.r6pCheckSelectedComponentHostIdentity=function(){
+  var comps=(R6P.components||[]);
+  var sel=document.getElementById('r6p-scan-comp');
+  var idx=sel?sel.value:'';
+  var c=(idx&&idx!=='__all__')?comps[Number(idx)]:comps[0];
+  var target=c&&r6pComponentTarget(c);
+  if(!target){alert('Select a mapped component first.');return;}
+  var host='';try{host=new URL(target.indexOf('://')>=0?target:'ssh://'+target).hostname;}catch(e){host=target.replace(/^[a-z][a-z0-9+.-]*:\/\//i,'').split('/')[0].split(':')[0];}
+  r6pOpenHostIdentityPanel(host,22,{
+    sshUser:((document.getElementById('r6p-scan-user')||{}).value||'').trim(),
+    sshKeyPath:((document.getElementById('r6p-scan-key')||{}).value||'').trim(),
+    knownHostsFile:((document.getElementById('r6p-scan-known-hosts')||{}).value||'').trim()});
+};
+/* === END SSH HOST IDENTITY WORKFLOW === */
 window.r6pRunAllLiveScans=function(){
   var sel=document.getElementById('r6p-scan-comp');
   var out=document.getElementById('r6p-scan-out');
