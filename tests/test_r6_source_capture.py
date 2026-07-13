@@ -208,3 +208,13 @@ def test_snapshot_only_capture_returns_before_bundle_generation(fake_openstack):
     assert data["capture"]["handoffStage"] == "9A_BUILD_VM_SNAPSHOTS"
     assert data["capture"]["nextStage"] == "9B_BUILD_CONTAINERS"
     assert "source-capture-manifest.json" in data["files"]
+
+
+def test_openstack_bin_reports_missing_cli_cleanly(monkeypatch):
+    monkeypatch.setenv("OPENSTACK_CLI", "/definitely/missing/openstack")
+    monkeypatch.setattr(dashboard.shutil, "which", lambda *a, **k: None)
+    monkeypatch.setattr(dashboard.os.path, "exists", lambda p: False)
+    with pytest.raises(RuntimeError) as exc:
+        dashboard._r6_openstack_bin()
+    assert "OpenStack CLI not found for Stage 9A" in str(exc.value)
+    assert "set OPENSTACK_CLI/PATH" in str(exc.value)

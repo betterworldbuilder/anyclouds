@@ -21179,14 +21179,32 @@ def _r6_capture_snapshot_kind(component: Dict[str, Any], paths: List[str]) -> st
     return "vm_image_snapshot"
 
 
+def _r6_openstack_bin() -> str:
+    candidates = [
+        os.environ.get("OPENSTACK_CLI"),
+        shutil.which("openstack"),
+        "/home/dzoan/.local/bin/openstack",
+        "/usr/local/bin/openstack",
+        "/usr/bin/openstack",
+    ]
+    for candidate in candidates:
+        if candidate and os.path.exists(candidate):
+            return candidate
+    raise RuntimeError("OpenStack CLI not found for Stage 9A. Install python-openstackclient or set OPENSTACK_CLI/PATH for the Flask process, then restart Flask.")
+
+
 def _r6_openstack_json(args: List[str]) -> Any:
     """Run an OpenStack CLI command and return its JSON output.
 
     Kept behind one small function so Stage 9 can be tested without a cloud and so it
     uses the same authenticated CLI environment as the existing image scanner.
     """
-    cmd = ["openstack"] + list(args) + ["-f", "json"]
-    proc = subprocess.run(cmd, text=True, capture_output=True, timeout=120, check=False)
+    openstack_bin = _r6_openstack_bin()
+    cmd = [openstack_bin] + list(args) + ["-f", "json"]
+    try:
+        proc = subprocess.run(cmd, text=True, capture_output=True, timeout=120, check=False)
+    except FileNotFoundError as exc:
+        raise RuntimeError("OpenStack CLI not found for Stage 9A. Install python-openstackclient or set OPENSTACK_CLI/PATH for the Flask process, then restart Flask.") from exc
     if proc.returncode:
         raise RuntimeError("OpenStack CLI failed (%s): %s" % (" ".join(cmd), (proc.stderr or proc.stdout).strip()))
     try:
