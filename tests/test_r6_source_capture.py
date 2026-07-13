@@ -169,7 +169,7 @@ def test_live_scan_does_not_use_stale_operator_known_hosts():
 
 def test_stage9_button_filters_capture_payload_after_stage8_only():
     script = (pathlib.Path(__file__).parent.parent / "workflow_dashboard" / "static" / "r6ace.js").read_text()
-    func = script.split("window.r6pGenRealDockerfiles=function(){", 1)[1].split("fetch('/api/r6/capture-sources-build'", 1)[0]
+    func = script.split("window.r6pGenRealDockerfiles=function(snapshotOnly){", 1)[1].split("fetch('/api/r6/capture-sources-build'", 1)[0]
     assert "r6pStage8ApprovedForCapture()" in func
     assert "Stage 8 approval required before source capture" in func
     assert "r6pStage9ApprovedContainerTargets().filter(function(c){return c.tgt;})" in func
@@ -185,3 +185,26 @@ def test_stage9_ui_excludes_database_like_components_from_capture_targets():
     assert "txt.indexOf('database')>=0" in script
     assert "!r6pStage9IsDatabaseLike(c)" in script
     assert "Retained VMs, operators, databases, external services, blocked and excluded components are skipped" in script
+
+
+def test_stage9_has_separate_snapshot_and_container_actions():
+    script = (pathlib.Path(__file__).parent.parent / "workflow_dashboard" / "static" / "r6ace.js").read_text()
+    assert "Stage 9A — Build VM Snapshots" in script
+    assert "Stage 9B — Build Containers" in script
+    assert "r6pGenRealDockerfiles(true)" in script
+    assert "r6pGenRealDockerfiles(false)" in script
+    assert "Build VM Snapshots first. Container build uses the snapshot lineage" in script
+    assert "snapshotOnly:snapshotOnly" in script
+
+
+def test_snapshot_only_capture_returns_before_bundle_generation(fake_openstack):
+    client = app.test_client()
+    payload = _payload()
+    payload["snapshotOnly"] = True
+    response = client.post("/api/r6/capture-sources-build", json=payload)
+    data = response.get_json()
+    assert response.status_code == 200
+    assert data["snapshotOnly"] is True
+    assert data["capture"]["handoffStage"] == "9A_BUILD_VM_SNAPSHOTS"
+    assert data["capture"]["nextStage"] == "9B_BUILD_CONTAINERS"
+    assert "source-capture-manifest.json" in data["files"]

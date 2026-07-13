@@ -1105,7 +1105,16 @@ window.r6pContent=function(n){
       +'</div>';
     var pendingResults='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:12px;">'+pendingCards+'</div>';
     return '<div class="r6p-info-box"><strong>Component Scan Appraisal</strong><br>Evaluate the runtime, services, application files, dependencies, storage, health, security and containerization constraints of every Business Apps System component. Twenty independent, allowlisted probes preserve exit code, stdout, stderr, timeout and truncation evidence. No snapshots are created.</div>'
-      +'<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px;">'
+      +'<div style="background:#f8fafc;border:1px solid #bfdbfe;border-radius:10px;padding:12px 14px;margin-bottom:14px;">'
+    +'<div style="font-size:14px;font-weight:900;color:#0f172a;margin-bottom:4px;">Stage 9A — Build VM Snapshots</div>'
+    +'<div style="font-size:11px;color:#475569;margin-bottom:10px;">Create or reuse OpenStack VM image / Cinder volume snapshots for approved container-source VMs only. Stage 9A records the exact OpenStack snapshot IDs from the CLI, verifies them with image/volume snapshot show, then hands those IDs to container build.</div>'
+    +'<button class="r6p-btn primary" onclick="r6pGenRealDockerfiles(true)" style="padding:8px 16px;font-size:12px;">&#9654; Build VM Snapshots</button>'
+    +'<div id="r6p-snapshot-status" style="font-size:12px;font-weight:600;color:#64748b;margin-top:8px;line-height:1.7;"></div>'
+    +'</div>'
+    +'<div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:10px;padding:12px 14px;margin-bottom:14px;">'
+    +'<div style="font-size:14px;font-weight:900;color:#0f172a;margin-bottom:4px;">Stage 9B — Build Containers</div>'
+    +'<div style="font-size:11px;color:#475569;margin-bottom:10px;">After snapshot lineage is available, extract approved application paths read-only, sanitize context, build/test/scan/sign/push images and record final registry digests.</div>'
+    +'<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px;">'
       +'<div><label style="font-size:11px;font-weight:700;color:#334155;display:block;margin-bottom:4px;">Component scan scope</label><select id="r6p-scan-comp" onchange="r6pScanScopeChanged()" style="padding:7px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;min-width:310px;">'+scanOptions+'</select></div>'
       +'<div><label style="font-size:11px;font-weight:700;color:#334155;display:block;margin-bottom:4px;">SSH User</label><input id="r6p-scan-user" value="'+r6pHtml(defaultScanConnection.sshUser||'ubuntu')+'" style="padding:7px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;width:100px;"></div>'
       +'<div><label style="font-size:11px;font-weight:700;color:#334155;display:block;margin-bottom:4px;">SSH Private Key Path / Secret Ref</label><input id="r6p-scan-key" value="'+r6pHtml(defaultScanConnection.sshKeyPath||'~/.ssh/id_rsa')+'" style="padding:7px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;width:190px;"></div>'
@@ -1153,7 +1162,16 @@ window.r6pContent=function(n){
     var comps7=(R6P.components||[]).filter(function(c){return c.tgt;});
     var opts7=comps7.length?comps7.map(function(c,i){return '<option value="'+i+'">'+c.name+' ('+c.tgt+')</option>';}).join(''):'<option value="">No components have a FLEX Target IP yet - go to Step 1, click Inspect on the selected system, and fill in Target IP for each component</option>';
     return '<div class="r6p-info-box">Identify real application content. Classify files into app content, config, secrets, logs, data, and excluded system files.</div>'
-      +'<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px;">'
+      +'<div style="background:#f8fafc;border:1px solid #bfdbfe;border-radius:10px;padding:12px 14px;margin-bottom:14px;">'
+    +'<div style="font-size:14px;font-weight:900;color:#0f172a;margin-bottom:4px;">Stage 9A — Build VM Snapshots</div>'
+    +'<div style="font-size:11px;color:#475569;margin-bottom:10px;">Create or reuse OpenStack VM image / Cinder volume snapshots for approved container-source VMs only. Stage 9A records the exact OpenStack snapshot IDs from the CLI, verifies them with image/volume snapshot show, then hands those IDs to container build.</div>'
+    +'<button class="r6p-btn primary" onclick="r6pGenRealDockerfiles(true)" style="padding:8px 16px;font-size:12px;">&#9654; Build VM Snapshots</button>'
+    +'<div id="r6p-snapshot-status" style="font-size:12px;font-weight:600;color:#64748b;margin-top:8px;line-height:1.7;"></div>'
+    +'</div>'
+    +'<div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:10px;padding:12px 14px;margin-bottom:14px;">'
+    +'<div style="font-size:14px;font-weight:900;color:#0f172a;margin-bottom:4px;">Stage 9B — Build Containers</div>'
+    +'<div style="font-size:11px;color:#475569;margin-bottom:10px;">After snapshot lineage is available, extract approved application paths read-only, sanitize context, build/test/scan/sign/push images and record final registry digests.</div>'
+    +'<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px;">'
       +'<div><label style="font-size:11px;font-weight:700;color:#334155;display:block;margin-bottom:4px;">Component</label><select id="r6p-classify-comp" style="padding:7px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;min-width:260px;">'+opts7+'</select></div>'
       +'<div><label style="font-size:11px;font-weight:700;color:#334155;display:block;margin-bottom:4px;">SSH User</label><input id="r6p-classify-user" value="root" style="padding:7px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;width:100px;"></div>'
       +'<div><label style="font-size:11px;font-weight:700;color:#334155;display:block;margin-bottom:4px;">SSH Key Path</label><input id="r6p-classify-key" value="~/.ssh/id_rsa" style="padding:7px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;width:160px;"></div>'
@@ -1265,13 +1283,22 @@ window.r6pContent=function(n){
     +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;"><div style="font-weight:800;font-size:13px;color:#0f172a;">Approved Container Source Capture</div>'
     +'<button onclick="r6pPreviewArtifact(\'source-lineage.json\')" style="background:#f1f5f9;color:#334155;border:1px solid #e2e8f0;border-radius:4px;padding:3px 10px;font-size:10px;cursor:pointer;">Preview snapshot lineage</button></div>'
     +'<div style="overflow-x:auto;margin-bottom:14px;"><table class="r6p-table"><thead><tr><th>Component</th><th>Source VM</th><th>Decision</th><th>Snapshot</th><th>Snapshot ID</th><th>Extraction</th><th>Build</th></tr></thead><tbody id="r6p-capture-tbody">'+r6pBuildCaptureRows()+'</tbody></table></div>'
+    +'<div style="background:#f8fafc;border:1px solid #bfdbfe;border-radius:10px;padding:12px 14px;margin-bottom:14px;">'
+    +'<div style="font-size:14px;font-weight:900;color:#0f172a;margin-bottom:4px;">Stage 9A — Build VM Snapshots</div>'
+    +'<div style="font-size:11px;color:#475569;margin-bottom:10px;">Create or reuse OpenStack VM image / Cinder volume snapshots for approved container-source VMs only. Stage 9A records the exact OpenStack snapshot IDs from the CLI, verifies them with image/volume snapshot show, then hands those IDs to container build.</div>'
+    +'<button class="r6p-btn primary" onclick="r6pGenRealDockerfiles(true)" style="padding:8px 16px;font-size:12px;">&#9654; Build VM Snapshots</button>'
+    +'<div id="r6p-snapshot-status" style="font-size:12px;font-weight:600;color:#64748b;margin-top:8px;line-height:1.7;"></div>'
+    +'</div>'
+    +'<div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:10px;padding:12px 14px;margin-bottom:14px;">'
+    +'<div style="font-size:14px;font-weight:900;color:#0f172a;margin-bottom:4px;">Stage 9B — Build Containers</div>'
+    +'<div style="font-size:11px;color:#475569;margin-bottom:10px;">After snapshot lineage is available, extract approved application paths read-only, sanitize context, build/test/scan/sign/push images and record final registry digests.</div>'
     +'<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px;">'
     +'<div><label style="font-size:11px;font-weight:700;color:#334155;display:block;margin-bottom:4px;">Registry</label><select id="r6p-build-regtype" style="padding:7px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;"><option value="harbor" selected>Harbor (in-cluster, recommended default)</option><option value="dockerhub">Docker Hub</option><option value="ghcr">GitHub Container Registry</option><option value="gitlab">GitLab Container Registry</option><option value="quay">Quay.io</option><option value="ecr">AWS ECR (private)</option><option value="ecrpublic">AWS ECR Public</option><option value="gcp">GCP Artifact Registry</option><option value="custom">Custom OCI URL</option></select></div>'
     +'<div><label style="font-size:11px;font-weight:700;color:#334155;display:block;margin-bottom:4px;">Registry URL (optional)</label><input id="r6p-build-regurl" placeholder="registry.example.com" style="padding:7px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;width:200px;"></div>'
     +'<div><label style="font-size:11px;font-weight:700;color:#334155;display:block;margin-bottom:4px;">Project</label><input id="r6p-build-project" value="flex-apps" style="padding:7px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;width:120px;"></div>'
     +'<div><label style="font-size:11px;font-weight:700;color:#334155;display:block;margin-bottom:4px;">Registry User</label><input id="r6p-build-reguser" placeholder="admin" style="padding:7px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;width:100px;"></div>'
     +'<div><label style="font-size:11px;font-weight:700;color:#334155;display:block;margin-bottom:4px;">Registry Password</label><input id="r6p-build-regpass" type="password" style="padding:7px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;width:120px;"></div>'
-    +'<button class="r6p-btn primary" onclick="r6pGenRealDockerfiles()" style="padding:8px 16px;font-size:12px;">&#9654; Capture Sources &amp; Build Containers</button>'
+    +'<button class="r6p-btn primary" onclick="r6pGenRealDockerfiles(false)" style="padding:8px 16px;font-size:12px;">&#9654; Build Containers</button>'
     +'</div>'
     +'<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 14px;margin-bottom:14px;">'
     +'<div style="font-size:11px;font-weight:700;color:#334155;margin-bottom:6px;">Build Mode</div>'
@@ -1280,6 +1307,7 @@ window.r6pContent=function(n){
     +'<div style="font-size:10px;color:#94a3b8;margin-top:4px;">Automatic mode pushes real images to the selected registry with no extra confirmation step - use Manual for a first run against a new registry.</div>'
     +'</div>'
     +'<div id="r6p-build-status" style="font-size:12px;font-weight:600;color:#64748b;margin-bottom:10px;line-height:1.7;"></div>'
+    +'</div>'
     +r6pFoot(9);
   }
   if(n===10)return '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;"><button class="r6p-btn primary" onclick="r6pGenYAML()">Generate All YAML</button><button class="r6p-btn secondary" onclick="r6pGenHelm()">Helm Chart</button><button class="r6p-btn secondary" onclick="r6pGenKustomize()">Kustomize</button><button class="r6p-btn secondary" onclick="r6pGenFlux()">Flux</button></div><pre id="r6p-yaml-preview" style="background:#0f172a;color:#2dd4bf;border-radius:8px;padding:14px;font-size:11px;max-height:280px;overflow:auto;white-space:pre-wrap;min-height:60px;margin-bottom:14px;">-- Click Generate All YAML --</pre>'+r6pFoot(10);
@@ -1743,8 +1771,9 @@ window.r6pBuildCaptureRows=function(){
   }).join('');
 };
 var _R6_SNAPSHOT_SIM_NOTE='';
-window.r6pGenRealDockerfiles=function(){
-  var st=document.getElementById('r6p-build-status');
+window.r6pGenRealDockerfiles=function(snapshotOnly){
+  snapshotOnly=!!snapshotOnly;
+  var st=document.getElementById(snapshotOnly?'r6p-snapshot-status':'r6p-build-status');
   if(!R6P.components||!R6P.components.length){if(st){st.textContent='Select a Business System in Step 1 first.';st.style.color='#dc2626';}return;}
   if(!r6pStage8ApprovedForCapture()){if(st){st.textContent='Stage 8 approval required before source capture. Approve the readiness plan first; no snapshots are created before that gate.';st.style.color='#dc2626';}return;}
   var clusterRef=(R6P.creds.opencenter.clusterRef||'rackspace-flex/flex-prod-k8s').split('/');
@@ -1770,6 +1799,7 @@ window.r6pGenRealDockerfiles=function(){
       persistentPath:r6pPersistentPathFor(c)};
   });
   var skipped=(R6P.components||[]).filter(function(c){return !r6pIsContainerCaptureTarget(c);}).map(function(c){return {component:c.name,targetForm:r6pStage9DecisionFor(c)};});
+  if(!snapshotOnly&&!R6P.captureRun){if(st){st.textContent='Build VM Snapshots first. Container build uses the snapshot lineage produced by Stage 9A.';st.style.color='#dc2626';}return;}
   var mode=(document.querySelector('input[name="r6p-build-mode"]:checked')||{}).value||'manual';
   /* Automatic mode makes the whole R6-to-production-OpenCenter transfer fully automatic in
      one action: build+push images (client-side chain below) AND commit+push the GitOps
@@ -1782,18 +1812,24 @@ window.r6pGenRealDockerfiles=function(){
       user:(document.getElementById('r6p-build-reguser')||{}).value||'',
       password:(document.getElementById('r6p-build-regpass')||{}).value||''},
     source_vm:{host:(srcComp&&srcComp.tgt)||'',user:'root'},
-    auto_commit:mode==='auto',import_to_gitops:true,
+    snapshotOnly:snapshotOnly,
+    auto_commit:mode==='auto'&&!snapshotOnly,import_to_gitops:!snapshotOnly,
     stage8Approved:R6P.status[8]==='done',
     businessSystem:R6P.bs||{},
     capture:{excludePaths:['/var/log','/tmp','/etc/ssh','/root/.ssh','/home/*/.ssh','/var/lib/postgresql','/var/lib/mysql','/var/lib/mongodb','/var/lib/redis','/var/backups']},
     bundle:{id:'r6p-'+Date.now(),businessSystemName:(R6P.bs&&R6P.bs.name)||'app',workloads:workloads}};
-  if(st){st.textContent='Capturing approved source snapshots and generating build plan...';st.style.color='#0369a1';}
+  if(st){st.textContent=snapshotOnly?'Building approved OpenStack VM/volume snapshots and recording lineage...':'Building containers from approved snapshot lineage...';st.style.color='#0369a1';}
   fetch('/api/r6/capture-sources-build',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
     .then(function(r){return r.json();})
     .then(function(d){
       if(!d||!d.ok){if(st){st.textContent='✗ '+((d&&d.error)||'generation failed');st.style.color='#dc2626';}return;}
       R6P._realBundle=d;
-      R6P.captureRun=d.capture||null;
+      R6P.captureRun=d.capture||R6P.captureRun||null;
+      if(snapshotOnly){
+        if(st){st.innerHTML='&#10003; VM snapshots ready. <code>'+((d.capture&&d.capture.approvedCount)||0)+' approved / '+((d.capture&&d.capture.reusedSnapshots)||0)+' reused / '+((d.capture&&d.capture.createdSnapshots)||0)+' created</code><br>Snapshot mode: <code>OPENSTACK_CLI</code>; handoff lineage: <code>'+((d.capture&&d.capture.snapshotIndexPath)||'~/.config/opencenter/r6/source-captures/snapshot-index.json')+'</code>';st.style.color='#15803d';}
+        var snapBody=document.getElementById('r6p-capture-tbody');if(snapBody)snapBody.innerHTML=r6pBuildCaptureRows();
+        return;
+      }
       R6P.yaml='# Generated by /api/r6/generate-bundle\n'+d.bundle_dir;
       R6P.artifacts=R6P.artifacts||{};
       ['opencenter_import_manifest.json','k8s/','helm/','kustomize/','flux/','Dockerfile','image_build_plan.yaml',

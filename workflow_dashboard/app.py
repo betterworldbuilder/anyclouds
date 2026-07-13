@@ -21388,8 +21388,14 @@ def r6_capture_sources_build():
         "approvedCount": approved_count, "reusedSnapshots": reused_count,
         "createdSnapshots": created_count, "components": capture_rows, "blockers": [],
         "snapshotMode": "OPENSTACK_CLI",
+        "handoffStage": "9A_BUILD_VM_SNAPSHOTS",
+        "nextStage": "9B_BUILD_CONTAINERS",
         "snapshotIndexPath": str(snapshots_path),
     }
+    if data.get("snapshotOnly"):
+        return jsonify({"ok": True, "snapshotOnly": True, "capture": capture,
+                        "files": ["source-capture-manifest.json", "source-lineage.json"],
+                        "bundle_dir": "", "pull_secret": ""}), 200
     payload = dict(data)
     payload["bundle"] = dict(bundle, workloads=sanitized_workloads, sourceCapture=capture)
     with app.test_request_context("/api/r6/generate-bundle", method="POST", json=payload):
