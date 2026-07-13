@@ -295,3 +295,13 @@ def test_stage8_live_scan_missing_is_advisory_not_approval_blocker():
     assert "var allCanProceed=decisions.every(function(d){return d.status!=='BLOCKED';});" in stage8
     assert "Live scan not yet run (advisory only; approval is allowed):" in stage8
     assert "Live scan required before approval" not in stage8
+
+
+def test_stage9_instructional_clutter_removed_from_main_ui():
+    assert "Stage 9 Production Substeps" not in V1
+    assert "Decision-Specific Source Path" not in V1
+    assert "Start Command Review" not in V1
+    assert "Stage 9 captures source safely" not in V1
+    assert "Approved Container Source Capture" in V1
+    assert "Stage 9A — Build VM Snapshots" in V1
+    assert "Stage 9B — Build Containers" in V1
