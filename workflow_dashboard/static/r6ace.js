@@ -1064,9 +1064,7 @@ window.r6pContent=function(n){
       +'<div style="margin-top:6px;font-size:11px;color:#64748b;">Run the full live scan to calculate evidence completeness, container readiness, warnings, blockers and the Stage 8 recommendation.</div>'
       +'</div>';
     var pendingResults='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:12px;">'+pendingCards+'</div>';
-    var uiChoices=R6_SCAN_UI_VERSIONS.map(function(v){return '<option value="'+v.id+'"'+(v.id===R6P.scanUiVersion?' selected':'')+'>'+v.label+'</option>';}).join('');
-    return '<div style="display:flex;justify-content:flex-start;align-items:flex-end;gap:8px;margin-bottom:10px;"><div><label style="font-size:11px;font-weight:800;color:#334155;display:block;margin-bottom:4px;">Scan UI Theme</label><select id="r6p-scan-ui-version" style="padding:7px 30px 7px 9px;border:1px solid #94a3b8;border-radius:6px;background:#fff;font-size:12px;font-weight:700;min-width:160px;">'+uiChoices+'</select></div><button class="r6p-btn primary" onclick="r6pApplySelectedScanUiTheme()">Apply Theme</button></div>'
-      +'<div class="r6p-info-box"><strong>Component Scan Appraisal</strong><br>Evaluate the runtime, services, application files, dependencies, storage, health, security and containerization constraints of every Business Apps System component. Twenty independent, allowlisted probes preserve exit code, stdout, stderr, timeout and truncation evidence. No snapshots are created.</div>'
+    return '<div class="r6p-info-box"><strong>Component Scan Appraisal</strong><br>Evaluate the runtime, services, application files, dependencies, storage, health, security and containerization constraints of every Business Apps System component. Twenty independent, allowlisted probes preserve exit code, stdout, stderr, timeout and truncation evidence. No snapshots are created.</div>'
       +'<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px;">'
       +'<div><label style="font-size:11px;font-weight:700;color:#334155;display:block;margin-bottom:4px;">Component scan scope</label><select id="r6p-scan-comp" onchange="r6pScanScopeChanged()" style="padding:7px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;min-width:310px;">'+scanOptions+'</select></div>'
       +'<div><label style="font-size:11px;font-weight:700;color:#334155;display:block;margin-bottom:4px;">SSH User</label><input id="r6p-scan-user" value="'+r6pHtml(defaultScanConnection.sshUser||'ubuntu')+'" style="padding:7px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;width:100px;"></div>'
@@ -2706,14 +2704,7 @@ window.r6pSetScanUiVersion=function(version){
      starts, stops or duplicates a scan. Fall back to an in-place switch only
      when browser storage is unavailable. */
   if(!persisted){r6pApplyScanUiVersion();return;}
-  var selector=document.getElementById('r6p-scan-ui-version')||document.getElementById('r6v2-ui-select');
-  if(selector){selector.disabled=true;selector.setAttribute('aria-busy','true');}
   window.setTimeout(function(){window.location.reload();},80);
-};
-window.r6pApplySelectedScanUiTheme=function(){
-  var selector=document.getElementById('r6p-scan-ui-version')||document.getElementById('r6v2-ui-select');
-  if(!selector){alert('Scan UI Theme selector is unavailable.');return;}
-  r6pSetScanUiVersion(selector.value);
 };
 window.r6pApplyScanUiVersion=function(){
   var body=document.getElementById('r6p-body-3'),host=body&&body.querySelector('.r6p-stage-body-inner');if(!host)return;

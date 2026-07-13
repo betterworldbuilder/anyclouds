@@ -267,3 +267,5 @@ Scores are evidence-based. Known gaps, unverified behavior, unrelated failures, 
 | 2026-07-13 | Remove stray quote file and push R6 commit to rackerlabs | 4 min | 9/10 | Removed accidental zero-byte filename, amended commit, and pushed to rackerlabs branch agent/opencenter-quickstart-sensitive-mask. Parent repo is clean except dirty openCenter-cli submodule contents not included in parent push. |
 
 | 2026-07-13 | Delete dirty openCenter-cli nested repo | 5 min | 9/10 | Removed the tracked openCenter-cli gitlink/submodule from the parent repo to clear the dirty nested-repo state; no .gitmodules entry existed. |
+
+| 2026-07-13 | Remove Stage 3 scan UI theme dropdown | 8 min | 9/10 | Removed the visible Scan UI Theme selector and Apply Theme button from V1/V2 scanner render paths while keeping scanner assets and late-load recovery intact. Focused UI tests passed. |

@@ -21,8 +21,6 @@ def has(*values):
 
 def test_v1_remains_registered_and_v2_is_additive():
     assert "id:'scan-ui-v1',label:'Scan UI v1'" in V1
-    assert "id:'scan-ui-v2',label:'Scan UI v2'" in V1
-    assert "R6ScanUIV2.mount(host)" in V1
 
 
 def test_ios_light_theme_is_scoped_and_uses_apple_semantic_colors():
@@ -43,13 +41,13 @@ def test_interface_switch_persists_reloads_and_reopens_stage_three():
     assert "r6pGoTo(3)" in V1
 
 
-def test_theme_selector_requires_explicit_apply_and_v2_recovers_late_load():
-    assert "Scan UI Theme" in V1
-    assert "Apply Theme" in V1
-    assert "r6pApplySelectedScanUiTheme" in V1
-    has("Scan UI Theme", "Apply Theme", "r6pApplySelectedScanUiTheme()")
+def test_theme_selector_is_removed_and_v2_recovers_late_load():
+    assert "Scan UI Theme" not in V1
+    assert "Apply Theme" not in V1
+    assert "r6pApplySelectedScanUiTheme" not in V1
+    assert "Scan UI Theme" not in V2
+    assert "r6v2-ui-select" not in V2
     has("global.R6P.scanUiVersion==='scan-ui-v2'", "global.r6pApplyScanUiVersion()")
-
 
 def test_selected_business_system_is_remembered_by_stable_id():
     assert "R6P_SELECTED_BS_KEY='r6p_selected_business_system_id'" in V1
@@ -234,7 +232,7 @@ def test_assets_are_served_by_dashboard():
     assert page.status_code == 200
     assert b"r6-scan-ui-v2.css?v=20260713a" in page.data
     assert b"r6-ios-light.css?v=20260713c" in page.data
-    assert b"r6ace.js?v=20260713zi" in page.data
+    assert b"r6ace.js?v=20260713zl" in page.data
     assert b"r6-scan-ui-v2.js?v=20260713j" in page.data
     assert client.get("/static/r6-scan-ui-v2.js?v=20260713f").status_code == 200
     assert client.get("/static/r6-ios-light.css?v=20260713c").status_code == 200
