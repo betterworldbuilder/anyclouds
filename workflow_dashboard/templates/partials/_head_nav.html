@@ -647,14 +647,19 @@
     .s0-dawn-title-highlight {
       display:inline-block;
       margin-top:4px;
-      padding:2px 14px 6px;
+      padding:5px 18px 9px;
       color:#fff;
       white-space:nowrap;
-      font-size:1em; /* same size as the Why/Who/What/When words */
+      max-width:calc(100vw - 48px);
+      font-family:inherit;
+      font-size:clamp(22px,3.45vw,52px);
+      font-weight:900;
+      line-height:1.08;
+      letter-spacing:-.035em;
       border-radius:10px;
       background:linear-gradient(90deg,rgba(37,99,235,0.92),rgba(96,165,250,0.82));
-      text-shadow:0 2px 8px rgba(0,0,0,0.18);
-      box-shadow:0 8px 26px rgba(37,99,235,0.35);
+      text-shadow:0 0 8px rgba(224,242,254,.98),0 0 18px rgba(125,211,252,.82),0 2px 8px rgba(3,105,161,.28);
+      box-shadow:0 8px 26px rgba(56,189,248,.30),0 0 20px rgba(186,230,253,.42);
       animation:s0-flex-block-blink calc(var(--s0wc,4s)*0.92) ease-in-out infinite;
     }
     /* After the Why/Who/What/When sweep, the whole FLEX block double-blinks (~78–88% of the 11s loop). */
@@ -1971,11 +1976,11 @@ body.flex-skyline-mode .uat-s1-template-tab.active {
 /* Modal (light-theme, body-level, CSS class toggle) */
 .uat-s1-modal-backdrop { position:fixed;inset:0;background:rgba(2,6,23,.55);display:none;align-items:center;justify-content:center;padding:24px;z-index:9999; }
 .uat-s1-modal-backdrop.open { display:flex; }
-.uat-s1-modal { width:min(1160px,100%);max-height:92vh;overflow:hidden;background:#fff;border-radius:20px;box-shadow:0 30px 80px rgba(0,0,0,.3);display:grid;grid-template-rows:auto 1fr auto; }
+.uat-s1-modal { width:min(1520px,96vw);max-height:92vh;overflow:hidden;background:#fff;border-radius:20px;box-shadow:0 30px 80px rgba(0,0,0,.3);display:grid;grid-template-rows:auto 1fr auto; }
 .uat-s1-modal-head { padding:16px 20px;border-bottom:1px solid #dbe4f0;display:flex;align-items:center;justify-content:space-between;gap:12px; }
 .uat-s1-modal-head h3 { margin:0;font-size:20px;color:#0f172a; }
 .uat-s1-modal-head p  { margin:3px 0 0;color:#64748b;font-size:12px; }
-.uat-s1-modal-body { overflow:auto;padding:20px;background:#f8fafc;display:grid;grid-template-columns:300px minmax(0,1fr);gap:16px; }
+.uat-s1-modal-body { overflow:auto;padding:20px;background:#f8fafc;display:grid;grid-template-columns:280px minmax(0,1fr);gap:16px; }
 .uat-s1-modal-panel { background:#fff;border:1px solid #dbe4f0;border-radius:16px;padding:14px; }
 .uat-s1-modal-panel h4 { margin:0 0 12px;font-size:14px;color:#0f172a; }
 .uat-s1-modal-foot { padding:12px 20px;border-top:1px solid #dbe4f0;display:flex;align-items:center;justify-content:flex-end;gap:8px; }
@@ -2176,7 +2181,7 @@ body.flex-skyline-mode .uat-s1-template-tab.active {
   <div class="header-inner">
     <div class="neon-sign-outer">
       <div class="neon-sign">
-        <h1><span class="shield">🛡</span> ANYWHERE TO FLEX MIGRATION <span class="mission-control">HUB MACHINE</span> – <span style="font-style:italic;animation:open-2424-neon 6s linear infinite;">OPEN 24/24</span></h1>
+        <h1><span class="shield">🛡</span> ANYWHERE TO ANYWHERE FLEX MIGRATION <span class="mission-control">HUB</span> – <span style="font-style:italic;animation:open-2424-neon 6s linear infinite;">OPEN 24/24</span></h1>
       </div>
     </div>
   </div>
@@ -2333,7 +2338,8 @@ body.flex-skyline-mode .uat-s1-template-tab.active {
   <button class="sub-btn" data-sub="s2flex2flex">🌐 R3 FLEX2FLEX-Region Cloning</button>
   <button class="sub-btn" data-sub="s2rehost_p2_1">⚙️ R5 Replatform — App & DB Replication</button>
   <!-- R5 Data Replatform / Full Manual Runbook removed — see Stage 2 migration tools -->
-  <button class="sub-btn" data-sub="s2rehost_p2_2">&#128640; Refactor VM Apps to Container</button>
+  <button class="sub-btn" data-sub="s2rehost_p2_2">&#128640; APPS to Container Refactor Engine</button>
+  <button class="sub-btn" data-sub="s2r6v2">&#128640; Refactor Apps Container V2</button>
   <button class="sub-btn" data-sub="s2opencenter">🚀 OpenCenter K8s Cluster Migration</button>
   <button class="sub-btn" data-stage-target="s10">Stage 8<br><small>AIOps &amp; Continuous Operations</small></button>
   <button class="sub-btn" data-stage-target="sai">Stage 9<br><small>AI Power Up</small></button>

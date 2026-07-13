@@ -84,27 +84,8 @@
         <h1 class="r6p-title">APPS to Container Refactor Engine</h1>
         <p class="r6p-sub">Convert FLEX workloads into Kubernetes-ready and OpenCenter-ready applications.</p>
         <p style="font-size:12px;color:#64748b;margin:0 0 8px;">The previous pipeline containerized parts of a business system. The hybrid pipeline transforms, deploys and operates the entire business system as one OpenCenter-managed application composed of containers, Kubernetes services, VMs, networks, storage and reconstructed dependencies.</p>
-        <div class="r6p-flow">Preflight &rarr; Input &rarr; Refresh (skip) &rarr; Classify &rarr; Readiness &rarr; Build &rarr; GitOps &rarr; Bundle &rarr; OpenCenter &rarr; Data+Validate &rarr; Report</div>
-      </div>
-      <div class="r6p-hero-btns">
-        <button class="r6p-hero-btn" onclick="r6pHeroImport()">&#128228; Import JSON</button>
-        <button class="r6p-hero-btn" onclick="r6pHeroExport()">&#11015; Export Systems</button>
-        <button class="r6p-hero-btn" onclick="r6pHeroHelp()">? Help</button>
       </div>
     </div>
-  </div>
-
-  <!-- SUMMARY CARDS -->
-  <div class="r6p-summary">
-    <div class="r6p-sum-card"><div class="r6p-sum-label">Selected FLEX Input</div><div id="r6p-sum-input" class="r6p-sum-val">None selected</div></div>
-    <div class="r6p-sum-card"><div class="r6p-sum-label">Components</div><div id="r6p-sum-comps" class="r6p-sum-val">0 selected</div></div>
-    <div class="r6p-sum-card"><div class="r6p-sum-label">Capture Method</div><div id="r6p-sum-method" class="r6p-sum-val" style="color:#0369a1;">Smart Snapshot</div></div>
-    <div class="r6p-sum-card"><div class="r6p-sum-label">Bundle Status</div><div id="r6p-sum-bundle" class="r6p-sum-val" style="color:#64748b;">Not generated</div></div>
-  </div>
-
-  <!-- STICKY PROGRESS TRACKER -->
-  <div class="r6p-progress">
-    <div class="r6p-progress-inner" id="r6p-progress-inner"></div>
   </div>
 
   <!-- COMPAT BANNER -->
@@ -112,45 +93,18 @@
     &#9888; <strong>Full Snapshot Compatibility Mode active.</strong> Not fully cloud-native. Manual hardening required.
   </div>
 
-  <!-- CONTAINER-READY BUSINESS APPS SYSTEM FORM (collapsible, auto-populates from selected Business System) -->
-  <div class="r6p-stage" style="margin-bottom:14px;">
-    <div class="r6p-stage-hd" style="cursor:pointer;" onclick="var b=document.getElementById('r6p-container-ready-body');if(b)b.style.display=b.style.display==='none'?'block':'none';var c=document.getElementById('r6p-container-ready-chevron');if(c)c.style.transform=c.style.transform?'':'rotate(90deg)';if(typeof r6pRenderContainerReadyForm==='function')r6pRenderContainerReadyForm();">
-      <div class="r6p-stage-num">&#128196;</div>
-      <div class="r6p-stage-info"><div class="r6p-stage-title">Container-Ready Business Apps System Form</div><div class="r6p-stage-desc">Auto-populated per component: category, endpoint, runtime, state, containerization decision, target Kubernetes resource, persistent data path, dependencies, health test, readiness, migration risk, recommended action. R6-only - does not touch the shared Add Business System modal.</div></div>
-      <span id="r6p-container-ready-chevron" style="margin-left:10px;font-size:14px;color:#94a3b8;">&#9654;</span>
-    </div>
-    <div id="r6p-container-ready-body" style="display:none;padding:14px;border-top:1px solid #e2e8f0;"></div>
-  </div>
-
   <!-- HYBRID PIPELINE: WHAT CHANGED (collapsible, always visible at top) -->
   <div class="r6p-stage" style="margin-bottom:14px;">
     <div class="r6p-stage-hd" style="cursor:pointer;" onclick="var b=document.getElementById('r6p-hybrid-delta-body');if(b)b.style.display=b.style.display==='none'?'block':'none';var c=document.getElementById('r6p-hybrid-delta-chevron');if(c)c.style.transform=c.style.transform?'':'rotate(90deg)';">
       <div class="r6p-stage-num">&#128260;</div>
-      <div class="r6p-stage-info"><div class="r6p-stage-title">Hybrid Pipeline: What Changed</div><div class="r6p-stage-desc">R6 no longer just containerizes parts of a system - it transforms, deploys and operates the whole Business Apps System as one OpenCenter-managed application.</div></div>
+      <div class="r6p-stage-info"><div class="r6p-stage-title">Apps Containerization Pipeline (version 2026-07-13)</div><div class="r6p-stage-desc">R6 no longer just containerizes parts of a system - it transforms, deploys and operates the whole Business Apps System as one OpenCenter-managed application.</div></div>
       <span id="r6p-hybrid-delta-chevron" style="margin-left:10px;font-size:14px;color:#94a3b8;">&#9654;</span>
     </div>
     <div id="r6p-hybrid-delta-body" style="display:none;padding:14px;border-top:1px solid #e2e8f0;"></div>
   </div>
 
-  <!-- PIPELINE STEPS OVERVIEW (collapsible, always visible at top) -->
-  <div class="r6p-stage" style="margin-bottom:14px;">
-    <div class="r6p-stage-hd" style="cursor:pointer;" onclick="var b=document.getElementById('r6p-pipeline-steps-body');if(b)b.style.display=b.style.display==='none'?'block':'none';var c=document.getElementById('r6p-pipeline-chevron');if(c)c.style.transform=c.style.transform?'':'rotate(90deg)';">
-      <div class="r6p-stage-num">&#128203;</div>
-      <div class="r6p-stage-info"><div class="r6p-stage-title">Pipeline Steps Overview</div><div class="r6p-stage-desc">The full R6 stage sequence: what each step does, and which ones are skipped by default for already-running FLEX VMs.</div></div>
-      <span id="r6p-pipeline-chevron" style="margin-left:10px;font-size:14px;color:#94a3b8;">&#9654;</span>
-    </div>
-    <div id="r6p-pipeline-steps-body" style="display:none;padding:14px;border-top:1px solid #e2e8f0;"></div>
-  </div>
-
-  <!-- COMPONENT CONTAINERIZATION CHART (collapsible, always visible at top) -->
-  <div class="r6p-stage" style="margin-bottom:14px;">
-    <div class="r6p-stage-hd" style="cursor:pointer;" onclick="var b=document.getElementById('r6p-classify-chart-body');if(b)b.style.display=b.style.display==='none'?'block':'none';var c=document.getElementById('r6p-classify-chevron');if(c)c.style.transform=c.style.transform?'':'rotate(90deg)';">
-      <div class="r6p-stage-num">&#128202;</div>
-      <div class="r6p-stage-info"><div class="r6p-stage-title">Component Containerization Chart</div><div class="r6p-stage-desc">Reference table: what state each component type usually has, and the default containerization decision. Component chips elsewhere auto-populate from this - engineers can still override per component.</div></div>
-      <span id="r6p-classify-chevron" style="margin-left:10px;font-size:14px;color:#94a3b8;">&#9654;</span>
-    </div>
-    <div id="r6p-classify-chart-body" style="display:none;padding:14px;border-top:1px solid #e2e8f0;"></div>
-  </div>
+  <!-- Containerization reference is a peer of the pipeline overview. -->
+  <div id="r6p-guidelines"></div>
 
   <!-- STAGES -->
   <div class="r6p-stages" id="r6p-stages"></div>
@@ -159,7 +113,6 @@
   <div class="r6p-bottombar">
     <div style="display:flex;gap:8px;">
       <button class="r6p-btn secondary" onclick="r6pPrev()">&#8592; Previous</button>
-      <button class="r6p-btn primary" onclick="r6pRunCurrent()">&#9654; Run Stage</button>
       <button class="r6p-btn primary" onclick="r6pNext()">Continue &#8594;</button>
     </div>
     <div style="display:flex;gap:8px;align-items:center;">
@@ -167,14 +120,16 @@
         <div id="r6p-fill" style="background:linear-gradient(90deg,#0369a1,#38bdf8);height:100%;width:0%;border-radius:999px;transition:width .4s;"></div>
       </div>
       <span id="r6p-pct" style="font-size:11px;color:#64748b;min-width:28px;">0%</span>
-      <button class="r6p-btn success" onclick="r6pRunAll()">&#9656; Generate All</button>
       <button class="r6p-btn secondary" onclick="r6pDownloadEvidence()">&#11015; Evidence</button>
       <button class="r6p-btn teal" onclick="r6pSendToOC()">&#128640; Send to OpenCenter</button>
     </div>
   </div>
 
 </div>
-<script src="/static/r6ace.js?v=20260712l"></script>
+<link rel="stylesheet" href="/static/r6-scan-ui-v2.css?v=20260713a">
+<link rel="stylesheet" href="/static/r6-ios-light.css?v=20260713a">
+<script src="/static/r6ace.js?v=20260713zh"></script>
+<script src="/static/r6-scan-ui-v2.js?v=20260713i"></script>
 <script>
 /* Hero buttons — were alert() placeholders; now real import/export/help. */
 window.r6pHeroExport = function(){

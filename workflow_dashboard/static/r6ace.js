@@ -1,5 +1,38 @@
 /* APPS to Container Refactor Engine v4 */
-var R6P={current:0,status:{},bs:null,components:[],captureMethod:'smart',compatConfirmed:false,yaml:'',bundle:null,artifacts:{},preflight:{},continueBlocked:true,creds:{cloud:{status:'not_configured',authUrl:'',region:'',credId:'',projectId:''},opencenter:{status:'not_configured',clusterRef:'rackspace-flex/flex-prod-k8s',gitDir:''},gitops:{status:'not_configured',localPath:'',branch:'main',method:'existing'}}};
+var R6P={current:0,status:{},bs:null,components:[],captureMethod:'smart',compatConfirmed:false,yaml:'',bundle:null,artifacts:{},preflight:{},continueBlocked:true,captureRun:null,creds:{cloud:{status:'not_configured',authUrl:'',region:'',credId:'',projectId:''},opencenter:{status:'not_configured',clusterRef:'rackspace-flex/flex-prod-k8s',gitDir:''},gitops:{status:'not_configured',localPath:'',branch:'main',method:'existing'}}};
+var R6_SCAN_UI_VERSIONS=[{id:'scan-ui-v1',label:'Scan UI v1'},{id:'scan-ui-v2',label:'Scan UI v2'}];
+try{R6P.scanUiVersion=localStorage.getItem('r6p_scan_ui_version')||'scan-ui-v1';}catch(e){R6P.scanUiVersion='scan-ui-v1';}
+/* Device-type badges for Stage 13 UAT rows - mirrors Stage 4's Component Test Lab
+   (panel-s5c) classification/icon language so a component reads the same way
+   (e.g. a Web/Mobile/Frontend component always shows the 📱 Mobile UI badge)
+   whether you're testing it from the main dashboard or from inside R6. */
+var R6_UAT_DEVICE_META={
+  mobile_phone:       {icon:'📱',color:'#1d4ed8',label:'Mobile UI'},
+  api_console_tablet: {icon:'📶',color:'#7c3aed',label:'API Console'},
+  service_console:    {icon:'🖥️',color:'#0891b2',label:'Service Console'},
+  backend_engine_rack:{icon:'⚙️',color:'#475569',label:'Backend Engine'},
+  auth_security_device:{icon:'🔒',color:'#b45309',label:'Auth Device'},
+  database_console:   {icon:'🗄️',color:'#b91c1c',label:'DB Console'},
+  cache_memory_chip:  {icon:'⚡',color:'#c2410c',label:'Cache Chip'},
+  queue_conveyor:      {icon:'📦',color:'#6d28d9',label:'Queue Belt'},
+  worker_factory:      {icon:'🏭',color:'#334155',label:'Worker Factory'},
+  monitoring_noc_wall: {icon:'📊',color:'#047857',label:'NOC Dashboard'}
+};
+window.r6pUatDeviceMeta=function(c){
+  var r=((c.type||c.role||'')+' '+(c.name||'')).toLowerCase();
+  var dt='service_console';
+  if(r.indexOf('frontend')>=0||r.indexOf('mobile')>=0||(r.indexOf('web')>=0&&r.indexOf('gateway')<0))dt='mobile_phone';
+  else if(r.indexOf('gateway')>=0)dt='api_console_tablet';
+  else if(r.indexOf('auth')>=0||r.indexOf('sso')>=0||r.indexOf('identity')>=0)dt='auth_security_device';
+  else if(r.indexOf('backend')>=0||r.indexOf('core')>=0||r.indexOf('ledger')>=0)dt='backend_engine_rack';
+  else if(r.indexOf('database')>=0||r.indexOf('postgres')>=0||r.indexOf('mysql')>=0||r.indexOf('db')>=0)dt='database_console';
+  else if(r.indexOf('cache')>=0||r.indexOf('redis')>=0)dt='cache_memory_chip';
+  else if(r.indexOf('queue')>=0||r.indexOf('rabbit')>=0||r.indexOf('kafka')>=0)dt='queue_conveyor';
+  else if(r.indexOf('worker')>=0||r.indexOf('cron')>=0||r.indexOf('batch')>=0)dt='worker_factory';
+  else if(r.indexOf('monitor')>=0||r.indexOf('observ')>=0||r.indexOf('logging')>=0)dt='monitoring_noc_wall';
+  else if(r.indexOf('api')>=0||r.indexOf('service')>=0)dt='service_console';
+  return R6_UAT_DEVICE_META[dt];
+};
 var R6P_TOOLS=[
   {name:'git',        req:true,  note:'GitOps commit',           manual:false},
   {name:'curl',       req:true,  note:'CLI installers',          manual:false},
@@ -12,10 +45,20 @@ var R6P_TOOLS=[
   {name:'yq',         req:false, note:'YAML processing',         manual:false},
   {name:'kustomize',  req:false, note:'Kustomize validation',    manual:false}
 ];
-var R6P_STEPS=[{n:0,label:'Preflight',title:'Preflight Requirements Check',desc:'Verify CLI tools, credentials, and GitOps access before running the refactor workflow.'},{n:1,label:'Input',title:'Import Source FLEX Business Apps System',desc:'Import the complete application and infrastructure topology - VMs, networks, volumes, IPs, ports and dependencies - not isolated components. Only FLEX workloads are accepted.'},{n:2,label:'Discovery',title:'Hydrate: Verify Source System Inventory (offline components only)',desc:'Reuses the known FLEX inventory to confirm VMs, networks, volumes and endpoints instead of full rediscovery. Not needed for live FLEX VMs - already known from Step 1. Only used to capture an offline/stopped component.'},{n:3,label:'Snapshot',title:'Select Snapshot / Volume Snapshot (offline components only)',desc:'Select snapshots for Smart Snapshot or Full Snapshot capture. Skip for live FLEX VMs.'},{n:4,label:'Mapping',title:'Map Snapshot to Business System Component (offline components only)',desc:'Link selected snapshots to business system components. Skip for live FLEX VMs.'},{n:5,label:'Method',title:'Choose Capture and Conversion Method (offline components only)',desc:'Smart Snapshot (recommended) or Full Snapshot Compatibility (legacy fallback). Skip for live FLEX VMs.'},{n:6,label:'Scan',title:'Live Scan (FLEX VM already running)',desc:'Scan the already-running FLEX VM directly over SSH using its known target IP - OS, runtime, ports, services, files.'},{n:7,label:'Classify',title:'Extract Assets and Classify State/Portability',desc:'Identify real application content, classify all files, and classify each component'+"'"+'s state and portability (stateless/stateful/mixed) - also assessing licensing, hardware and machine-identity constraints. Overridable per component and feeds the Step 8 Transform decision.'},{n:8,label:'Transform',title:'Hybrid Containerization Decision Engine - Readiness, Security and Migration Risk',desc:'For every component: validate readiness (non-root support, writable paths, secrets, fixed IPs, health checks, resource sizing), assess migration risk, and assign one of 11 target runtime resources - containerized, Kubernetes-native, operator-managed, retained/redeployed FLEX VM, external service, data-migration-required, or blocked.'},{n:9,label:'Build',title:'Build Container Images and Prepare VM Artifacts',desc:'Build the Dockerfile, image plan and build/start command for containerized components; VM-targeted components keep their existing FLEX VM image, flavor, network, volume and cloud-init definition instead.'},{n:10,label:'GitOps',title:'Kubernetes YAML / Helm / Kustomize / Flux',desc:'Generate all Kubernetes and GitOps artifacts for containerized and operator-managed components, forming half of the unified OpenCenter Business System blueprint.'},{n:11,label:'Bundle',title:'Generate Unified OpenCenter Blueprint',desc:'Assemble the final OpenCenter-ready Business Apps System bundle: Kubernetes manifests plus the retained/redeployed FLEX VM handoff for VM-targeted components.'},{n:12,label:'OpenCenter',title:'OpenCenter Hybrid Business System Deployment',desc:'Import the bundle and trigger Flux reconciliation for the Kubernetes portion; VM-targeted components are provisioned or validated through the FLEX/OpenStack VM workflow.'},
-{n:13,label:'Cutover+UAT',title:'Cutover: Validate the Hybrid Business Transaction Path',desc:'Per-component data migration commands, live app-level validation (HTTP/DB) across both containers and VMs, and a cutover checklist with real DNS/LB commands.'},
-{n:14,label:'Report',title:'Final Report and OpenCenter Day-2 Management',desc:'Generate the customer transformation evidence report - source/target mapping, target forms, decisions, validation results - and register the system for OpenCenter day-2 management (status, scaling, backup, drift detection, rollback). Downloadable as JSON/Markdown.'}];
+var R6P_STEPS=[{n:0,label:'Preflight',title:'Preflight Check',desc:'Verify CLI tools, FLEX/OpenStack credentials, SSH access, registry, GitOps repository, Kubernetes/OpenCenter access and required platform capabilities.'},{n:1,label:'Input',title:'Select Source Business Apps System',desc:'Import the complete FLEX Business Apps System: VMs, applications, databases, volumes, networks, IPs, ports, load balancers and dependencies.'},{n:2,label:'Refresh',title:'Refresh FLEX Inventory',desc:'Confirm current VM IDs, states, IPs, attached volumes, networks and existing snapshot metadata.'},{n:3,label:'Live Scan',title:'Live Scan Application VMs',desc:'Use read-only SSH to discover processes, services, ports, runtimes, startup commands, files, mounts, users and active dependencies.'},{n:4,label:'Components',title:'Map Components',desc:'Convert VM-level evidence into frontend, API, backend, worker, scheduler, database, cache, queue and storage components.'},{n:5,label:'Dependencies',title:'Map Dependencies',desc:'Define consumer/provider relationships, protocols, ports, current endpoints, authentication, TLS and startup order.'},{n:6,label:'Normalize',title:'Normalize Discovery Evidence',desc:'Merge imported topology and live inspection results; mark unreachable VMs and available snapshot fallback evidence.'},{n:7,label:'Classify',title:'Classify Components & Portability',desc:'Classify each component as stateless, stateful, mixed or unknown; assess licensing, hardware, identity and portability constraints.'},{n:8,label:'Decide',title:'Containerization Decision & Risk',desc:'Decide the target for every component: container, partial container, Kubernetes-native, operator-managed, retained VM, redeployed VM, external service, separate data migration or blocked.'},{n:9,label:'Capture+Build',title:'Capture Source & Build Images',desc:'Snapshot only approved container targets, safely extract application files, sanitize the build context, build/test/scan/sign/push images and preserve VM artifacts.'},{n:10,label:'GitOps',title:'Generate Kubernetes & GitOps',desc:'Generate workloads, Services, PVCs, NetworkPolicies, Gateway, operators, monitoring, backup, validation Jobs, Kustomize and Flux resources.'},{n:11,label:'Bundle',title:'Generate OpenCenter Bundle',desc:'Assemble the unified Business System bundle containing Kubernetes, VM, network, storage, DNS, LB, SG, validation and rollback requirements.'},{n:12,label:'Deploy',title:'Deploy to OpenCenter',desc:'Validate the bundle, copy it into managed-services/, commit and push GitOps changes, and trigger Flux reconciliation.'},
+{n:13,label:'Validate+Cutover',title:'Validate, UAT & Cutover',desc:'Run Kubernetes validation Jobs, migrate data, execute business UAT, ramp traffic and trigger rollback when thresholds fail.'},
+{n:14,label:'Report',title:'Final Report & Day-2 Operations',desc:'Produce transformation evidence and register monitoring, backup, scaling, drift detection, upgrades and rollback procedures.'}];
 var R6P_MAX_STEP=Math.max.apply(null,R6P_STEPS.map(function(s){return s.n;}));
+/* The former Step 2 "Refresh FLEX Inventory" was display-only: it made no
+   cloud/API call and produced no new evidence. Remove it from the executable UI. */
+R6P_STEPS=R6P_STEPS.filter(function(s){return s.n!==2;});
+
+function r6pAdjacentStep(n,direction){
+  var nums=R6P_STEPS.map(function(s){return s.n;});
+  var idx=nums.indexOf(n);
+  if(idx<0)return direction>0?nums[0]:nums[nums.length-1];
+  return nums[idx+direction];
+}
 
 var R6_DECISION_TABLE=[['Web Frontend','Stateless','Containerize and run multiple replicas','Deployment + Service + Gateway'],['Mobile Backend','Stateless','Containerize and autoscale','Deployment + Service'],['API Server','Stateless','Containerize independently','Deployment + Service'],['API Gateway','Usually stateless','Use API Gateway, load balancer or container gateway','Gateway API + Envoy Gateway'],['Core Banking Backend','Unknown/mixed','Containerize after externalizing state','Deployment initially'],['Backend Service','Stateless','Containerize independently','Deployment + Service'],['Worker','Stateless','Containerize and scale on queue depth','Deployment'],['Batch Worker','Stateless execution','Run as an isolated task/job','Kubernetes Job'],['Scheduler','Stateless execution','Use managed scheduling rather than VM crontab','CronJob'],['Webhook Receiver','Stateless','Containerize behind controlled ingress','Deployment + Service'],['Notification Service','Stateless','Containerize and connect to a queue','Deployment'],['Database','Stateful','Keep outside the application container; use a managed or dedicated database initially','Existing FLEX DB or operator-managed DB'],['Database Proxy','Stateless','Containerize separately','Deployment + Service'],['Cache','Stateful or disposable','Use a dedicated cache service; rebuild disposable data','Redis operator or external Redis'],['Session Store','Stateful','Use a dedicated Redis-like session service','Redis operator'],['Queue','Stateful','Use a dedicated managed or operator-controlled message service','RabbitMQ operator'],['Event Stream','Stateful','Use a dedicated streaming platform','Kafka/Strimzi operator'],['Search Service API','Stateless','Containerize the API separately from the index','Deployment + Service'],['Search Engine','Stateful','Use a dedicated search cluster','OpenSearch operator or external service'],['File Storage','Stateful','Use shared persistent storage such as EFS rather than container disk','Manila, CephFS, NFS or PVC'],['Object Storage','Stateful external service','Store documents and uploads outside the container','Swift or S3-compatible object storage'],['Upload Service','Stateless','Containerize; write uploaded objects externally','Deployment + object storage'],['Document Service','Mixed','Containerize processing logic; externalize documents','Deployment + object storage/PVC'],['Auth / SSO','Mixed','Containerize service with an external database or use managed identity','Operator/Deployment + external DB'],['Secrets Manager','Stateful security service','Use external managed secrets rather than embedding secrets','Vault or External Secrets'],['Monitoring','Platform capability','Use platform-level container monitoring','Prometheus and Grafana'],['Metrics Exporter','Stateless','Run as sidecar, agent or service','Sidecar/DaemonSet'],['Log Processor','Stateless','Run as cluster-level collector','DaemonSet'],['Tracing Collector','Mostly stateless','Containerize collector and externalize trace storage','OpenTelemetry Collector'],['Backup Service','Stateful output','Store backups outside the cluster','Velero + object storage'],['Legacy Adapter','Unknown/mixed','Containerize only after OS, library, device and licensing checks','Deployment after assessment']];
 var R6_AUTO_RULES=[['Application stores sessions in local RAM','Move sessions to Redis or use signed tokens'],['Application stores uploads locally','Move uploads to object or shared file storage'],['Application connects to localhost database/cache','Replace with external service hostname'],['Configuration is embedded in application files','Externalize to ConfigMap'],['Password exists in configuration file','Move to Secret/secret manager'],['Process runs as root','Create non-root container user'],['Application writes throughout root filesystem','Identify required writable paths and make the rest read-only'],['No health endpoint exists','Generate technical health check or request application change'],['Only one production replica is configured','Recommend two or more replicas'],['Dependency uses a fixed FLEX IP','Replace with internal DNS/service name'],['Several unrelated processes run on one VM','Create separate containers per application responsibility'],['Database files are found on an attached volume','Exclude them from image build and create a data-migration plan'],['Cache data is disposable','Deploy a clean cache and allow it to warm up'],['Queue contains pending business messages','Require drain, replication or controlled cutover'],['Logs are written only to files','Redirect to stdout/stderr and central logging'],['Image uses latest','Use a version and preferably immutable digest'],['CPU and memory are unknown','Use observed FLEX metrics as initial requests and limits'],['Application requires local identity or hostname','Mark as mixed and require manual assessment'],['Hardware or license binding is detected','Mark BLOCKED or KEEP_EXTERNAL']];
@@ -24,6 +67,8 @@ var R6_CLASSIFY={};
 R6_CLASSIFY_ROWS.forEach(function(r){R6_CLASSIFY[r[0]]={state:r[1],decision:r[2]};});
 window.r6pClassifyFor=function(name){
   if(R6_CLASSIFY[name])return R6_CLASSIFY[name];
+  var base=String(name||'').split(/\s+[—–-]\s+/)[0].trim();
+  if(R6_CLASSIFY[base])return R6_CLASSIFY[base];
   var n=(name||'').toLowerCase();
   if(n.indexOf('database')>=0||n.indexOf('db')>=0)return{state:'Stateful',decision:'Keep external initially or migrate later with a database operator'};
   if(n.indexOf('cache')>=0)return{state:'Unknown / mixed',decision:'Deploy with operator; rebuild if data is disposable'};
@@ -31,7 +76,7 @@ window.r6pClassifyFor=function(name){
   return{state:'Unknown / mixed',decision:'Run live assessment before deciding'};
 };
 window.r6pBuildPipelineStepsRows=function(){
-  var groupDesc='Offline-capture path (snapshot discovery, volume snapshot selection, mapping to component, capture method) - not needed for live FLEX VMs, since Step 1 already has target IP/volumes. Ends with the live SSH scan (OS, runtime, ports, services, files) for already-running VMs.';
+  var groupDesc='Inspect FLEX runtime and model the source system: refresh VM/network/volume details, scan reachable VMs, identify components, map dependencies, normalize evidence and record snapshot fallback availability. This grouped stage does not create new snapshots.';
   var rows=[];
   var groupHandled=false;
   R6P_STEPS.forEach(function(st){
@@ -40,7 +85,7 @@ window.r6pBuildPipelineStepsRows=function(){
       groupHandled=true;
       var lo=Math.min.apply(null,R6P_RESCAN_GROUP), hi=Math.max.apply(null,R6P_RESCAN_GROUP);
       var titles=R6P_STEPS.filter(function(s2){return R6P_RESCAN_GROUP.indexOf(s2.n)>=0;}).map(function(s2){return s2.label;}).join(' &rarr; ');
-      rows.push({num:lo+'&ndash;'+hi,stage:'Refresh FLEX VM / DB List (grouped, skip by default)',title:titles,desc:groupDesc});
+      rows.push({num:lo+'&ndash;'+hi,stage:'Inspect FLEX Runtime & Model Source System',title:titles,desc:groupDesc});
       return;
     }
     rows.push({num:st.n,stage:st.label,title:st.title,desc:st.desc});
@@ -55,10 +100,10 @@ window.r6pRenderPipelineStepsTable=function(){
   }).join('');
   host.innerHTML='<div style="font-weight:800;font-size:13px;color:#0f172a;margin-bottom:8px;">R6 Pipeline Steps</div>'
     +'<div style="overflow-x:auto;max-height:420px;overflow-y:auto;margin-bottom:10px;"><table class="r6p-table"><thead><tr><th>#</th><th>Stage</th><th>Title</th><th>What it does</th></tr></thead><tbody>'+body+'</tbody></table></div>'
-    +'<div style="font-size:11px;color:#64748b;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:8px 12px;">Note: steps '+Math.min.apply(null,R6P_RESCAN_GROUP)+'&ndash;'+Math.max.apply(null,R6P_RESCAN_GROUP)+' are collapsed into one "Refresh FLEX VM / DB List" card and skipped by default (R6P_RESCAN_GROUP), since for live FLEX VMs the business system input in Step 1 already supplies everything the offline snapshot-capture path exists for.</div>';
+    +'<div style="font-size:11px;color:#64748b;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:8px 12px;">Note: Steps 3&ndash;6 scan and model the source system without creating snapshots. Snapshot capture happens only in Stage 9 after Stage 8 approval.</div>';
 };
 window.r6pRenderClassifyChart=function(){
-  var host=document.getElementById('r6p-classify-chart-body');if(!host)return;
+  var host=document.getElementById('r6p-classify-chart-inner')||document.getElementById('r6p-classify-chart-body');if(!host)return;
   var stColor={'Stateless':'#16a34a','Stateful':'#dc2626','Unknown / mixed':'#d97706'};
   var rows=R6_CLASSIFY_ROWS.map(function(r){
     var c=stColor[r[1]]||'#64748b';
@@ -89,52 +134,126 @@ var R6_DELTA_COMPARE=[['Primary goal','Convert suitable application components i
 var R6_DELTA_STAGES=[['Select FLEX Business System','Import the complete application and infrastructure topology'],['Hydrate FLEX Inventory','Verify VMs, networks, volumes, endpoints and existing relationships'],['Runtime Inspection','Inspect application processes plus VM-specific runtime requirements'],['Component Detection','Build an application, infrastructure and network model'],['State Classification','Also assess portability, licensing, hardware and machine-identity requirements'],['Containerization Decision','Replaced by target-runtime selection for every component'],['Asset Extraction','Extract container assets and preserve complete VM deployment definitions'],['Readiness Assessment','Validate container readiness, VM deployability and hybrid connectivity'],['Target Architecture','Design the complete hybrid Business Apps System'],['Image Build','Build container images and prepare VM images, snapshots, cloud-init and volume definitions'],['GitOps Bundle','Generate a unified OpenCenter deployment blueprint'],['Staging Deployment','OpenCenter provisions VMs and infrastructure and deploys Kubernetes workloads'],['Cutover','Validate the entire container-and-VM business transaction path'],['Final Report','Register the system for OpenCenter day-2 management']];
 var R6_DELTA_SCOPE=[['Containers and Kubernetes services','FluxCD, Helm, Kustomize and Kubernetes APIs'],['FLEX/OpenStack VMs and infrastructure','Terraform/OpenTofu and OpenStack APIs'],['VM volumes','Cinder provisioning and attachment'],['Kubernetes storage','CSI, StorageClasses and PVCs'],['Container-to-VM access','Kubernetes Service aliases and EndpointSlices'],['VM-to-container access','Internal load balancer, Gateway and private DNS'],['Network security','OpenStack security groups and Kubernetes NetworkPolicies'],['System validation','Component, dependency and end-to-end business tests']];
 var R6_OC_PRODUCTION_PIPELINE=[
-  ['Image build &amp; push','R6 Step 9 - Docker build, SBOM (syft), vulnerability scan (trivy), sign (cosign), digest resolution, push to Harbor/Docker Hub/GHCR/GitLab/Quay/ECR/ECR Public/GCP/custom'],
+  ['Source capture gate','R6 Step 9 - snapshot only Stage 8-approved container sources, extract approved paths read-only, block secrets/database files, record source lineage'],
+  ['Image build &amp; push','R6 Step 9 - Docker build, start test, SBOM (syft), vulnerability scan (trivy), sign (cosign), digest resolution, push to Harbor/Docker Hub/GHCR/GitLab/Quay/ECR/ECR Public/GCP/custom'],
   ['Kubernetes deploy','FluxCD + Kustomize, via the real GitOps repo overlay applications/overlays/&lt;cluster&gt;/managed-services/&lt;slug&gt;/'],
   ['GitOps commit/push','R6 Step 12 - real git add/commit/push, manual button or auto-chained from Step 9 Automatic mode'],
   ['Config source','Production panel (ocqp_state), not Quickstart - org/cluster/repo/SSH key all sync from the real production config'],
   ['VM provisioning (retained/redeployed)','Decided correctly by R6 (Step 8), not yet automated - real Terraform/OpenStack integration is documented as future work, not faked'],
+  ['Bundle evidence','R6 writes source-capture-manifest.json, source-lineage.json, bundle-validation.json, image manifest, rollback runbook and validation jobs'],
   ['Post-deploy validation','R6 Step 13 UAT - kubectl exec into deployed pods or SSH to retained/redeployed VMs, real health-path checks, sign-off tracker']
+];
+var R6_HYBRID_PRODUCTION_ROWS=[
+  ['0','Preflight Requirements Check','preflight-report.json: tools, credentials, registry, GitOps, Kubernetes/OpenCenter access','Blocks production until required local and platform access are present'],
+  ['1','Import Source FLEX Business Apps System','source-business-system.json: VMs, DBs, networks, volumes, ports, dependencies','Defines the OpenCenter Business System identity and source topology'],
+  ['3-6','Required discovery evidence','runtime-inspection.json, component-catalog.json, dependency graph, normalized discovery','Each discovery step feeds Stage 8 decisions; no snapshot is created before approval'],
+  ['7','Extract Assets and Classify State/Portability','state-classification.json: stateless/stateful/mixed, files, config, secrets, DB data, portability risks','Determines which components are safe candidates and which require VM/operator/data paths'],
+  ['8','Hybrid Containerization Decision Engine','component-decisions.json: container, partial container, operator, retained/redeployed VM, external, data migration, blocked','Hard approval gate for Stage 9 source capture and OpenCenter target runtime selection'],
+  ['9','Capture Source &amp; Build Images','source-capture-manifest.json, source-lineage.json, Dockerfiles, image plan, SBOM, scan, signature, digest','Snapshots only approved container sources, sanitizes context, pushes immutable images, preserves VM artifacts'],
+  ['10','Kubernetes YAML / Helm / Kustomize / Flux','Deployments, Services, PVCs, NetworkPolicies, Gateway, validation Jobs, Flux/Kustomize resources','Creates the GitOps payload OpenCenter reconciles into Kubernetes'],
+  ['11','Generate Unified OpenCenter Blueprint','business-system.yaml plus Kubernetes, VM handoff, storage, network, validation and rollback requirements','Assembles the deployable OpenCenter-managed hybrid application bundle'],
+  ['12','OpenCenter Hybrid Business System Deployment','GitOps overlay import, optional real git commit/push, Flux reconcile trigger','Deploys container resources; retained/redeployed VMs are validated or handed to FLEX/OpenStack workflow'],
+  ['13','Cutover: Validate Hybrid Business Transaction Path','validation-evidence.json, UAT sign-off, DNS/LB commands, rollback decision points','Proves business flows across containers, VMs, databases, storage, queues and gateways'],
+  ['14','Final Report and OpenCenter Day-2 Management','final report, day-2 registration, monitoring/backup/drift/rollback records','Registers the managed system for operations, scaling, backup, drift detection, upgrade and rollback']
 ];
 window.r6pRenderHybridDeltaChart=function(){
   var host=document.getElementById('r6p-hybrid-delta-body');if(!host)return;
-  var cmpRows=R6_DELTA_COMPARE.map(function(r){
-    return '<tr><td style="font-weight:700;color:#0369a1;">'+r[0]+'</td><td style="font-size:11px;color:#64748b;">'+r[1]+'</td><td style="font-size:11px;color:#166534;font-weight:600;">'+r[2]+'</td></tr>';
-  }).join('');
-  var stgRows=R6_DELTA_STAGES.map(function(r){
-    return '<tr><td style="font-weight:600;">'+r[0]+'</td><td style="font-size:11px;color:#475569;">'+r[1]+'</td></tr>';
-  }).join('');
-  var scopeRows=R6_DELTA_SCOPE.map(function(r){
-    return '<tr><td style="font-weight:600;">'+r[0]+'</td><td style="font-size:11px;color:#0369a1;font-weight:600;">'+r[1]+'</td></tr>';
-  }).join('');
-  var tfRows=R6_TARGET_FORMS.map(function(r){
-    return '<tr><td style="font-weight:700;color:#0369a1;">'+r[0]+'</td><td style="font-size:11px;color:#475569;">'+r[1]+'</td><td style="font-size:11px;color:#64748b;">'+r[2]+'</td></tr>';
-  }).join('');
-  var curRows=r6pBuildPipelineStepsRows().map(function(r){
-    return '<tr><td style="font-weight:700;color:#0369a1;">'+r.num+'</td><td style="font-size:11px;color:#334155;">'+r.title+'</td></tr>';
+  var curRows=R6_HYBRID_PRODUCTION_ROWS.map(function(r){
+    return '<tr><td style="font-weight:700;color:#0369a1;">'+r[0]+'</td><td style="font-weight:600;color:#0f172a;">'+r[1]+'</td><td style="font-size:11px;color:#475569;">'+r[2]+'</td><td style="font-size:11px;color:#166534;font-weight:600;">'+r[3]+'</td></tr>';
   }).join('');
   var ocRows=R6_OC_PRODUCTION_PIPELINE.map(function(r){
     return '<tr><td style="font-weight:600;">'+r[0]+'</td><td style="font-size:11px;color:#475569;">'+r[1]+'</td></tr>';
   }).join('');
-  host.innerHTML='<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:12px 16px;font-size:12px;color:#1e40af;font-weight:700;line-height:1.6;margin-bottom:18px;">The previous pipeline containerized parts of a business system; the hybrid pipeline transforms, deploys and operates the entire business system as one OpenCenter-managed application composed of containers, Kubernetes services, VMs, networks, storage and reconstructed dependencies.</div>'
-    +'<div style="font-weight:800;font-size:14px;color:#0f172a;margin-bottom:8px;">R6 Hybrid Refactor Pipeline (current, 15 stages)</div>'
-    +'<div style="overflow-x:auto;max-height:340px;overflow-y:auto;margin-bottom:18px;"><table class="r6p-table"><thead><tr><th>#</th><th>Stage - what it does now</th></tr></thead><tbody>'+curRows+'</tbody></table></div>'
-    +'<div style="font-weight:800;font-size:14px;color:#0f172a;margin-bottom:8px;">OpenCenter Production Pipeline (current)</div>'
-    +'<div style="overflow-x:auto;margin-bottom:18px;"><table class="r6p-table"><thead><tr><th>Area</th><th>Mechanism</th></tr></thead><tbody>'+ocRows+'</tbody></table></div>'
-    +'<div style="font-weight:800;font-size:13px;color:#0f172a;margin-bottom:8px;">Previous Pipeline vs. Hybrid Pipeline</div>'
-    +'<div style="overflow-x:auto;max-height:420px;overflow-y:auto;margin-bottom:18px;"><table class="r6p-table"><thead><tr><th>Area</th><th>Previous pipeline</th><th>Hybrid pipeline</th></tr></thead><tbody>'+cmpRows+'</tbody></table></div>'
-    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:18px;">'
-    +'<div><div style="font-weight:800;font-size:12px;color:#64748b;margin-bottom:6px;">Previous model</div><pre style="background:#0f172a;color:#fca5a5;padding:12px;border-radius:8px;font-size:10.5px;line-height:1.5;overflow-x:auto;margin:0;">FLEX Business System\n        |\n        v\nContainerization Engine\n        |\n        v\nDocker images + Kubernetes manifests\n        |\n        v\nOpenCenter deploys containers\n        |\n        v\nVM components remain external</pre></div>'
-    +'<div><div style="font-weight:800;font-size:12px;color:#64748b;margin-bottom:6px;">Hybrid model</div><pre style="background:#0f172a;color:#7dd3fc;padding:12px;border-radius:8px;font-size:10.5px;line-height:1.5;overflow-x:auto;margin:0;">FLEX Business Apps System\n+-- VMs\n+-- Networks\n+-- Volumes\n+-- Load balancers\n+-- Dependencies\n        |\n        v\nR6 Hybrid Transformation Engine\n        |\n        v\nTarget Business Apps System\n+-- Containers\n+-- Kubernetes-native services\n+-- Operator-managed services\n+-- Retained or redeployed VMs\n+-- Networks and storage\n+-- Reconstructed connections\n        |\n        v\nOpenCenter deploys and manages everything</pre></div>'
-    +'</div>'
-    +'<div style="font-weight:800;font-size:13px;color:#0f172a;margin-bottom:8px;">Main Pipeline Stage Changes</div>'
-    +'<div style="overflow-x:auto;max-height:340px;overflow-y:auto;margin-bottom:18px;"><table class="r6p-table"><thead><tr><th>Previous stage</th><th>Hybrid change</th></tr></thead><tbody>'+stgRows+'</tbody></table></div>'
-    +'<div style="font-weight:800;font-size:13px;color:#0f172a;margin-bottom:8px;">New Component Target Options (used live in Step 8 - Transform)</div>'
-    +'<div style="overflow-x:auto;max-height:340px;overflow-y:auto;margin-bottom:18px;"><table class="r6p-table"><thead><tr><th>Target option</th><th>Meaning</th><th>Typical examples</th></tr></thead><tbody>'+tfRows+'</tbody></table></div>'
-    +'<div style="font-weight:800;font-size:13px;color:#0f172a;margin-bottom:8px;">New OpenCenter Deployment Scope</div>'
-    +'<div style="overflow-x:auto;"><table class="r6p-table"><thead><tr><th>Deployment area</th><th>OpenCenter mechanism</th></tr></thead><tbody>'+scopeRows+'</tbody></table></div>';
+  host.innerHTML=''
+    +'<div style="font-weight:800;font-size:14px;color:#0f172a;margin-bottom:8px;">R6 Hybrid Refactor Pipeline (15 stages)</div>'
+    +'<div style="overflow-x:auto;max-height:360px;overflow-y:auto;margin-bottom:18px;"><table class="r6p-table"><thead><tr><th>#</th><th>R6 Stage</th><th>R6 Output</th><th>OpenCenter Production Use</th></tr></thead><tbody>'+curRows+'</tbody></table></div>'
+    +'<div style="font-weight:800;font-size:14px;color:#0f172a;margin-bottom:8px;">OpenCenter Production Pipeline</div>'
+    +'<div style="overflow-x:auto;"><table class="r6p-table"><thead><tr><th>Area</th><th>Mechanism</th></tr></thead><tbody>'+ocRows+'</tbody></table></div>';
 };
-window.r6pInit=function(){r6pRenderProgress();r6pRenderStages();r6pGoTo(0);setTimeout(r6pLoadBiz,350);setTimeout(r6pLoadCredCache,200);setTimeout(r6pLoadCredsServer,250);r6pRenderClassifyChart();r6pRenderPipelineStepsTable();r6pRenderHybridDeltaChart();setTimeout(r6pRenderContainerReadyForm,400);};
+var R6P_BS_STORAGE_SIG='';
+var R6P_SELECTED_BS_KEY='r6p_selected_business_system_id';
+window.r6pSyncSelectedBusinessSystem=function(force){
+  var raw='[]';
+  try{raw=localStorage.getItem('uatS1_systems')||'[]';}catch(e){}
+  if(!force&&raw===R6P_BS_STORAGE_SIG)return;
+  R6P_BS_STORAGE_SIG=raw;
+  var systems=[];
+  try{systems=JSON.parse(raw)||[];}catch(e){systems=[];}
+  var selected=null;
+  if(R6P.bs&&R6P.bs.id)selected=systems.find(function(s){return s.id===R6P.bs.id;})||null;
+  if(!selected){
+    var rememberedId='';
+    try{rememberedId=localStorage.getItem(R6P_SELECTED_BS_KEY)||'';}catch(e){}
+    if(rememberedId)selected=systems.find(function(s){return String(s.id)===rememberedId;})||null;
+    if(rememberedId&&!selected)try{localStorage.removeItem(R6P_SELECTED_BS_KEY);}catch(e){}
+  }
+  if(selected){
+    R6P.bs=selected;
+    R6P.components=selected.components||[];
+  }else if(R6P.bs&&R6P.bs.id){
+    R6P.bs=null;
+    R6P.components=[];
+  }
+  var si=document.getElementById('r6p-sum-input');
+  if(si)si.textContent=(R6P.bs&&R6P.bs.name)||'No Business System selected';
+  var sc=document.getElementById('r6p-sum-comps');
+  if(sc)sc.textContent=((R6P.components||[]).length)+' components';
+  if(selected&&typeof r6pMarkStep1Selected==='function')r6pMarkStep1Selected();
+  if(typeof r6pLoadBiz==='function')r6pLoadBiz();
+  if(typeof r6pRenderContainerReadyForm==='function')r6pRenderContainerReadyForm();
+  if(typeof r6pRefreshComponentDrivenStages==='function')r6pRefreshComponentDrivenStages();
+};
+window.r6pRefreshComponentDrivenStages=function(){
+  [3,4,5,6,7,8,9,13].forEach(function(n){
+    var body=document.getElementById('r6p-body-'+n);
+    if(!body)return;
+    var inner=body.querySelector('.r6p-stage-body-inner');
+    if(inner)inner.innerHTML=r6pContent(n);
+  });
+};
+window.r6pComponentTarget=function(c){
+  c=c||{};
+  var nested=c.target||c.flex||c.vm||{};
+  return String(c.tgt||c.targetIp||c.targetIP||c.target_ip||c.flexIp||c.flexIP||
+    c.flex_ip||c.vmIp||c.vm_ip||c.ip||c.endpoint||c.host||
+    nested.ip||nested.address||nested.endpoint||'').trim();
+};
+window.r6pResolveComponentVm=function(c){
+  c=c||{};var direct=c.sourceVmId||c.source_vm_id||c.vmId||c.vm_id||c.openstackServerId||c.serverId||c.flexVmId;
+  if(direct)return{id:direct,name:c.sourceVmName||c.source_vm_name||c.vmName||c.vm_name||'',ip:c.sourceIp||c.source_ip||'',region:c.cloudRegion||c.cloud_region||''};
+  var target=r6pComponentTarget(c),host='';try{host=new URL(target.indexOf('://')>=0?target:'ssh://'+target).hostname;}catch(e){host=target.replace(/^[a-z][a-z0-9+.-]*:\/\//i,'').split('/')[0].split(':')[0];}
+  var rows=window._uatS1FlexVmRows||[],matches=rows.filter(function(row){return [row.public_ip,row.private_ip,row.ip].filter(Boolean).map(String).indexOf(String(host))>=0;});
+  if(matches.length!==1)return{id:null,name:'',ip:host,region:'',mappingAmbiguous:matches.length>1};
+  var row=matches[0];return{id:row.id||row.vm_id||row.server_id||row.uuid||null,name:row.name||'',ip:host,region:row.region||row.cloud_region||''};
+};
+window.r6pBusinessSystemsChanged=function(){
+  R6P_BS_STORAGE_SIG='';
+  if(typeof r6pLoadBiz==='function')r6pLoadBiz();
+  r6pSyncSelectedBusinessSystem(true);
+};
+window.r6pInstallBusinessSystemAutoRefresh=function(){
+  if(window._r6pBsAutoRefreshInstalled)return;
+  window._r6pBsAutoRefreshInstalled=true;
+  window.addEventListener('storage',function(e){
+    if(e&&e.key==='uatS1_systems')r6pBusinessSystemsChanged();
+    if(e&&e.key===R6P_SELECTED_BS_KEY)r6pSyncSelectedBusinessSystem(true);
+  });
+  window.addEventListener('uatS1:businessSystemsChanged',function(){r6pBusinessSystemsChanged();});
+  setInterval(function(){r6pSyncSelectedBusinessSystem(false);},1200);
+};
+window.r6pInit=function(){
+  r6pRenderProgress();r6pRenderStages();r6pInstallBusinessSystemAutoRefresh();
+  setTimeout(r6pLoadBiz,350);setTimeout(r6pLoadCredCache,200);
+  setTimeout(function(){Promise.resolve(r6pLoadCredsServer()).then(function(){setTimeout(r6pAutoRunStartupPreflight,150);},function(){setTimeout(r6pAutoRunStartupPreflight,150);});},250);
+  r6pRenderClassifyChart();r6pRenderPipelineStepsTable();r6pRenderHybridDeltaChart();
+  setTimeout(function(){r6pSyncSelectedBusinessSystem(true);r6pRenderContainerReadyForm();},400);
+  /* A scan-interface change performs one deliberate reload. Reopen Stage 3
+     only after the selected Business System and credential cache have had a
+     chance to rehydrate; scan execution remains owned by the backend run. */
+  var reopen=false;
+  try{reopen=sessionStorage.getItem('r6p_scan_ui_reopen_stage')==='3';if(reopen)sessionStorage.removeItem('r6p_scan_ui_reopen_stage');}catch(e){}
+  if(reopen)setTimeout(function(){r6pGoTo(3);},700);
+};
 
 /* Server-side credential persistence - survives incognito/browser reset/different browsers.
    localStorage stays as a fast local mirror; the server file is the source of truth. */
@@ -150,7 +269,7 @@ window.r6pSaveCredsServer=function(){
   fetch('/api/r6/save-creds',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}).catch(function(){});
 };
 window.r6pLoadCredsServer=function(){
-  fetch('/api/r6/load-creds').then(function(r){return r.json();}).then(function(d){
+  return fetch('/api/r6/load-creds').then(function(r){return r.json();}).then(function(d){
     if(!d||!d.ok||!d.data)return;
     var c=d.data.cloud||{},g=d.data.gitops||{};
     var set=function(id,val){if(!val)return;var el=document.getElementById(id);if(el&&!el.value)el.value=val;};
@@ -172,15 +291,13 @@ window.r6pLoadCredsServer=function(){
 };
 window.r6aceInit=window.r6pInit;
 
-var R6P_RESCAN_GROUP=[2,3,4,5,6];
+/* Steps 3-6 are required evidence-producing stages.  They used to be wrapped in
+   one oversized "Inspect" card labelled "SKIP by Default"; the wrapper had no
+   endpoint or artifact and incorrectly implied that live discovery was optional. */
+var R6P_RESCAN_GROUP=[];
 window.r6pRenderProgress=function(){
   var el=document.getElementById('r6p-progress-inner');if(!el)return;
-  var shown=R6P_STEPS.filter(function(s){return R6P_RESCAN_GROUP.indexOf(s.n)<0||s.n===R6P_RESCAN_GROUP[0];});
-  el.innerHTML=shown.map(function(s,i){
-    if(s.n===R6P_RESCAN_GROUP[0]){
-      var grpCur=R6P_RESCAN_GROUP.indexOf(R6P.current)>=0;
-      return (i>0?'<span class="r6p-arrow">&gt;</span>':'')+'<span class="r6p-step'+(grpCur?' current':'')+'" onclick="r6pGoTo(2)">2-6. Refresh (skip)</span>';
-    }
+  el.innerHTML=R6P_STEPS.map(function(s,i){
     var st=R6P.status[s.n]||'ns',isCur=R6P.current===s.n,cls=isCur?'current':st;
     return (i>0?'<span class="r6p-arrow">&gt;</span>':'')+'<span class="r6p-step '+cls+'" onclick="r6pGoTo('+s.n+')">'+s.n+'. '+s.label+'</span>';
   }).join('');
@@ -188,56 +305,43 @@ window.r6pRenderProgress=function(){
 
 window.r6pRenderStages=function(){
   var el=document.getElementById('r6p-stages');if(!el)return;
-  el.innerHTML=R6P_STEPS.map(function(s){
-    if(R6P_RESCAN_GROUP.indexOf(s.n)>=0&&s.n!==R6P_RESCAN_GROUP[0])return '';
-    if(s.n===R6P_RESCAN_GROUP[0]){
-      var grpOpen=R6P_RESCAN_GROUP.indexOf(R6P.current)>=0;
-      var grpBody=R6P_RESCAN_GROUP.map(function(gn){
-        var gs=R6P_STEPS.filter(function(x){return x.n===gn;})[0];
-        return '<div style="border-top:1px solid #e2e8f0;padding-top:12px;margin-top:12px;">'
-          +'<div style="font-weight:800;font-size:12px;color:#334155;margin-bottom:2px;">'+gn+'. '+gs.title+'</div>'
-          +'<div style="font-size:11px;color:#94a3b8;margin-bottom:8px;">'+gs.desc+'</div>'
-          +r6pContent(gn)+'</div>';
-      }).join('');
-      return '<div id="r6p-stage-'+R6P_RESCAN_GROUP[0]+'" class="r6p-stage'+(grpOpen?' current':'')+'">'
-        +'<div class="r6p-stage-hd" onclick="r6pToggleRescanGroup()" style="cursor:pointer;">'
-        +'<div class="r6p-stage-num">&#8635;</div>'
-        +'<div class="r6p-stage-info"><div class="r6p-stage-title">Refresh FLEX VM / DB List</div><div class="r6p-stage-desc">Snapshot discovery + live scan, steps 2-6. Not needed by default - the target IP/volume is already known from the selected Business System. Expand only to refresh a component’s data.</div></div>'
-        +'<span class="r6p-stage-badge" style="background:#f1f5f9;color:#64748b;">SKIP by Default</span>'
-        +'<span id="r6p-rescan-chevron" style="margin-left:10px;font-size:14px;color:#94a3b8;transition:transform .15s;'+(grpOpen?'transform:rotate(90deg);':'')+'">&#9654;</span>'
-        +'</div>'
-        +'<div class="r6p-stage-body'+(grpOpen?' open':'')+'" id="r6p-body-'+R6P_RESCAN_GROUP[0]+'"><div class="r6p-stage-body-inner">'+grpBody+'</div></div>'
-        +'</div>';
-    }
+  var guidelinesEl=document.getElementById('r6p-guidelines');
+  var guidelines='<div class="r6p-stage" style="margin-bottom:14px;">'
+    +'<div class="r6p-stage-hd" onclick="var b=document.getElementById(\'r6p-classify-chart-body\');if(b)b.classList.toggle(\'open\');var c=document.getElementById(\'r6p-classify-chevron\');if(c)c.style.transform=b&&b.classList.contains(\'open\')?\'rotate(90deg)\':\'\';">'
+    +'<div class="r6p-stage-num">&#128202;</div>'
+    +'<div class="r6p-stage-info"><div class="r6p-stage-title">Apps Containerization Guidelines</div><div class="r6p-stage-desc">Reference table: what state each component type usually has, and the default containerization decision. Component chips elsewhere auto-populate from this.</div></div>'
+    +'<span id="r6p-classify-chevron" style="margin-left:10px;font-size:14px;color:#94a3b8;transition:transform .2s;">&#9654;</span>'
+    +'</div>'
+    +'<div class="r6p-stage-body" id="r6p-classify-chart-body"><div class="r6p-stage-body-inner" id="r6p-classify-chart-inner"></div></div>'
+    +'</div>';
+  if(guidelinesEl)guidelinesEl.innerHTML=guidelines;
+  el.innerHTML=(guidelinesEl?'':guidelines)+R6P_STEPS.map(function(s){
     var st=R6P.status[s.n]||'ns',isCur=R6P.current===s.n;
     var bstyle=isCur?'background:#eff6ff;color:#0369a1;':st==='done'?'background:#dcfce7;color:#16a34a;':st==='warn'?'background:#fef3c7;color:#d97706;':st==='blocked'?'background:#fee2e2;color:#dc2626;':'background:#f1f5f9;color:#94a3b8;';
     var btxt=isCur?'Current':st==='done'?'Complete':st==='warn'?'Warning':st==='blocked'?'Blocked':'Not Started';
     var ccls='r6p-stage'+(isCur?' current':st!=='ns'?' '+st:'');
-    return '<div id="r6p-stage-'+s.n+'" class="'+ccls+'">'
-      +'<div class="r6p-stage-hd" onclick="r6pGoTo('+s.n+')">'
+    var card='<div id="r6p-stage-'+s.n+'" class="'+ccls+'">'
+      +'<div class="r6p-stage-hd" onclick="r6pToggle('+s.n+')">'
       +'<div class="r6p-stage-num">'+s.n+'</div>'
       +'<div class="r6p-stage-info"><div class="r6p-stage-title">'+s.title+'</div><div class="r6p-stage-desc">'+s.desc+'</div></div>'
       +'<span class="r6p-stage-badge" id="r6p-stage-badge-'+s.n+'" style="'+bstyle+'">'+btxt+'</span>'
       +'</div>'
       +'<div class="r6p-stage-body" id="r6p-body-'+s.n+'"><div class="r6p-stage-body-inner">'+r6pContent(s.n)+'</div></div>'
       +'</div>';
+    if(s.n===1){
+      card+='<div class="r6p-stage" style="margin-bottom:14px;">'
+        +'<div class="r6p-stage-hd" onclick="var b=document.getElementById(\'r6p-container-ready-body\');if(b)b.classList.toggle(\'open\');var c=document.getElementById(\'r6p-container-ready-chevron\');if(c)c.style.transform=b&&b.classList.contains(\'open\')?\'rotate(90deg)\':\'\';;if(typeof r6pRenderContainerReadyForm===\'function\')r6pRenderContainerReadyForm();">'
+        +'<div class="r6p-stage-num">&#128196;</div>'
+        +'<div class="r6p-stage-info"><div class="r6p-stage-title">Apps Component Containers Mapping</div><div class="r6p-stage-desc">Per-component: category, endpoint, runtime, state, containerization decision, target Kubernetes resource, persistent data path, dependencies, health test, readiness and migration risk. Auto-populated from the selected Business System.</div></div>'
+        +'<span id="r6p-container-ready-chevron" style="margin-left:10px;font-size:14px;color:#94a3b8;transition:transform .2s;">&#9654;</span>'
+        +'</div>'
+        +'<div class="r6p-stage-body" id="r6p-container-ready-body"><div class="r6p-stage-body-inner" id="r6p-container-ready-inner"></div></div>'
+        +'</div>';
+    }
+    return card;
   }).join('');
 };
 
-window.r6pToggleRescanGroup=function(){
-  var b=document.getElementById('r6p-body-'+R6P_RESCAN_GROUP[0]);
-  var card=document.getElementById('r6p-stage-'+R6P_RESCAN_GROUP[0]);
-  var chev=document.getElementById('r6p-rescan-chevron');
-  if(!b||!card)return;
-  var willOpen=!b.classList.contains('open');
-  if(willOpen){
-    b.classList.add('open');card.className='r6p-stage current';
-    if(chev)chev.style.transform='rotate(90deg)';
-  } else {
-    b.classList.remove('open');card.className='r6p-stage';
-    if(chev)chev.style.transform='';
-  }
-};
 window.r6pGoTo=function(n){
   R6P.current=n;
   R6P_STEPS.forEach(function(s){
@@ -248,12 +352,31 @@ window.r6pGoTo=function(n){
   });
   r6pRenderProgress();
   if(n===1){setTimeout(r6pLoadBiz,200);}
+  if(n===3){setTimeout(function(){r6pApplyScanUiVersion();R6P.scanRunId=R6P.scanRunId||localStorage.getItem('r6p_latest_scan_run');if(R6P.scanRunId)r6pPollProductionScan();},200);}
+};
+window.r6pToggle=function(n){
+  var b=document.getElementById('r6p-body-'+n);
+  var card=document.getElementById('r6p-stage-'+n);
+  if(!b||!card)return;
+  var willOpen=!b.classList.contains('open');
+  if(willOpen){
+    b.classList.add('open');
+    R6P.current=n;
+    var st=R6P.status[n]||'ns';
+    card.className='r6p-stage current'+(st!=='ns'?' '+st:'');
+    if(n===1)setTimeout(r6pLoadBiz,200);
+  } else {
+    b.classList.remove('open');
+    var st2=R6P.status[n]||'ns';
+    card.className='r6p-stage'+(st2!=='ns'?' '+st2:'');
+  }
+  r6pRenderProgress();
 };
 
-function r6pFoot(n,extra){var nextN=(n===1)?7:n+1;return '<div class="r6p-stage-footer">'+(extra||'')+'<button class="r6p-btn success" onclick="r6pMarkDone('+n+')">Mark Complete</button>'+(n<R6P_MAX_STEP?'<button class="r6p-btn primary" onclick="r6pGoTo('+nextN+')">Continue</button>':'')+'</div>';}
+function r6pFoot(n,extra){var nextN=r6pAdjacentStep(n,1);return '<div class="r6p-stage-footer">'+(extra||'')+'<button class="r6p-btn success" onclick="r6pMarkDone('+n+')">Mark Complete</button>'+(nextN!==undefined?'<button class="r6p-btn primary" onclick="r6pGoTo('+nextN+')">Continue</button>':'')+'</div>';}
 
 /* Real migration-mode decision engine (Stage 4-5): evaluates each component against
-   name/type signals and, if available, the Step 2-6 live scan output. */
+   name/type signals and, if available, the Steps 3-6 live scan output. */
 window.r6pDecideMigrationMode=function(c){
   var name=(c.name||'').toLowerCase();
   var type=(c.type||c.role||'').toLowerCase();
@@ -276,7 +399,7 @@ window.r6pDecideMigrationMode=function(c){
   }
   if(!scan){
     return {name:c.name,workloadType:'Unscanned application',status:'READY_WITH_EXTERNALIZATION',
-      reason:'No live scan run yet (Step 2-6) - assuming stateless until scanned.',
+      reason:'No live scan run yet (Steps 3-6) - assuming stateless until scanned.',
       method:'Containerize and deploy via OpenCenter GitOps (run live scan to confirm)'};
   }
   if(appFileCount>200){
@@ -303,9 +426,9 @@ var R6_TARGET_FORM_BADGE={
   PARTIALLY_CONTAINERIZED:['Partially Containerize','#0d9488'],
   KUBERNETES_NATIVE:['Replace with Kubernetes','#7c3aed'],
   OPERATOR_MANAGED:['Deploy with Operator','#0369a1'],
-  RETAINED_FLEX_VM:['Keep on FLEX','#1d4ed8'],
-  REDEPLOYED_FLEX_VM:['Keep on FLEX','#1d4ed8'],
-  EXTERNAL_SERVICE:['Keep on FLEX','#1d4ed8'],
+  RETAINED_FLEX_VM:['Keep as VM','#1d4ed8'],
+  REDEPLOYED_FLEX_VM:['Keep as VM','#1d4ed8'],
+  EXTERNAL_SERVICE:['Keep as VM','#1d4ed8'],
   DATA_MIGRATION_REQUIRED:['Migrate Data Separately','#d97706'],
   MANUAL_REVIEW:['Unknown','#64748b'],
   BLOCKED:['Blocked','#dc2626'],
@@ -321,7 +444,7 @@ var R6_REQUIRED_GATE={
   'Partially Containerize':'Image built, scanned and locally tested; externalized state confirmed reachable',
   'Replace with Kubernetes':'Platform service available and configuration validated',
   'Deploy with Operator':'Operator installed and storage class confirmed',
-  'Keep on FLEX':'DNS, network, credentials, TLS and health test validated',
+  'Keep as VM':'DNS, network, credentials, TLS and health test validated',
   'Migrate Data Separately':'Data plan approved and rollback available',
   'Blocked':'Explicit manual override required',
   'Unknown':'Additional runtime inspection required before a gate can be assigned'
@@ -331,12 +454,34 @@ window.r6pRequiredGateFor=function(form){
   return R6_REQUIRED_GATE[badge]||'Manual review required';
 };
 var R6_TARGET_FORMS=[['CONTAINERIZED','Converted into a tested Docker image and Kubernetes workload','Frontend, API, backend service'],['PARTIALLY_CONTAINERIZED','Application process becomes a container, but state stays outside','Reporting app with external reports'],['KUBERNETES_NATIVE','VM function is replaced by a native Kubernetes capability','Gateway API, CronJob, scheduler, platform monitoring'],['OPERATOR_MANAGED','Service is recreated through a Kubernetes operator','Redis, RabbitMQ, Kafka'],['RETAINED_FLEX_VM','Existing FLEX VM stays in service, unchanged','Oracle DB, legacy or commercial application'],['REDEPLOYED_FLEX_VM','Component remains a VM but can be recreated from its VM definition','Windows app, licensed software requiring a VM'],['EXTERNAL_SERVICE','Represented through a managed endpoint and logical service alias','Partner API, managed object storage, secrets manager'],['DATA_MIGRATION_REQUIRED','Persistent data is migrated independently of the application process','Upload volume, documents, object storage'],['MANUAL_REVIEW','Insufficient evidence for an automatic decision','Unknown legacy service'],['BLOCKED','Cannot currently be transformed or safely connected','Hardware-bound workload'],['EXCLUDED','Component is not required in the new system','Obsolete agent']];
+window.r6pFormFromComponentDecision=function(decision){
+  var d=String(decision||'').toLowerCase();
+  if(!d)return '';
+  if(/exclude/.test(d))return 'EXCLUDED';
+  if(/block/.test(d))return 'BLOCKED';
+  if(/redeploy.*vm/.test(d))return 'REDEPLOYED_FLEX_VM';
+  if(/retain.*vm|keep external/.test(d))return 'RETAINED_FLEX_VM';
+  if(/deploy with operator/.test(d))return 'OPERATOR_MANAGED';
+  if(/replace with|convert to cronjob|use platform/.test(d))return 'KUBERNETES_NATIVE';
+  if(/migrate separately/.test(d))return 'DATA_MIGRATION_REQUIRED';
+  if(/external service|connect as external/.test(d))return 'EXTERNAL_SERVICE';
+  if(/external database|after assessment|partially/.test(d))return 'PARTIALLY_CONTAINERIZED';
+  if(/containerize/.test(d))return 'CONTAINERIZED';
+  return 'MANUAL_REVIEW';
+};
 /* Real hybrid-transform decision engine (Stage 8 Transform table): assigns each real
    selected component one of the 11 target forms above, using its state/portability
    classification (r6pClassifyFor), name signals and the readiness engine's migration
    mode. Every decision is overridable per component and persisted in R6P.targetForms. */
 window.r6pDecideTargetForm=function(c){
   var name=(c.name||'').toLowerCase();
+  var savedForm=c.targetForm||r6pFormFromComponentDecision(c.containerizationDecision);
+  if(savedForm)return {form:savedForm,reason:'Saved Stage 1 component decision: '+(c.containerizationDecision||savedForm)+'.'};
+  var appraisal=R6P.structuredAppraisal&&R6P.structuredAppraisal.components&&R6P.structuredAppraisal.components.find(function(x){return x.componentName===c.name;});
+  if(appraisal){
+    var mapped={STRONG_CONTAINER_CANDIDATE:'CONTAINERIZED',CANDIDATE_WITH_REMEDIATION:'PARTIALLY_CONTAINERIZED',PARTIAL_CONTAINERIZATION:'PARTIALLY_CONTAINERIZED',KUBERNETES_NATIVE_REPLACEMENT:'KUBERNETES_NATIVE',OPERATOR_MANAGED:'OPERATOR_MANAGED',DB_NATIVE_MIGRATION:'DATA_MIGRATION_REQUIRED',RETAIN_FLEX_VM:'RETAINED_FLEX_VM',REDEPLOY_FLEX_VM:'REDEPLOYED_FLEX_VM',EXTERNAL_SERVICE:'EXTERNAL_SERVICE',MANUAL_REVIEW:'MANUAL_REVIEW',BLOCKED:'BLOCKED'};
+    if(mapped[appraisal.containerizationRecommendation])return {form:mapped[appraisal.containerizationRecommendation],reason:'Structured scan appraisal: '+appraisal.componentVerdict+'; readiness '+appraisal.containerReadinessScore+'%.'};
+  }
   var cls=r6pClassifyForComponent(c)||{state:'Unknown / mixed',decision:''};
   var mig=r6pDecideMigrationMode(c);
   if(mig.status==='COMPATIBILITY_CONTAINER_ONLY'){
@@ -393,9 +538,39 @@ window.r6pDecideTargetForm=function(c){
   }
   return {form:'MANUAL_REVIEW',reason:'Insufficient evidence for an automatic decision - review manually before assigning a target form.'};
 };
+window.r6pDecisionLabelFor=function(c,form){
+  if(c&&c.containerizationDecision)return c.containerizationDecision;
+  var n=String(c&&c.name||'').toLowerCase();
+  if(/gateway/.test(n))return 'Replace with Gateway API';
+  if(/auth.*sso|sso.*auth/.test(n))return 'Containerize with external database';
+  if(/core banking backend/.test(n))return 'Containerize after assessment';
+  if(form==='CONTAINERIZED')return 'Containerize';
+  if(form==='PARTIALLY_CONTAINERIZED')return 'Partially containerize';
+  if(form==='OPERATOR_MANAGED')return 'Deploy with operator';
+  if(form==='RETAINED_FLEX_VM')return /database/.test(n)?'Keep external initially':'Retain FLEX VM';
+  if(form==='REDEPLOYED_FLEX_VM')return 'Redeploy FLEX VM';
+  if(form==='KUBERNETES_NATIVE')return 'Replace with Kubernetes capability';
+  if(form==='DATA_MIGRATION_REQUIRED')return 'Migrate separately';
+  if(form==='EXTERNAL_SERVICE')return 'External service';
+  if(form==='BLOCKED')return 'Block';
+  if(form==='EXCLUDED')return 'Exclude';
+  return 'Manual review';
+};
+window.r6pPersistComponentFields=function(name,fields){
+  var component=(R6P.components||[]).find(function(c){return c.name===name;});
+  if(component)Object.assign(component,fields);
+  try{
+    var systems=JSON.parse(localStorage.getItem('uatS1_systems')||'[]');
+    var system=systems.find(function(s){return R6P.bs&&s.id===R6P.bs.id;});
+    var saved=system&&(system.components||[]).find(function(c){return c.name===name;});
+    if(saved){Object.assign(saved,fields);localStorage.setItem('uatS1_systems',JSON.stringify(systems));R6P_BS_STORAGE_SIG=JSON.stringify(systems);}
+  }catch(e){}
+};
 window.r6pSetTargetForm=function(name,val){
   R6P.targetForms=R6P.targetForms||{};
   R6P.targetForms[name]=val;
+  var component=(R6P.components||[]).find(function(c){return c.name===name;})||{name:name};
+  r6pPersistComponentFields(name,{targetForm:val,containerizationDecision:r6pDecisionLabelFor({name:component.name},val)});
   var b=document.getElementById('r6p-tf-badge-'+btoa(unescape(encodeURIComponent(name))).replace(/[^a-zA-Z0-9]/g,''));
   if(typeof r6pRenderContainerReadyForm==='function')r6pRenderContainerReadyForm();
 };
@@ -412,23 +587,32 @@ window.r6pClassifyForComponent=function(c){
   if(R6P.classifyOverride&&R6P.classifyOverride[name]){
     return {state:R6P.classifyOverride[name],decision:base.decision};
   }
+  var appraisal=R6P.structuredAppraisal&&R6P.structuredAppraisal.components&&R6P.structuredAppraisal.components.find(function(x){return x.componentName===name;});
+  if(appraisal){
+    var state={STATELESS:'Stateless',STATEFUL:'Stateful',MIXED:'Unknown / mixed',UNKNOWN:'Unknown / mixed'}[appraisal.stateClassification]||'Unknown / mixed';
+    return {state:state,decision:appraisal.containerizationRecommendation+' ('+appraisal.containerReadinessScore+'% readiness)'};
+  }
+  if(c&&['Stateless','Stateful','Unknown / mixed'].indexOf(c.state)>=0){
+    return {state:c.state,decision:c.containerizationDecision||base.decision};
+  }
   return base;
 };
 window.r6pSetClassifyOverride=function(name,val){
   R6P.classifyOverride=R6P.classifyOverride||{};
   R6P.classifyOverride[name]=val;
+  r6pPersistComponentFields(name,{state:val});
   if(typeof r6pRenderContainerReadyForm==='function')r6pRenderContainerReadyForm();
 };
 /* Per-component lifecycle status. The pipeline currently checkpoints at the
    business-system level (one Mark Complete/Approve per step, not per component),
    so this derives a real, honest stage from those actual step-completion flags
    rather than inventing untracked per-component granularity. Kept-external
-   components (Keep on FLEX badge) follow the short KEEP_EXTERNAL path instead
+   components (Keep as VM badge) follow the short KEEP_EXTERNAL path instead
    of the container build path. */
 window.r6pLifecycleFor=function(c){
   var saved=(R6P.targetForms&&R6P.targetForms[c.name])||r6pDecideTargetForm(c).form;
   var badge=r6pBadgeForTargetForm(saved)[0];
-  var isExternalPath=(badge==='Keep on FLEX'||saved==='EXTERNAL_SERVICE'||saved==='EXCLUDED');
+  var isExternalPath=(badge==='Keep as VM'||saved==='EXTERNAL_SERVICE'||saved==='EXCLUDED');
   var st=R6P.status||{};
   if(st[13]==='done')return 'CUTOVER_VALIDATED';
   if(isExternalPath){
@@ -452,6 +636,7 @@ window.r6pLifecycleFor=function(c){
    existing real classify/transform/readiness engines. Auto-refreshes whenever a
    Business System is selected or a Classify/Transform override changes. */
 window.r6pGuessRuntime=function(c){
+  if(c&&c.runtime)return c.runtime;
   var n=(c.name||'').toLowerCase(), t=(c.type||'').toLowerCase();
   var hay=n+' '+t;
   if(/mysql/.test(hay))return 'MySQL';
@@ -471,8 +656,8 @@ window.r6pGuessRuntime=function(c){
   if(/search/.test(hay))return 'Search engine (product TBD)';
   if(/object storage|file storage|upload/.test(hay))return 'Object/file storage service';
   var scan=R6P.depScan&&R6P.depScan[c.name];
-  if(scan)return 'Detected from live scan - see Step 7';
-  return 'Unknown - run Live Scan (Step 6) to confirm';
+  if(scan)return 'Detected from live scan - see Step 3';
+  return 'Unknown - run Live Scan (Step 3) to confirm';
 };
 var R6_K8S_RESOURCE_FOR_FORM={
   CONTAINERIZED:'Deployment + Service',
@@ -491,6 +676,7 @@ window.r6pTargetK8sResourceFor=function(form){
   return R6_K8S_RESOURCE_FOR_FORM[form]||'TBD';
 };
 window.r6pPersistentPathFor=function(c){
+  if(c&&c.persistentDataPath)return c.persistentDataPath;
   var hay=((c.name||'')+' '+(c.type||'')).toLowerCase();
   if(/mysql/.test(hay))return '/var/lib/mysql';
   if(/postgres/.test(hay))return '/var/lib/postgresql/data';
@@ -501,8 +687,8 @@ window.r6pPersistentPathFor=function(c){
   if(/kafka|event stream/.test(hay))return '/var/lib/kafka';
   if(/object storage|upload|file storage|document/.test(hay))return '/srv/ (move to object storage/PVC)';
   if(/frontend/.test(hay))return 'None - stateless';
-  if(/api|backend|gateway|worker|service/.test(hay))return 'None expected - verify no local writes during Step 6 scan';
-  return 'Unknown - run Live Scan (Step 6) to confirm';
+  if(/api|backend|gateway|worker|service/.test(hay))return 'None expected - verify no local writes during Step 3 scan';
+  return 'Unknown - run Live Scan (Step 3) to confirm';
 };
 var R6_MIGRATION_RISK_FOR_STATUS={
   CLOUD_NATIVE_READY:'Low',
@@ -514,6 +700,7 @@ window.r6pMigrationRiskFor=function(status){
   return R6_MIGRATION_RISK_FOR_STATUS[status]||'Unknown';
 };
 window.r6pDependenciesFor=function(c){
+  if(c&&c.dependencies)return c.dependencies;
   var scan=R6P.depScan&&R6P.depScan[c.name];
   if(scan&&scan.rawLog){
     var ports=(scan.rawLog.match(/LISTEN\s+\S+:(\d+)/g)||[]).slice(0,5).join(', ');
@@ -526,7 +713,7 @@ window.r6pDependenciesFor=function(c){
 window.r6pComponentProfile=function(c){
   var cls=r6pClassifyForComponent(c);
   var mig=r6pDecideMigrationMode(c);
-  var saved=(R6P.targetForms&&R6P.targetForms[c.name])||r6pDecideTargetForm(c).form;
+  var saved=(R6P.targetForms&&R6P.targetForms[c.name])||c.targetForm||r6pDecideTargetForm(c).form;
   var tf=r6pDecideTargetForm(c);
   return {
     name:c.name||'(unnamed component)',
@@ -534,8 +721,8 @@ window.r6pComponentProfile=function(c){
     endpoint:c.tgt||'Not set - fill in Target IP/URL in Step 1 Inspect',
     runtime:r6pGuessRuntime(c),
     state:cls.state,
-    decision:cls.decision,
-    targetK8sResource:r6pTargetK8sResourceFor(saved),
+    decision:r6pDecisionLabelFor(c,saved),
+    targetK8sResource:c.targetRuntimeResource||r6pTargetK8sResourceFor(saved),
     persistentPath:r6pPersistentPathFor(c),
     dependencies:r6pDependenciesFor(c),
     healthTest:c.path||'Not set - fill in Health/Test Path in Step 1 Inspect',
@@ -546,7 +733,7 @@ window.r6pComponentProfile=function(c){
   };
 };
 window.r6pFilterContainerReady=function(filter){
-  var host=document.getElementById('r6p-container-ready-body');if(!host)return;
+  var host=document.getElementById('r6p-container-ready-inner')||document.getElementById('r6p-container-ready-body');if(!host)return;
   R6P._containerReadyFilter=filter;
   host.querySelectorAll('.r6p-cr-card').forEach(function(card){
     var show=(filter==='all')
@@ -561,7 +748,7 @@ window.r6pFilterContainerReady=function(filter){
   });
 };
 window.r6pRenderContainerReadyForm=function(){
-  var host=document.getElementById('r6p-container-ready-body');if(!host)return;
+  var host=document.getElementById('r6p-container-ready-inner')||document.getElementById('r6p-container-ready-body');if(!host)return;
   var comps=R6P.components||[];
   if(!comps.length){host.innerHTML='<div class="r6p-warn-box">No Business System selected yet. Select one in Step 1 to auto-populate this form.</div>';return;}
   var stColor={'Stateless':'#16a34a','Stateful':'#dc2626','Unknown / mixed':'#d97706'};
@@ -573,12 +760,12 @@ window.r6pRenderContainerReadyForm=function(){
   var filter=R6P._containerReadyFilter||'all';
   var filterDefs=[['all','All'],['Stateless','Stateless'],['Stateful','Stateful'],['Unknown / mixed','Unknown'],
     ['Containerize','Containerize'],['Replace with Kubernetes','Kubernetes-native'],['Deploy with Operator','Operator-managed'],
-    ['Keep on FLEX','Retained/Redeployed VM'],['Migrate Data Separately','External/Data-migration'],['Blocked','Blocked'],['highrisk','High risk']];
+    ['Keep as VM','Retained/Redeployed VM'],['Migrate Data Separately','External/Data-migration'],['Blocked','Blocked'],['highrisk','High risk']];
   var filterBtns=filterDefs.map(function(f){
     return '<button class="r6p-cr-filter-btn" data-filter="'+f[0]+'" onclick="r6pFilterContainerReady(\''+f[0]+'\')" style="background:'+(filter===f[0]?'#0369a1':'#f1f5f9')+';color:'+(filter===f[0]?'#fff':'#334155')+';border:none;border-radius:999px;padding:4px 12px;font-size:11px;font-weight:700;cursor:pointer;margin:2px;">'+f[1]+'</button>';
   }).join('');
   var counterDefs=[['Components',comps.length,'#0f172a'],['Containerized',badgeCounts['Containerize']||0,'#16a34a'],
-    ['Operator-managed',badgeCounts['Deploy with Operator']||0,'#0369a1'],['Kept on FLEX',badgeCounts['Keep on FLEX']||0,'#1d4ed8'],
+    ['Operator-managed',badgeCounts['Deploy with Operator']||0,'#0369a1'],['Kept as VM',badgeCounts['Keep as VM']||0,'#1d4ed8'],
     ['Data migration',badgeCounts['Migrate Data Separately']||0,'#d97706'],['High risk',riskHighCount,'#dc2626']];
   var counters=counterDefs.map(function(c){
     return '<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:8px 12px;text-align:center;min-width:90px;"><div style="font-size:18px;font-weight:900;color:'+c[2]+';">'+c[1]+'</div><div style="font-size:9px;font-weight:700;color:#64748b;text-transform:uppercase;">'+c[0]+'</div></div>';
@@ -614,34 +801,238 @@ window.r6pRenderContainerReadyForm=function(){
 };
 function r6pCmd(id,cmd){var cid='r6p-cmd-'+id,oid='r6p-out-'+id;return '<div class="r6p-cmd-box" id="'+cid+'">'+cmd.replace(/</g,'&lt;').replace(/>/g,'&gt;')+'</div><div style="display:flex;gap:5px;margin-bottom:8px;"><button onclick="navigator.clipboard&&navigator.clipboard.writeText(document.getElementById(\''+cid+'\').textContent)" style="background:#f1f5f9;color:#475569;border:1px solid #e2e8f0;border-radius:4px;padding:3px 10px;font-size:10px;cursor:pointer;">Copy</button><button onclick="r6pRunCmd(\''+cid+'\',\''+oid+'\')" style="background:#eff6ff;color:#0369a1;border:1px solid #bfdbfe;border-radius:4px;padding:3px 10px;font-size:10px;font-weight:700;cursor:pointer;">Run</button><button onclick="var e=document.getElementById(\''+oid+'\');e.style.display=e.style.display===\'none\'?\'block\':\'none\'" style="background:#f1f5f9;color:#64748b;border:1px solid #e2e8f0;border-radius:4px;padding:3px 10px;font-size:10px;cursor:pointer;">Log</button></div><div id="'+oid+'" class="r6p-terminal" style="display:none;">$ waiting...</div>';}
 
+window.r6pHandoverSection=function(){
+  var LEFT_CHECKS=[['R6 BUNDLE & KUBERNETES','#0369a1',[
+    'Toolchain','Bundle Completeness','Image Manifest','YAML Parse',
+    'Kustomize Staging','Kustomize Production','Namespace + PSS','RBAC / SecCtx',
+    'NetworkPolicies','Storage / PVCs','Flux Kustomization','Stage 12 Gate','Rollback Runbook'
+  ]]];
+  var RIGHT_CHECKS=[['TARGET OPENCENTER ENVIRONMENT','#0369a1',[
+    'Registry Access','Kubernetes Access','StorageClass','Gateway API',
+    'Cert Manager','Flux Operator','Monitoring Stack','Backup Capability'
+  ]],['HYBRID VM','#b45309',[
+    'VM Identity','EndpointSlice','SG Intent','Validation Jobs'
+  ]]];
+  function checkRows(items){return items.map(function(label){return '<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid #f1f5f9;">'+'<span style="font-size:12px;color:#334155;">'+label+'</span>'+'<span class="r6h-badge r6h-badge-pending" data-check="'+label+'">Pending</span>'+'</div>';}).join('');}
+  var leftHtml=LEFT_CHECKS.map(function(g){return '<div style="font-size:11px;font-weight:800;color:'+g[1]+';text-transform:uppercase;letter-spacing:1px;margin:10px 0 6px;">'+g[0]+'</div>'+checkRows(g[2]);}).join('');
+  var rightHtml=RIGHT_CHECKS.map(function(g){return '<div style="font-size:11px;font-weight:800;color:'+g[1]+';text-transform:uppercase;letter-spacing:1px;margin:10px 0 6px;">'+g[0]+'</div>'+checkRows(g[2]);}).join('');
+  return '<div id="r6p-handover-section" style="margin-top:24px;border:2px solid #1e3a5f;border-radius:14px;overflow:hidden;background:#0f172a;">'
+    +'<div style="background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 100%);padding:16px 20px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">'
+    +'<div><div id="r6p-handover-status-badge" style="display:inline-block;background:#334155;color:#94a3b8;font-size:10px;font-weight:700;padding:2px 10px;border-radius:4px;letter-spacing:1px;margin-bottom:6px;">NOT RUN</div>'
+    +'<div style="display:flex;align-items:center;gap:8px;"><span style="font-size:18px;">&#9989;</span><div><div style="font-size:16px;font-weight:900;color:#f8fafc;">Final R6 &rarr; OpenCenter Handover Readiness</div>'
+    +'<div style="font-size:11px;color:#94a3b8;margin-top:2px;">Verify images, Kubernetes resources, GitOps bundle, hybrid VM connections, platform prerequisites and rollback readiness before releasing to OpenCenter.</div></div></div></div>'
+    +'<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">'
+    +'<button onclick="r6pRunHandoverCheck()" style="background:#dc2626;color:#fff;border:none;border-radius:6px;padding:10px 18px;font-size:13px;font-weight:800;cursor:pointer;">&#9654; Run Handover Check</button>'
+    +'<button onclick="r6pStopHandover()" style="background:#1e293b;color:#f87171;border:1px solid #f87171;border-radius:6px;padding:8px 12px;font-size:12px;font-weight:700;cursor:pointer;">&#9632; Stop</button>'
+    +'<button onclick="r6pRetryHandover()" style="background:#1e293b;color:#60a5fa;border:1px solid #60a5fa;border-radius:6px;padding:8px 12px;font-size:12px;font-weight:700;cursor:pointer;">&#8635; Retry</button>'
+    +'<button onclick="r6pExportHandover()" style="background:#1e293b;color:#94a3b8;border:1px solid #475569;border-radius:6px;padding:8px 12px;font-size:12px;cursor:pointer;">&#11015; Export</button>'
+    +'</div></div>'
+    +'<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:1px;background:#1e3a5f;">'
+    +['SCORE','PASSED','WARNINGS','BLOCKED','N/A','TOTAL','DURATION'].map(function(l,i){var colors=['#60a5fa','#4ade80','#fbbf24','#f87171','#94a3b8','#e2e8f0','#a78bfa'];return '<div style="background:#0f172a;padding:12px 8px;text-align:center;"><div style="font-size:18px;font-weight:900;color:'+colors[i]+';border-bottom:2px solid '+colors[i]+';padding-bottom:4px;margin-bottom:4px;" id="r6p-hsc-'+l.toLowerCase().replace('/','').replace(' ','')+'">&mdash;</div><div style="font-size:9px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:1px;">'+l+'</div></div>';}).join('')
+    +'</div>'
+    +'<div style="display:grid;grid-template-columns:1fr 260px 1fr;gap:0;background:#1e293b;">'
+    +'<div style="padding:14px 16px;background:#f8fafc;">'+leftHtml+'</div>'
+    +'<div style="background:#1e293b;display:flex;flex-direction:column;align-items:center;padding:16px 8px;gap:10px;">'
+    +'<div style="font-size:9px;font-weight:800;color:#60a5fa;text-transform:uppercase;letter-spacing:2px;margin-bottom:4px;">OpenCenter Live Preview</div>'
+    +'<div style="width:169px;height:338px;background:#fff;border:8px solid #1e293b;border-radius:28px;outline:4px solid #334155;overflow:hidden;box-shadow:0 0 0 2px #0f172a,0 8px 32px rgba(0,0,0,.6);" id="r6p-handover-phone"><div style="height:100%;display:flex;align-items:center;justify-content:center;background:#0f172a;color:#475569;font-size:11px;text-align:center;padding:8px;">OpenCenter<br>preview<br>will load here</div></div>'
+    +'<div style="background:#0f172a;border-radius:8px;padding:8px 10px;width:220px;">'
+    +'<div style="font-size:10px;color:#64748b;margin-bottom:2px;">Host <span id="r6p-h-host" style="color:#e2e8f0;font-weight:700;">&mdash;</span></div>'
+    +'<div style="font-size:10px;color:#64748b;margin-bottom:2px;">HTTP <span id="r6p-h-http" style="color:#e2e8f0;font-weight:700;">&mdash;</span></div>'
+    +'<div style="font-size:10px;color:#64748b;margin-bottom:6px;">Latency <span id="r6p-h-lat" style="color:#e2e8f0;font-weight:700;">&mdash;</span></div>'
+    +'<div style="display:flex;gap:4px;margin-bottom:6px;">'
+    +'<button onclick="r6pHandoverLoad()" style="background:#16a34a;color:#fff;border:none;border-radius:4px;padding:4px 8px;font-size:10px;cursor:pointer;">Load</button>'
+    +'<button onclick="r6pHandoverHealth()" style="background:#dc2626;color:#fff;border:none;border-radius:4px;padding:4px 8px;font-size:10px;cursor:pointer;">Health</button>'
+    +'<button onclick="r6pHandoverReady()" style="background:#d97706;color:#fff;border:none;border-radius:4px;padding:4px 8px;font-size:10px;cursor:pointer;">Ready</button>'
+    +'<button onclick="r6pHandoverLogin()" style="background:#7c3aed;color:#fff;border:none;border-radius:4px;padding:4px 8px;font-size:10px;cursor:pointer;">Login</button>'
+    +'</div>'
+    +'<input id="r6p-h-hostport" placeholder="host:port" style="width:100%;box-sizing:border-box;background:#1e293b;border:1px solid #334155;border-radius:4px;padding:5px 8px;font-size:11px;color:#e2e8f0;">'
+    +'</div></div>'
+    +'<div style="padding:14px 16px;background:#f8fafc;">'+rightHtml+'</div>'
+    +'</div>'
+    +'<div style="background:#fff;padding:10px 14px;display:flex;gap:6px;align-items:center;flex-wrap:wrap;border-top:1px solid #e2e8f0;">'
+    +'<button onclick="r6pHFilter(\'all\')" style="background:#334155;color:#fff;border:none;border-radius:4px;padding:4px 10px;font-size:11px;cursor:pointer;">All</button>'
+    +'<button onclick="r6pHFilter(\'blocked\')" style="background:#dc2626;color:#fff;border:none;border-radius:4px;padding:4px 10px;font-size:11px;cursor:pointer;">&#128308; Blocked</button>'
+    +'<button onclick="r6pHFilter(\'warning\')" style="background:#d97706;color:#fff;border:none;border-radius:4px;padding:4px 10px;font-size:11px;cursor:pointer;">&#9651; Warning</button>'
+    +'<button onclick="r6pHFilter(\'pass\')" style="background:#16a34a;color:#fff;border:none;border-radius:4px;padding:4px 10px;font-size:11px;cursor:pointer;">&#10003; Pass</button>'
+    +'<button onclick="r6pHFilter(\'pending\')" style="background:#f1f5f9;color:#475569;border:1px solid #e2e8f0;border-radius:4px;padding:4px 10px;font-size:11px;cursor:pointer;">Pending</button>'
+    +'<input id="r6p-h-search" placeholder="Search..." oninput="r6pHSearch(this.value)" style="margin-left:auto;padding:4px 10px;border:1px solid #e2e8f0;border-radius:4px;font-size:11px;width:160px;">'
+    +'</div>'
+    +'<div style="background:#fff;overflow-x:auto;">'
+    +'<table class="r6p-table" id="r6p-handover-table"><thead><tr><th>Status</th><th>ID</th><th>Checkpoint</th><th>Result</th><th>Blocking</th><th>Duration</th><th>Action</th></tr></thead>'
+    +'<tbody id="r6p-handover-tbody"><tr><td colspan="7" style="text-align:center;color:#94a3b8;padding:20px;">Click <strong>Run Handover Check</strong> to verify the R6 bundle</td></tr></tbody>'
+    +'</table></div>'
+    +'</div>'
+    +'<style>.r6h-badge{padding:2px 8px;border-radius:999px;font-size:10px;font-weight:700;}.r6h-badge-pending{background:#f1f5f9;color:#94a3b8;}.r6h-badge-pass{background:#dcfce7;color:#16a34a;}.r6h-badge-blocked{background:#fee2e2;color:#dc2626;}.r6h-badge-warning{background:#fef3c7;color:#d97706;}</style>';
+};
+window.r6pRunHandoverCheck=function(){
+  var btn=document.querySelector('#r6p-handover-section button');
+  var badge=document.getElementById('r6p-handover-status-badge');
+  if(badge){badge.textContent='RUNNING';badge.style.background='#1d4ed8';badge.style.color='#bfdbfe';}
+  fetch('/api/r6/handover-checks/run',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({bundle_dir:R6P.creds&&R6P.creds.gitops&&R6P.creds.gitops.localPath||'',bs_name:(R6P.bs&&R6P.bs.name)||''})})
+  .then(function(r){return r.json();})
+  .then(function(d){r6pPollHandover(d.run_id);})
+  .catch(function(e){if(badge){badge.textContent='ERROR';badge.style.background='#7f1d1d';badge.style.color='#fca5a5';}});
+};
+window.r6pPollHandover=function(runId){
+  if(!runId)return;
+  var interval=setInterval(function(){
+    fetch('/api/r6/handover-checks/runs/'+runId)
+    .then(function(r){return r.json();})
+    .then(function(d){
+      r6pRenderHandoverResults(d);
+      if(d.status==='done'||d.status==='error'||d.status==='cancelled')clearInterval(interval);
+    }).catch(function(){clearInterval(interval);});
+  },1500);
+};
+window.r6pRenderHandoverResults=function(d){
+  var badge=document.getElementById('r6p-handover-status-badge');
+  if(badge){var s=d.status||'unknown';badge.textContent=s.toUpperCase();badge.style.background=s==='done'?'#166534':s==='error'?'#7f1d1d':'#1d4ed8';badge.style.color=s==='done'?'#bbf7d0':s==='error'?'#fca5a5':'#bfdbfe';}
+  var checks=d.checks||[];
+  var pass=checks.filter(function(c){return c.status==='pass';}).length;
+  var blocked=checks.filter(function(c){return c.status==='blocked';}).length;
+  var warn=checks.filter(function(c){return c.status==='warning';}).length;
+  var na=checks.filter(function(c){return c.status==='na';}).length;
+  var score=checks.length?Math.round((pass/(checks.length-na||1))*100):0;
+  [['score',score+'%'],['passed',pass],['warnings',warn],['blocked',blocked],['na',na],['total',checks.length],['duration',(d.duration_ms?(d.duration_ms/1000).toFixed(1)+'s':'—')]].forEach(function(p){var el=document.getElementById('r6p-hsc-'+p[0]);if(el)el.textContent=p[1];});
+  var tbody=document.getElementById('r6p-handover-tbody');
+  if(!tbody)return;
+  if(!checks.length){tbody.innerHTML='<tr><td colspan="7" style="text-align:center;color:#94a3b8;padding:20px;">No checkpoint data yet.</td></tr>';return;}
+  tbody.innerHTML=checks.map(function(c){
+    var sc=c.status==='pass'?'#16a34a':c.status==='blocked'?'#dc2626':c.status==='warning'?'#d97706':'#94a3b8';
+    var dot=c.status==='pass'?'&#10003;':c.status==='blocked'?'&#10007;':c.status==='warning'?'&#9651;':'&#9679;';
+    return '<tr><td><span style="color:'+sc+';font-weight:700;">'+dot+'</span></td><td style="font-size:10px;color:#64748b;">'+( c.id||'')+'</td><td style="font-weight:600;">'+( c.name||'')+'</td><td style="font-size:11px;color:#475569;">'+( c.result||'')+'</td><td><span style="font-size:10px;font-weight:700;color:'+(c.blocking?'#dc2626':'#64748b')+'">'+(c.blocking?'YES':'—')+'</span></td><td style="font-size:11px;color:#64748b;">'+(c.duration_ms?(c.duration_ms)+'ms':'—')+'</td><td><button onclick="r6pHandoverRetryOne(\''+( c.id||'')+'\')" style="font-size:10px;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:4px;padding:2px 6px;cursor:pointer;">Retry</button></td></tr>';
+  }).join('');
+  var dots=document.querySelectorAll('[data-check]');
+  dots.forEach(function(el){var lbl=el.getAttribute('data-check');var match=checks.find(function(c){return c.name===lbl;});if(match){el.className='r6h-badge r6h-badge-'+(match.status==='pass'?'pass':match.status==='blocked'?'blocked':match.status==='warning'?'warning':'pending');el.textContent=match.status==='pass'?'Pass':match.status==='blocked'?'Blocked':match.status==='warning'?'Warning':'Pending';}});
+};
+window.r6pStopHandover=function(){};
+window.r6pRetryHandover=function(){r6pRunHandoverCheck();};
+window.r6pExportHandover=function(){var t=document.getElementById('r6p-handover-tbody');if(!t)return;var blob=new Blob([t.innerText],{type:'text/plain'});var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='r6_handover_check_'+Date.now()+'.txt';a.click();};
+window.r6pHFilter=function(f){var rows=document.querySelectorAll('#r6p-handover-tbody tr');rows.forEach(function(r){r.style.display=(f==='all'||r.textContent.toLowerCase().indexOf(f)>=0)?'':'none';});};
+window.r6pHSearch=function(q){var rows=document.querySelectorAll('#r6p-handover-tbody tr');rows.forEach(function(r){r.style.display=r.textContent.toLowerCase().indexOf(q.toLowerCase())>=0?'':'none';});};
+window.r6pHandoverLoad=function(){var hp=document.getElementById('r6p-h-hostport');var phone=document.getElementById('r6p-handover-phone');if(hp&&hp.value&&phone){phone.innerHTML='<iframe src="http://'+hp.value+'" style="width:100%;height:100%;border:none;"></iframe>';}};
+window.r6pHandoverHealth=function(){var hp=document.getElementById('r6p-h-hostport');if(!hp||!hp.value)return;var hh=document.getElementById('r6p-h-http');var hl=document.getElementById('r6p-h-lat');var t=Date.now();fetch('http://'+hp.value+'/health').then(function(r){if(hh)hh.textContent=r.status;if(hl)hl.textContent=(Date.now()-t)+'ms';}).catch(function(){if(hh)hh.textContent='ERR';});};
+window.r6pHandoverReady=function(){r6pHandoverHealth();};
+window.r6pHandoverLogin=function(){var hp=document.getElementById('r6p-h-hostport');if(hp&&hp.value)window.open('http://'+hp.value+'/login','_blank');};
+/* Stage 13 "Load in R6 Phone Preview" - feeds a component's target host:port
+   straight into the Handover section's phone mockup (r6p-handover-phone),
+   the R6-native device preview, instead of sending the user out to Stage 4's
+   separate UAT bench. */
+window.r6pOpenMobileBench=function(compName){
+  var c=(R6P.components||[]).find(function(x){return x.name===compName;});
+  if(!c){alert('Component not found.');return;}
+  var m=String(c.tgt||'').match(/^[a-zA-Z0-9+.-]+:\/\/([^\/:]+)(?::(\d+))?/);
+  var host=m?m[1]:'', port=m&&m[2]?m[2]:'';
+  if(!host){alert(c.name+' has no FLEX Target IP/URL yet - fill it in Step 1 Inspect first.');return;}
+  var hp=document.getElementById('r6p-h-hostport');
+  if(hp)hp.value=host+(port?':'+port:'');
+  var section=document.getElementById('r6p-handover-section');
+  if(section&&section.scrollIntoView)section.scrollIntoView({behavior:'smooth',block:'start'});
+  setTimeout(function(){ if(typeof window.r6pHandoverLoad==='function')window.r6pHandoverLoad(); },350);
+};
+window.r6pHandoverRetryOne=function(id){};
+window.r6pComponentCatalogRows=function(){
+  var comps=R6P.components||[];
+  if(!comps.length)return '<tr><td colspan="6" style="color:#64748b;font-style:italic;">No components selected yet.</td></tr>';
+  return comps.map(function(c){
+    var cls=r6pClassifyForComponent(c);
+    var ep=r6pParseTargetEndpoint(c.tgt||'');
+    var role=(c.type||c.role||r6pComponentProfile(c).category||'Application').replace(/^Component Type:\s*/i,'');
+    var scan=R6P.depScan&&R6P.depScan[c.name];
+    return '<tr><td style="font-weight:700;">'+c.name+'</td><td>'+role+'</td><td style="font-family:monospace;font-size:11px;color:#0369a1;">'+(c.tgt||'Not mapped')+'</td><td>'+(ep.port||'auto')+'</td><td>'+cls.state+'</td><td>'+(scan?'runtime-inspection.json ready':'pending live scan')+'</td></tr>';
+  }).join('');
+};
+window.r6pDependencyGraphRows=function(){
+  var comps=R6P.components||[];
+  if(!comps.length)return '<tr><td colspan="5" style="color:#64748b;font-style:italic;">No components selected yet.</td></tr>';
+  var rows=[];
+  comps.forEach(function(c){
+    var deps=(R6P.components||[]).filter(function(x){return x.name!==c.name;}).map(function(x){return x.name;});
+    if(!deps.length)rows.push({from:c.name,to:'No in-system dependency detected',proto:'n/a',port:'n/a',evidence:'Business System has one component'});
+    deps.slice(0,5).forEach(function(d){rows.push({from:c.name,to:d,proto:/database|db|postgres|mysql/i.test(d)?'tcp/db':'http/tcp',port:/database|db|postgres|mysql/i.test(d)?'5432/3306':'80/443',evidence:(R6P.depScan&&R6P.depScan[c.name])?'live scan + topology':'imported topology'});});
+  });
+  return rows.map(function(r){return '<tr><td style="font-weight:700;">'+r.from+'</td><td>'+r.to+'</td><td>'+r.proto+'</td><td>'+r.port+'</td><td style="font-size:11px;color:#64748b;">'+r.evidence+'</td></tr>';}).join('');
+};
+window.r6pNormalizedDiscoveryRows=function(){
+  var comps=R6P.components||[];
+  if(!comps.length)return '<tr><td colspan="5" style="color:#64748b;font-style:italic;">No components selected yet.</td></tr>';
+  return comps.map(function(c){
+    var reachable=!!(R6P.depScan&&R6P.depScan[c.name]);
+    var form=(R6P.targetForms&&R6P.targetForms[c.name])||r6pDecideTargetForm(c).form;
+    var fallback=(form==='CONTAINERIZED'||form==='PARTIALLY_CONTAINERIZED')?'Stage 9 snapshot eligible':'no container snapshot required';
+    return '<tr><td style="font-weight:700;">'+c.name+'</td><td>'+(c.tgt||'Not mapped')+'</td><td><span style="color:'+(reachable?'#16a34a':'#d97706')+';font-weight:700;">'+(reachable?'reachable / scanned':'not scanned yet')+'</span></td><td>'+fallback+'</td><td style="font-size:11px;color:#64748b;">normalized-discovery.json</td></tr>';
+  }).join('');
+};
 window.r6pContent=function(n){
   if(n===0)return r6pStage0();
   if(n===1)return '<div class="r6p-warn-box">Only FLEX workloads can be converted here. Complete migration to FLEX first.</div><div class="uat-s1-biz-grid"><div><div style="font-weight:800;font-size:15px;color:#0f172a;margin-bottom:12px;">Business Systems <span style="font-size:11px;color:#64748b;font-weight:400;">from FLEX Migration Log</span></div><div id="r6p-biz-list" style="min-height:180px;"></div>'
-    +'</div><div class="uat-s1-arch-selector"><div class="uat-s1-arch-head"><div class="uat-s1-arch-title">Business System Templates</div><span class="uat-s1-arch-badge">10 Templates</span></div><p class="uat-s1-arch-desc">Templates define structure only. Conversion requires real FLEX VM/DB mapping.</p><div class="uat-s1-template-pane active"><div id="r6p-arch-grid" class="uat-s1-arch-grid"></div></div></div></div>'+r6pFoot(1,'<button class="r6p-btn secondary" onclick="r6pLoadBiz()">Refresh FLEX Inventory</button>');
-  if(n===2||n===3||n===4||n===5){
-    var skipMsg={2:'Discover FLEX Snapshots',3:'Select Snapshot / Volume Snapshot',4:'Map Snapshot to Business System Component',5:'Choose Capture and Conversion Method'}[n];
-    return '<div class="r6p-info-box" style="background:#f0fdf4;border-color:#bbf7d0;">'
-      +'<strong>Not required for this business system.</strong> Its components already have a live FLEX target IP and attached volume '
-      +'(captured when the Business System was set up in Step 1) - there is nothing to snapshot or map here.'
+    +'</div><div class="uat-s1-arch-selector"><div class="uat-s1-arch-head"><div class="uat-s1-arch-title">Business System Templates</div><span class="uat-s1-arch-badge">10 Templates</span></div><p class="uat-s1-arch-desc">Templates define structure only. Conversion requires real FLEX VM/DB mapping.</p><div class="uat-s1-template-pane active"><div id="r6p-arch-grid" class="uat-s1-arch-grid"></div></div></div></div>'+r6pFoot(1);
+  if(n===2){
+    var comps2=R6P.components||[];
+    return '<div class="r6p-info-box">Refresh the selected Business System inventory before runtime inspection. This confirms current FLEX VM IDs, states, IPs, attached volumes, networks and existing snapshot metadata; it does not create snapshots.</div>'
+      +'<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:14px;">'
+      +[['Components',comps2.length],['Mapped endpoints',comps2.filter(function(c){return c.tgt;}).length],['Attached-volume hints',comps2.filter(function(c){return /database|db|storage|queue|cache/i.test(c.name||c.type||'');}).length],['Live scans',R6P.depScan?Object.keys(R6P.depScan).length:0],['Snapshot action','Stage 9 only']].map(function(x){return '<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:9px 12px;text-align:center;"><div style="font-size:16px;font-weight:900;color:#0369a1;">'+x[1]+'</div><div style="font-size:9px;font-weight:800;color:#64748b;text-transform:uppercase;">'+x[0]+'</div></div>';}).join('')
       +'</div>'
-      +'<div style="font-size:12px;color:#64748b;margin-bottom:14px;">"'+skipMsg+'" only applies when a component is offline/stopped and can only be reached via a snapshot. '
-      +'<a href="#" onclick="var e=document.getElementById(\'r6p-legacy-snap-'+n+'\');if(e)e.style.display=e.style.display===\'none\'?\'block\':\'none\';return false;">Use snapshot capture for an offline component instead &rarr;</a></div>'
-      +'<div id="r6p-legacy-snap-'+n+'" style="display:none;margin-bottom:14px;"><iframe src="/image_migrator/?mode=flex2flex&embedded=1&focus=snapshot" style="width:100%;height:500px;border:1px solid #e2e8f0;border-radius:10px;display:block;"></iframe></div>'
+      +'<pre style="background:#0f172a;color:#7dd3fc;border-radius:8px;padding:12px;font-size:11px;white-space:pre-wrap;max-height:180px;overflow:auto;">hydrated-source-system.json\n'+JSON.stringify({businessSystem:R6P.bs&&R6P.bs.name||null,components:comps2.map(function(c){return {name:c.name,target:c.tgt||'',source:c.src||'',health:c.path||'',type:c.type||''};})},null,2)+'</pre>'
+      +r6pFoot(n);
+  }
+  if(n===3){
+    var comps6=(R6P.components||[]);
+    var scanOptions=comps6.length?'<option value="__all__">All components scan ('+comps6.length+')</option>'+comps6.map(function(c,i){return '<option value="'+i+'">'+r6pHtml(c.name)+' — '+r6pHtml(r6pComponentTarget(c)||'mapping required')+'</option>';}).join(''):'<option value="">No components</option>';
+    var pendingCards=comps6.map(function(c){
+      var endpoint=r6pComponentTarget(c),vm=c.vmId||c.vm_id||c.sourceVmId||c.name;
+      return '<div style="border:1px solid #cbd5e1;border-top:4px solid #94a3b8;border-radius:9px;background:#fff;padding:13px;">'
+        +'<div style="display:flex;justify-content:space-between;gap:8px;"><strong>'+r6pHtml(c.name)+'</strong><span style="font-size:10px;color:#64748b;font-weight:900;">NOT_TESTED</span></div>'
+        +'<div style="font-size:11px;color:#64748b;margin:5px 0;">Source VM: '+r6pHtml(vm)+'</div>'
+        +'<div style="font-size:11px;color:#334155;">Endpoint: '+r6pHtml(endpoint)+'<br>Connectivity: Pending<br>Runtime: Pending<br>Services: Pending<br>Ports: Pending<br>Application paths: Pending<br>Persistence: Pending<br>Dependencies: Pending<br>Health: Not tested<br>Secret safety: Not tested</div>'
+        +'<div style="display:flex;gap:12px;font-size:12px;margin-top:8px;"><b>Readiness —</b><b>Evidence —</b></div>'
+        +'<div style="font-size:11px;color:#64748b;margin-top:7px;">Capture: Pending appraisal<br>Container recommendation: Pending appraisal</div>'
+        +'</div>';
+    }).join('');
+    var pendingAppraisal='<div style="border:2px solid #94a3b8;border-radius:10px;padding:14px;margin-bottom:14px;background:#fff;">'
+      +'<div style="display:flex;justify-content:space-between;gap:10px;"><div><h3 style="margin:0 0 4px;">Business Apps System Scan Appraisal</h3><div style="font-size:12px;color:#64748b;">'+r6pHtml((R6P.bs&&R6P.bs.name)||'Selected Business Apps System')+'</div></div><span style="color:#64748b;font-weight:900;">NOT_TESTED</span></div>'
+      +'<div style="margin-top:10px;font-size:12px;"><b>'+comps6.length+' logical components queued</b> &bull; 0 probes executed &bull; Final verdict pending</div>'
+      +'<div style="margin-top:6px;font-size:11px;color:#64748b;">Run the full live scan to calculate evidence completeness, container readiness, warnings, blockers and the Stage 8 recommendation.</div>'
+      +'</div>';
+    var pendingResults='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:12px;">'+pendingCards+'</div>';
+    var uiChoices=R6_SCAN_UI_VERSIONS.map(function(v){return '<option value="'+v.id+'"'+(v.id===R6P.scanUiVersion?' selected':'')+'>'+v.label+'</option>';}).join('');
+    return '<div style="display:flex;justify-content:flex-start;align-items:flex-end;gap:8px;margin-bottom:10px;"><div><label style="font-size:11px;font-weight:800;color:#334155;display:block;margin-bottom:4px;">Scan UI Theme</label><select id="r6p-scan-ui-version" style="padding:7px 30px 7px 9px;border:1px solid #94a3b8;border-radius:6px;background:#fff;font-size:12px;font-weight:700;min-width:160px;">'+uiChoices+'</select></div><button class="r6p-btn primary" onclick="r6pApplySelectedScanUiTheme()">Apply Theme</button></div>'
+      +'<div class="r6p-info-box"><strong>Component Scan Appraisal</strong><br>Evaluate the runtime, services, application files, dependencies, storage, health, security and containerization constraints of every Business Apps System component. Twenty independent, allowlisted probes preserve exit code, stdout, stderr, timeout and truncation evidence. No snapshots are created.</div>'
+      +'<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px;">'
+      +'<div><label style="font-size:11px;font-weight:700;color:#334155;display:block;margin-bottom:4px;">Component scan scope</label><select id="r6p-scan-comp" onchange="r6pScanScopeChanged()" style="padding:7px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;min-width:310px;">'+scanOptions+'</select></div>'
+      +'<div><label style="font-size:11px;font-weight:700;color:#334155;display:block;margin-bottom:4px;">SSH User</label><input id="r6p-scan-user" value="root" style="padding:7px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;width:100px;"></div>'
+      +'<div><label style="font-size:11px;font-weight:700;color:#334155;display:block;margin-bottom:4px;">SSH Key Path</label><input id="r6p-scan-key" value="~/.ssh/id_rsa" style="padding:7px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;width:160px;"></div>'
+      +'<div><label style="font-size:11px;font-weight:700;color:#334155;display:block;margin-bottom:4px;">Managed known_hosts</label><input id="r6p-scan-known-hosts" value="~/.ssh/known_hosts" style="padding:7px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;width:180px;"></div>'
+      +'<button id="r6p-full-scan-btn" class="r6p-btn primary" onclick="r6pStartProductionScan()" style="padding:8px 16px;font-size:12px;">&#9654; Run Scan</button>'
+      +'<button id="r6p-stop-scan-btn" class="r6p-btn secondary" onclick="r6pStopProductionScan()" style="padding:8px 16px;font-size:12px;" disabled>Stop Scan</button>'
+      +'<button class="r6p-btn secondary" onclick="r6pRefreshAppraisal()" style="padding:8px 16px;font-size:12px;">Refresh Appraisal</button>'
+      +'<button class="r6p-btn secondary" onclick="r6pExportProductionScan()" style="padding:8px 16px;font-size:12px;">&#11015; Export Evidence</button>'
+      +'<button class="r6p-btn secondary" onclick="r6pExportAllAppraisalsCsv()" style="padding:8px 16px;font-size:12px;">&#11015; Export All Appraisal Results CSV</button>'
+      +'</div>'
+      +r6pProductionScanTerminal()
+      +'<div id="r6p-scan-appraisal">'+(comps6.length?pendingResults:'<div class="r6p-warn-box">No components with FLEX target endpoints are available. Select and inspect a Business System in Stage 1 first.</div>')+'</div>'
+      +'<div id="r6p-scan-final-verdict">'+(comps6.length?pendingAppraisal:'')+'</div>'
+      +'<div id="r6p-scan-failed-checks"></div>'
+      +'<div id="r6p-appraisal-drawer" style="display:none;position:fixed;inset:0;z-index:10020;background:rgba(15,23,42,.55);" onclick="if(event.target===this)r6pCloseAppraisal()"><div style="position:absolute;right:0;top:0;bottom:0;width:min(760px,94vw);background:#fff;overflow:auto;padding:20px;box-shadow:-8px 0 30px #0f172a55;"><button class="r6p-btn secondary" onclick="r6pCloseAppraisal()" style="float:right;">Close</button><div id="r6p-appraisal-detail"></div></div></div>'
+      +r6pFoot(n);
+  }
+  if(n===4){
+    return '<div class="r6p-info-box">Convert VM-level topology and live-scan evidence into application components: frontend, API, backend, worker, scheduler, database, cache, queue and storage.</div>'
+      +'<div style="overflow-x:auto;margin-bottom:14px;"><table class="r6p-table"><thead><tr><th>Component</th><th>Role / Category</th><th>Current FLEX Endpoint</th><th>Port</th><th>Initial State</th><th>Evidence</th></tr></thead><tbody>'+r6pComponentCatalogRows()+'</tbody></table></div>'
+      +'<pre style="background:#0f172a;color:#c4b5fd;border-radius:8px;padding:12px;font-size:11px;white-space:pre-wrap;max-height:160px;overflow:auto;">component-catalog.json\n'+JSON.stringify((R6P.components||[]).map(function(c){return {name:c.name,type:c.type||'',target:c.tgt||'',health:c.path||'',runtime:r6pGuessRuntime(c)};}),null,2)+'</pre>'
+      +r6pFoot(n);
+  }
+  if(n===5){
+    return '<div class="r6p-info-box">Define consumer/provider relationships, protocols, ports, current endpoints, authentication/TLS placeholders and startup order. Live-scan evidence strengthens this graph when available.</div>'
+      +'<div style="overflow-x:auto;margin-bottom:14px;"><table class="r6p-table"><thead><tr><th>Consumer</th><th>Provider</th><th>Protocol</th><th>Port</th><th>Evidence</th></tr></thead><tbody>'+r6pDependencyGraphRows()+'</tbody></table></div>'
+      +'<pre style="background:#0f172a;color:#7dd3fc;border-radius:8px;padding:12px;font-size:11px;white-space:pre-wrap;max-height:180px;overflow:auto;">dependency-graph.yaml\n# generated from selected Business System and runtime inspection\n'+(R6P.components||[]).map(function(c){return '- consumer: '+c.name+'\n  providers: '+(R6P.components||[]).filter(function(x){return x.name!==c.name;}).map(function(x){return x.name;}).join(', ');}).join('\n')+'</pre>'
       +r6pFoot(n);
   }
   if(n===6){
-    var comps6=(R6P.components||[]).filter(function(c){return c.tgt;});
-    var opts6=comps6.length?comps6.map(function(c,i){return '<option value="'+i+'">'+c.name+' ('+c.tgt+')</option>';}).join(''):'<option value="">No components have a FLEX Target IP yet - go to Step 1, click Inspect on the selected system, and fill in Target IP for each component</option>';
-    return '<div class="r6p-info-box">Live scan over SSH against the FLEX VM already backing this component - no snapshot needed, it is already running with its real volumes attached.</div>'
-      +'<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px;">'
-      +'<div><label style="font-size:11px;font-weight:700;color:#334155;display:block;margin-bottom:4px;">Component</label><select id="r6p-scan-comp" style="padding:7px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;min-width:260px;">'+opts6+'</select></div>'
-      +'<div><label style="font-size:11px;font-weight:700;color:#334155;display:block;margin-bottom:4px;">SSH User</label><input id="r6p-scan-user" value="root" style="padding:7px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;width:100px;"></div>'
-      +'<div><label style="font-size:11px;font-weight:700;color:#334155;display:block;margin-bottom:4px;">SSH Key Path</label><input id="r6p-scan-key" value="~/.ssh/id_rsa" style="padding:7px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;width:160px;"></div>'
-      +'<button class="r6p-btn primary" onclick="r6pRunLiveScan()" style="padding:8px 16px;font-size:12px;">&#9654; Run Live Scan</button>'
-      +'<button class="r6p-btn secondary" onclick="r6pExportDepScan()" style="padding:8px 16px;font-size:12px;">&#11015; Export app_dependency_report.json</button>'
-      +'</div>'
-      +'<div id="r6p-scan-out" class="r6p-terminal" style="display:none;max-height:260px;"></div>'
-      +r6pFoot(6);
+    return '<div class="r6p-info-box">Merge imported topology and live inspection results. Mark unreachable VMs and record snapshot fallback availability for Stage 9 only.</div>'
+      +'<div style="overflow-x:auto;margin-bottom:14px;"><table class="r6p-table"><thead><tr><th>Component</th><th>Endpoint</th><th>Runtime Evidence</th><th>Snapshot Fallback</th><th>Output</th></tr></thead><tbody>'+r6pNormalizedDiscoveryRows()+'</tbody></table></div>'
+      +'<pre style="background:#0f172a;color:#2dd4bf;border-radius:8px;padding:12px;font-size:11px;white-space:pre-wrap;max-height:180px;overflow:auto;">normalized-discovery.json\n'+JSON.stringify({businessSystem:R6P.bs&&R6P.bs.name||null,scanned:Object.keys(R6P.depScan||{}),components:(R6P.components||[]).map(function(c){return {name:c.name,reachable:!!(R6P.depScan&&R6P.depScan[c.name]),snapshotFallback:'Stage 9 only after decision'};})},null,2)+'</pre>'
+      +r6pFoot(n);
   }
   if(n===7){var rows7=[
       ['app_code','Container image','Include','Your actual application code (binaries, scripts, compiled assets). This is what gets COPYed into the Dockerfile.'],
@@ -682,15 +1073,17 @@ window.r6pContent=function(n){
     var counts={CLOUD_NATIVE_READY:0,READY_WITH_EXTERNALIZATION:0,KEEP_ON_FLEX_VM_FOR_NOW:0,COMPATIBILITY_CONTAINER_ONLY:0,BLOCKED:0};
     decisions.forEach(function(d){counts[d.status]=(counts[d.status]||0)+1;});
     var tiles=[['CLOUD_NATIVE_READY','#dcfce7','#16a34a'],['READY_WITH_EXTERNALIZATION','#fef3c7','#d97706'],['KEEP_ON_FLEX_VM_FOR_NOW','#dbeafe','#1d4ed8'],['COMPATIBILITY_CONTAINER_ONLY','#faf5ff','#7c3aed'],['BLOCKED','#fee2e2','#dc2626']];
-    var allCanProceed=decisions.every(function(d){return d.status!=='BLOCKED';});
-    return '<div class="r6p-info-box">Migration mode decision engine - evaluates each component'+"'"+'s type, OS, and (if run) Step 2-6 live scan results to recommend rehost vs. containerize.</div>'
+    var missingScans=comps8.filter(function(c){return r6pComponentTarget(c)&&!(R6P.depScan&&R6P.depScan[c.name]&&R6P.depScan[c.name].completed===true)&&!r6pAppraisalAllowsStage8(c);});
+    var allCanProceed=decisions.every(function(d){return d.status!=='BLOCKED';})&&missingScans.length===0;
+    return '<div class="r6p-info-box">Migration mode decision engine - evaluates each component'+"'"+'s type, OS, and Steps 3-6 discovery evidence to assign container, operator, VM, external, data-migration, manual-review or blocked targets.</div>'
       +'<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:14px;">'
       +tiles.map(function(b){return '<div style="background:'+b[1]+';border-radius:8px;padding:10px;text-align:center;"><div style="font-size:16px;font-weight:900;color:'+b[2]+';">'+(counts[b[0]]||0)+'</div><div style="font-size:9px;color:'+b[2]+';font-weight:700;margin-top:2px;">'+b[0].replace(/_/g,' ')+'</div></div>';}).join('')
       +'</div><div style="overflow-x:auto;"><table class="r6p-table"><thead><tr><th>Component</th><th>Workload Type</th><th>Readiness</th><th>Reason</th><th>Recommended Method</th><th>Can Proceed</th></tr></thead><tbody>'
       +decisions.map(function(d){var rc={CLOUD_NATIVE_READY:['#dcfce7','#16a34a'],READY_WITH_EXTERNALIZATION:['#fef3c7','#d97706'],KEEP_ON_FLEX_VM_FOR_NOW:['#dbeafe','#1d4ed8'],COMPATIBILITY_CONTAINER_ONLY:['#faf5ff','#7c3aed'],BLOCKED:['#fee2e2','#dc2626']}[d.status];
         return '<tr><td style="font-weight:600;">'+d.name+'</td><td style="font-size:11px;color:#64748b;">'+d.workloadType+'</td><td><span style="background:'+rc[0]+';color:'+rc[1]+';padding:2px 8px;border-radius:999px;font-size:10px;font-weight:700;">'+d.status.replace(/_/g,' ')+'</span></td><td style="font-size:11px;color:#64748b;max-width:220px;">'+d.reason+'</td><td style="font-size:11px;color:#0369a1;font-weight:700;">'+d.method+'</td><td><span style="background:'+(d.status==='BLOCKED'?'#fee2e2':'#dcfce7')+';color:'+(d.status==='BLOCKED'?'#dc2626':'#16a34a')+';padding:2px 8px;border-radius:999px;font-size:10px;font-weight:700;">'+(d.status==='BLOCKED'?'No':'Yes')+'</span></td></tr>';}).join('')
       +'</tbody></table></div>'
-      +(allCanProceed?'':'<div class="r6p-warn-box" style="margin-top:10px;">One or more components are BLOCKED - resolve before approving.</div>')
+      +(missingScans.length?'<div class="r6p-warn-box" style="margin-top:10px;">Live scan required before approval: '+missingScans.map(function(c){return c.name;}).join(', ')+'</div>':'')
+      +(decisions.some(function(d){return d.status==='BLOCKED';})?'<div class="r6p-warn-box" style="margin-top:10px;">One or more components are BLOCKED - resolve before approving.</div>':'')
       +'<div style="font-weight:800;font-size:13px;color:#0f172a;margin:20px 0 8px;">Transform: Target Runtime Decision (Hybrid)</div>'
       +'<div class="r6p-info-box">Assigns every real selected component one of 11 target forms - CONTAINERIZED, KUBERNETES_NATIVE, OPERATOR_MANAGED, RETAINED_FLEX_VM, REDEPLOYED_FLEX_VM, EXTERNAL_SERVICE, DATA_MIGRATION_REQUIRED, PARTIALLY_CONTAINERIZED, MANUAL_REVIEW, BLOCKED or EXCLUDED. Engineers can override any row - overrides are saved per component.</div>'
       +'<div style="overflow-x:auto;"><table class="r6p-table"><thead><tr><th>Component</th><th>State</th><th>Containerized</th><th>Default Target Form</th><th>UI Decision Badge</th><th>Lifecycle</th><th>Required Gate Before Deploy</th><th>Reason</th><th>Override</th></tr></thead><tbody>'
@@ -707,12 +1100,41 @@ window.r6pContent=function(n){
         return '<tr><td style="font-weight:600;">'+c.name+'</td><td><span style="background:'+stDot+'22;color:'+stDot+';padding:2px 8px;border-radius:999px;font-size:10px;font-weight:700;">'+cls.state+'</span></td><td style="font-size:11px;color:#334155;">'+isContainerized+'</td><td><span style="background:#eff6ff;color:#0369a1;padding:2px 8px;border-radius:999px;font-size:10px;font-weight:700;">'+saved+'</span></td><td><span style="background:'+badge[1]+'22;color:'+badge[1]+';padding:2px 8px;border-radius:999px;font-size:10px;font-weight:700;">'+badge[0]+'</span></td><td style="font-size:10px;color:#7c3aed;font-weight:700;">'+lc.replace(/_/g,' ')+'</td><td style="font-size:11px;color:#64748b;max-width:180px;">'+gate+'</td><td style="font-size:11px;color:#64748b;max-width:200px;">'+tf.reason+'</td><td><select onchange="r6pSetTargetForm(\''+c.name.replace(/'/g,"\\'")+'\',this.value)" style="padding:4px 6px;border:1px solid #cbd5e1;border-radius:5px;font-size:11px;">'+opts+'</select></td></tr>';
       }).join('')
       +'</tbody></table></div>'
-      +r6pFoot(8,'<button class="r6p-btn success" onclick="r6pMarkDone(8)"'+(allCanProceed?'':' disabled')+'>Approve Readiness Plan</button>');}
+      +'<div class="r6p-stage-footer"><button class="r6p-btn success" onclick="r6pMarkDone(8)"'+(allCanProceed?'':' disabled')+'>Approve Readiness Plan</button>'
+      +'<button class="r6p-btn primary" onclick="r6pGoTo(9)"'+(allCanProceed?'':' disabled')+'>Continue</button></div>';}
   if(n===9){
     var buildableComps9=(R6P.components||[]).filter(function(c){
       var form=(R6P.targetForms&&R6P.targetForms[c.name])||r6pDecideTargetForm(c).form;
       return form==='CONTAINERIZED'||form==='PARTIALLY_CONTAINERIZED';
     });
+    var stage9Rows=[
+      ['9.1','Read Stage 8 decisions','Every component'],
+      ['9.2','Select CONTAINERIZED and PARTIALLY_CONTAINERIZED components','Container targets only'],
+      ['9.3','Reuse an approved existing snapshot or create a new VM/volume snapshot','Container targets requiring extraction'],
+      ['9.4','Wait until snapshot is available','Snapshot targets'],
+      ['9.5','Mount or expose snapshot read-only','Snapshot targets'],
+      ['9.6','Extract only approved application paths','Container targets'],
+      ['9.7','Remove secrets, logs, temporary files, host keys, backups and database files','Every extracted context'],
+      ['9.8','Calculate source checksum and record lineage','Every extracted context'],
+      ['9.9','Generate Dockerfile and build configuration','Custom container targets'],
+      ['9.10','Build and start-test the image','Custom container targets'],
+      ['9.11','Compare container ports, runtime, health and dependencies with live-scan evidence','Custom container targets'],
+      ['9.12','Generate SBOM and vulnerability scan','Custom container targets'],
+      ['9.13','Push and optionally sign the image','Successful images'],
+      ['9.14','Resolve immutable digest and update component state','Successful images'],
+      ['9.15','Preserve VM image, network, volume and cloud-init definitions','Retained/redeployed VM targets']
+    ].map(function(r){return '<tr><td style="font-weight:800;color:#0369a1;">'+r[0]+'</td><td>'+r[1]+'</td><td style="font-size:11px;color:#64748b;">'+r[2]+'</td></tr>';}).join('');
+    var decisionRows=[
+      ['CONTAINERIZED','Snapshot or clone application source','Build custom OCI image'],
+      ['PARTIALLY_CONTAINERIZED','Snapshot execution files, exclude durable state','Build image plus external storage/data plan'],
+      ['OPERATOR_MANAGED','No normal VM filesystem snapshot','Generate operator CR and data migration plan'],
+      ['RETAINED_FLEX_VM','No containerization snapshot','Preserve VM definition and Service binding'],
+      ['REDEPLOYED_FLEX_VM','Preserve VM image/volume source','Generate OpenCenter VM provisioning definition'],
+      ['EXTERNAL_SERVICE','No snapshot','Generate Service/DNS/Secret contract'],
+      ['DATA_MIGRATION_REQUIRED','Use native migration method','Generate migration commands and validation'],
+      ['BLOCKED','No snapshot','Stop pipeline for that component'],
+      ['EXCLUDED','No action','Component omitted']
+    ].map(function(r){return '<tr><td style="font-weight:800;">'+r[0]+'</td><td>'+r[1]+'</td><td style="font-size:11px;color:#64748b;">'+r[2]+'</td></tr>';}).join('');
     var startCmdRows=buildableComps9.map(function(c){
       var detected=(R6P.startCmdOverride&&R6P.startCmdOverride[c.name])||r6pDetectStartCommand(c);
       var missing=!detected;
@@ -722,17 +1144,26 @@ window.r6pContent=function(n){
         +'style="width:100%;padding:5px 7px;border:1px solid '+(missing?'#fca5a5':'#cbd5e1')+';border-radius:5px;font-size:11px;font-family:monospace;"></td>'
         +'<td>'+(missing?'<span style="color:#dc2626;font-size:10px;font-weight:700;">Not detected - run Live Scan or set manually</span>':'<span style="color:#16a34a;font-size:10px;font-weight:700;">Detected from Live Scan</span>')+'</td></tr>';
     }).join('');
-    return '<div class="r6p-info-box">Generates a real per-component Dockerfile, extract_assets.sh (pulls app files from the live FLEX VM), build_and_push.sh (build, SBOM, scan, sign, push, resolve digest), and a SOPS-encrypted registry pull secret. Images are only built for components Step 8 decided are CONTAINERIZED or PARTIALLY_CONTAINERIZED - everything else (operator-managed, retained/redeployed VM, external, data-migration, blocked) is skipped here by design.</div>'
+    return '<div class="r6p-info-box">Stage 9 captures source safely after Stage 8 approval: snapshot only approved container targets, extract read-only, sanitize the build context, build/test/scan/sign/push images, resolve digests, and preserve VM artifacts. Databases do not follow the normal snapshot-to-container path.</div>'
+    +'<div class="r6p-info-box" style="margin-bottom:14px;"><strong>OpenStack source capture:</strong> Stage 9 reuses a valid indexed snapshot or creates VM image / relevant Cinder volume snapshots with the authenticated OpenStack CLI, waits for availability, and records immutable lineage before extraction.</div>'
+    +'<div style="font-weight:800;font-size:13px;color:#0f172a;margin-bottom:6px;">Stage 9 Production Substeps</div>'
+    +'<div style="overflow-x:auto;margin-bottom:14px;"><table class="r6p-table"><thead><tr><th>#</th><th>Action</th><th>Applicability</th></tr></thead><tbody>'+stage9Rows+'</tbody></table></div>'
+    +'<div style="font-weight:800;font-size:13px;color:#0f172a;margin-bottom:6px;">Decision-Specific Source Path</div>'
+    +'<div style="overflow-x:auto;margin-bottom:14px;"><table class="r6p-table"><thead><tr><th>Component Decision</th><th>Snapshot Action</th><th>Stage 9 Result</th></tr></thead><tbody>'+decisionRows+'</tbody></table></div>'
+    +'<div class="r6p-warn-box" style="margin-bottom:14px;"><strong>Database exception:</strong> active database files must not be copied into a Docker image. Retain DB VMs, redeploy DB VMs, use operator dump/restore or replication, external managed endpoints, or approved schema/seed rebuilds for test databases.</div>'
     +(buildableComps9.length?('<div style="font-weight:800;font-size:13px;color:#0f172a;margin-bottom:6px;">Start Command Review</div>'
       +'<div class="r6p-warn-box" style="margin-bottom:10px;">A container with no start command will not run your application - it will exit or hang doing nothing even though Kubernetes shows it as scheduled. Review every row below before building.</div>'
       +'<div style="overflow-x:auto;margin-bottom:14px;"><table class="r6p-table"><thead><tr><th>Component</th><th>Start Command</th><th>Source</th></tr></thead><tbody>'+startCmdRows+'</tbody></table></div>'):'')
+    +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;"><div style="font-weight:800;font-size:13px;color:#0f172a;">Approved Container Source Capture</div>'
+    +'<button onclick="r6pPreviewArtifact(\'source-lineage.json\')" style="background:#f1f5f9;color:#334155;border:1px solid #e2e8f0;border-radius:4px;padding:3px 10px;font-size:10px;cursor:pointer;">Preview snapshot lineage</button></div>'
+    +'<div style="overflow-x:auto;margin-bottom:14px;"><table class="r6p-table"><thead><tr><th>Component</th><th>Source VM</th><th>Decision</th><th>Snapshot</th><th>Snapshot ID</th><th>Extraction</th><th>Build</th></tr></thead><tbody id="r6p-capture-tbody">'+r6pBuildCaptureRows()+'</tbody></table></div>'
     +'<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px;">'
     +'<div><label style="font-size:11px;font-weight:700;color:#334155;display:block;margin-bottom:4px;">Registry</label><select id="r6p-build-regtype" style="padding:7px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;"><option value="harbor" selected>Harbor (in-cluster, recommended default)</option><option value="dockerhub">Docker Hub</option><option value="ghcr">GitHub Container Registry</option><option value="gitlab">GitLab Container Registry</option><option value="quay">Quay.io</option><option value="ecr">AWS ECR (private)</option><option value="ecrpublic">AWS ECR Public</option><option value="gcp">GCP Artifact Registry</option><option value="custom">Custom OCI URL</option></select></div>'
     +'<div><label style="font-size:11px;font-weight:700;color:#334155;display:block;margin-bottom:4px;">Registry URL (optional)</label><input id="r6p-build-regurl" placeholder="registry.example.com" style="padding:7px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;width:200px;"></div>'
     +'<div><label style="font-size:11px;font-weight:700;color:#334155;display:block;margin-bottom:4px;">Project</label><input id="r6p-build-project" value="flex-apps" style="padding:7px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;width:120px;"></div>'
     +'<div><label style="font-size:11px;font-weight:700;color:#334155;display:block;margin-bottom:4px;">Registry User</label><input id="r6p-build-reguser" placeholder="admin" style="padding:7px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;width:100px;"></div>'
     +'<div><label style="font-size:11px;font-weight:700;color:#334155;display:block;margin-bottom:4px;">Registry Password</label><input id="r6p-build-regpass" type="password" style="padding:7px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;width:120px;"></div>'
-    +'<button class="r6p-btn primary" onclick="r6pGenRealDockerfiles()" style="padding:8px 16px;font-size:12px;">&#9654; Generate Dockerfiles + Build Plan</button>'
+    +'<button class="r6p-btn primary" onclick="r6pGenRealDockerfiles()" style="padding:8px 16px;font-size:12px;">&#9654; Capture Sources &amp; Build Containers</button>'
     +'</div>'
     +'<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 14px;margin-bottom:14px;">'
     +'<div style="font-size:11px;font-weight:700;color:#334155;margin-bottom:6px;">Build Mode</div>'
@@ -876,6 +1307,7 @@ window.r6pContent=function(n){
       +'# 8. Rollback path: revert DNS/LB to source VM if error rate/latency regress';
     var nsSlug=((R6P.bs&&R6P.bs.name)||'app').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'');
     var uatRows=(R6P.components||[]).map(function(c){
+      var dtMeta=r6pUatDeviceMeta(c);
       var form=(R6P.targetForms&&R6P.targetForms[c.name])||r6pDecideTargetForm(c).form;
       var compSlug=(c.name||'app').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'');
       var healthPath=(c.path&&c.path.indexOf('/')===0)?c.path.split(',')[0]:'/health';
@@ -899,8 +1331,14 @@ window.r6pContent=function(n){
         uatCmd='# '+c.name+' ('+form+') has no in-cluster/VM endpoint to smoke-test automatically - confirm manually per its connectivity plan.';
       }
       return '<div style="border:1px solid #e2e8f0;border-radius:8px;padding:12px;margin-bottom:10px;">'
-        +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px;"><div style="font-weight:800;font-size:13px;color:#0f172a;">'+c.name+'</div><span style="background:#eff6ff;color:#0369a1;padding:2px 8px;border-radius:999px;font-size:10px;font-weight:700;">'+form+'</span></div>'
+        +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px;">'
+        +'<div style="display:flex;align-items:center;gap:8px;">'
+        +'<span style="width:24px;height:24px;border-radius:6px;background:'+dtMeta.color+';color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0;" title="'+dtMeta.label+'">'+dtMeta.icon+'</span>'
+        +'<div><div style="font-weight:800;font-size:13px;color:#0f172a;">'+c.name+'</div><div style="font-size:10px;color:#64748b;">'+dtMeta.label+'</div></div>'
+        +'</div>'
+        +'<span style="background:#eff6ff;color:#0369a1;padding:2px 8px;border-radius:999px;font-size:10px;font-weight:700;">'+form+'</span></div>'
         +r6pCmd('13-uat-'+c.name.replace(/\W+/g,''),uatCmd)
+        +'<button onclick="r6pOpenMobileBench(\''+c.name.replace(/'/g,"\\'")+'\')" style="margin-top:8px;background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;border-radius:6px;padding:5px 10px;font-size:11px;font-weight:700;cursor:pointer;">'+dtMeta.icon+' Load in R6 Phone Preview</button>'
         +'</div>';
     }).join('');
     return '<div class="r6p-info-box">Real per-component data migration and validation commands, plus a cutover checklist with real OpenStack/Kubernetes commands (edit IDs/SGs for your environment).</div>'
@@ -913,6 +1351,7 @@ window.r6pContent=function(n){
       +'<button class="r6p-btn success" onclick="r6pMarkUatSignoff()">&#10003; UAT Sign-off: All Migrated Apps Verified Working</button>'
       +'<span id="r6p-uat-signoff-status" style="font-size:12px;font-weight:700;color:'+(R6P.uatSignedOff?'#16a34a':'#94a3b8')+';">'+(R6P.uatSignedOff?'Signed off '+R6P.uatSignedOff:'Not signed off yet')+'</span>'
       +'</div>'
+      +r6pHandoverSection()
       +r6pFoot(13);
   }
   if(n===14){
@@ -951,11 +1390,10 @@ window.r6pGenReport=function(){
   r6pMarkDone(14);
 };
 
-window.r6pMarkDone=function(n){R6P.status[n]='done';var badge=document.getElementById('r6p-stage-badge-'+n);if(badge){badge.textContent='Complete';badge.style.cssText='background:#dcfce7;color:#16a34a;padding:3px 12px;border-radius:999px;font-size:11px;font-weight:700;';}var card=document.getElementById('r6p-stage-'+n);if(card)card.className='r6p-stage done';var done=Object.values(R6P.status).filter(function(s){return s==='done';}).length;var pct=Math.round(done/(R6P_MAX_STEP+1)*100);var fill=document.getElementById('r6p-fill');if(fill)fill.style.width=pct+'%';var pEl=document.getElementById('r6p-pct');if(pEl)pEl.textContent=pct+'%';r6pRenderProgress();if(n===1)r6pGoTo(7);else if(n<R6P_MAX_STEP&&R6P_RESCAN_GROUP.indexOf(n)<0)r6pGoTo(n+1);};
+window.r6pMarkDone=function(n){R6P.status[n]='done';var badge=document.getElementById('r6p-stage-badge-'+n);if(badge){badge.textContent='Complete';badge.style.cssText='background:#dcfce7;color:#16a34a;padding:3px 12px;border-radius:999px;font-size:11px;font-weight:700;';}var card=document.getElementById('r6p-stage-'+n);if(card)card.className='r6p-stage done';var done=R6P_STEPS.filter(function(s){return R6P.status[s.n]==='done';}).length;var pct=Math.round(done/R6P_STEPS.length*100);var fill=document.getElementById('r6p-fill');if(fill)fill.style.width=pct+'%';var pEl=document.getElementById('r6p-pct');if(pEl)pEl.textContent=pct+'%';r6pRenderProgress();var nextN=r6pAdjacentStep(n,1);if(nextN!==undefined)r6pGoTo(nextN);};
 
-window.r6pNext=function(){if(R6P.current<R6P_MAX_STEP)r6pGoTo(R6P.current+1);};
-window.r6pPrev=function(){if(R6P.current>1)r6pGoTo(R6P.current-1);};
-window.r6pRunCurrent=function(){r6pMarkDone(R6P.current);};
+window.r6pNext=function(){var n=r6pAdjacentStep(R6P.current,1);if(n!==undefined)r6pGoTo(n);};
+window.r6pPrev=function(){var n=r6pAdjacentStep(R6P.current,-1);if(n!==undefined)r6pGoTo(n);};
 
 window.r6pSetMethod=function(m){
   var box=document.getElementById('r6p-compat-confirm-box');
@@ -985,7 +1423,25 @@ window.r6pConfirmCompat=function(){
   cards.forEach(function(c){c.classList.toggle('selected',c.classList.contains('compat'));});
 };;
 
-window.r6pLoadBiz=function(){var list=document.getElementById('r6p-biz-list');if(!list)return;try{var sys=JSON.parse(localStorage.getItem('uatS1_systems')||'[]');if(!sys.length){list.innerHTML='<div style="text-align:center;padding:24px 10px;">'+'<div style="color:#94a3b8;font-size:13px;margin-bottom:12px;">No business systems yet. Create one right here - no need to leave R6.</div>'+'<button class="r6p-btn primary" onclick="typeof uatS1OpenModal===\'function\'&&uatS1OpenModal(null,\'custom\')" style="padding:8px 18px;font-size:12px;">+ Create New Business System</button>'+'</div>';return;}list.innerHTML=sys.map(function(s){var comps=s.components||[];var isSel=R6P.bs&&R6P.bs.id===s.id;var selBtn=isSel?'<button onclick="event.stopPropagation();" class="r6p-btn" style="padding:5px 12px;font-size:11px;background:#16a34a;color:#fff;border:1px solid #15803d;cursor:default;">&#10003; Selected</button>':'<button onclick="event.stopPropagation();r6pSelectBS(\''+s.id+'\')" class="r6p-btn primary" style="padding:5px 12px;font-size:11px;">Select for Refactor</button>';return '<div class="r6p-bs-card" id="r6p-bsc-'+s.id+'" onclick="r6pSelectBS(\''+s.id+'\')">'+'<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;">'+'<div style="display:flex;align-items:center;gap:8px;">'+'<div style="width:32px;height:32px;border-radius:8px;background:#eff6ff;color:#2563eb;font-weight:900;font-size:11px;display:grid;place-items:center;">'+s.name.slice(0,2).toUpperCase()+'</div>'+'<div><div style="font-weight:800;color:#0f172a;font-size:14px;">'+s.name+'</div><div style="font-size:11px;color:#64748b;">'+(s.type||'')+(s.criticality?' - '+s.criticality:'')+(s.migrationWave?' - Wave '+s.migrationWave:'')+'</div></div></div>'+(s.region?'<span style="background:#eff6ff;color:#2563eb;border:1px solid #bfdbfe;border-radius:999px;padding:2px 8px;font-size:10px;font-weight:700;margin-right:6px;">&#127760; '+s.region+'</span>':'')+'<span style="background:#dcfce7;color:#16a34a;padding:2px 8px;border-radius:999px;font-size:10px;font-weight:700;">Active</span></div>'+'<div style="display:flex;flex-wrap:wrap;gap:3px;margin-bottom:10px;">'+comps.slice(0,7).map(function(c){var cls=r6pClassifyFor(c.name);var dot=cls.state==='Stateless'?'#16a34a':cls.state==='Stateful'?'#dc2626':'#d97706';return '<span class="r6p-chip" title="'+cls.state+' - '+cls.decision.replace(/"/g,'&quot;')+'"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:'+dot+';margin-right:4px;"></span>'+c.name+'</span>';}).join('')+'</div>'+'<div style="display:flex;gap:6px;">'+selBtn+'<button onclick="event.stopPropagation();typeof uatS1OpenModal===\'function\'&&uatS1OpenModal(\''+s.id+'\')" class="r6p-btn secondary" style="padding:5px 12px;font-size:11px;">Inspect</button><button onclick="event.stopPropagation();r6pDeleteBS(\''+s.id+'\',\''+s.name.replace(/'/g,"\\'")+'\')" style="background:#fee2e2;color:#dc2626;border:1px solid #fecaca;border-radius:6px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:auto;">&#128465; Delete</button></div></div>';}).join('');var ag=document.getElementById('r6p-arch-grid'),lg=document.getElementById('uatS1ArchList');if(ag&&lg&&lg.innerHTML.trim()){ag.innerHTML=lg.innerHTML;ag.querySelectorAll('.uat-s1-arch-card').forEach(function(c){c.style.cursor='pointer';c.addEventListener('click',function(){ag.querySelectorAll('.uat-s1-arch-card').forEach(function(x){x.classList.remove('selected');});c.classList.add('selected');var k=c.getAttribute('data-arch-key');typeof window.uatS1OpenModal==='function'&&window.uatS1OpenModal(null,k);});});}}catch(e){if(list)list.innerHTML='<div style="color:#dc2626;padding:10px;">'+e.message+'</div>';}};
+window.r6pOpenSourceValidationStage=function(event){
+  if(event){event.preventDefault();event.stopPropagation();}
+  var button=document.querySelector('.stage-btn[data-stage="s4"]');
+  if(button)button.click();else if(typeof window.activateStage==='function')window.activateStage('s4');
+  setTimeout(function(){var source=document.getElementById('uatS1FlexVmSection')||document.getElementById('panel-s4');if(source&&source.scrollIntoView)source.scrollIntoView({behavior:'smooth',block:'start'});},180);
+  return false;
+};
+window.r6pDecorateBusinessSystemProvenance=function(list,systems){
+  (systems||[]).forEach(function(system){
+    if(system.name!=='Automatic Business System from Existing VMs')return;
+    var card=document.getElementById('r6p-bsc-'+system.id);if(!card||!card.firstElementChild)return;
+    var note=document.createElement('div');note.className='r6p-bs-provenance';
+    note.style.cssText='margin:-3px 0 9px 40px;font-size:11px;color:#636366;line-height:1.35;';
+    note.innerHTML='Comes from the main migration pipeline\u2019s <a href="?stage=s4" onclick="return r6pOpenSourceValidationStage(event)" style="color:#0066cc;font-weight:700;text-decoration:underline;text-underline-offset:2px;">Stage 3 \u2014 Validation &amp; UAT</a>.';
+    card.firstElementChild.insertAdjacentElement('afterend',note);
+  });
+};
+
+window.r6pLoadBiz=function(){var list=document.getElementById('r6p-biz-list');if(!list)return;try{var sys=JSON.parse(localStorage.getItem('uatS1_systems')||'[]');if(!sys.length){list.innerHTML='<div style="text-align:center;padding:24px 10px;">'+'<div style="color:#94a3b8;font-size:13px;margin-bottom:12px;">No business systems yet. Create one right here - no need to leave R6.</div>'+'<button class="r6p-btn primary" onclick="typeof uatS1OpenModal===\'function\'&&uatS1OpenModal(null,\'custom\')" style="padding:8px 18px;font-size:12px;">+ Create New Business System</button>'+'</div>';return;}list.innerHTML=sys.map(function(s){var comps=s.components||[];var isSel=R6P.bs&&R6P.bs.id===s.id;var selBtn=isSel?'<button onclick="event.stopPropagation();" class="r6p-btn" style="padding:5px 12px;font-size:11px;background:#16a34a;color:#fff;border:1px solid #15803d;cursor:default;">&#10003; Selected</button>':'<button onclick="event.stopPropagation();r6pSelectBS(\''+s.id+'\')" class="r6p-btn primary" style="padding:5px 12px;font-size:11px;">Select for Refactor</button>';return '<div class="r6p-bs-card" id="r6p-bsc-'+s.id+'" onclick="r6pSelectBS(\''+s.id+'\')">'+'<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;">'+'<div style="display:flex;align-items:center;gap:8px;">'+'<div style="width:32px;height:32px;border-radius:8px;background:#eff6ff;color:#2563eb;font-weight:900;font-size:11px;display:grid;place-items:center;">'+s.name.slice(0,2).toUpperCase()+'</div>'+'<div><div style="font-weight:800;color:#0f172a;font-size:14px;">'+s.name+'</div><div style="font-size:11px;color:#64748b;">'+(s.type||'')+(s.criticality?' - '+s.criticality:'')+(s.migrationWave?' - Wave '+s.migrationWave:'')+'</div></div></div>'+(s.region?'<span style="background:#eff6ff;color:#2563eb;border:1px solid #bfdbfe;border-radius:999px;padding:2px 8px;font-size:10px;font-weight:700;margin-right:6px;">&#127760; '+s.region+'</span>':'')+'<span style="background:#dcfce7;color:#16a34a;padding:2px 8px;border-radius:999px;font-size:10px;font-weight:700;">Active</span></div>'+'<div style="display:flex;flex-wrap:wrap;gap:3px;margin-bottom:10px;">'+comps.slice(0,7).map(function(c){var cls=r6pClassifyFor(c.name);var dot=cls.state==='Stateless'?'#16a34a':cls.state==='Stateful'?'#dc2626':'#d97706';return '<span class="r6p-chip" title="'+cls.state+' - '+cls.decision.replace(/"/g,'&quot;')+'"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:'+dot+';margin-right:4px;"></span>'+c.name+'</span>';}).join('')+'</div>'+'<div style="display:flex;gap:6px;">'+selBtn+'<button onclick="event.stopPropagation();typeof uatS1OpenModal===\'function\'&&uatS1OpenModal(\''+s.id+'\')" class="r6p-btn secondary" style="padding:5px 12px;font-size:11px;">Inspect</button><button onclick="event.stopPropagation();r6pDeleteBS(\''+s.id+'\',\''+s.name.replace(/'/g,"\\'")+'\')" style="background:#fee2e2;color:#dc2626;border:1px solid #fecaca;border-radius:6px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:auto;">&#128465; Delete</button></div></div>';}).join('');r6pDecorateBusinessSystemProvenance(list,sys);var ag=document.getElementById('r6p-arch-grid'),lg=document.getElementById('uatS1ArchList');if(ag&&lg&&lg.innerHTML.trim()){ag.innerHTML=lg.innerHTML;ag.querySelectorAll('.uat-s1-arch-card').forEach(function(c){c.style.cursor='pointer';c.addEventListener('click',function(){ag.querySelectorAll('.uat-s1-arch-card').forEach(function(x){x.classList.remove('selected');});c.classList.add('selected');var k=c.getAttribute('data-arch-key');typeof window.uatS1OpenModal==='function'&&window.uatS1OpenModal(null,k);});});}}catch(e){if(list)list.innerHTML='<div style="color:#dc2626;padding:10px;">'+e.message+'</div>';}};
 
 window.r6pMarkStep1Selected=function(){
   R6P.status[1]='done';
@@ -997,7 +1453,7 @@ window.r6pMarkStep1Selected=function(){
   var pEl=document.getElementById('r6p-pct');if(pEl)pEl.textContent=pct+'%';
   r6pRenderProgress();
 };
-window.r6pSelectBS=function(id){document.querySelectorAll('[id^="r6p-bsc-"]').forEach(function(el){el.classList.remove('selected');});var c=document.getElementById('r6p-bsc-'+id);if(c)c.classList.add('selected');try{var sys=JSON.parse(localStorage.getItem('uatS1_systems')||'[]');var bs=sys.find(function(s){return s.id===id;});if(!bs)return;R6P.bs=bs;R6P.components=bs.components||[];var si=document.getElementById('r6p-sum-input');if(si)si.textContent=bs.name;var sc=document.getElementById('r6p-sum-comps');if(sc)sc.textContent=(bs.components||[]).length+' components';R6P_RESCAN_GROUP.forEach(function(gn){R6P.status[gn]='done';});r6pMarkStep1Selected();r6pLoadBiz();if(typeof r6pRenderContainerReadyForm==='function')r6pRenderContainerReadyForm();}catch(e){}};
+window.r6pSelectBS=function(id){document.querySelectorAll('[id^="r6p-bsc-"]').forEach(function(el){el.classList.remove('selected');});var c=document.getElementById('r6p-bsc-'+id);if(c)c.classList.add('selected');try{var raw=localStorage.getItem('uatS1_systems')||'[]';var sys=JSON.parse(raw);var bs=sys.find(function(s){return s.id===id;});if(!bs)return;localStorage.setItem(R6P_SELECTED_BS_KEY,String(bs.id));R6P_BS_STORAGE_SIG=raw;R6P.bs=bs;R6P.components=bs.components||[];var si=document.getElementById('r6p-sum-input');if(si)si.textContent=bs.name;var sc=document.getElementById('r6p-sum-comps');if(sc)sc.textContent=(bs.components||[]).length+' components';r6pMarkStep1Selected();r6pLoadBiz();if(typeof r6pRenderContainerReadyForm==='function')r6pRenderContainerReadyForm();if(typeof r6pRefreshComponentDrivenStages==='function')r6pRefreshComponentDrivenStages();}catch(e){}};
 window.r6pDeleteBS=function(id,name){
   if(!confirm('Delete business system "'+name+'"? This removes it from Migration Logs everywhere, not just here.'))return;
   try{
@@ -1005,8 +1461,8 @@ window.r6pDeleteBS=function(id,name){
     sys=sys.filter(function(s){return s.id!==id;});
     localStorage.setItem('uatS1_systems',JSON.stringify(sys));
     if(window.UAT)window.UAT.businessSystems=sys;
-    if(R6P.bs&&R6P.bs.id===id){R6P.bs=null;R6P.components=[];}
-    r6pLoadBiz();
+    if(R6P.bs&&R6P.bs.id===id){R6P.bs=null;R6P.components=[];localStorage.removeItem(R6P_SELECTED_BS_KEY);}
+    r6pBusinessSystemsChanged();
   }catch(e){alert('Delete failed: '+e.message);}
 };
 
@@ -1099,7 +1555,7 @@ window.r6pAutoRunBuildPipeline=function(extractCmd,buildCmd,outId){
   es1.onerror=function(){out.textContent+='[closed]\n';es1.close();};
 };
 /* Real start-command detection: parses the actual `ps aux --sort=-%mem` output captured
-   by Live Scan (Step 3/6) - not a guess. Picks the heaviest process that is not the SSH
+   by Live Scan (Step 3) - not a guess. Picks the heaviest process that is not the SSH
    session, shell or scan tooling itself. Returns '' (not a fake command) when no scan has
    been run, so the backend emits a loud, fail-fast placeholder instead of something wrong. */
 /* Parses a real component target endpoint (e.g. "mysql://50.56.158.30:3306",
@@ -1135,6 +1591,42 @@ window.r6pDetectStartCommand=function(c){
   }
   return '';
 };
+window.r6pIsContainerCaptureTarget=function(c){
+  var form=(R6P.targetForms&&R6P.targetForms[c.name])||r6pDecideTargetForm(c).form;
+  return form==='CONTAINERIZED'||form==='PARTIALLY_CONTAINERIZED';
+};
+window.r6pBuildCaptureRows=function(){
+  var rows=(R6P.components||[]).map(function(c){
+    var form=(R6P.targetForms&&R6P.targetForms[c.name])||r6pDecideTargetForm(c).form;
+    var endpoint=r6pParseTargetEndpoint(c.tgt);
+    var approved=(form==='CONTAINERIZED'||form==='PARTIALLY_CONTAINERIZED');
+    var cap=(R6P.captureRun&&R6P.captureRun.components||[]).filter(function(x){return x.component===c.name;})[0]||{};
+    return {
+      component:c.name,
+      vm:endpoint.ip||c.tgt||'Not mapped',
+      decision:form,
+      snapshot:cap.snapshotStatus||(approved?'Pending':'Not applicable'),
+      snapshotIds:cap.snapshotIds||[],
+      simulated:false,
+      extraction:cap.extractionStatus||(approved?'Waiting':'N/A'),
+      build:cap.buildStatus||(approved?'Waiting':'N/A'),
+      approved:approved,
+      reason:cap.reason||''
+    };
+  });
+  if(!rows.length)return '<tr><td colspan="7" style="color:#64748b;font-style:italic;">No components selected yet.</td></tr>';
+  return rows.map(function(r){
+    var tone=r.approved?'#16a34a':(r.decision==='BLOCKED'?'#dc2626':'#64748b');
+    return '<tr><td style="font-weight:600;">'+r.component+'</td>'
+      +'<td style="font-size:11px;color:#64748b;">'+r.vm+'</td>'
+      +'<td><span style="background:'+tone+'22;color:'+tone+';padding:2px 8px;border-radius:999px;font-size:10px;font-weight:700;">'+r.decision+'</span></td>'
+      +'<td style="font-size:11px;color:#334155;">'+r.snapshot+(r.simulated?'<div style="font-size:9px;color:#d97706;font-weight:700;margin-top:2px;" title="'+_R6_SNAPSHOT_SIM_NOTE.replace(/"/g,"&quot;")+'">SIMULATED - no OpenStack call</div>':'')+'</td>'
+      +'<td style="font-size:10px;color:#334155;font-family:monospace;">'+(r.snapshotIds.length?r.snapshotIds.join('<br>'):'&mdash;')+'</td>'
+      +'<td style="font-size:11px;color:#334155;">'+r.extraction+'</td>'
+      +'<td style="font-size:11px;color:#334155;">'+r.build+(r.reason?'<div style="font-size:10px;color:#dc2626;margin-top:2px;">'+r.reason+'</div>':'')+'</td></tr>';
+  }).join('');
+};
+var _R6_SNAPSHOT_SIM_NOTE='';
 window.r6pGenRealDockerfiles=function(){
   var st=document.getElementById('r6p-build-status');
   if(!R6P.components||!R6P.components.length){if(st){st.textContent='Select a Business System in Step 1 first.';st.style.color='#dc2626';}return;}
@@ -1145,7 +1637,7 @@ window.r6pGenRealDockerfiles=function(){
   /* Only components Step 8's real Transform decision assigned CONTAINERIZED or
      PARTIALLY_CONTAINERIZED get a Dockerfile/image - every other target form
      (operator-managed, retained/redeployed VM, external, data-migration, manual
-     review, blocked, excluded) is intentionally skipped here, matching Step 6's decision. */
+     review, blocked, excluded) is intentionally skipped here, matching Step 8's decision. */
   var workloads=comps.map(function(c){
     var form=(R6P.targetForms&&R6P.targetForms[c.name])||r6pDecideTargetForm(c).form;
     var buildable=(form==='CONTAINERIZED'||form==='PARTIALLY_CONTAINERIZED');
@@ -1172,13 +1664,17 @@ window.r6pGenRealDockerfiles=function(){
       password:(document.getElementById('r6p-build-regpass')||{}).value||''},
     source_vm:{host:(srcComp&&srcComp.tgt)||'',user:'root'},
     auto_commit:mode==='auto',import_to_gitops:true,
+    stage8Approved:R6P.status[8]==='done',
+    businessSystem:R6P.bs||{},
+    capture:{excludePaths:['/var/log','/tmp','/etc/ssh','/root/.ssh','/home/*/.ssh','/var/lib/postgresql','/var/lib/mysql','/var/lib/mongodb','/var/lib/redis','/var/backups']},
     bundle:{id:'r6p-'+Date.now(),businessSystemName:(R6P.bs&&R6P.bs.name)||'app',workloads:workloads}};
-  if(st){st.textContent='Generating real Dockerfiles + build plan...';st.style.color='#0369a1';}
-  fetch('/api/r6/generate-bundle',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
+  if(st){st.textContent='Capturing approved source snapshots and generating build plan...';st.style.color='#0369a1';}
+  fetch('/api/r6/capture-sources-build',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
     .then(function(r){return r.json();})
     .then(function(d){
       if(!d||!d.ok){if(st){st.textContent='✗ '+((d&&d.error)||'generation failed');st.style.color='#dc2626';}return;}
       R6P._realBundle=d;
+      R6P.captureRun=d.capture||null;
       R6P.yaml='# Generated by /api/r6/generate-bundle\n'+d.bundle_dir;
       R6P.artifacts=R6P.artifacts||{};
       ['opencenter_import_manifest.json','k8s/','helm/','kustomize/','flux/','Dockerfile','image_build_plan.yaml',
@@ -1186,10 +1682,13 @@ window.r6pGenRealDockerfiles=function(){
       ].forEach(function(k){R6P.artifacts[k]=true;});
       var skipMsg=skipped.length?('<br><span style="color:#64748b;">Skipped (not CONTAINERIZED/PARTIALLY_CONTAINERIZED): '+skipped.map(function(w){return w.component+' ('+w.targetForm+')';}).join(', ')+'</span>'):'';
       var gitopsMsg=(mode==='auto')?('<br>GitOps commit+push: <code>'+(d.gitops_commit||'skipped')+'</code>'):'';
+      var capMsg=d.capture?('<br>Source capture: <code>'+d.capture.approvedCount+' approved / '+d.capture.reusedSnapshots+' reused snapshot(s) / '+d.capture.createdSnapshots+' created snapshot record(s)</code>'
+        +'<br>Snapshot mode: <code>OPENSTACK_CLI</code>; lineage index: <code>'+(d.capture.snapshotIndexPath||'~/.config/opencenter/r6/source-captures/snapshot-index.json')+'</code>'):'';
       if(st){st.innerHTML='&#10003; '+d.files.length+' files written to <code>'+d.bundle_dir+'</code>'
         +(d.imported_to?'<br>&#10003; K8s manifests imported to GitOps overlay: <code>'+d.imported_to+'</code>':'<br>&#9888; GitOps repo not found - manifests not imported')
-        +'<br>Pull secret: '+d.pull_secret+skipMsg+gitopsMsg;
+        +'<br>Pull secret: '+d.pull_secret+capMsg+skipMsg+gitopsMsg;
         st.style.color='#15803d';}
+      var capBody=document.getElementById('r6p-capture-tbody');if(capBody)capBody.innerHTML=r6pBuildCaptureRows();
       var box=document.getElementById('r6p-build-cmds');
       if(!box){box=document.createElement('div');box.id='r6p-build-cmds';box.style.marginTop='10px';st.parentNode.insertBefore(box,st.nextSibling);}
       if(mode==='auto'){
@@ -1381,11 +1880,14 @@ window.r6pMarkUatSignoff=function(){
   var el=document.getElementById('r6p-uat-signoff-status');
   if(el){el.textContent='Signed off '+R6P.uatSignedOff;el.style.color='#16a34a';}
 };
-window.r6pRunAll=function(){r6pGenBundle();for(var i=1;i<=12;i++)r6pMarkDone(i);r6pGoTo(12);};
 
 window.r6pPreviewArtifact=function(f){
   var content='';
   if(f==='opencenter_import_manifest.json')content=JSON.stringify((R6P.bundle&&R6P.bundle.manifest)||{},null,2);
+  else if(f==='source-lineage.json'||f==='source-capture-manifest.json'){
+    if(!R6P.captureRun)content='-- Run "Capture Sources & Build Containers" in Stage 9 first --';
+    else content=JSON.stringify(R6P.captureRun,null,2);
+  }
   else if(f.match(/^(k8s\/|Dockerfile)/))content=R6P.yaml||'-- Generate YAML in Step 10 first --';
   else if(f.match(/helm\//))content=r6pHelmPreview();
   else if(f.match(/flux\//))content=r6pFluxPreview();
@@ -1577,18 +2079,33 @@ window.r6pStage0=function(){
 };
 
 /* ── Preflight helpers ── */
-window.r6pRunPreflight=function(){
+window.r6pRunPreflight=function(done){
   var out=document.getElementById('r6p-preflight-out');if(out)out.style.display='block';
   R6P_TOOLS.forEach(function(t){r6pSetToolStatus(t.name,'checking','—');});
-  var cmd='for t in git curl jq kubectl flux openstack helm yq kustomize; do'
-    +' if command -v "$t" &>/dev/null; then echo "OK:$t:$(${t} --version 2>/dev/null | head -1 | tr -d \'\\n\')";'
-    +' else echo "MISSING:$t"; fi; done;'
-    +' if command -v opencenter &>/dev/null; then echo "OK:opencenter:$(opencenter version 2>/dev/null | head -1)"; else echo "MISSING:opencenter"; fi';
+  var cmd='for t in git curl jq kubectl flux openstack helm yq kustomize opencenter; do '
+    +'if command -v "$t" >/dev/null 2>&1; then v=$(timeout 2 "$t" --version 2>/dev/null | head -1 | tr -d "\\n"); [ -z "$v" ] && v="installed"; echo "OK:$t:$v"; '
+    +'else echo "MISSING:$t"; fi; done';
   var url='/api/stream/run-cmd?cmd='+encodeURIComponent(cmd);
   var es=new EventSource(url);
   var buf='',_done=false;
+  var finish=function(reason){
+    if(_done)return;
+    _done=true;
+    try{es.close();}catch(e){}
+    R6P_TOOLS.forEach(function(t){
+      if(R6P.preflight[t.name]==='checking'||!R6P.preflight[t.name]){
+        R6P.preflight[t.name]='missing';
+        R6P.preflight[t.name+'_ver']=reason||'preflight timed out';
+        r6pSetToolStatus(t.name,'missing',reason||'preflight timed out');
+      }
+    });
+    if(out&&reason){out.textContent+=(buf?'\n':'')+'[WARN] '+reason+'\n';}
+    r6pCheckContinue();
+    if(typeof done==='function')done({ok:R6P_TOOLS.every(function(t){return !t.req||R6P.preflight[t.name]==='ok';}),reason:reason||''});
+  };
+  var watchdog=setTimeout(function(){finish('preflight timed out - marked unresolved tools as missing')},8000);
   es.onmessage=function(e){
-    if(e.data==='[DONE]'){_done=true;es.close();r6pCheckContinue();return;}
+    if(e.data==='[DONE]'||e.data.indexOf('[EXIT')===0){clearTimeout(watchdog);finish(/\[EXIT 0\]/.test(e.data)?'':'preflight command failed');return;}
     buf+=e.data+'\n';
     if(out){out.textContent=buf;out.scrollTop=out.scrollHeight;}
     var m=e.data.match(/^(OK|MISSING):([^:]+):?(.*)?$/);
@@ -1599,7 +2116,7 @@ window.r6pRunPreflight=function(){
       if(name==='opencenter'&&status==='missing'){var w=document.getElementById('r6p-oc-missing-warn');if(w)w.style.display='block';}
     }
   };
-  es.onerror=function(){if(!_done)r6pCheckContinue();es.close();};
+  es.onerror=function(){clearTimeout(watchdog);finish('preflight stream closed before completion - marked unresolved tools as missing');};
 };
 
 window.r6pSetToolStatus=function(name,status,ver){
@@ -1776,7 +2293,7 @@ window.r6pGitopsMethodChange=function(m){
   r6pSaveCred('gitops','method',m);
 };
 
-window.r6pTestCloud=function(){
+window.r6pTestCloud=function(done){
   function v(id){var el=document.getElementById(id);return el?el.value.trim():'';}
   var authUrl=v('r6p-c-authurl').replace(/\/+$/,'');
   var authType=v('r6p-c-authtype')||'password';
@@ -1786,18 +2303,18 @@ window.r6pTestCloud=function(){
   var proj=v('r6p-c-proj');
   var res=document.getElementById('r6p-cloud-result');
 
-  if(!authUrl){if(res){res.style.color='#dc2626';res.textContent='Fill in Auth URL first.';}return;}
+  if(!authUrl){if(res){res.style.color='#dc2626';res.textContent='Fill in Auth URL first.';}if(typeof done==='function')done({ok:false,reason:'not configured'});return;}
 
   /* Build Keystone v3 token request body — no shell, no CLI needed */
   var tokenUrl=authUrl+'/auth/tokens';
   var body,authDesc;
 
   if(authType==='appcred'){
-    if(!credId||!secret){if(res){res.style.color='#dc2626';res.textContent='Fill Application Credential ID and Secret.';}return;}
+    if(!credId||!secret){if(res){res.style.color='#dc2626';res.textContent='Fill Application Credential ID and Secret.';}if(typeof done==='function')done({ok:false,reason:'application credential incomplete'});return;}
     authDesc='v3 Application Credential';
     body={auth:{identity:{methods:['application_credential'],application_credential:{id:credId,secret:secret}}}};
   } else {
-    if(!username||!password){if(res){res.style.color='#dc2626';res.textContent='Fill Username and Password.';}return;}
+    if(!username||!password){if(res){res.style.color='#dc2626';res.textContent='Fill Username and Password.';}if(typeof done==='function')done({ok:false,reason:'username/password incomplete'});return;}
     var isV2=authUrl.indexOf('/v2')>=0;
     if(isV2){
       /* Rackspace v2 identity */
@@ -1834,10 +2351,12 @@ window.r6pTestCloud=function(){
         res.textContent='Login failed ('+d.status+'): '+errMsg;
       }
     }
+    if(typeof done==='function')done({ok:ok,status:d.status});
   })
   .catch(function(e){
     R6P.creds.cloud.status='failed';
     if(res){res.style.color='#dc2626';res.textContent='Request failed: '+(e.message||e);}
+    if(typeof done==='function')done({ok:false,reason:e.message||String(e)});
   });
 };
 
@@ -1894,7 +2413,7 @@ window.r6pRunGitopsCmd=function(sub){
 
 function r6pGCSet(id,ok,val){var st=document.getElementById(id+'-st'),v=document.getElementById(id+'-val');if(st){st.style.background=ok?'#dcfce7':'#fee2e2';st.style.color=ok?'#16a34a':'#dc2626';st.textContent=ok?'Pass':'Fail';}if(v)v.textContent=val||'—';}
 
-window.r6pRunGitopsPreflight=function(){
+window.r6pRunGitopsPreflight=function(done){
   var gitDir=R6P.creds.opencenter.gitDir||document.getElementById('r6p-gs-path')&&document.getElementById('r6p-gs-path').value;
   var out=document.getElementById('r6p-gc-out');if(out){out.style.display='block';out.textContent='';}
   var cmd='GD="'+(gitDir||'')+'"\n'
@@ -1916,16 +2435,36 @@ window.r6pRunGitopsPreflight=function(){
     +'else echo "KUBECTL:fail:cluster unreachable via $KCFG"; fi';
   var url='/api/stream/run-cmd?cmd='+encodeURIComponent(cmd);
   var es=new EventSource(url);
+  var results={},finished=false;
+  var finish=function(reason){if(finished)return;finished=true;try{es.close();}catch(e){}var required=['GITDIR','ISREPO','REMOTE','WORKLOADS','GITNAME','GITEMAIL','FLUX','KUBECTL'];var ok=required.every(function(k){return results[k]===true;});if(typeof done==='function')done({ok:ok,results:results,reason:reason||''});};
   es.onmessage=function(e){
-    if(e.data==='[DONE]'){es.close();r6pCheckContinue();return;}
+    if(e.data==='[DONE]'||e.data.indexOf('[EXIT')===0){r6pCheckContinue();finish();return;}
     if(out){out.textContent+=e.data+'\n';out.scrollTop=out.scrollHeight;}
     var m=e.data.match(/^(GITDIR|ISREPO|REMOTE|WORKLOADS|GITNAME|GITEMAIL|FLUX|KUBECTL):(ok|fail):?(.*)?$/);
     if(!m)return;
     var key=m[1],ok=m[2]==='ok',val=m[3]||'';
+    results[key]=ok;
     var map={GITDIR:'r6p-gc-gitdir',ISREPO:'r6p-gc-isrepo',REMOTE:'r6p-gc-remote',WORKLOADS:'r6p-gc-workloads',GITNAME:'r6p-gc-gituser',GITEMAIL:'r6p-gc-gitemail',FLUX:'r6p-gc-flux',KUBECTL:'r6p-gc-kubectl'};
     if(map[key])r6pGCSet(map[key],ok,val);
   };
-  es.onerror=function(){es.close();};
+  es.onerror=function(){finish('GitOps preflight stream error');};
+};
+
+window.r6pAutoRunStartupPreflight=function(){
+  if(R6P.startupPreflightStarted)return;
+  R6P.startupPreflightStarted=true;
+  var out=document.getElementById('r6p-preflight-out');
+  if(out){out.style.display='block';out.textContent='Automatic R6 startup checks\n1/3 CLI tools preflight running...\n';}
+  r6pRunPreflight(function(cli){
+    if(out){out.textContent+='\n2/3 Cloud login test '+(cli.ok?'starting':'starting (CLI issues remain)')+'...\n';out.scrollTop=out.scrollHeight;}
+    r6pTestCloud(function(cloud){
+      if(out){out.textContent+='\nCloud login: '+(cloud.ok?'PASS':'FAIL / NOT CONFIGURED')+'\n3/3 GitOps preflight starting...\n';out.scrollTop=out.scrollHeight;}
+      r6pRunGitopsPreflight(function(gitops){
+        R6P.startupPreflight={cli:cli,cloud:cloud,gitops:gitops,completedAt:new Date().toISOString()};
+        if(out){out.textContent+='\nAutomatic startup checks complete — CLI '+(cli.ok?'PASS':'FAIL')+', Cloud '+(cloud.ok?'PASS':'FAIL')+', GitOps '+(gitops.ok?'PASS':'FAIL')+'.\nReview failures before continuing.\n';out.scrollTop=out.scrollHeight;}
+      });
+    });
+  });
 };
 
 window.r6pTestKubectlLive=function(){
@@ -1954,46 +2493,321 @@ window.r6pTestKubectlLive=function(){
   es.onerror=function(){es.close();if(out)out.textContent+='[stream error]\n';};
 };
 
-window.r6pRunLiveScan=function(){
+window.r6pParseSshTarget=function(raw,component){
+  var value=String(raw||'').trim(), host='';
+  try{
+    var parsed=new URL(value.indexOf('://')>=0?value:'ssh://'+value);
+    host=parsed.hostname;
+  }catch(e){
+    host=value.replace(/^[a-z][a-z0-9+.-]*:\/\//i,'').split('/')[0].split(':')[0];
+  }
+  host=host.replace(/^\[|\]$/g,'');
+  var sshPort=parseInt((component&&(
+    component.sshPort||component.ssh_port||
+    (component.ssh&&component.ssh.port)))||22,10);
+  if(!host||!/^[a-z0-9._:-]+$/i.test(host))return null;
+  if(!Number.isInteger(sshPort)||sshPort<1||sshPort>65535)sshPort=22;
+  return {host:host,port:sshPort,source:value};
+};
+window.r6pShellQuote=function(value){
+  return "'"+String(value).replace(/'/g,"'\"'\"'")+"'";
+};
+window.r6pHtml=function(value){
+  return String(value==null?'':value).replace(/[&<>"']/g,function(ch){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch];});
+};
+window.r6pProductionScanTerminal=function(){
+  var value=R6P.productionScanLog||'Live scan output will appear here after Run Scan is selected.';
+  return '<div class="r6p-scan-terminal-wrap" style="margin:-4px 0 14px;"><div style="font-size:11px;font-weight:800;color:#334155;margin-bottom:4px;">Verbose live scan output</div><pre id="r6p-production-scan-status" class="r6p-terminal" data-terminal-output style="display:block;min-height:180px;max-height:420px;overflow:auto;white-space:pre-wrap;">'+r6pHtml(value)+'</pre></div>';
+};
+window.r6pSetProductionScanLog=function(value,append){
+  R6P.productionScanLog=append&&R6P.productionScanLog?R6P.productionScanLog+'\n'+String(value||''):String(value||'');
+  var out=document.getElementById('r6p-production-scan-status');
+  if(out){out.style.display='block';out.textContent=R6P.productionScanLog;out.scrollTop=out.scrollHeight;}
+};
+window.r6pFormatProductionScanLog=function(run){
+  var p=run.progress||{},events=run.liveLog||[],lines=['=== R6 VERBOSE COMPONENT SCAN ===','Run: '+run.runId,'Business System: '+((run.businessSystem&&run.businessSystem.name)||'unknown'),'Status: '+run.status,'Started: '+(run.startedAt||'unknown'),'Updated: '+new Date().toISOString(),'Components: '+(p.completedComponents||0)+' / '+(p.totalComponents||0),'Diagnostic events: '+events.length];
+  if(run.completedAt)lines.push('Completed: '+run.completedAt);
+  if(run.currentComponent)lines.push('Current component: '+run.currentComponent);
+  if(p.currentProbe)lines.push('Current probe: '+p.currentProbe+' '+(p.currentProbeName||'')+' ('+(p.completedProbes||0)+' / '+(p.totalProbes||20)+')');
+  lines.push('');
+  events.forEach(function(e,index){
+    var prefix='['+(e.timestamp||'')+'] ['+(e.level||'INFO')+']';
+    if(e.component)prefix+=' ['+e.component+']';
+    if(e.probeId)prefix+=' ['+e.probeId+' '+(e.probeName||'')+']';
+    lines.push('--- EVENT '+(index+1)+' / '+events.length+' ---');
+    lines.push(prefix+' '+(e.message||'')+(e.status?' — '+e.status:'')+(e.commandIdentifier?' command='+e.commandIdentifier:'')+(e.exitCode!=null?' exit='+e.exitCode:'')+(e.durationMs!=null?' duration='+e.durationMs+'ms':''));
+    if(e.targetHost)lines.push('  target: '+e.targetHost+':'+(e.targetPort||22)+(e.sourceVmId?' source-vm='+e.sourceVmId:''));
+    if(e.phase)lines.push('  phase: '+e.phase);
+    if(e.startedAt)lines.push('  started: '+e.startedAt);
+    if(e.completedAt)lines.push('  completed: '+e.completedAt);
+    if(e.timeoutSeconds!=null)lines.push('  timeout limit: '+e.timeoutSeconds+'s');
+    if(e.timeout!=null||e.truncated!=null||e.evidenceCount!=null)lines.push('  timeout='+(e.timeout?'yes':'no')+' truncated='+(e.truncated?'yes':'no')+' evidence-lines='+(e.evidenceCount==null?'0':e.evidenceCount));
+    if(e.probeId&&e.status!=='RUNNING')lines.push('  STDOUT:\n    '+(e.stdout?String(e.stdout).replace(/\n/g,'\n    '):'<empty>'));
+    if(e.probeId&&e.status!=='RUNNING')lines.push('  STDERR:\n    '+(e.stderr?String(e.stderr).replace(/\n/g,'\n    '):'<empty>'));
+    if(e.remediation)lines.push('  recommended action: '+e.remediation);
+  });
+  if(!(run.liveLog||[]).some(function(e){return e.probeId;})){
+    (run.components||[]).forEach(function(c){
+      lines.push('\n=== COMPONENT '+c.componentName+' — '+c.componentVerdict+' ===');
+      (c.probes||[]).forEach(function(e){
+        lines.push('['+(e.completedAt||'')+'] ['+e.status+'] ['+e.probeId+' '+e.probeName+'] command='+(e.commandIdentifier||e.probeId)+' exit='+e.exitCode+' duration='+e.durationMs+'ms');
+        lines.push('  started: '+(e.startedAt||'unknown')+'\n  completed: '+(e.completedAt||'unknown')+'\n  timeout='+(e.timeout?'yes':'no')+' truncated='+(e.truncated?'yes':'no')+' evidence-lines='+(e.evidenceCount||0));
+        if(e.stdout)lines.push('  STDOUT:\n    '+String(e.stdout).replace(/\n/g,'\n    '));
+        if(e.stderr)lines.push('  STDERR:\n    '+String(e.stderr).replace(/\n/g,'\n    '));
+        if(e.remediation)lines.push('  recommended action: '+e.remediation);
+      });
+    });
+  }
+  return lines.join('\n');
+};
+window.r6pFailedChecksTable=function(run){
+  var roots=run&&run.appraisal&&run.appraisal.rootCauses||[];
+  if(!roots.length)(run&&run.components||[]).forEach(function(c){(c.probes||[]).forEach(function(p){if(p.status==='FAIL'||p.status==='BLOCKED')roots.push({componentId:c.componentId,componentName:c.componentName,sourceVmId:c.sourceVmId,probeId:p.probeId,errorCode:p.errorCode,summary:p.diagnosticSummary||p.stderr||p.stdout,recommendedActions:p.recommendedActions||[p.remediation],skippedChecks:(c.probes||[]).filter(function(s){return s.derivedFrom===p.rootCauseId;}).length});});});
+  return '<section class="r6p-failed-checks" style="margin:16px 0;border:1px solid #fecaca;border-radius:9px;padding:12px;background:#fff;"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;"><div><h3 style="margin:0;">Failed Checks by Components — Root Causes</h3><div style="font-size:11px;color:#64748b;">Prerequisite-skipped probes are collapsed beneath their root cause and are not counted as independent blockers.</div></div><div style="display:flex;gap:6px;"><button class="r6p-btn secondary" onclick="r6pRetryAllFailed()">Retry All Failed</button><button class="r6p-btn secondary" onclick="r6pExportFailedChecksCsv()">Export Root Causes CSV</button></div></div><div style="overflow:auto;margin-top:10px;"><table class="r6p-table"><thead><tr><th>Component / VM</th><th>Root cause</th><th>Details / impact</th><th>Recommended actions</th><th>Retry</th></tr></thead><tbody>'+(roots.length?roots.map(function(x){var actions=(x.recommendedActions||[]).filter(Boolean),fingerprints=x.errorCode==='SSH_HOST_KEY_CHANGED'?'<br><b>Target:</b> '+r6pHtml(x.targetHost||'unknown')+'<br><b>Old key:</b> '+r6pHtml(x.oldFingerprint||'not reported')+'<br><b>New key:</b> '+r6pHtml(x.newFingerprint||'not reported'):'';return '<tr><td><b>'+r6pHtml(x.componentName)+'</b><br>'+r6pHtml(x.sourceVmId||'unmapped')+'</td><td><b style="color:#dc2626;">'+r6pHtml(x.errorCode||x.probeId||'SCAN_FAILURE')+'</b><br>'+r6pHtml(x.probeId||'')+'</td><td style="max-width:390px;white-space:pre-wrap;">'+r6pHtml(x.summary||'No diagnostic summary returned.')+fingerprints+'<br><b>Impact:</b> '+r6pHtml(x.skippedChecks||0)+' dependent checks skipped</td><td>'+r6pHtml(actions.join(' • ')||'Review diagnostics and retry.')+'</td><td><button class="r6p-btn secondary" onclick="r6pRetryAppraisal(\''+r6pHtml(x.componentId)+'\')">Retry Component</button>'+(x.sourceVmId?'<button class="r6p-btn secondary" style="margin-top:4px;" onclick="r6pRetryVm(\''+r6pHtml(x.sourceVmId)+'\')">Retry VM</button>':'')+(x.errorCode==='SSH_HOST_KEY_CHANGED'?'<button class="r6p-btn secondary" style="margin-top:4px;" onclick="r6pVerifyReplaceHostKey(\''+r6pHtml(x.componentId)+'\')">Verify and Replace Key</button>':'')+'</td></tr>';}).join(''):'<tr><td colspan="5">No root failures or blockers.</td></tr>')+'</tbody></table></div></section>';
+};
+window.r6pAppraisalAllowsStage8=function(c){
+  var a=R6P.structuredAppraisal&&R6P.structuredAppraisal.components&&R6P.structuredAppraisal.components.find(function(x){return x.componentName===c.name;});
+  if(!a)return false;
+  return ['READY_FOR_STAGE_8','DB_NATIVE_REQUIRED','RETAIN_VM_RECOMMENDED'].indexOf(a.componentVerdict)>=0||
+    (a.componentVerdict==='READY_FOR_STAGE_8_WITH_WARNINGS'&&R6P.appraisalReviewed===true);
+};
+window.r6pProductionScanPayload=function(){
+  var user=((document.getElementById('r6p-scan-user')||{}).value||'').trim();
+  var key=((document.getElementById('r6p-scan-key')||{}).value||'').trim();
+  var known=((document.getElementById('r6p-scan-known-hosts')||{}).value||'~/.ssh/known_hosts').trim();
+  var all=(R6P.components||[]);
+  var scope=(document.getElementById('r6p-scan-comp')||{}).value||'__all__';
+  var selected=scope==='__all__'?all:(all[parseInt(scope,10)]?[all[parseInt(scope,10)]]:[]);
+  return {businessSystem:{id:R6P.bs&&R6P.bs.id,name:R6P.bs&&R6P.bs.name,totalComponentCount:all.length,scanScope:scope==='__all__'?'ALL_COMPONENTS':'SINGLE_COMPONENT',components:selected.map(function(c){var ep=r6pParseSshTarget(r6pComponentTarget(c),c),mapped=r6pResolveComponentVm(c),vmId=mapped.id,dbMode=c.databaseAccessMode||c.database_access_mode||c.databaseTargetType||((/database|db/i.test(c.type||c.role||c.name||'')&&!vmId)?'UNKNOWN':null);return{id:c.id||c.name,name:c.name,sourceVmId:vmId,source_vm_id:vmId,sourceVmName:c.sourceVmName||c.source_vm_name||c.vmName||c.vm_name||mapped.name||null,sourceIp:(ep&&ep.host)||c.sourceIp||c.source_ip||mapped.ip||null,sshHost:ep&&ep.host,sshPort:ep&&ep.port,sshUser:c.sshUser||c.ssh_user||user,cloudRegion:c.cloudRegion||c.cloud_region||mapped.region||R6P.bs&&R6P.bs.region||null,scanTargetId:c.scanTargetId||c.scan_target_id||vmId,expectedFingerprint:c.expectedFingerprint||c.sshFingerprint||null,type:c.type||c.role||'',databaseAccessMode:dbMode,databaseEndpoint:c.databaseEndpoint||r6pComponentTarget(c),cloudInventory:c.cloudInventory||c.cloud_inventory||null,volumeIds:c.volumeIds||c.volume_ids||[]};})},ssh:{user:user,keyPath:key,knownHostsFile:known}};
+};
+window.r6pSetScanUiVersion=function(version){
+  var known=R6_SCAN_UI_VERSIONS.some(function(v){return v.id===version;});
+  if(!known){alert('Unknown scan interface version: '+version);return;}
+  R6P.scanUiVersion=version;
+  var persisted=false;
+  try{
+    localStorage.setItem('r6p_scan_ui_version',version);
+    sessionStorage.setItem('r6p_scan_ui_reopen_stage','3');
+    persisted=true;
+  }catch(e){}
+  /* Reloading guarantees that all version-specific markup and assets start
+     cleanly. The persisted run id is polled after Stage 3 reopens; this never
+     starts, stops or duplicates a scan. Fall back to an in-place switch only
+     when browser storage is unavailable. */
+  if(!persisted){r6pApplyScanUiVersion();return;}
+  var selector=document.getElementById('r6p-scan-ui-version')||document.getElementById('r6v2-ui-select');
+  if(selector){selector.disabled=true;selector.setAttribute('aria-busy','true');}
+  window.setTimeout(function(){window.location.reload();},80);
+};
+window.r6pApplySelectedScanUiTheme=function(){
+  var selector=document.getElementById('r6p-scan-ui-version')||document.getElementById('r6v2-ui-select');
+  if(!selector){alert('Scan UI Theme selector is unavailable.');return;}
+  r6pSetScanUiVersion(selector.value);
+};
+window.r6pApplyScanUiVersion=function(){
+  var body=document.getElementById('r6p-body-3'),host=body&&body.querySelector('.r6p-stage-body-inner');if(!host)return;
+  if(R6P.scanUiVersion==='scan-ui-v2'&&window.R6ScanUIV2){window.R6ScanUIV2.mount(host);return;}
+  host.innerHTML=r6pContent(3);
+  if(R6P.structuredAppraisal)r6pRenderProductionAppraisal(R6P.structuredAppraisal);
+};
+window.r6pScanScopeChanged=function(){
+  var sel=document.getElementById('r6p-scan-comp'),btn=document.getElementById('r6p-full-scan-btn');if(!sel||!btn)return;
+  btn.innerHTML='&#9654; Run Scan';
+};
+window.r6pStartProductionScan=function(){
+  var payload=r6pProductionScanPayload(),out=document.getElementById('r6p-production-scan-status');
+  if(!payload.businessSystem.components.length){alert('Select a Business System with FLEX target IPs first.');return;}
+  var requiresSsh=payload.businessSystem.components.some(function(c){return ['MANAGED_DATABASE','KUBERNETES_SERVICE','PRIVATE_ENDPOINT','UNKNOWN'].indexOf(String(c.databaseAccessMode||'').toUpperCase())<0;});
+  if(requiresSsh&&(!payload.ssh.user||!payload.ssh.keyPath)){alert('SSH user and key path are required for VM-hosted components.');return;}
+  r6pSetProductionScanLog('Starting structured scan...');
+  var button=document.getElementById('r6p-full-scan-btn');if(button)button.disabled=true;
+  fetch('/api/r6/scans/business-system/run',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}).then(function(r){return r.json();}).then(function(data){
+    if(!data.ok)throw new Error(data.error||'scan start failed');
+    R6P.scanRunId=data.runId;localStorage.setItem('r6p_latest_scan_run',data.runId);R6P.appraisalReviewed=false;
+    var stop=document.getElementById('r6p-stop-scan-btn');if(stop)stop.disabled=false;
+    r6pPollProductionScan();
+  }).catch(function(error){r6pSetProductionScanLog('Scan start failed: '+error.message);if(button)button.disabled=false;});
+};
+window.r6pPollProductionScan=function(){
+  if(!R6P.scanRunId)return;
+  fetch('/api/r6/scans/runs/'+encodeURIComponent(R6P.scanRunId),{cache:'no-store',headers:{'Cache-Control':'no-cache'}}).then(function(r){return r.json();}).then(function(run){
+    if(!run.ok)throw new Error(run.error||'run unavailable');
+    if(R6P.bs&&run.businessSystem&&run.businessSystem.id&&run.businessSystem.id!==R6P.bs.id){throw new Error('saved scan belongs to a different Business System');}
+    var p=run.progress||{},out=document.getElementById('r6p-production-scan-status');
+    r6pSetProductionScanLog(r6pFormatProductionScanLog(run));
+    if(run.components&&run.components.length){R6P.structuredAppraisal=run;r6pRenderProductionAppraisal(run);}
+    if(run.status==='RUNNING'){window.clearTimeout(R6P.scanPollTimer);R6P.scanPollTimer=window.setTimeout(r6pPollProductionScan,1500);return;}
+    var button=document.getElementById('r6p-full-scan-btn'),stop=document.getElementById('r6p-stop-scan-btn');if(button)button.disabled=false;if(stop)stop.disabled=true;
+    if(run.appraisal){R6P.structuredAppraisal=run;r6pAdoptStructuredEvidence(run);r6pRenderProductionAppraisal(run);}
+  }).catch(function(error){r6pSetProductionScanLog('Refresh failed: '+error.message,true);});
+};
+window.r6pRefreshAppraisal=function(){R6P.scanRunId=R6P.scanRunId||localStorage.getItem('r6p_latest_scan_run');if(R6P.scanRunId)r6pPollProductionScan();else alert('No saved scan run exists.');};
+window.r6pStopProductionScan=function(){if(!R6P.scanRunId)return;fetch('/api/r6/scans/runs/'+encodeURIComponent(R6P.scanRunId)+'/cancel',{method:'POST'}).then(function(){r6pPollProductionScan();});};
+window.r6pExportProductionScan=function(){var id=R6P.scanRunId||localStorage.getItem('r6p_latest_scan_run');if(!id){alert('Run a scan first.');return;}window.location='/api/r6/scans/runs/'+encodeURIComponent(id)+'/export';};
+window.r6pExportAllAppraisalsCsv=function(){var id=R6P.scanRunId||localStorage.getItem('r6p_latest_scan_run');if(!id){alert('Run a scan first.');return;}window.location='/api/r6/scans/runs/'+encodeURIComponent(id)+'/appraisals.csv';};
+window.r6pExportAppraisalCsv=function(componentId){var id=R6P.scanRunId||localStorage.getItem('r6p_latest_scan_run');if(!id||!componentId){alert('Open a completed appraisal first.');return;}window.location='/api/r6/scans/runs/'+encodeURIComponent(id)+'/components/'+encodeURIComponent(componentId)+'/appraisal.csv';};
+window.r6pExportFailedChecksCsv=function(){var id=R6P.scanRunId||localStorage.getItem('r6p_latest_scan_run');if(!id){alert('Run a scan first.');return;}window.location='/api/r6/scans/runs/'+encodeURIComponent(id)+'/failed-checks.csv';};
+window.r6pAdoptStructuredEvidence=function(run){
+  R6P.depScan=R6P.depScan||{};
+  (run.components||[]).forEach(function(a){R6P.depScan[a.componentName]={status:a.componentVerdict,completed:['READY_FOR_STAGE_8','DB_NATIVE_REQUIRED','RETAIN_VM_RECOMMENDED'].indexOf(a.componentVerdict)>=0,structured:true,runId:run.runId,appraisal:a,rawLog:(a.probes||[]).map(function(p){return p.probeId+' '+p.status+'\n'+(p.stdout||'')+'\n'+(p.stderr||'');}).join('\n')};});
+  if(run.appraisal&&['READY','READY_FOR_STAGE_8'].indexOf(run.appraisal.finalVerdict)>=0)R6P.appraisalReviewed=true;
+  if(typeof r6pRefreshComponentDrivenStages==='function')r6pRefreshComponentDrivenStages();
+};
+window.r6pReviewAppraisal=function(){
+  var a=R6P.structuredAppraisal&&R6P.structuredAppraisal.appraisal;if(!a)return;
+  if(['BLOCKED','BLOCKED_INFRASTRUCTURE','SCAN_FAILED','SCAN_ERROR'].indexOf(a.finalVerdict)>=0){alert('Blocked or failed scans cannot be approved.');return;}
+  if(confirm('Record review of warnings/manual findings and allow eligible components to continue to classification?')){R6P.appraisalReviewed=true;r6pAdoptStructuredEvidence(R6P.structuredAppraisal);r6pRenderProductionAppraisal(R6P.structuredAppraisal);}
+};
+window.r6pRenderProductionAppraisal=function(run){
+  if(R6P.scanUiVersion==='scan-ui-v2'&&window.R6ScanUIV2){window.R6ScanUIV2.update(run);return;}
+  var root=document.getElementById('r6p-scan-appraisal'),verdictRoot=document.getElementById('r6p-scan-final-verdict'),failedRoot=document.getElementById('r6p-scan-failed-checks');if(!root)return;var a=run.appraisal;
+  if(!a){root.innerHTML='<div class="r6p-info-box">Scan running. Completed component appraisals appear below.</div>';}
+  var color=function(v){return /BLOCKED|FAILED|ERROR/.test(v)?'#dc2626':/WARNING|PARTIAL|MORE_EVIDENCE|REVIEW/.test(v)?'#d97706':/DB_NATIVE/.test(v)?'#2563eb':/RETAIN/.test(v)?'#7c3aed':'#16a34a';};
+  var dimensions=a?'<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:7px;margin-top:10px;">'+[['Discovery Coverage',a.discoveryCoveragePercent+'%'],['Infrastructure Access',a.infrastructureAccessStatus],['Application Readiness',a.applicationReadiness],['Database Readiness',a.databaseReadiness],['Snapshot Readiness',a.snapshotReadiness],['Containerization Readiness',a.containerizationReadiness]].map(function(x){return '<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:7px;padding:8px;"><span style="font-size:10px;color:#64748b;">'+x[0]+'</span><br><b>'+r6pHtml(x[1])+'</b></div>';}).join('')+'</div>':'';
+  var summary=a?'<div style="border:2px solid '+color(a.finalVerdict)+';border-radius:10px;padding:14px;margin-bottom:14px;background:#fff;"><div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start;"><div><h3 style="margin:0 0 4px;">Business System Final Verdict</h3><div style="font-size:12px;color:#64748b;">'+r6pHtml(a.businessSystemName||'Business Apps System')+'</div></div><span style="color:'+color(a.finalVerdict)+';font-weight:900;">'+r6pHtml(a.finalVerdict)+'</span></div><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;margin-top:12px;">'+[['Components',a.summary.components],['Source VMs',a.summary.sourceVms],['Completed / applicable',(a.evidenceCoverage&&a.evidenceCoverage.completed||0)+' / '+(a.evidenceCoverage&&a.evidenceCoverage.applicable||0)],['Skipped',a.evidenceCoverage&&a.evidenceCoverage.skipped||0],['N/A',a.evidenceCoverage&&a.evidenceCoverage.notApplicable||0],['DB native',a.summary.databaseNative],['Blocked',a.summary.blocked],['Coverage',a.discoveryCoveragePercent+'%']].map(function(x){return '<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:7px;padding:8px;text-align:center;"><b>'+r6pHtml(x[1])+'</b><div style="font-size:10px;color:#64748b;">'+x[0]+'</div></div>';}).join('')+'</div>'+dimensions+'<div style="margin-top:10px;font-size:12px;"><b>Reason:</b> '+r6pHtml(a.reason||'')+'</div><div style="margin-top:6px;font-size:12px;"><b>Recommended fix / next action:</b> '+r6pHtml(a.nextAction)+'</div>'+((a.systemWarnings||[]).length?'<button class="r6p-btn secondary" onclick="r6pReviewAppraisal()" style="margin-top:10px;">'+(R6P.appraisalReviewed?'Warnings Reviewed':'Review Warnings')+'</button>':'')+'</div>':'';
+  var cards=(run.components||[]).map(function(c){var ps=c.probeSummary||{},ssh=(c.probes||[]).find(function(p){return p.probeId==='SCAN-001';})||{};return '<div style="border:1px solid #cbd5e1;border-top:4px solid '+color(c.componentVerdict)+';border-radius:9px;background:#fff;padding:13px;"><div style="display:flex;justify-content:space-between;gap:8px;"><strong>'+r6pHtml(c.componentName)+'</strong><span style="font-size:10px;color:'+color(c.componentVerdict)+';font-weight:900;">'+r6pHtml(c.componentVerdict)+'</span></div><div style="font-size:11px;color:#475569;margin:5px 0;">Mapped source VM: <b>'+r6pHtml(c.sourceVmName||c.sourceVmId||'unmapped')+'</b><br>Target IP: '+r6pHtml(c.sourceHost||c.sourceIp||'not mapped')+'<br>Access status: '+r6pHtml(ssh.status||'NOT_TESTED')+'<br>Completed checks: '+r6pHtml((ps.completed||0)+' / '+(ps.applicable||0))+' &bull; Warnings: '+r6pHtml((ps.warning||0)+(ps.passWithWarning||0))+' &bull; Root blockers: '+r6pHtml((c.blockers||[]).length)+'<br>Last scan: '+r6pHtml(c.probes&&c.probes.length?c.probes[c.probes.length-1].completedAt:'Never')+'</div><div style="display:flex;gap:12px;font-size:12px;"><b>Readiness '+c.containerReadinessScore+'%</b><b>Coverage '+c.discoveryCoveragePercent+'%</b></div><div style="font-size:11px;margin-top:8px;">Runtime: '+r6pHtml((c.runtime&&c.runtime.type)||'unknown')+' &bull; Ports: '+r6pHtml((c.ports||[]).join(', ')||'none')+'<br>Capture: '+r6pHtml(c.captureRecommendation)+'<br>Recommendation: '+r6pHtml(c.containerizationRecommendation)+'</div><div style="font-size:11px;margin-top:7px;color:#64748b;">'+(ps.pass||0)+' pass &bull; '+((ps.warning||0)+(ps.partial||0)+(ps.passWithWarning||0))+' warnings/partial &bull; '+((ps.fail||0)+(ps.blocked||0))+' root failures &bull; '+(ps.skippedPrerequisite||0)+' skipped</div><div style="display:flex;gap:6px;margin-top:10px;"><button class="r6p-btn secondary" onclick="r6pViewAppraisal(\''+r6pHtml(c.componentId)+'\')">View Appraisal</button><button class="r6p-btn secondary" onclick="r6pRetryAppraisal(\''+r6pHtml(c.componentId)+'\')">Retry Component</button>'+(c.sourceVmId?'<button class="r6p-btn secondary" onclick="r6pRetryVm(\''+r6pHtml(c.sourceVmId)+'\')">Retry VM</button>':'')+'</div></div>';}).join('');
+  if(verdictRoot)verdictRoot.innerHTML=summary;
+  root.innerHTML='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:12px;">'+cards+'</div>';
+  if(failedRoot)failedRoot.innerHTML=r6pFailedChecksTable(run);
+};
+window.r6pViewAppraisal=function(id){
+  var c=R6P.structuredAppraisal&&R6P.structuredAppraisal.components&&R6P.structuredAppraisal.components.find(function(x){return x.componentId===id;}),drawer=document.getElementById('r6p-appraisal-drawer'),detail=document.getElementById('r6p-appraisal-detail');if(!c||!drawer||!detail)return;
+  detail.innerHTML='<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;"><h2>'+r6pHtml(c.componentName)+'</h2><button class="r6p-btn secondary" onclick="r6pExportAppraisalCsv(\''+r6pHtml(c.componentId)+'\')">Export Result CSV</button></div><p><b>Verdict:</b> '+r6pHtml(c.componentVerdict)+' &nbsp; <b>Capture:</b> '+r6pHtml(c.captureRecommendation)+'</p><h3>Warnings</h3><ul>'+((c.warnings||[]).map(function(x){return '<li>'+r6pHtml(x.code)+': '+r6pHtml(x.message)+'</li>';}).join('')||'<li>None</li>')+'</ul><h3>Blockers</h3><ul>'+((c.blockers||[]).map(function(x){return '<li>'+r6pHtml(x.code)+': '+r6pHtml(x.message)+'</li>';}).join('')||'<li>None</li>')+'</ul><h3>Application paths</h3><pre>'+r6pHtml((c.applicationPaths||[]).join('\n')||'None discovered')+'</pre><h3>Probe Results</h3>'+((c.probes||[]).map(function(p){return '<details style="border:1px solid #e2e8f0;border-radius:6px;padding:8px;margin:6px 0;"><summary><b>'+p.probeId+' '+r6pHtml(p.probeName)+'</b> — '+p.status+' ('+p.durationMs+'ms, exit '+p.exitCode+(p.truncated?', truncated':'')+')</summary><div style="font-size:11px;margin:8px 0;">'+r6pHtml(p.remediation||'No remediation required.')+'</div><pre class="r6p-terminal" style="display:block;max-height:220px;">STDOUT\n'+r6pHtml(p.stdout||'')+'\n\nSTDERR\n'+r6pHtml(p.stderr||'')+'</pre></details>';}).join(''));
+  drawer.style.display='block';
+};
+window.r6pCloseAppraisal=function(){var d=document.getElementById('r6p-appraisal-drawer');if(d)d.style.display='none';};
+window.r6pRetryAppraisal=function(id){
+  if(!R6P.scanRunId)return;var payload=r6pProductionScanPayload();
+  fetch('/api/r6/scans/runs/'+encodeURIComponent(R6P.scanRunId)+'/components/'+encodeURIComponent(id)+'/retry',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ssh:payload.ssh})}).then(function(r){return r.json();}).then(function(d){if(!d.ok)throw new Error(d.error);r6pRefreshAppraisal();}).catch(function(e){alert('Retry failed: '+e.message);});
+};
+window.r6pRetryVm=function(vmId){
+  if(!R6P.scanRunId||!vmId)return;var payload=r6pProductionScanPayload();
+  fetch('/api/r6/scans/runs/'+encodeURIComponent(R6P.scanRunId)+'/vms/'+encodeURIComponent(vmId)+'/retry',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ssh:payload.ssh})}).then(function(r){return r.json();}).then(function(d){if(!d.ok)throw new Error(d.error);r6pRefreshAppraisal();}).catch(function(e){alert('VM retry failed: '+e.message);});
+};
+window.r6pRetryAllFailed=function(){
+  if(!R6P.scanRunId){alert('Run a scan first.');return;}var payload=r6pProductionScanPayload();
+  fetch('/api/r6/scans/runs/'+encodeURIComponent(R6P.scanRunId)+'/retry-failed',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ssh:payload.ssh})}).then(function(r){return r.json();}).then(function(d){if(!d.ok)throw new Error(d.error);r6pRefreshAppraisal();}).catch(function(e){alert('Retry failed: '+e.message);});
+};
+window.r6pVerifyReplaceHostKey=function(componentId){
+  var component=R6P.structuredAppraisal&&(R6P.structuredAppraisal.components||[]).find(function(c){return c.componentId===componentId;});
+  var probe=component&&(component.probes||[]).find(function(p){return p.errorCode==='SSH_HOST_KEY_CHANGED';});
+  if(!component||!probe){alert('Host-key evidence is unavailable.');return;}
+  var fingerprint=probe.newFingerprint||probe.hostFingerprint;if(!fingerprint){alert('A verified replacement fingerprint is required before this key can be changed.');return;}
+  var message='Verify replacement SSH host key\n\nHost: '+component.sourceHost+'\nOld: '+(probe.oldFingerprint||'not reported')+'\nNew: '+fingerprint+'\n\nOnly approve after independently verifying the new fingerprint.';
+  if(!confirm(message))return;
+  var known=((document.getElementById('r6p-scan-known-hosts')||{}).value||'~/.ssh/known_hosts').trim();
+  fetch('/api/r6/scans/known-hosts/verify-and-replace',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({approved:true,host:component.sourceHost,port:component.sshPort||22,expectedFingerprint:fingerprint,knownHostsFile:known})}).then(function(r){return r.json();}).then(function(d){if(!d.ok)throw new Error(d.error);alert('Trusted host key replaced. Retry the VM prerequisite.');r6pRetryVm(component.sourceVmId);}).catch(function(e){alert('Host-key replacement failed: '+e.message);});
+};
+window.r6pRunAllLiveScans=function(){
+  var sel=document.getElementById('r6p-scan-comp');
+  var out=document.getElementById('r6p-scan-out');
+  var comps=(R6P.components||[]).filter(function(c){return r6pComponentTarget(c);});
+  if(!sel||!comps.length||R6P.allScanRunning)return;
+  /* Capture credentials once. Stage bodies can be refreshed while a batch is
+     running; rereading a replaced input used to silently fall back to root. */
+  var batchCredentials={
+    user:String(((document.getElementById('r6p-scan-user')||{}).value)||'').trim(),
+    key:String(((document.getElementById('r6p-scan-key')||{}).value)||'').trim()
+  };
+  if(!/^[a-z_][a-z0-9_.-]*$/i.test(batchCredentials.user)){
+    if(out){out.style.display='block';out.textContent='Enter a valid SSH username before scanning all components.';}
+    return;
+  }
+  if(!batchCredentials.key){
+    if(out){out.style.display='block';out.textContent='Enter an SSH private key path before scanning all components.';}
+    return;
+  }
+  R6P.allScanRunning=true;
+  var button=document.getElementById('r6p-live-scan-btn');
+  if(button){button.disabled=true;button.textContent='Scanning all components...';}
+  if(out){out.style.display='block';out.textContent='== All components live scan: '+comps.length+' component(s) ==\n';}
+  var index=0,passed=0,failed=0;
+  function next(){
+    if(index>=comps.length){
+      sel.value='__all__';
+      if(out){out.textContent+='\n== All components scan complete: '+passed+' passed, '+failed+' failed ==\n';out.scrollTop=out.scrollHeight;}
+      R6P.allScanRunning=false;
+      if(button){button.disabled=false;button.innerHTML='&#9654; Run Live Scan';}
+      var stage8=document.getElementById('r6p-body-8');
+      var stage8Inner=stage8&&stage8.querySelector('.r6p-stage-body-inner');
+      if(stage8Inner)stage8Inner.innerHTML=r6pContent(8);
+      return;
+    }
+    sel.value=String(index);
+    if(out){out.textContent+='\n['+(index+1)+'/'+comps.length+'] '+comps[index].name+'\n';out.scrollTop=out.scrollHeight;}
+    index++;
+    r6pRunLiveScan(function(ok){if(ok)passed++;else failed++;next();},true,batchCredentials);
+  }
+  next();
+};
+window.r6pRunLiveScan=function(done,appendMode,credentials){
   var sel=document.getElementById('r6p-scan-comp');
   var idx=sel?sel.value:'';
-  var comps6=(R6P.components||[]).filter(function(c){return c.tgt;});
+  if(idx==='__all__'){r6pRunAllLiveScans();return;}
+  var comps6=(R6P.components||[]).filter(function(c){return r6pComponentTarget(c);});
   var comp=comps6[idx];
   var out=document.getElementById('r6p-scan-out');
-  if(!comp){if(out){out.style.display='block';out.textContent='Select a component with a FLEX target IP first (choose a Business System in Step 1).';}return;}
-  var user=(document.getElementById('r6p-scan-user')||{}).value||'root';
-  var key=(document.getElementById('r6p-scan-key')||{}).value||'~/.ssh/id_rsa';
-  var ip=comp.tgt;
-  var sshBase='ssh -i '+key+' -o StrictHostKeyChecking=no -o ConnectTimeout=8 '+user+'@'+ip+' ';
-  var cmd='echo "== Guest dependency scan: '+comp.name+' ('+ip+') =="\n'
-    +'echo "-- hostnamectl / uname --"\n'+sshBase+'"hostnamectl 2>/dev/null; uname -a"\n'
-    +'echo "-- open ports --"\n'+sshBase+'"ss -tulpn 2>/dev/null || netstat -tulpn 2>/dev/null"\n'
-    +'echo "-- running services --"\n'+sshBase+'"systemctl --type=service --state=running 2>/dev/null | head -30"\n'
-    +'echo "-- top processes --"\n'+sshBase+'"ps aux --sort=-%mem 2>/dev/null | head -30"\n'
-    +'echo "-- disk usage (df -h) --"\n'+sshBase+'"df -h 2>/dev/null"\n'
-    +'echo "-- block devices (lsblk) --"\n'+sshBase+'"lsblk 2>/dev/null"\n'
-    +'echo "-- mounts (/etc/fstab) --"\n'+sshBase+'"cat /etc/fstab 2>/dev/null"\n'
-    +'echo "-- cron jobs --"\n'+sshBase+'"crontab -l 2>/dev/null; ls /etc/cron.d/ 2>/dev/null"\n'
-    +'echo "-- known app/db config files --"\n'+sshBase+'"find /etc -maxdepth 3 -type f 2>/dev/null | grep -E \'nginx|apache|mysql|postgres|mongo|redis|env\' | head -30"\n'
-    +'echo "-- app paths (non-system files) --"\n'+sshBase+'"find /opt /srv /var/www /home -maxdepth 4 -type f 2>/dev/null | grep -vE \'\\.cache|\\.log$\' | head -50"';
-  if(out){out.style.display='block';out.textContent='';}
+  if(!comp){if(out){out.style.display='block';out.textContent='Select a component with a FLEX target IP first (choose a Business System in Step 1).';}if(typeof done==='function')done(false);return;}
+  var user=String((credentials&&credentials.user)||((document.getElementById('r6p-scan-user')||{}).value)||'').trim();
+  var key=String((credentials&&credentials.key)||((document.getElementById('r6p-scan-key')||{}).value)||'').trim();
+  var endpoint=r6pParseSshTarget(r6pComponentTarget(comp),comp);
+  if(!endpoint){if(out){out.style.display='block';out.textContent='Invalid SSH target for '+comp.name+'. Set a valid FLEX hostname or IP in Step 1.';}if(typeof done==='function')done(false);return;}
+  if(!/^[a-z_][a-z0-9_.-]*$/i.test(user)){if(out){out.style.display='block';out.textContent='Invalid SSH username.';}if(typeof done==='function')done(false);return;}
+  key=String(key).trim().replace(/^~(?=\/|$)/,'$HOME');
+  if(!/^(\$HOME|\/)[a-z0-9_./ -]+$/i.test(key)){if(out){out.style.display='block';out.textContent='Invalid SSH key path.';}if(typeof done==='function')done(false);return;}
+  var remote=[
+    'echo "-- hostnamectl / uname --"; hostnamectl 2>/dev/null || true; uname -a',
+    'echo "-- open ports --"; (ss -tulpn 2>/dev/null || netstat -tulpn 2>/dev/null || true)',
+    'echo "-- running services --"; systemctl --type=service --state=running 2>/dev/null | head -30 || true',
+    'echo "-- top processes --"; ps aux --sort=-%mem 2>/dev/null | head -30',
+    'echo "-- disk usage (df -h) --"; df -h 2>/dev/null',
+    'echo "-- block devices (lsblk) --"; lsblk 2>/dev/null || true',
+    'echo "-- mounts (/etc/fstab) --"; cat /etc/fstab 2>/dev/null || true',
+    'echo "-- cron jobs --"; crontab -l 2>/dev/null || true; ls /etc/cron.d/ 2>/dev/null || true',
+    'echo "-- known app/db config files --"; find /etc -maxdepth 3 -type f 2>/dev/null | grep -E "nginx|apache|mysql|postgres|mongo|redis|env" | head -30 || true',
+    'echo "-- app paths (non-system files) --"; find /opt /srv /var/www /home -maxdepth 4 -type f 2>/dev/null | grep -vE "\\.cache|\\.log$" | head -50 || true'
+  ].join('; ');
+  var keyArg=key.indexOf('$HOME')===0?'\"'+key+'\"':r6pShellQuote(key);
+  var cmd='echo '+r6pShellQuote('== Guest dependency scan: '+comp.name+' ('+endpoint.host+':'+endpoint.port+') ==')+'\n'
+    +'ssh -i '+keyArg+' -p '+endpoint.port+' -o BatchMode=yes -o StrictHostKeyChecking=no '
+    +'-o UserKnownHostsFile=/dev/null -o GlobalKnownHostsFile=/dev/null '
+    +'-o ConnectTimeout=8 '+r6pShellQuote(user+'@'+endpoint.host)+' '+r6pShellQuote(remote);
+  if(out){out.style.display='block';if(!appendMode)out.textContent='';}
   R6P.depScan=R6P.depScan||{};
-  R6P.depScan[comp.name]={ip:ip,startedAt:new Date().toISOString(),rawLog:''};
+  R6P.depScan[comp.name]={ip:endpoint.host,sshPort:endpoint.port,sourceEndpoint:endpoint.source,startedAt:new Date().toISOString(),rawLog:'',status:'RUNNING',completed:false};
   var url='/api/stream/run-cmd?cmd='+encodeURIComponent(cmd);
   var es=new EventSource(url);
   es.onmessage=function(e){
-    if(e.data==='[DONE]'||e.data.indexOf('[EXIT')===0){es.close();return;}
+    if(e.data==='[DONE]'){es.close();return;}
+    if(e.data.indexOf('[EXIT')===0){
+      var ok=/\[EXIT 0\]/.test(e.data);
+      R6P.depScan[comp.name].status=ok?'COMPLETE':'FAILED';
+      R6P.depScan[comp.name].completed=ok;
+      R6P.depScan[comp.name].finishedAt=new Date().toISOString();
+      if(out){out.textContent+=(ok?'✓ Live scan completed successfully.':'✗ Live scan failed: '+e.data)+'\n';out.scrollTop=out.scrollHeight;}
+      es.close();if(typeof done==='function')done(ok);return;
+    }
     if(out){out.textContent+=e.data+'\n';out.scrollTop=out.scrollHeight;}
     R6P.depScan[comp.name].rawLog+=e.data+'\n';
   };
-  es.onerror=function(){es.close();if(out)out.textContent+='[stream error]\n';};
+  es.onerror=function(){R6P.depScan[comp.name].status='FAILED';R6P.depScan[comp.name].completed=false;es.close();if(out)out.textContent+='[stream error]\n';if(typeof done==='function')done(false);};
 };
 window.r6pExportDepScan=function(){
   var sel=document.getElementById('r6p-scan-comp');
-  var comps6=(R6P.components||[]).filter(function(c){return c.tgt;});
+  var comps6=(R6P.components||[]).filter(function(c){return r6pComponentTarget(c);});
+  if(sel&&sel.value==='__all__'){
+    var reports=comps6.map(function(c){
+      var scan=(R6P.depScan&&R6P.depScan[c.name])||{};
+      return {component:c.name,sourceEndpoint:r6pComponentTarget(c),sshHost:scan.ip||null,sshPort:scan.sshPort||null,status:scan.status||'NOT_RUN',completed:scan.completed===true,scannedAt:scan.startedAt||null,finishedAt:scan.finishedAt||null,raw:scan.rawLog||''};
+    });
+    var allBlob=new Blob([JSON.stringify({generatedAt:new Date().toISOString(),components:reports},null,2)],{type:'application/json'});
+    var allLink=document.createElement('a');allLink.href=URL.createObjectURL(allBlob);allLink.download='app_dependency_report_all_components.json';
+    document.body.appendChild(allLink);allLink.click();document.body.removeChild(allLink);return;
+  }
   var comp=comps6[sel?sel.value:''];
   if(!comp||!R6P.depScan||!R6P.depScan[comp.name]){alert('Run the live scan first.');return;}
-  var report={component:comp.name,ip:comp.tgt,scannedAt:R6P.depScan[comp.name].startedAt,raw:R6P.depScan[comp.name].rawLog};
+  var scan=R6P.depScan[comp.name];
+  var report={component:comp.name,sourceEndpoint:r6pComponentTarget(comp),sshHost:scan.ip,sshPort:scan.sshPort,status:scan.status,completed:scan.completed,scannedAt:scan.startedAt,finishedAt:scan.finishedAt||null,raw:scan.rawLog};
   var blob=new Blob([JSON.stringify(report,null,2)],{type:'application/json'});
   var a=document.createElement('a');a.href=URL.createObjectURL(blob);
   a.download='app_dependency_report_'+comp.name.replace(/\s+/g,'_')+'.json';
@@ -2003,13 +2817,13 @@ window.r6pExportDepScan=function(){
 window.r6pRunClassify=function(){
   var sel=document.getElementById('r6p-classify-comp');
   var idx=sel?sel.value:'';
-  var comps7=(R6P.components||[]).filter(function(c){return c.tgt;});
+  var comps7=(R6P.components||[]).filter(function(c){return r6pComponentTarget(c);});
   var comp=comps7[idx];
   var out=document.getElementById('r6p-classify-out');
   if(!comp){if(out){out.style.display='block';out.textContent='Select a component with a FLEX target IP first (choose a Business System in Step 1).';}return;}
   var user=(document.getElementById('r6p-classify-user')||{}).value||'root';
   var key=(document.getElementById('r6p-classify-key')||{}).value||'~/.ssh/id_rsa';
-  var ip=comp.tgt;
+  var ip=r6pComponentTarget(comp);
   ['app_code','config_template','secret_candidate','log_file','database_data','excluded_file'].forEach(function(k){
     var el=document.getElementById('r6p-classify-count-'+k);if(el){el.textContent='Checking...';el.style.color='#0369a1';}
   });
