@@ -23670,6 +23670,26 @@ def edit_config_nano():
     return jsonify({"ok": False, "error": f"could not launch a terminal: {last_err}"}), 500
 
 
+def _workflow_dashboard_restart_process():
+    sys.stdout.flush()
+    sys.stderr.flush()
+    os.execv(sys.executable, [sys.executable] + sys.argv)
+
+
+@app.post("/api/dev/restart-flask")
+def dev_restart_flask():
+    remote = request.headers.get("X-Forwarded-For", request.remote_addr or "").split(",")[0].strip()
+    if remote not in {"127.0.0.1", "::1", "localhost"}:
+        return jsonify({"ok": False, "error": "restart is only allowed from localhost"}), 403
+    if app.config.get("TESTING") or os.environ.get("WORKFLOW_DASHBOARD_DISABLE_SELF_RESTART") == "1":
+        return jsonify({"ok": True, "restart": "suppressed-for-test"})
+    def _restart_later():
+        time.sleep(0.35)
+        _workflow_dashboard_restart_process()
+    threading.Thread(target=_restart_later, daemon=True).start()
+    return jsonify({"ok": True, "restart": "scheduled", "pid": os.getpid()})
+
+
 if __name__ == "__main__":
     host = os.environ.get("WORKFLOW_DASHBOARD_HOST", "127.0.0.1")
     port = int(os.environ.get("WORKFLOW_DASHBOARD_PORT", "5001"))

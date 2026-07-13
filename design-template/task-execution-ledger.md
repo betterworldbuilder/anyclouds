@@ -283,3 +283,5 @@ Scores are evidence-based. Known gaps, unverified behavior, unrelated failures, 
 | 2026-07-13 | Remove Stage 8 live-scan approval blocker | 6 min | 10/10 | Stage 8 approval/continue is no longer disabled by missing live scans; only BLOCKED decisions block approval. Missing scans remain visible as advisory-only warnings. Focused Stage 8 UI regression test and JS syntax check passed. |
 
 | 2026-07-13 | Remove Stage 9 instructional clutter from main UI | 6 min | 10/10 | Removed the large Stage 9 explanatory substeps, decision table, database exception lecture and start-command review from the rendered UI. Stage 8 remains decision-only, and Stage 9 keeps only the actionable source-capture table plus 9A/9B buttons. Focused UI/source-capture tests and JS syntax check passed. |
+
+| 2026-07-13 | Add hotkey Flask restart button | 9 min | 10/10 | Added Ctrl+Shift+R hotkey overlay with a Restart Flask button, local-only /api/dev/restart-flask endpoint that schedules in-process exec restart, cache-busted R6 script, and focused tests for endpoint safety plus UI wiring. Python compile and JS syntax checks passed. |

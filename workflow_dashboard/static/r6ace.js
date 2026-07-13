@@ -3602,3 +3602,35 @@ window.r6pGitSave = function(){
   if (b){ b.textContent = st.gitRepo ? 'Configured' : 'Not Configured'; b.style.color = st.gitRepo ? '#15803d' : '#94a3b8'; }
 };
 setTimeout(function(){ if (document.getElementById('r6p-git-repo')) r6pGitLoad(); }, 400);
+
+
+(function(){
+  if(window.__r6pFlaskRestartHotkeyInstalled)return;
+  window.__r6pFlaskRestartHotkeyInstalled=true;
+  function ensurePanel(){
+    var panel=document.getElementById('r6p-flask-restart-panel');
+    if(panel)return panel;
+    panel=document.createElement('div');
+    panel.id='r6p-flask-restart-panel';
+    panel.style.cssText='display:none;position:fixed;right:18px;bottom:18px;z-index:10080;background:#ffffff;border:1px solid #bfdbfe;box-shadow:0 18px 45px rgba(15,23,42,.20);border-radius:14px;padding:14px 16px;min-width:280px;font-family:system-ui,-apple-system,Segoe UI,sans-serif;color:#0f172a;';
+    panel.innerHTML='<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:8px;"><div><div style="font-weight:900;font-size:14px;">Flask Control</div><div style="font-size:11px;color:#64748b;">Ctrl + Shift + R opened this panel.</div></div><button id="r6p-flask-restart-close" style="border:0;background:#f1f5f9;color:#334155;border-radius:8px;padding:3px 8px;cursor:pointer;">×</button></div><button id="r6p-flask-restart-btn" class="r6p-btn primary" style="width:100%;padding:9px 12px;font-size:12px;">Restart Flask</button><div id="r6p-flask-restart-status" style="font-size:11px;color:#64748b;margin-top:8px;line-height:1.4;">Restart without rerunning letsmove.sh.</div>';
+    document.body.appendChild(panel);
+    document.getElementById('r6p-flask-restart-close').onclick=function(){panel.style.display='none';};
+    document.getElementById('r6p-flask-restart-btn').onclick=r6pRestartFlask;
+    return panel;
+  }
+  window.r6pShowFlaskRestart=function(){ensurePanel().style.display='block';};
+  window.r6pRestartFlask=function(){
+    var panel=ensurePanel(),btn=document.getElementById('r6p-flask-restart-btn'),st=document.getElementById('r6p-flask-restart-status');
+    panel.style.display='block';if(btn)btn.disabled=true;if(st){st.textContent='Restart requested… Flask will reload in a moment.';st.style.color='#0369a1';}
+    fetch('/api/dev/restart-flask',{method:'POST',headers:{'Accept':'application/json'}}).then(function(r){return r.json().catch(function(){return{};}).then(function(d){if(!r.ok||!d.ok)throw new Error(d.error||('HTTP '+r.status));return d;});}).then(function(){
+      if(st){st.textContent='Restart scheduled. Reloading when Flask comes back…';st.style.color='#15803d';}
+      setTimeout(function(){window.location.reload();},2200);
+    }).catch(function(e){if(st){st.textContent='Restart failed: '+e.message;st.style.color='#dc2626';}if(btn)btn.disabled=false;});
+  };
+  document.addEventListener('keydown',function(e){
+    if(e.ctrlKey&&e.shiftKey&&String(e.key||'').toLowerCase()==='r'){
+      e.preventDefault();e.stopPropagation();r6pShowFlaskRestart();
+    }
+  },true);
+})();
