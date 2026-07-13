@@ -1213,7 +1213,7 @@ window.r6pContent=function(n){
   if(n===9){
     var buildableComps9=(R6P.components||[]).filter(function(c){
       var form=(R6P.targetForms&&R6P.targetForms[c.name])||r6pDecideTargetForm(c).form;
-      return form==='CONTAINERIZED'||form==='PARTIALLY_CONTAINERIZED';
+      return (form==='CONTAINERIZED'||form==='PARTIALLY_CONTAINERIZED')&&!r6pStage9IsDatabaseLike(c);
     });
     var stage9Rows=[
       ['9.1','Read Stage 8 decisions','Every component'],
@@ -1699,15 +1699,23 @@ window.r6pDetectStartCommand=function(c){
   }
   return '';
 };
-window.r6pIsContainerCaptureTarget=function(c){
-  var form=(R6P.targetForms&&R6P.targetForms[c.name])||r6pDecideTargetForm(c).form;
-  return form==='CONTAINERIZED'||form==='PARTIALLY_CONTAINERIZED';
+window.r6pStage8ApprovedForCapture=function(){return !!(R6P.status&&R6P.status[8]==='done');};
+window.r6pStage9DecisionFor=function(c){return (R6P.targetForms&&R6P.targetForms[c.name])||r6pDecideTargetForm(c).form;};
+window.r6pStage9IsDatabaseLike=function(c){
+  var form=r6pStage9DecisionFor(c);
+  var txt=[c.name,c.type,c.category,c.role,c.runtime,c.product,c.tgt,c.path].join(' ').toLowerCase();
+  return form==='DATA_MIGRATION_REQUIRED'||txt.indexOf('database')>=0||txt.indexOf('postgres')>=0||txt.indexOf('mysql')>=0||txt.indexOf('mariadb')>=0||txt.indexOf('mongodb')>=0||txt.indexOf('/var/lib/postgresql')>=0||txt.indexOf('/var/lib/mysql')>=0;
 };
+window.r6pIsContainerCaptureTarget=function(c){
+  var form=r6pStage9DecisionFor(c);
+  return (form==='CONTAINERIZED'||form==='PARTIALLY_CONTAINERIZED')&&!r6pStage9IsDatabaseLike(c);
+};
+window.r6pStage9ApprovedContainerTargets=function(){return (R6P.components||[]).filter(function(c){return r6pIsContainerCaptureTarget(c);});};
 window.r6pBuildCaptureRows=function(){
   var rows=(R6P.components||[]).map(function(c){
-    var form=(R6P.targetForms&&R6P.targetForms[c.name])||r6pDecideTargetForm(c).form;
+    var form=r6pStage9DecisionFor(c);
     var endpoint=r6pParseTargetEndpoint(c.tgt);
-    var approved=(form==='CONTAINERIZED'||form==='PARTIALLY_CONTAINERIZED');
+    var approved=r6pIsContainerCaptureTarget(c);
     var cap=(R6P.captureRun&&R6P.captureRun.components||[]).filter(function(x){return x.component===c.name;})[0]||{};
     return {
       component:c.name,
@@ -1738,17 +1746,18 @@ var _R6_SNAPSHOT_SIM_NOTE='';
 window.r6pGenRealDockerfiles=function(){
   var st=document.getElementById('r6p-build-status');
   if(!R6P.components||!R6P.components.length){if(st){st.textContent='Select a Business System in Step 1 first.';st.style.color='#dc2626';}return;}
+  if(!r6pStage8ApprovedForCapture()){if(st){st.textContent='Stage 8 approval required before source capture. Approve the readiness plan first; no snapshots are created before that gate.';st.style.color='#dc2626';}return;}
   var clusterRef=(R6P.creds.opencenter.clusterRef||'rackspace-flex/flex-prod-k8s').split('/');
   var org=clusterRef[0]||'rackspace-flex',cluster=clusterRef[1]||'flex-prod-k8s';
-  var comps=R6P.components.filter(function(c){return c.tgt;});
+  var comps=r6pStage9ApprovedContainerTargets().filter(function(c){return c.tgt;});
+  if(!comps.length){if(st){st.textContent='No Stage 8-approved container source VMs are eligible for capture. Retained VMs, operators, databases, external services, blocked and excluded components are skipped.';st.style.color='#dc2626';}return;}
   var srcComp=comps[0];
-  /* Only components Step 8's real Transform decision assigned CONTAINERIZED or
-     PARTIALLY_CONTAINERIZED get a Dockerfile/image - every other target form
-     (operator-managed, retained/redeployed VM, external, data-migration, manual
-     review, blocked, excluded) is intentionally skipped here, matching Step 8's decision. */
+  /* Only Stage 8-approved CONTAINERIZED/PARTIALLY_CONTAINERIZED application VMs reach
+     this payload. Databases, retained/redeployed VMs, operators, external services,
+     blocked and excluded components are not snapshotted for container image builds. */
   var workloads=comps.map(function(c){
-    var form=(R6P.targetForms&&R6P.targetForms[c.name])||r6pDecideTargetForm(c).form;
-    var buildable=(form==='CONTAINERIZED'||form==='PARTIALLY_CONTAINERIZED');
+    var form=r6pStage9DecisionFor(c);
+    var buildable=true;
     var startCmd=(R6P.startCmdOverride&&R6P.startCmdOverride[c.name])||r6pDetectStartCommand(c);
     var siblingDeps=(R6P.components||[]).filter(function(x){return x.name!==c.name;}).map(function(x){return x.name;});
     var endpoint=r6pParseTargetEndpoint(c.tgt);
@@ -1756,9 +1765,11 @@ window.r6pGenRealDockerfiles=function(){
       readiness:buildable?'READY':'KEEP_ON_VM_FOR_NOW',layer:'API',sourcePath:c.path||'/opt/app',targetForm:form,
       startCommand:startCmd,healthPath:(c.path&&c.path.indexOf('/')===0)?c.path.split(',')[0]:'/health',
       dependencies:siblingDeps,targetIp:endpoint.ip,targetPort:endpoint.port,
+      sourceVmId:c.vmId||c.serverId||c.instanceId||'',sourceVmName:c.vmName||c.name||'',
+      cloudRegion:c.region||c.cloudRegion||(R6P.bs&&R6P.bs.region)||'iad3',volumeIds:c.volumes||c.volumeIds||[],
       persistentPath:r6pPersistentPathFor(c)};
   });
-  var skipped=workloads.filter(function(w){return w.readiness==='KEEP_ON_VM_FOR_NOW';});
+  var skipped=(R6P.components||[]).filter(function(c){return !r6pIsContainerCaptureTarget(c);}).map(function(c){return {component:c.name,targetForm:r6pStage9DecisionFor(c)};});
   var mode=(document.querySelector('input[name="r6p-build-mode"]:checked')||{}).value||'manual';
   /* Automatic mode makes the whole R6-to-production-OpenCenter transfer fully automatic in
      one action: build+push images (client-side chain below) AND commit+push the GitOps

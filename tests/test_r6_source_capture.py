@@ -165,3 +165,23 @@ def test_live_scan_does_not_use_stale_operator_known_hosts():
     script = (pathlib.Path(__file__).parent.parent / "workflow_dashboard" / "static" / "r6ace.js").read_text()
     assert "-o UserKnownHostsFile=/dev/null" in script
     assert "-o GlobalKnownHostsFile=/dev/null" in script
+
+
+def test_stage9_button_filters_capture_payload_after_stage8_only():
+    script = (pathlib.Path(__file__).parent.parent / "workflow_dashboard" / "static" / "r6ace.js").read_text()
+    func = script.split("window.r6pGenRealDockerfiles=function(){", 1)[1].split("fetch('/api/r6/capture-sources-build'", 1)[0]
+    assert "r6pStage8ApprovedForCapture()" in func
+    assert "Stage 8 approval required before source capture" in func
+    assert "r6pStage9ApprovedContainerTargets().filter(function(c){return c.tgt;})" in func
+    assert "var comps=R6P.components.filter(function(c){return c.tgt;});" not in func
+    assert "sourceVmId:c.vmId||c.serverId||c.instanceId||''" in func
+    assert "volumeIds:c.volumes||c.volumeIds||[]" in func
+
+
+def test_stage9_ui_excludes_database_like_components_from_capture_targets():
+    script = (pathlib.Path(__file__).parent.parent / "workflow_dashboard" / "static" / "r6ace.js").read_text()
+    assert "r6pStage9IsDatabaseLike" in script
+    assert "form==='DATA_MIGRATION_REQUIRED'" in script
+    assert "txt.indexOf('database')>=0" in script
+    assert "!r6pStage9IsDatabaseLike(c)" in script
+    assert "Retained VMs, operators, databases, external services, blocked and excluded components are skipped" in script
