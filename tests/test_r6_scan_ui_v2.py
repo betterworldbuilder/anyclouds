@@ -287,3 +287,11 @@ def test_stage3_business_system_mapper_preserves_openstack_vm_lineage():
     assert "scanTargetId: sourceVmId" in MAIN_SCRIPTS
     assert "existing.sourceVmId" in MAIN_SCRIPTS
     assert "r6pResolveComponentVm" in V1
+
+
+def test_stage8_live_scan_missing_is_advisory_not_approval_blocker():
+    stage8 = V1.split("if(n===8){", 1)[1].split("if(n===9){", 1)[0]
+    assert "missingScans.length===0" not in stage8
+    assert "var allCanProceed=decisions.every(function(d){return d.status!=='BLOCKED';});" in stage8
+    assert "Live scan not yet run (advisory only; approval is allowed):" in stage8
+    assert "Live scan required before approval" not in stage8
