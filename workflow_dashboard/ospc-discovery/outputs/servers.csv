@@ -1,12 +1,12 @@
 collected_at,service_type,region,name,resource_id,status,public_ips,private_ips,flavor_id,image_id,image_name,image_os_distro,image_os_version,image_os_type
-2026-07-01T15:06:49Z,cloud_server,IAD,"Bank-Database Service, Cache Service",6b7d5316-ad33-4ec9-87cc-2bbcd341a3bc,ACTIVE,104.130.26.116,10.176.192.165,general1-4,2fd07c5d-3104-4931-882b-4fe6a115c3bd,Ubuntu 24.04,ubuntu,24.04,linux
-2026-07-01T15:06:49Z,cloud_server,IAD,"Ledger / Transfer Service, Audit / Compliance Log, Notification Service",c93ba5c0-f551-42df-9444-0f08546e38b2,ACTIVE,104.130.13.28,10.176.194.81,general1-4,2fd07c5d-3104-4931-882b-4fe6a115c3bd,Ubuntu 24.04,ubuntu,24.04,linux
-2026-07-01T15:06:49Z,cloud_server,IAD,"3Auth / Identity Service, Core Banking Backend",77472100-524e-46f8-a0d5-53909cb2bb90,ACTIVE,23.253.159.193,10.176.194.11,general1-4,2fd07c5d-3104-4931-882b-4fe6a115c3bd,Ubuntu 24.04,ubuntu,24.04,linux
-2026-07-01T15:06:49Z,cloud_server,IAD,API Gateway / Mobile AP,6b2c0ba8-3af9-40f0-89f9-3b6835d29645,ACTIVE,104.130.26.180,10.176.192.208,general1-2,2fd07c5d-3104-4931-882b-4fe6a115c3bd,Ubuntu 24.04,ubuntu,24.04,linux
-2026-07-01T15:06:49Z,cloud_server,IAD,bankappfrontend,e02bef0a-7d9e-4b0d-9cab-02553e053a9e,ACTIVE,23.253.159.71,10.176.193.140,general1-2,2fd07c5d-3104-4931-882b-4fe6a115c3bd,Ubuntu 24.04,ubuntu,24.04,linux
-2026-07-01T15:06:49Z,cloud_server,IAD,haproxyopsc,08c9a1a4-55b9-45e0-8b99-eeb5789c4fe2,ACTIVE,23.253.159.45,10.176.192.255,general1-4,2fd07c5d-3104-4931-882b-4fe6a115c3bd,Ubuntu 24.04,ubuntu,24.04,linux
-2026-07-01T15:06:49Z,cloud_server,IAD,u24 green server,13b9ba25-fe39-4169-a1fb-437276a07e45,ACTIVE,23.253.159.251,10.176.194.35,general1-2,2fd07c5d-3104-4931-882b-4fe6a115c3bd,Ubuntu 24.04,ubuntu,24.04,linux
-2026-07-01T15:06:49Z,cloud_server,IAD,ospcwin2019,09d88d96-901d-4741-9a61-38bfbd466e84,ACTIVE,23.253.159.176,10.176.193.227,general1-1,,Windows Server,windows,,Windows
-2026-07-01T15:06:49Z,cloud_server,IAD,bigjumpwindowsiad,77fbe978-4b0b-43cd-8722-47a495827d49,ACTIVE,104.130.29.126,10.209.32.49,compute1-30,,Windows Server,windows,,Windows
-2026-07-01T15:06:49Z,cloud_server,IAD,centos7,8daf4f80-47bc-41a6-bbcb-cd5974193b41,ACTIVE,104.130.29.156,10.209.32.39,compute1-4,,Centos,centos,,Linux
-2026-07-01T15:06:49Z,cloud_server,IAD,windows2016,1850f963-95f6-477f-97da-81e5b404694f,ACTIVE,104.130.26.194,10.176.192.167,general1-2,1ccd0f49-2169-4854-9222-443914c71830,Windows 2016,windows,2016,windows
+2026-07-14T01:20:15Z,cloud_server,IAD,"Bank-Database Service, Cache Service",6b7d5316-ad33-4ec9-87cc-2bbcd341a3bc,ACTIVE,104.130.26.116,10.176.192.165,general1-4,2fd07c5d-3104-4931-882b-4fe6a115c3bd,Ubuntu 24.04,ubuntu,24.04,linux
+2026-07-14T01:20:15Z,cloud_server,IAD,"Ledger / Transfer Service, Audit / Compliance Log, Notification Service",c93ba5c0-f551-42df-9444-0f08546e38b2,ACTIVE,104.130.13.28,10.176.194.81,general1-4,2fd07c5d-3104-4931-882b-4fe6a115c3bd,Ubuntu 24.04,ubuntu,24.04,linux
+2026-07-14T01:20:15Z,cloud_server,IAD,"3Auth / Identity Service, Core Banking Backend",77472100-524e-46f8-a0d5-53909cb2bb90,ACTIVE,23.253.159.193,10.176.194.11,general1-4,2fd07c5d-3104-4931-882b-4fe6a115c3bd,Ubuntu 24.04,ubuntu,24.04,linux
+2026-07-14T01:20:15Z,cloud_server,IAD,API Gateway / Mobile AP,6b2c0ba8-3af9-40f0-89f9-3b6835d29645,ACTIVE,104.130.26.180,10.176.192.208,general1-2,2fd07c5d-3104-4931-882b-4fe6a115c3bd,Ubuntu 24.04,ubuntu,24.04,linux
+2026-07-14T01:20:15Z,cloud_server,IAD,bankappfrontend,e02bef0a-7d9e-4b0d-9cab-02553e053a9e,ACTIVE,23.253.159.71,10.176.193.140,general1-2,2fd07c5d-3104-4931-882b-4fe6a115c3bd,Ubuntu 24.04,ubuntu,24.04,linux
+2026-07-14T01:20:15Z,cloud_server,IAD,haproxyopsc,08c9a1a4-55b9-45e0-8b99-eeb5789c4fe2,ACTIVE,23.253.159.45,10.176.192.255,general1-4,2fd07c5d-3104-4931-882b-4fe6a115c3bd,Ubuntu 24.04,ubuntu,24.04,linux
+2026-07-14T01:20:15Z,cloud_server,IAD,u24 green server,13b9ba25-fe39-4169-a1fb-437276a07e45,ACTIVE,23.253.159.251,10.176.194.35,general1-2,2fd07c5d-3104-4931-882b-4fe6a115c3bd,Ubuntu 24.04,ubuntu,24.04,linux
+2026-07-14T01:20:15Z,cloud_server,IAD,ospcwin2019,09d88d96-901d-4741-9a61-38bfbd466e84,ACTIVE,23.253.159.176,10.176.193.227,general1-1,,Windows Server,windows,,Windows
+2026-07-14T01:20:15Z,cloud_server,IAD,bigjumpwindowsiad,77fbe978-4b0b-43cd-8722-47a495827d49,ACTIVE,104.130.29.126,10.209.32.49,compute1-30,,Windows Server,windows,,Windows
+2026-07-14T01:20:15Z,cloud_server,IAD,centos7,8daf4f80-47bc-41a6-bbcb-cd5974193b41,ACTIVE,104.130.29.156,10.209.32.39,compute1-4,,Centos,centos,,Linux
+2026-07-14T01:20:15Z,cloud_server,IAD,windows2016,1850f963-95f6-477f-97da-81e5b404694f,ACTIVE,104.130.26.194,10.176.192.167,general1-2,1ccd0f49-2169-4854-9222-443914c71830,Windows 2016,windows,2016,windows

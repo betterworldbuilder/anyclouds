@@ -163,14 +163,14 @@
                 <div>
                     <h2 class="section-title"><div class="section-title-wrapper">OSPC Cloud Credentials</div></h2>
                     <div class="form-group"><label>Username</label><input type="text" id="ospc_cloud_user" placeholder="e.g. admin"></div>
-                    <div class="form-group"><label>API Key / Password</label><input type="text" id="ospc_cloud_key" autocomplete="off" placeholder="Enter API Key"></div>
+                    <div class="form-group"><label>API Key / Password</label><input type="password" id="ospc_cloud_key" autocomplete="new-password" placeholder="Enter API Key"></div>
                     <div class="form-group"><label>Account / Project ID</label><input type="text" id="ospc_cloud_account" placeholder="e.g. 123456789"></div>
                 </div>
                 <div>
                     <h2 class="section-title"><div class="section-title-wrapper">FLEX Cloud Credentials (Keystone v3)</div></h2>
                     <div class="form-group"><label>Auth URL</label><input type="text" id="flex_auth_url" placeholder="e.g. https://keystone.flex.rackspacecloud.com/v3" value="https://keystone.api.dfw3.rackspacecloud.com/v3/"></div>
                     <div class="form-group"><label>Username</label><input type="text" id="flex_cloud_user" placeholder="e.g. dzng.8294" value="dzng.8294"></div>
-                    <div class="form-group"><label>Password</label><input type="text" id="flex_cloud_key" autocomplete="off" placeholder="Enter Password"></div>
+                    <div class="form-group"><label>Password</label><input type="password" id="flex_cloud_key" autocomplete="new-password" placeholder="Enter Password"></div>
                     <div class="form-group"><label>Project ID</label><input type="text" id="flex_cloud_account" placeholder="e.g. 20ffb2987a3b..." value="49a2c18a567c402ef560bb0f11821b61"></div>
                     <div class="form-group"><label>Domain</label><input type="text" id="flex_cloud_domain" placeholder="e.g. default" value="rackspace_cloud_domain"></div>
                     <div style="margin-top: 8px;">
@@ -2719,19 +2719,30 @@ printf '</div>\\n'
                 document.getElementById('discovery-spinner').style.display = 'none';
                 return;
             }
-            const resp = await fetch('/api/agent1/run/discovery', { 
-                method: 'POST', 
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({
-                    region:        selectedRegion,
-                    ssh_user:      sshUser,
-                    ssh_key:       sshKey,
-                    ospc_username: ospcUser,
-                    ospc_apikey:   ospcApiKey,
-                    ospc_tenant:   ospcTenant
-                }) 
-            });
-            const data = await resp.json();
+            const discoveryPayload = {
+                region: selectedRegion, ssh_user: sshUser, ssh_key: sshKey,
+                ospc_username: ospcUser, ospc_apikey: ospcApiKey, ospc_tenant: ospcTenant
+            };
+            let resp = null, lastNetworkError = null;
+            for (let attempt = 1; attempt <= 3; attempt++) {
+                try {
+                    resp = await fetch('/api/agent1/run/discovery', {
+                        method: 'POST', credentials: 'same-origin',
+                        headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
+                        body: JSON.stringify(discoveryPayload)
+                    });
+                    break;
+                } catch (networkError) {
+                    lastNetworkError = networkError;
+                    if (attempt < 3) await new Promise(resolve => setTimeout(resolve, 700 * attempt));
+                }
+            }
+            if (!resp) throw new Error('Discovery API is unreachable after 3 attempts: ' + (lastNetworkError && lastNetworkError.message || 'network failure'));
+            const responseText = await resp.text();
+            let data;
+            try { data = JSON.parse(responseText); }
+            catch (_) { throw new Error('Discovery API returned non-JSON (HTTP ' + resp.status + '): ' + responseText.slice(0, 240)); }
+            if (!resp.ok) throw new Error(data.error || data.message || ('Discovery API HTTP ' + resp.status));
             
             if (data.status === "started") {
                 let pollInterval = setInterval(async () => {
@@ -2742,12 +2753,14 @@ printf '</div>\\n'
                             logsEle.textContent = text;
                             logsEle.parentElement.scrollTop = logsEle.parentElement.scrollHeight;
                             
-                            if(text.includes("Discovery complete!") || text.includes("Error:") || text.includes("Stopped")) {
+                            const discoveryComplete = text.includes("Discovery complete!");
+                            const discoveryFailed = text.includes("[ERROR]") || text.includes("[FATAL]") || text.includes("Stopped");
+                            if(discoveryComplete || discoveryFailed) {
                                 clearInterval(pollInterval);
                                 document.getElementById('discovery-spinner').style.display = 'none';
-                                document.getElementById('import-topology-btn').style.display = 'inline-flex';
-                                showToast("Discovery Complete!");
-                                
+                                document.getElementById('import-topology-btn').style.display = discoveryComplete ? 'inline-flex' : 'none';
+                                showToast(discoveryComplete ? "Discovery Complete!" : "Discovery failed — review the live console.");
+                                if (!discoveryComplete) return;
                                 try {
                                     const topResp = await fetch('/api/agent1/results/topology?t=' + new Date().getTime());
                                     if(topResp.ok) {
@@ -2787,7 +2800,8 @@ printf '</div>\\n'
                 document.getElementById('discovery-spinner').style.display = 'none';
             }
         } catch(err) {
-            logsEle.textContent += "Error: API Backend connection failed (is server pending start?).";
+            logsEle.textContent += "[ERROR] " + (err && err.message ? err.message : "Discovery request failed.");
+            console.error("OSPC discovery failed", err);
             document.getElementById('discovery-spinner').style.display = 'none';
         }
     });

@@ -1270,7 +1270,7 @@ window.r6pContent=function(n){
     var stage9Rows=[
       ['9.1','Read Stage 8 decisions','Every component'],
       ['9.2','Select CONTAINERIZED and PARTIALLY_CONTAINERIZED components','Container targets only'],
-      ['9.3','Reuse an approved existing snapshot or create a new VM/volume snapshot','Container targets requiring extraction'],
+      ['9.3','Build or discover an approved VM/volume snapshot','Container targets requiring extraction'],
       ['9.4','Wait until snapshot is available','Snapshot targets'],
       ['9.5','Mount or expose snapshot read-only','Snapshot targets'],
       ['9.6','Extract only approved application paths','Container targets'],
@@ -1304,35 +1304,56 @@ window.r6pContent=function(n){
         +'style="width:100%;padding:5px 7px;border:1px solid '+(missing?'#fca5a5':'#cbd5e1')+';border-radius:5px;font-size:11px;font-family:monospace;"></td>'
         +'<td>'+(missing?'<span style="color:#dc2626;font-size:10px;font-weight:700;">Not detected - run Live Scan or set manually</span>':'<span style="color:#16a34a;font-size:10px;font-weight:700;">Detected from Live Scan</span>')+'</td></tr>';
     }).join('');
+    var extractOptions='<option value="__all__">All approved extraction targets ('+buildableComps9.length+')</option>'+buildableComps9.map(function(c){return '<option value="'+String(c.name).replace(/"/g,'&quot;')+'">'+c.name+'</option>';}).join('');
+    var extractCards=buildableComps9.map(function(c){
+      var scan=r6pStage9ScanEvidenceFor(c), endpoint=r6pParseTargetEndpoint(c.tgt);
+      var cap=((R6P.captureRun&&R6P.captureRun.components)||[]).filter(function(x){return x.component===c.name;})[0]||{};
+      return '<div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:10px;min-height:92px;">'
+        +'<div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start;"><div style="font-weight:900;color:#0f172a;font-size:13px;line-height:1.15;">'+c.name+'</div>'
+        +'<span style="background:'+(scan.scanned?'#dcfce7;color:#15803d':'#fee2e2;color:#b91c1c')+';border-radius:999px;padding:2px 8px;font-size:9px;font-weight:900;">'+(scan.scanned?'READY':'NEEDS SCAN')+'</span></div>'
+        +'<div style="border-top:1px solid #e5e7eb;margin-top:8px;padding-top:8px;font-size:11px;color:#475569;line-height:1.6;">'
+        +'<div><b>Source VM:</b> '+(endpoint.ip||c.tgt||'Not mapped')+'</div>'
+        +'<div><b>Decision:</b> '+r6pStage9DecisionFor(c)+'</div>'
+        +'<div><b>Extraction:</b> '+(cap.extractionStatus||'Waiting')+'</div>'
+        +'</div></div>';
+    }).join('');
     return '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;"><div style="font-weight:800;font-size:13px;color:#0f172a;">Approved Container Source Capture</div>'
     +'<button onclick="r6pPreviewArtifact(\'source-lineage.json\')" style="background:#f1f5f9;color:#334155;border:1px solid #e2e8f0;border-radius:4px;padding:3px 10px;font-size:10px;cursor:pointer;">Preview snapshot lineage</button></div>'
-    +'<div style="overflow-x:auto;margin-bottom:14px;"><table class="r6p-table"><thead><tr><th>Component</th><th>Source VM</th><th>Decision</th><th>Snapshot</th><th>Snapshot ID</th><th>Extraction</th><th>Build</th></tr></thead><tbody id="r6p-capture-tbody">'+r6pBuildCaptureRows()+'</tbody></table></div>'
+    +'<label style="display:inline-flex;align-items:center;gap:6px;margin:8px 0 12px;font-size:11px;color:#92400e;font-weight:800;"><input id="r6p-stage9-override-unscanned" type="checkbox"> Override missing Full Scan evidence</label>'
+    +'<div style="overflow-x:auto;margin-bottom:14px;"><table class="r6p-table"><thead><tr><th>Component</th><th>Source VM</th><th>Decision</th><th>Full Scan</th><th>Snapshot</th><th>Snapshot ID</th><th>Extraction</th><th>Build</th></tr></thead><tbody id="r6p-capture-tbody">'+r6pBuildCaptureRows()+'</tbody></table></div>'
     +'<div style="background:#f8fafc;border:1px solid #bfdbfe;border-radius:10px;padding:12px 14px;margin-bottom:14px;">'
-    +'<div style="font-size:14px;font-weight:900;color:#0f172a;margin-bottom:4px;">Stage 9A — Build VM Snapshots</div>'
-    +'<div style="font-size:11px;color:#475569;margin-bottom:10px;">Create or reuse OpenStack VM image / Cinder volume snapshots for approved container-source VMs only. Stage 9A records the exact OpenStack snapshot IDs from the CLI, verifies them with image/volume snapshot show, then hands those IDs to container build.</div>'
-    +'<button class="r6p-btn primary" onclick="r6pGenRealDockerfiles(true)" style="padding:8px 16px;font-size:12px;">&#9654; Build VM Snapshots</button>'
+    +'<div style="font-size:14px;font-weight:900;color:#0f172a;margin-bottom:4px;">Stage 9A — Build / Discover VM Snapshots</div>'
+    +'<div style="font-size:11px;color:#475569;margin-bottom:10px;">Scan origin-region snapshot lineage first. Create Snapshot is the only action that creates missing VM/volume snapshots.</div>'
+    +'<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px;"><button class="r6p-btn" onclick="r6pRunStage9SnapshotCreate()">＋ Create Snapshot</button><button class="r6p-btn" onclick="r6pRunStage9SnapshotScan()">🔎 Snapshot Scan</button></div>'
+    +'<div style="font-size:11px;font-weight:800;color:#334155;margin:10px 0 4px;">Stage 9A snapshot output</div>'
+    +'<pre id="r6p-stage9a-log" class="r6p-terminal" data-terminal-output style="display:block;min-height:92px;max-height:260px;overflow:auto;white-space:pre-wrap;">Waiting to scan origin-region snapshots...</pre>'
     +'<div id="r6p-snapshot-status" style="font-size:12px;font-weight:600;color:#64748b;margin-top:8px;line-height:1.7;"></div>'
     +'</div>'
-    +'<div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:10px;padding:12px 14px;margin-bottom:14px;">'
-    +'<div style="font-size:14px;font-weight:900;color:#0f172a;margin-bottom:4px;">Stage 9B — Build Containers</div>'
-    +'<div style="font-size:11px;color:#475569;margin-bottom:10px;">After snapshot lineage is available, extract approved application paths read-only, sanitize context, build/test/scan/sign/push images and record final registry digests.</div>'
+    +'<div style="background:#fff;border:1px solid #bfdbfe;border-radius:10px;padding:12px 14px;margin-bottom:14px;">'
+    +'<div style="font-size:14px;font-weight:900;color:#0f172a;margin-bottom:4px;">Stage 9B — Extract VM Data</div>'
+    +'<div style="font-size:11px;color:#475569;margin-bottom:10px;">Live-scan style extraction console. Pull only approved app paths, sanitize secrets/logs/temp/host keys/database files, checksum the source context, and preserve snapshot lineage. No registry or image build controls live here.</div>'
+    +'<div style="background:#ffffff;border:1px solid #e5e7eb;border-radius:12px;padding:12px;box-shadow:0 8px 22px rgba(15,23,42,.06);margin-bottom:14px;">'
+    +'<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;">'
+    +'<div style="min-width:260px;flex:1;"><label style="display:block;font-size:11px;font-weight:800;color:#555;margin-bottom:5px;">Component extraction scope</label><select id="r6p-extract-comp" style="width:100%;padding:9px;border:1px solid #cbd5e1;border-radius:8px;">'+extractOptions+'</select></div>'
+    +'<div style="width:120px;"><label style="display:block;font-size:11px;font-weight:800;color:#555;margin-bottom:5px;">SSH User</label><input id="r6p-extract-user" value="ubuntu" style="width:100%;padding:9px;border:1px solid #cbd5e1;border-radius:8px;"></div>'
+    +'<div style="min-width:240px;flex:1;"><label style="display:block;font-size:11px;font-weight:800;color:#555;margin-bottom:5px;">SSH Private Key Path / Secret Ref</label><input id="r6p-extract-key" value="~/.ssh/id_rsa" style="width:100%;padding:9px;border:1px solid #cbd5e1;border-radius:8px;"></div>'
+    +'<div style="min-width:230px;flex:1;"><label style="display:block;font-size:11px;font-weight:800;color:#555;margin-bottom:5px;">Managed known_hosts</label><input id="r6p-extract-known-hosts" value="./data/ssh/known_hosts" style="width:100%;padding:9px;border:1px solid #cbd5e1;border-radius:8px;"></div>'
+    +'<button class="r6p-btn primary" onclick="r6pGenRealDockerfiles(false,false)">▶ Extract VM Data</button><button class="r6p-btn secondary" disabled>Stop Extraction</button><button class="r6p-btn secondary" onclick="r6pCopyStage9ExtractLog()">Copy Log</button>'
+    +'</div></div>'
+    +'<div style="font-size:11px;font-weight:900;color:#555;margin:10px 0 6px;text-transform:uppercase;letter-spacing:.04em;">Verbose VM extraction output</div>'
+    +'<pre id="r6p-stage9b-log" class="r6p-terminal" data-terminal-output style="display:block;min-height:240px;max-height:420px;overflow:auto;white-space:pre-wrap;">=== R6 VM DATA EXTRACTION ===\nStatus: WAITING\nRun Stage 9A Snapshot Scan/Create first, then click Extract VM Data.</pre>'
+    +'<div id="r6p-extract-status" style="font-size:12px;font-weight:600;color:#64748b;margin-top:8px;line-height:1.7;"></div>'
+    +'<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin-top:14px;">'+(extractCards||'<div style="color:#64748b;font-size:12px;">No approved extraction targets.</div>')+'</div>'
+    +'</div>'
+    +'<div style="background:#f8fafc;border:1px solid #bfdbfe;border-radius:10px;padding:12px 14px;margin-bottom:14px;">'
+    +'<div style="font-size:14px;font-weight:900;color:#0f172a;margin-bottom:4px;">Stage 9C — Build Containers</div>'
+    +'<div style="font-size:11px;color:#475569;margin-bottom:10px;">Build from sanitized extracted context only, then SBOM, scan, sign, push and record immutable registry digests.</div>'
     +'<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px;">'
-    +'<div><label style="font-size:11px;font-weight:700;color:#334155;display:block;margin-bottom:4px;">Registry</label><select id="r6p-build-regtype" style="padding:7px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;"><option value="harbor" selected>Harbor (in-cluster, recommended default)</option><option value="dockerhub">Docker Hub</option><option value="ghcr">GitHub Container Registry</option><option value="gitlab">GitLab Container Registry</option><option value="quay">Quay.io</option><option value="ecr">AWS ECR (private)</option><option value="ecrpublic">AWS ECR Public</option><option value="gcp">GCP Artifact Registry</option><option value="custom">Custom OCI URL</option></select></div>'
-    +'<div><label style="font-size:11px;font-weight:700;color:#334155;display:block;margin-bottom:4px;">Registry URL (optional)</label><input id="r6p-build-regurl" placeholder="registry.example.com" style="padding:7px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;width:200px;"></div>'
-    +'<div><label style="font-size:11px;font-weight:700;color:#334155;display:block;margin-bottom:4px;">Project</label><input id="r6p-build-project" value="flex-apps" style="padding:7px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;width:120px;"></div>'
-    +'<div><label style="font-size:11px;font-weight:700;color:#334155;display:block;margin-bottom:4px;">Registry User</label><input id="r6p-build-reguser" placeholder="admin" style="padding:7px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;width:100px;"></div>'
-    +'<div><label style="font-size:11px;font-weight:700;color:#334155;display:block;margin-bottom:4px;">Registry Password</label><input id="r6p-build-regpass" type="password" style="padding:7px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;width:120px;"></div>'
-    +'<button class="r6p-btn primary" onclick="r6pGenRealDockerfiles(false)" style="padding:8px 16px;font-size:12px;">&#9654; Build Containers</button>'
-    +'</div>'
-    +'<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 14px;margin-bottom:14px;">'
-    +'<div style="font-size:11px;font-weight:700;color:#334155;margin-bottom:6px;">Build Mode</div>'
-    +'<label style="font-size:12px;color:#334155;margin-right:16px;cursor:pointer;"><input type="radio" name="r6p-build-mode" value="manual" checked style="margin-right:6px;">Manual - review and click Run on each command</label>'
-    +'<label style="font-size:12px;color:#334155;cursor:pointer;"><input type="radio" name="r6p-build-mode" value="auto" style="margin-right:6px;">Automatic - extract, build, scan and push run immediately after generation</label>'
-    +'<div style="font-size:10px;color:#94a3b8;margin-top:4px;">Automatic mode pushes real images to the selected registry with no extra confirmation step - use Manual for a first run against a new registry.</div>'
-    +'</div>'
-    +'<div id="r6p-build-status" style="font-size:12px;font-weight:600;color:#64748b;margin-bottom:10px;line-height:1.7;"></div>'
-    +'</div>'
-    +r6pFoot(9);
+    +'<div><label>Registry</label><select id="r6p-build-regtype"><option value="harbor" selected>Harbor</option><option value="dockerhub">Docker Hub</option><option value="ghcr">GitHub Container Registry</option><option value="ecr">AWS ECR</option><option value="gcp">GCP Artifact Registry</option><option value="custom">Custom OCI URL</option></select></div>'
+    +'<div><label>Registry URL optional</label><input id="r6p-build-regurl" placeholder="registry.example.com"></div><div><label>Project</label><input id="r6p-build-project" value="flex-apps"></div><div><label>Registry User</label><input id="r6p-build-reguser" placeholder="admin"></div><div><label>Registry Password</label><input id="r6p-build-regpass" type="password"></div></div>'
+    +'<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px;margin-bottom:14px;"><div style="font-size:11px;font-weight:700;color:#334155;margin-bottom:6px;">Stage 9C Execution Mode</div><label style="margin-right:16px;"><input type="radio" name="r6p-build-mode" value="manual" checked style="margin-right:6px;">Manual - review and run commands</label><label><input type="radio" name="r6p-build-mode" value="auto" style="margin-right:6px;">Automatic - build, scan and push after generation</label><div style="font-size:10px;color:#94a3b8;margin-top:4px;">Automatic mode pushes images to the selected registry. Use Manual for first registry run.</div></div>'
+    +'<button class="r6p-btn primary" onclick="r6pGenRealDockerfiles(false,true)">▶ Build Containers</button><div id="r6p-build-status" style="font-size:12px;font-weight:600;color:#64748b;margin-top:10px;line-height:1.7;"></div>'
+    +'</div>'+r6pFoot(9);
   }
   if(n===10)return '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;"><button class="r6p-btn primary" onclick="r6pGenYAML()">Generate All YAML</button><button class="r6p-btn secondary" onclick="r6pGenHelm()">Helm Chart</button><button class="r6p-btn secondary" onclick="r6pGenKustomize()">Kustomize</button><button class="r6p-btn secondary" onclick="r6pGenFlux()">Flux</button></div><pre id="r6p-yaml-preview" style="background:#0f172a;color:#2dd4bf;border-radius:8px;padding:14px;font-size:11px;max-height:280px;overflow:auto;white-space:pre-wrap;min-height:60px;margin-bottom:14px;">-- Click Generate All YAML --</pre>'+r6pFoot(10);
   if(n===11)return '<div id="r6p-bundle-status" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px;margin-bottom:12px;font-size:12px;color:#64748b;">Generate bundle to see status.</div><pre id="r6p-bundle-preview" style="background:#0f172a;color:#c4b5fd;border-radius:8px;padding:14px;font-size:11px;max-height:220px;overflow:auto;white-space:pre-wrap;min-height:60px;margin-bottom:12px;">-- Generate bundle to see manifest --</pre>'+r6pFoot(11,'<button class="r6p-btn primary" onclick="r6pGenBundle()">Generate OpenCenter Bundle</button><button class="r6p-btn secondary" onclick="r6pDownloadBundle()">Download</button>');
@@ -1652,12 +1673,13 @@ window.r6pGenFlux=function(){
     return {component:c.name,image:'debian:stable-slim',replicas:1,
       readiness:buildable?'READY':'KEEP_ON_VM_FOR_NOW',layer:'API',sourcePath:c.path||'/opt/app',targetForm:form,
       startCommand:startCmd,healthPath:(c.path&&c.path.indexOf('/')===0)?c.path.split(',')[0]:'/health',
+      fullScan:r6pStage9ScanEvidenceFor(c),scanOverride:r6pStage9AllowUnscanned(),
       dependencies:siblingDeps,targetIp:endpoint.ip,targetPort:endpoint.port,
       persistentPath:r6pPersistentPathFor(c)};
   });
   var payload={org:org,cluster:cluster,region:stage9Region,cloud:cloudCreds,
     registry:{type:'harbor',project:'flex-apps'},
-    source_vm:{host:(srcComp&&srcComp.tgt)||'',user:'root'},
+    source_vm:{host:(srcComp&&srcComp.tgt)||'',user:((document.getElementById('r6p-extract-user')||{}).value||'ubuntu')},
     auto_commit:false,import_to_gitops:false,
     bundle:{id:'r6p-flux-preview-'+Date.now(),businessSystemName:(R6P.bs&&R6P.bs.name)||'app',workloads:workloads}};
   if(el){el.textContent='Generating real Flux Kustomization via the backend...';el.style.color='';}
@@ -1763,6 +1785,17 @@ window.r6pIsContainerCaptureTarget=function(c){
   return (form==='CONTAINERIZED'||form==='PARTIALLY_CONTAINERIZED')&&!r6pStage9IsDatabaseLike(c);
 };
 window.r6pStage9ApprovedContainerTargets=function(){return (R6P.components||[]).filter(function(c){return r6pIsContainerCaptureTarget(c);});};
+window.r6pStage9ScanEvidenceFor=function(c){
+  var name=String(c&&c.name||'');
+  var run=R6P.structuredAppraisal||{};
+  var app=(run.components||[]).find(function(x){return String(x.componentName||'')===name||String(x.componentId||'')===String(c&&c.id||'');})||{};
+  var scan=R6P.depScan&&R6P.depScan[name]||{};
+  var explicitReady=/^(READY|PASS|PASSED|COMPLETE|COMPLETED|DONE)$/i.test(String((c&&(c.fullScan||c.fullScanStatus||c.scanStatus||c.liveScanStatus||c.stage3Status||c.status))||''));
+  var raw=scan.rawLog||'';
+  var rawProcesses=raw?raw.split('\n').filter(function(line){return /python|node|java|php|nginx|apache|gunicorn|uwsgi|pm2|postgres|mysql|redis|worker|queue/i.test(line);}).slice(0,50):[];
+  return {scanned:!!(explicitReady||app.componentName||scan.completed||scan.structured),componentVerdict:app.componentVerdict||scan.status||'UNSCANNED',runtime:app.runtime||{},packageManager:app.packageManager||app.osPackageManager||'',os:app.os||{},kernel:app.kernel||'',cpu:app.cpu||{},memory:app.memory||{},disk:app.disk||{},packages:app.packages||[],services:app.services||app.systemdServices||[],ports:app.ports||[],cron:app.cron||app.cronJobs||[],docker:app.docker||{},databases:app.databases||[],webServers:app.webServers||[],applicationPaths:app.applicationPaths||[],environment:app.environment||app.env||{},processes:app.processes||app.processTree||rawProcesses,lockfiles:app.lockfiles||app.dependencyFiles||app.dependencyManifests||[],dependencies:app.dependencies||app.externalDependencies||[],writablePaths:app.writablePaths||app.writePaths||[],healthEndpoints:app.healthEndpoints||app.httpChecks||[],tls:app.tls||app.certificates||[],usersGroups:app.usersGroups||[],warnings:app.warnings||[],blockers:app.blockers||[],rawLog:raw};
+};
+window.r6pStage9AllowUnscanned=function(){var el=document.getElementById('r6p-stage9-override-unscanned');return !!(el&&el.checked);};
 window.r6pBuildCaptureRows=function(){
   var rows=(R6P.components||[]).map(function(c){
     var form=r6pStage9DecisionFor(c);
@@ -1773,6 +1806,7 @@ window.r6pBuildCaptureRows=function(){
       component:c.name,
       vm:endpoint.ip||c.tgt||'Not mapped',
       decision:form,
+      fullScan:(r6pStage9ScanEvidenceFor(c).scanned?'READY':(approved?'MISSING':'N/A')),
       snapshot:cap.snapshotStatus||(approved?'Pending':'Not applicable'),
       snapshotIds:cap.snapshotIds||[],
       simulated:false,
@@ -1782,12 +1816,13 @@ window.r6pBuildCaptureRows=function(){
       reason:cap.reason||''
     };
   });
-  if(!rows.length)return '<tr><td colspan="7" style="color:#64748b;font-style:italic;">No components selected yet.</td></tr>';
+  if(!rows.length)return '<tr><td colspan="8" style="color:#64748b;font-style:italic;">No components selected yet.</td></tr>';
   return rows.map(function(r){
     var tone=r.approved?'#16a34a':(r.decision==='BLOCKED'?'#dc2626':'#64748b');
     return '<tr><td style="font-weight:600;">'+r.component+'</td>'
       +'<td style="font-size:11px;color:#64748b;">'+r.vm+'</td>'
       +'<td><span style="background:'+tone+'22;color:'+tone+';padding:2px 8px;border-radius:999px;font-size:10px;font-weight:700;">'+r.decision+'</span></td>'
+      +'<td style="font-size:11px;color:'+(r.fullScan==='MISSING'?'#dc2626':'#334155')+';">'+r.fullScan+'</td>'
       +'<td style="font-size:11px;color:#334155;">'+r.snapshot+(r.simulated?'<div style="font-size:9px;color:#d97706;font-weight:700;margin-top:2px;" title="'+_R6_SNAPSHOT_SIM_NOTE.replace(/"/g,"&quot;")+'">SIMULATED - no OpenStack call</div>':'')+'</td>'
       +'<td style="font-size:10px;color:#334155;font-family:monospace;">'+(r.snapshotIds.length?r.snapshotIds.join('<br>'):'&mdash;')+'</td>'
       +'<td style="font-size:11px;color:#334155;">'+r.extraction+'</td>'
@@ -1795,15 +1830,47 @@ window.r6pBuildCaptureRows=function(){
   }).join('');
 };
 var _R6_SNAPSHOT_SIM_NOTE='';
-window.r6pGenRealDockerfiles=function(snapshotOnly){
+
+window.r6pSetStage9SnapshotLog=function(text,append){
+  var el=document.getElementById('r6p-stage9a-log');
+  if(!el)return;
+  var value=String(text||'');
+  el.textContent=append?(el.textContent.replace(/\s*$/,'')+'\n'+value):value;
+  el.scrollTop=el.scrollHeight;
+};
+window.r6pCopyStage9SnapshotLog=function(){
+  var el=document.getElementById('r6p-stage9a-log');
+  if(el&&navigator.clipboard)navigator.clipboard.writeText(el.textContent||'');
+};
+window.r6pSetStage9ExtractLog=function(text,append){
+  var el=document.getElementById('r6p-stage9b-log');
+  if(!el)return;
+  var value=String(text||'');
+  el.textContent=append?(el.textContent.replace(/\s*$/,'')+'\n'+value):value;
+  el.scrollTop=el.scrollHeight;
+};
+window.r6pCopyStage9ExtractLog=function(){
+  var el=document.getElementById('r6p-stage9b-log');
+  if(el&&navigator.clipboard)navigator.clipboard.writeText(el.textContent||'');
+};
+window.r6pRunStage9SnapshotScan=function(){r6pGenRealDockerfiles(true,false,'scan');};
+window.r6pRunStage9SnapshotCreate=function(){r6pGenRealDockerfiles(true,false,'create');};
+window.r6pGenRealDockerfiles=function(snapshotOnly,autoBuildRequested,snapshotAction){
   snapshotOnly=!!snapshotOnly;
-  var st=document.getElementById(snapshotOnly?'r6p-snapshot-status':'r6p-build-status');
+  autoBuildRequested=!!autoBuildRequested;
+  snapshotAction=snapshotAction||'create';
+  var st=document.getElementById(snapshotOnly?'r6p-snapshot-status':(autoBuildRequested?'r6p-build-status':'r6p-extract-status'));
   if(!R6P.components||!R6P.components.length){if(st){st.textContent='Select a Business System in Step 1 first.';st.style.color='#dc2626';}return;}
   if(!r6pStage8ApprovedForCapture()){if(st){st.textContent='Stage 8 approval required before source capture. Approve the readiness plan first; no snapshots are created before that gate.';st.style.color='#dc2626';}return;}
   var clusterRef=(R6P.creds.opencenter.clusterRef||'rackspace-flex/flex-prod-k8s').split('/');
   var org=clusterRef[0]||'rackspace-flex',cluster=clusterRef[1]||'flex-prod-k8s';
   var comps=r6pStage9ApprovedContainerTargets().filter(function(c){return c.tgt;});
   if(!comps.length){if(st){st.textContent='No Stage 8-approved container source VMs are eligible for capture. Retained VMs, operators, databases, external services, blocked and excluded components are skipped.';st.style.color='#dc2626';}return;}
+  var unscanned=comps.filter(function(c){return !r6pStage9ScanEvidenceFor(c).scanned;});
+  if(unscanned.length&&!r6pStage9AllowUnscanned()){
+    if(st){st.textContent='Full Scan required before Stage 9 for: '+unscanned.map(function(c){return c.name;}).join(', ')+'. Run Step 3 Live Scan or check the explicit override.';st.style.color='#dc2626';}
+    return;
+  }
   var srcComp=comps[0];
   /* Only Stage 8-approved CONTAINERIZED/PARTIALLY_CONTAINERIZED application VMs reach
      this payload. Databases, retained/redeployed VMs, operators, external services,
@@ -1817,14 +1884,15 @@ window.r6pGenRealDockerfiles=function(snapshotOnly){
     return {component:c.name,image:'debian:stable-slim',replicas:1,
       readiness:buildable?'READY':'KEEP_ON_VM_FOR_NOW',layer:'API',sourcePath:c.path||'/opt/app',targetForm:form,
       startCommand:startCmd,healthPath:(c.path&&c.path.indexOf('/')===0)?c.path.split(',')[0]:'/health',
+      fullScan:r6pStage9ScanEvidenceFor(c),scanOverride:r6pStage9AllowUnscanned(),
       dependencies:siblingDeps,targetIp:endpoint.ip,targetPort:endpoint.port,
       sourceVmId:c.vmId||c.serverId||c.instanceId||'',sourceVmName:c.vmName||c.name||'',
       cloudRegion:c.region||c.cloudRegion||(R6P.bs&&R6P.bs.region)||'iad3',volumeIds:c.volumes||c.volumeIds||[],
       persistentPath:r6pPersistentPathFor(c)};
   });
   var skipped=(R6P.components||[]).filter(function(c){return !r6pIsContainerCaptureTarget(c);}).map(function(c){return {component:c.name,targetForm:r6pStage9DecisionFor(c)};});
-  if(!snapshotOnly&&!R6P.captureRun){if(st){st.textContent='Build VM Snapshots first. Container build uses the snapshot lineage produced by Stage 9A.';st.style.color='#dc2626';}return;}
-  var mode=(document.querySelector('input[name="r6p-build-mode"]:checked')||{}).value||'manual';
+  if(!snapshotOnly&&!R6P.captureRun){if(st){st.textContent='Run Stage 9A first. Extraction and container build use the snapshot lineage produced by Stage 9A.';st.style.color='#dc2626';}return;}
+  var mode=autoBuildRequested?((document.querySelector('input[name="r6p-build-mode"]:checked')||{}).value||'manual'):'manual';
   function r6pStage9Cred(id,key){
     var el=document.getElementById(id);
     var val=el?(el.value||''):'';
@@ -1859,22 +1927,32 @@ window.r6pGenRealDockerfiles=function(snapshotOnly){
       user:(document.getElementById('r6p-build-reguser')||{}).value||'',
       password:(document.getElementById('r6p-build-regpass')||{}).value||''},
     source_vm:{host:(srcComp&&srcComp.tgt)||'',user:'root'},
-    snapshotOnly:snapshotOnly,
+    snapshotOnly:snapshotOnly,snapshotAction:snapshotAction,
     auto_commit:mode==='auto'&&!snapshotOnly,import_to_gitops:!snapshotOnly,
     stage8Approved:R6P.status[8]==='done',
     businessSystem:R6P.bs||{},
-    capture:{excludePaths:['/var/log','/tmp','/etc/ssh','/root/.ssh','/home/*/.ssh','/var/lib/postgresql','/var/lib/mysql','/var/lib/mongodb','/var/lib/redis','/var/backups']},
+    capture:{sshKeyPath:((document.getElementById('r6p-extract-key')||{}).value||''),knownHostsFile:((document.getElementById('r6p-extract-known-hosts')||{}).value||''),scope:((document.getElementById('r6p-extract-comp')||{}).value||'__all__'),excludePaths:['/var/log','/tmp','/etc/ssh','/root/.ssh','/home/*/.ssh','/var/lib/postgresql','/var/lib/mysql','/var/lib/mongodb','/var/lib/redis','/var/backups']},
     bundle:{id:'r6p-'+Date.now(),businessSystemName:(R6P.bs&&R6P.bs.name)||'app',workloads:workloads}};
-  if(st){st.textContent=snapshotOnly?'Building approved OpenStack VM/volume snapshots and recording lineage...':'Building containers from approved snapshot lineage...';st.style.color='#0369a1';}
+  if(st){st.textContent=snapshotOnly?(snapshotAction==='scan'?'Scanning origin-region VM snapshots...':'Creating missing VM snapshots and recording lineage...'):(autoBuildRequested?'Building containers from sanitized extracted VM data...':'Preparing VM data extraction bundle from approved snapshot lineage...');st.style.color='#0369a1';}
+  if(!snapshotOnly&&!autoBuildRequested)r6pSetStage9ExtractLog('=== R6 VM DATA EXTRACTION ===\nStatus: PREPARING\nComponents: '+workloads.length+'\nScope: '+(((document.getElementById('r6p-extract-comp')||{}).value)||'__all__')+'\nSnapshot lineage: ready');
+  if(snapshotOnly)r6pSetStage9SnapshotLog('Stage 9A VM snapshot build/discovery\nRegion: '+stage9Region+'\nComponents: '+workloads.map(function(w){return w.component+' -> '+(w.sourceVmId||w.targetIp||'unmapped');}).join('\n')+'\nStatus: SCANNING');
   fetch('/api/r6/capture-sources-build',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
     .then(function(r){return r.json();})
     .then(function(d){
-      if(!d||!d.ok){if(st){st.textContent='✗ '+((d&&d.error)||'generation failed');st.style.color='#dc2626';}return;}
+      if(!d||!d.ok){if(snapshotOnly)r6pSetStage9SnapshotLog('Status: BLOCKED\n'+((d&&d.error)||'generation failed')+'\n'+(((d&&d.capture&&d.capture.blockers)||[]).join('\n')));if(st){st.textContent='✗ '+((d&&d.error)||'generation failed');st.style.color='#dc2626';}return;}
       R6P._realBundle=d;
       R6P.captureRun=d.capture||R6P.captureRun||null;
       if(snapshotOnly){
+        if(snapshotOnly)r6pSetStage9SnapshotLog('Status: READY\nApproved: '+((d.capture&&d.capture.approvedCount)||0)+'\nReused snapshots: '+((d.capture&&d.capture.reusedSnapshots)||0)+'\nCreated snapshots: '+((d.capture&&d.capture.createdSnapshots)||0)+'\nSnapshot index: '+((d.capture&&d.capture.snapshotIndexPath)||'~/.config/opencenter/r6/source-captures/snapshot-index.json')+'\nRows:\n'+(((d.capture&&d.capture.components)||[]).map(function(r){return '- '+r.component+' | '+r.sourceVm+' | '+r.snapshotStatus+' | '+(r.snapshotIds||[]).join(',');}).join('\n')));
         if(st){st.innerHTML='&#10003; VM snapshots ready. <code>'+((d.capture&&d.capture.approvedCount)||0)+' approved / '+((d.capture&&d.capture.reusedSnapshots)||0)+' reused / '+((d.capture&&d.capture.createdSnapshots)||0)+' created</code><br>Snapshot mode: <code>OPENSTACK_CLI</code>; handoff lineage: <code>'+((d.capture&&d.capture.snapshotIndexPath)||'~/.config/opencenter/r6/source-captures/snapshot-index.json')+'</code>';st.style.color='#15803d';}
         var snapBody=document.getElementById('r6p-capture-tbody');if(snapBody)snapBody.innerHTML=r6pBuildCaptureRows();
+        return;
+      }
+      if(!autoBuildRequested){
+        R6P.extractionRun=d;
+        r6pSetStage9ExtractLog('=== R6 VM DATA EXTRACTION ===\nStatus: READY\nBundle: '+((d&&d.bundle_dir)||'not generated')+'\nExtraction command:\n'+((d&&d.extract_cmd)||'not generated'));
+        if(st){st.textContent='VM data extraction bundle ready. Review the extraction command in the console.';st.style.color='#15803d';}
+        var extractBody=document.getElementById('r6p-capture-tbody');if(extractBody)extractBody.innerHTML=r6pBuildCaptureRows();
         return;
       }
       R6P.yaml='# Generated by /api/r6/generate-bundle\n'+d.bundle_dir;
@@ -3676,10 +3754,32 @@ setTimeout(function(){ if (document.getElementById('r6p-git-repo')) r6pGitLoad()
   window.r6pRestartFlask=function(){
     var panel=ensurePanel(),btn=document.getElementById('r6p-flask-restart-btn'),st=document.getElementById('r6p-flask-restart-status');
     panel.style.display='block';if(btn)btn.disabled=true;if(st){st.textContent='Restart requested… Flask will reload in a moment.';st.style.color='#0369a1';}
-    fetch('/api/dev/restart-flask',{method:'POST',headers:{'Accept':'application/json'}}).then(function(r){return r.json().catch(function(){return{};}).then(function(d){if(!r.ok||!d.ok)throw new Error(d.error||('HTTP '+r.status));return d;});}).then(function(){
-      if(st){st.textContent='Restart scheduled. Reloading when Flask comes back…';st.style.color='#15803d';}
-      setTimeout(function(){window.location.reload();},2200);
-    }).catch(function(e){if(st){st.textContent='Restart failed: '+e.message;st.style.color='#dc2626';}if(btn)btn.disabled=false;});
+    var started=Date.now(),attempts=0,previousBoot='';
+    function waitForFlask(){
+      attempts++;
+      fetch('/api/dev/restart-ready?_='+Date.now(),{method:'GET',cache:'no-store'})
+        .then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.json();})
+        .then(function(d){
+          if(!d||!d.ok)throw new Error('not ready');
+          if(previousBoot&&d.bootId===previousBoot)throw new Error('old Flask process still stopping');
+          if(st){st.textContent='Flask restarted. Reloading…';st.style.color='#15803d';}
+          setTimeout(function(){window.location.reload();},250);
+        })
+        .catch(function(){
+          if(Date.now()-started<20000){
+            if(st){st.textContent='Restarting Flask… health check '+attempts;st.style.color='#0369a1';}
+            setTimeout(waitForFlask,500);
+          }else{
+            if(st){st.textContent='Restart timed out. Flask did not become healthy within 20 seconds.';st.style.color='#dc2626';}
+            if(btn)btn.disabled=false;
+          }
+        });
+    }
+    fetch('/api/dev/restart-flask',{method:'POST',headers:{'Accept':'application/json'},cache:'no-store',keepalive:true})
+      .then(function(r){return r.json().catch(function(){return{};}).then(function(d){if(!r.ok||!d.ok)throw new Error(d.error||('HTTP '+r.status));return d;});})
+      .then(function(d){previousBoot=d.bootId||'';if(st){st.textContent='Restart scheduled. Waiting for Flask…';st.style.color='#15803d';}})
+      .catch(function(e){if(st){st.textContent='Connection switched during restart; checking Flask health…';st.style.color='#0369a1';}})
+      .then(function(){setTimeout(waitForFlask,1200);});
   };
   document.addEventListener('keydown',function(e){
     if(e.ctrlKey&&e.shiftKey&&String(e.key||'').toLowerCase()==='r'){

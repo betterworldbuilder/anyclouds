@@ -140,6 +140,17 @@ print("[STARTUP] Template cache flushed — serving fresh templates from disk.")
 @app.after_request
 def add_no_cache_headers(response):
     if "text/html" in response.content_type:
+        # Apply the shared output cache to every current and future HTML page.
+        try:
+            if response.direct_passthrough:
+                response.direct_passthrough = False
+            html = response.get_data(as_text=True)
+            marker = '<script src="/static/stage_output_cache.js?v=1"></script>'
+            if marker not in html and "</body>" in html.lower():
+                close_at = html.lower().rfind("</body>")
+                response.set_data(html[:close_at] + marker + "\n" + html[close_at:])
+        except (RuntimeError, UnicodeDecodeError):
+            pass
         response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
         response.headers["Pragma"] = "no-cache"
         response.headers["Expires"] = "0"
@@ -21358,16 +21369,57 @@ def _r6_create_snapshots(vm_id: str, volume_ids: List[str], name: str) -> Tuple[
     return kind, ids
 
 
+def _r6_origin_snapshot_inventory() -> List[Dict[str, str]]:
+    """Read active image snapshots from the authenticated origin region."""
+    rows = _r6_openstack_json(["image", "list", "--private"])
+    inventory: List[Dict[str, str]] = []
+    for row in rows if isinstance(rows, list) else []:
+        if not isinstance(row, dict):
+            continue
+        name = str(row.get("Name") or row.get("name") or "").strip()
+        status = str(row.get("Status") or row.get("status") or "").upper()
+        snapshot_id = str(row.get("ID") or row.get("Id") or row.get("id") or "").strip()
+        if snapshot_id and status in {"ACTIVE", "AVAILABLE"}:
+            inventory.append({"id": snapshot_id, "name": name, "status": status, "kind": "vm_image_snapshot"})
+    return inventory
+
+
+def _r6_match_origin_snapshot(inventory: List[Dict[str, str]], *refs: str) -> Optional[Dict[str, str]]:
+    def tokens(value: str) -> List[str]:
+        return [x for x in re.sub(r"[^a-z0-9]+", " ", str(value or "").lower()).split()
+                if len(x) > 1 and x not in {"r6", "snap", "linsnap", "flex", "fresh"}]
+    best: Optional[Dict[str, str]] = None
+    best_score = 0
+    for item in inventory:
+        image_tokens = tokens(item.get("name") or "")
+        image_set = set(image_tokens)
+        score = 0
+        for ref in refs:
+            ref_tokens = tokens(ref)
+            if not ref_tokens:
+                continue
+            overlap = len(image_set.intersection(ref_tokens))
+            score = max(score, overlap * 10 + (20 if overlap == len(set(ref_tokens)) else 0))
+        if score > best_score:
+            best, best_score = item, score
+    return best if best_score >= 20 else None
+
+
 @app.post("/api/r6/capture-sources-build")
 def r6_capture_sources_build():
     """Stage 9 gate: capture only Stage-8-approved container sources, then reuse the
-    existing R6 bundle generator. A VM snapshot is recorded as source lineage, never as
+    existing R6 bundle generator. Stage 9A first reuses/discovers an approved snapshot;
+    when none is available, it creates a VM image or volume snapshot with the existing
+    OpenStack snapshot builder. A VM snapshot is recorded as source lineage, never as
     a container image."""
     import hashlib as _hashlib, json as _json, time as _time
 
     data = request.get_json(silent=True) or {}
+    dry_run = str(data.get("dry_run") or data.get("dryRun") or "").strip().lower() in ("1", "true", "yes", "on")
+    snapshot_action = str(data.get("snapshotAction") or ("scan" if data.get("snapshotOnly") else "create")).strip().lower()
+    scan_only = snapshot_action == "scan"
     incoming_cloud = data.get("cloud") if isinstance(data.get("cloud"), dict) else {}
-    if incoming_cloud:
+    if incoming_cloud and not dry_run:
         try:
             creds_path = Path(os.path.expanduser("~")) / ".config" / "opencenter" / "r6" / "creds.json"
             creds_path.parent.mkdir(parents=True, exist_ok=True)
@@ -21406,18 +21458,26 @@ def r6_capture_sources_build():
     ] + [str(x) for x in ((data.get("capture") or {}).get("excludePaths") or [])]))
 
     state_root = Path(os.environ.get("R6_CAPTURE_STATE_DIR") or (Path(os.path.expanduser("~")) / ".config" / "opencenter" / "r6" / "source-captures"))
-    state_root.mkdir(parents=True, exist_ok=True)
     snapshots_path = state_root / "snapshot-index.json"
-    try:
-        snapshot_index = _json.loads(snapshots_path.read_text(encoding="utf-8")) if snapshots_path.exists() else {}
-    except Exception:
-        snapshot_index = {}
+    snapshot_index = {}
+    if not dry_run:
+        state_root.mkdir(parents=True, exist_ok=True)
+        try:
+            snapshot_index = _json.loads(snapshots_path.read_text(encoding="utf-8")) if snapshots_path.exists() else {}
+        except Exception:
+            snapshot_index = {}
 
     stamp = _time.strftime("%Y%m%d_%H%M%S")
     capture_rows: List[Dict[str, Any]] = []
     sanitized_workloads: List[Dict[str, Any]] = []
     blockers: List[str] = []
     approved_count = reused_count = created_count = 0
+
+    try:
+        origin_snapshots = _r6_origin_snapshot_inventory()
+    except Exception as exc:
+        return jsonify({"ok": False, "error": "Origin-region snapshot scan failed: %s" % exc}), 400
+    origin_region = str((data.get("cloud") or {}).get("region") or os.environ.get("OS_REGION_NAME") or "origin")
 
     for w in workloads:
         if not isinstance(w, dict):
@@ -21474,6 +21534,7 @@ def r6_capture_sources_build():
         cache_key = "%s:%s:%s" % (source_vm, name, checksum[:16])
         cached = snapshot_index.get(cache_key) or {}
         snapshot_ids = cached.get("snapshotIds") or []
+        snapshot_names = cached.get("snapshotNames") or []
         snap_kind = cached.get("snapshotKind") or _r6_capture_snapshot_kind(component, paths)
         reusable = bool(cached and cached.get("sourceChecksum") == checksum and snapshot_ids)
         if reusable:
@@ -21486,19 +21547,50 @@ def r6_capture_sources_build():
                 reused_count += 1
                 snapshot_status = "REUSED"
             else:
-                snap_name = "r6-%s-%s" % (_r6_capture_slug(name), checksum[:12])
-                snap_kind, snapshot_ids = _r6_create_snapshots(source_vm, volumes, snap_name)
-                created_count += len(snapshot_ids)
-                snapshot_status = "AVAILABLE"
-            snapshot_index[cache_key] = {
-                "component": name, "sourceVm": source_vm, "snapshotKind": snap_kind,
-                "snapshotIds": snapshot_ids, "sourceChecksum": checksum,
-                "createdAt": stamp, "status": "AVAILABLE",
-            }
+                found = _r6_match_origin_snapshot(origin_snapshots, name, w.get("sourceVmName"), source_vm)
+                if found:
+                    snap_kind = found["kind"]
+                    snapshot_ids = [found["id"]]
+                    snapshot_names = [found["name"]]
+                    reused_count += 1
+                    snapshot_status = "DISCOVERED"
+                else:
+                    if scan_only:
+                        snap_kind = _r6_capture_snapshot_kind(component, paths)
+                        snapshot_ids = []
+                        snapshot_names = []
+                        snapshot_status = "MISSING"
+                    else:
+                        snapshot_name = "r6-%s-%s" % (re.sub(r"[^0-9A-Za-z_.-]+", "-", name).strip("-")[:48] or "component", stamp)
+                        if dry_run:
+                            snap_kind = _r6_capture_snapshot_kind(component, paths)
+                            snapshot_ids = ["dryrun-%s" % snapshot_name]
+                        else:
+                            snap_kind, snapshot_ids = _r6_create_snapshots(source_vm, volumes, snapshot_name)
+                        snapshot_names = [snapshot_name]
+                        created_count += len(snapshot_ids)
+                        snapshot_status = "DRY_RUN_CREATE" if dry_run else "CREATED"
+            if not dry_run:
+                snapshot_index[cache_key] = {
+                    "component": name, "sourceVm": source_vm, "snapshotKind": snap_kind,
+                    "snapshotIds": snapshot_ids, "snapshotNames": snapshot_names, "sourceChecksum": checksum,
+                    "createdAt": stamp, "status": "AVAILABLE",
+                }
         except Exception as exc:
             row.update({"snapshotStatus": "BLOCKED", "extractionStatus": "BLOCKED", "buildStatus": "BLOCKED", "reason": str(exc)})
             blockers.append("%s: %s" % (name, exc))
             capture_rows.append(row)
+            continue
+        if snapshot_status == "MISSING":
+            row.update({
+                "snapshotStatus": "MISSING", "snapshotIds": [], "snapshotNames": [],
+                "snapshotRegion": origin_region, "snapshotMode": "OPENSTACK_CLI",
+                "extractionStatus": "WAITING_FOR_SNAPSHOT", "buildStatus": "WAITING_FOR_SNAPSHOT",
+                "sourceChecksum": checksum,
+                "lineage": {"sourceVm": source_vm, "volumeIds": lineage_seed["volumes"], "snapshotIds": [], "sourceChecksum": checksum},
+            })
+            capture_rows.append(row)
+            sanitized_workloads.append(dict(w, readiness="WAITING_FOR_SNAPSHOT"))
             continue
         if not paths:
             row.update({"snapshotStatus": "BLOCKED", "extractionStatus": "BLOCKED", "buildStatus": "BLOCKED",
@@ -21508,6 +21600,7 @@ def r6_capture_sources_build():
             continue
         row.update({
             "snapshotStatus": snapshot_status, "snapshotIds": snapshot_ids,
+            "snapshotNames": snapshot_names, "snapshotRegion": origin_region,
             "snapshotMode": "OPENSTACK_CLI",
             "extractionStatus": "READY", "buildStatus": "READY", "sourceChecksum": checksum,
             "lineage": {"sourceVm": source_vm, "volumeIds": lineage_seed["volumes"], "snapshotIds": snapshot_ids, "sourceChecksum": checksum},
@@ -21522,15 +21615,20 @@ def r6_capture_sources_build():
     if blockers:
         return jsonify({"ok": False, "error": "Source capture blocked: %s" % "; ".join(blockers), "capture": {"components": capture_rows, "blockers": blockers}}), 400
 
-    snapshots_path.write_text(_json.dumps(snapshot_index, indent=2), encoding="utf-8")
+    if not dry_run:
+        snapshots_path.write_text(_json.dumps(snapshot_index, indent=2), encoding="utf-8")
     capture = {
         "id": "r6-source-capture-%s" % stamp, "generatedAt": stamp,
         "approvedCount": approved_count, "reusedSnapshots": reused_count,
         "createdSnapshots": created_count, "components": capture_rows, "blockers": [],
         "snapshotMode": "OPENSTACK_CLI",
+        "snapshotAction": snapshot_action,
         "handoffStage": "9A_BUILD_VM_SNAPSHOTS",
-        "nextStage": "9B_BUILD_CONTAINERS",
-        "snapshotIndexPath": str(snapshots_path),
+        "nextStage": "9B_EXTRACT_VM_DATA",
+        "originRegion": origin_region,
+        "discoveredSnapshots": origin_snapshots,
+        "snapshotIndexPath": ("<dry-run:not-written>" if dry_run else str(snapshots_path)),
+        "dryRun": dry_run,
     }
     if data.get("snapshotOnly"):
         return jsonify({"ok": True, "snapshotOnly": True, "capture": capture,
@@ -21668,6 +21766,98 @@ def r6_generate_bundle():
         fp.parent.mkdir(parents=True, exist_ok=True)
         fp.write_text(content, encoding="utf-8")
 
+    def _r6_secretish_key(key):
+        return bool(re.search(r"(password|passwd|pwd|secret|token|api[_-]?key|private[_-]?key|credential|auth)", str(key or ""), re.I))
+
+    def _r6_redact_env(env):
+        if not isinstance(env, dict):
+            return {}
+        return {str(k): ("<redacted>" if _r6_secretish_key(k) else "<captured>") for k in env.keys()}
+
+    def _r6_scan_ports(scan):
+        ports = []
+        raw = scan.get("ports") if isinstance(scan, dict) else []
+        for item in raw if isinstance(raw, list) else []:
+            val = item.get("port") if isinstance(item, dict) else item
+            try:
+                n = int(str(val).split("/")[0])
+                if 0 < n < 65536 and n not in ports:
+                    ports.append(n)
+            except Exception:
+                pass
+        return ports
+
+    def _r6_scan_values(scan, *keys):
+        if not isinstance(scan, dict):
+            return []
+        for key in keys:
+            val = scan.get(key)
+            if isinstance(val, list):
+                return val
+            if isinstance(val, dict):
+                return [val]
+            if isinstance(val, str) and val.strip():
+                return [x.strip() for x in re.split(r"[\n,]", val) if x.strip()]
+        return []
+
+    def _r6_scan_dict(scan, *keys):
+        if not isinstance(scan, dict):
+            return {}
+        for key in keys:
+            val = scan.get(key)
+            if isinstance(val, dict):
+                return val
+        return {}
+
+    def _r6_env_secret_contract(env):
+        if not isinstance(env, dict):
+            return {"configMapKeys": [], "secretKeys": []}
+        secret_keys, config_keys = [], []
+        for key in sorted(str(k) for k in env.keys()):
+            (secret_keys if _r6_secretish_key(key) else config_keys).append(key)
+        return {"configMapKeys": config_keys, "secretKeys": secret_keys}
+
+    def _r6_infer_lockfile_paths(scan):
+        vals = _r6_scan_values(scan, "lockfiles", "dependencyFiles", "dependencyManifests", "buildFiles")
+        out = []
+        for item in vals:
+            if isinstance(item, dict):
+                item = item.get("path") or item.get("file") or item.get("name")
+            item = str(item or "").strip()
+            if item and item not in out:
+                out.append(item)
+        return out
+
+    def _r6_infer_workload_kind_from_scan(scan, fallback):
+        cron = _r6_scan_values(scan, "cron", "cronJobs", "schedules")
+        services = " ".join(str(x) for x in _r6_scan_values(scan, "services", "systemdServices")).lower()
+        if cron and str(fallback or "").upper() in ("", "DEPLOYMENT"):
+            return "CRONJOB_CANDIDATE"
+        if any(x in services for x in ("worker", "queue", "celery", "sidekiq")):
+            return "WORKER_DEPLOYMENT"
+        return str(fallback or "DEPLOYMENT")
+
+    def _r6_base_image_from_scan(scan, fallback):
+        rt = scan.get("runtime") if isinstance(scan, dict) else {}
+        text = " ".join([str(rt.get("type") if isinstance(rt, dict) else rt), str(rt), str(scan.get("packages") if isinstance(scan, dict) else ""), str(_r6_infer_lockfile_paths(scan))]).lower()
+        if "node" in text or "package-lock.json" in text or "pnpm-lock" in text or "yarn.lock" in text:
+            return "docker.io/library/node:20-bookworm-slim"
+        if "python" in text or "gunicorn" in text or "uwsgi" in text or "requirements.txt" in text or "poetry.lock" in text or "pyproject.toml" in text:
+            return "docker.io/library/python:3.12-slim"
+        if "java" in text or "tomcat" in text or "spring" in text or "pom.xml" in text or "build.gradle" in text:
+            return "docker.io/library/eclipse-temurin:21-jre"
+        if "php" in text or "apache2" in text or "composer.lock" in text:
+            return "docker.io/library/php:8.3-apache"
+        if "nginx" in text:
+            return "docker.io/library/nginx:1.27-alpine"
+        if "ruby" in text or "gemfile.lock" in text:
+            return "docker.io/library/ruby:3.3-slim"
+        if "go.mod" in text or "golang" in text:
+            return "docker.io/library/debian:stable-slim"
+        if fallback and "debian:stable-slim" not in fallback:
+            return fallback
+        return fallback or "docker.io/library/debian:stable-slim"
+
     _w("opencenter_import_manifest.json", _json.dumps({
         "bundle_id": bundle.get("id"), "system": bundle.get("businessSystemName"),
         "org": org, "cluster": cluster,
@@ -21714,14 +21904,72 @@ def r6_generate_bundle():
     components_missing_persistent_path = []
     storage_classes_used = set()
     components_critical_single_replica = []  # critical=true but replicas=1; HA gap recorded after validation_warnings init
+    container_runtime_evidence = []
+    container_gap_closure = []
+    component_container_ports = {}
     monitorable_components = []  # Deployment/StatefulSet HTTP components eligible for ServiceMonitor
     db_validation_targets = []  # {comp, secret, host_var, dep_type} for database validation Jobs
     for w in deployable:
         comp = _comp(w)
-        base = str(w.get("image") or "docker.io/library/debian:stable-slim")
+        full_scan = w.get("fullScan") if isinstance(w.get("fullScan"), dict) else {}
+        base = _r6_base_image_from_scan(full_scan, str(w.get("image") or "docker.io/library/debian:stable-slim"))
         image = _img(w)
         start_cmd = str(w.get("startCommand") or "").strip()
         health_path = str(w.get("healthPath") or "").strip() or "/health"
+        scan_ports = _r6_scan_ports(full_scan)
+        try:
+            container_port = int(w.get("targetPort") or (scan_ports[0] if scan_ports else 8080))
+        except Exception:
+            container_port = 8080
+        if container_port <= 0 or container_port > 65535:
+            container_port = 8080
+        component_container_ports[comp] = container_port
+        scan_app_paths = full_scan.get("applicationPaths") if isinstance(full_scan, dict) else []
+        env_contract = _r6_env_secret_contract(full_scan.get("environment") or {})
+        process_evidence = _r6_scan_values(full_scan, "processes", "processTree", "process_tree", "topProcesses")
+        lockfiles = _r6_infer_lockfile_paths(full_scan)
+        writable_paths = _r6_scan_values(full_scan, "writablePaths", "writable_paths", "writePaths")
+        health_candidates = _r6_scan_values(full_scan, "healthEndpoints", "health_endpoints", "httpChecks")
+        service_translation = {
+            "systemdServices": _r6_scan_values(full_scan, "services", "systemdServices"),
+            "cron": _r6_scan_values(full_scan, "cron", "cronJobs", "schedules"),
+            "recommendedController": _r6_infer_workload_kind_from_scan(full_scan, w.get("workloadKind") or "DEPLOYMENT"),
+        }
+        dependency_graph = _r6_scan_values(full_scan, "dependencies", "externalDependencies", "dependencyGraph") or w.get("dependencies") or []
+        container_runtime_evidence.append({
+            "component": comp, "fullScanStatus": "READY" if full_scan.get("scanned") else ("OVERRIDDEN" if w.get("scanOverride") else "MISSING"),
+            "baseImage": base, "runtime": full_scan.get("runtime") or {}, "packageManager": full_scan.get("packageManager") or "",
+            "os": full_scan.get("os") or {}, "kernelSourceOnly": full_scan.get("kernel") or "", "ports": scan_ports,
+            "selectedPort": container_port, "processEvidence": process_evidence[:50], "lockfiles": lockfiles,
+            "dependencyGraph": dependency_graph, "writablePaths": writable_paths, "healthCandidates": health_candidates,
+            "services": service_translation["systemdServices"], "cron": service_translation["cron"], "serviceTranslation": service_translation,
+            "docker": full_scan.get("docker") or {}, "databasesExternalized": full_scan.get("databases") or [],
+            "webServers": full_scan.get("webServers") or [], "environmentKeys": _r6_redact_env(full_scan.get("environment") or {}),
+            "environmentContract": env_contract, "usersGroupsSourceOnly": _r6_scan_values(full_scan, "users", "groups", "usersGroups")[:50],
+            "tlsExternalized": _r6_scan_values(full_scan, "tls", "certificates", "tlsCertificates"),
+            "excludedFromImage": ["hostname", "ssh", "users/groups/password hashes", "kernel/sysctl/network clone", "database files", "TLS private keys", "whole /home", "FLEX VM mutations"],
+            "warnings": full_scan.get("warnings") or [], "blockers": full_scan.get("blockers") or []})
+        container_gap_closure.append({
+            "component": comp,
+            "closed": {
+                "processTreeAndStartCommand": bool(process_evidence or start_cmd),
+                "processToPortMapping": bool(scan_ports),
+                "runtimeLockfiles": bool(lockfiles),
+                "secretInventoryRedacted": bool(env_contract["secretKeys"] or env_contract["configMapKeys"]),
+                "dependencyGraph": bool(dependency_graph),
+                "healthEndpoints": bool(health_candidates or health_path),
+                "writablePaths": bool(writable_paths or w.get("persistentPath")),
+                "serviceCronTranslation": bool(service_translation["systemdServices"] or service_translation["cron"]),
+                "nonRootRuntimeUser": True,
+                "sbomVulnerabilitySigningPlan": True,
+            },
+            "remainingManualReview": [k for k, v in {
+                "confirm exact entrypoint": bool(start_cmd),
+                "confirm runtime lockfiles after extraction": bool(lockfiles),
+                "confirm writable paths/PVC sizing": bool(writable_paths or w.get("persistentPath")),
+                "confirm health endpoint": bool(health_candidates or health_path),
+            }.items() if not v],
+        })
         if start_cmd:
             cmd_line = 'CMD ["sh", "-c", %s]' % _json.dumps(start_cmd)
         else:
@@ -21739,17 +21987,18 @@ def r6_generate_bundle():
             'LABEL org.opencontainers.image.title="%s" org.opencontainers.image.source="r6-flex-refactoring"' % comp,
             "WORKDIR /app",
             "COPY ./app /app",
-            "EXPOSE 8080",
-            "HEALTHCHECK --interval=30s --timeout=5s CMD curl -fsS http://localhost:8080%s || exit 1" % health_path,
+            "RUN set -eux; if [ -f package-lock.json ]; then npm ci --omit=dev; elif [ -f requirements.txt ]; then pip install --no-cache-dir -r requirements.txt; elif [ -f composer.lock ]; then composer install --no-dev --no-interaction || true; fi",
+            "EXPOSE %s" % container_port,
+            "HEALTHCHECK --interval=30s --timeout=5s CMD curl -fsS http://localhost:%s%s || exit 1" % (container_port, health_path),
             cmd_line,
         ]
         _w("dockerfiles/%s/Dockerfile" % comp, "\n".join(df_lines) + "\n")
         plan_yaml += ["  - component: %s" % comp, "    base_image: %s" % base,
                       "    target: %s" % image, "    context: dockerfiles/%s" % comp,
-                      "    ports: [8080]", "    healthcheck: /healthz"]
+                      "    ports: [%s]" % container_port, "    healthcheck: %s" % health_path]
         (out_dir / "dockerfiles" / comp / "app").mkdir(parents=True, exist_ok=True)
         (out_dir / "dockerfiles" / comp / "app" / ".gitkeep").write_text("", encoding="utf-8")
-        app_paths = w.get("applicationPaths") or [w.get("sourcePath") or layer_paths.get(str(w.get("layer")), "/opt/app/")]
+        app_paths = scan_app_paths or w.get("applicationPaths") or [w.get("sourcePath") or layer_paths.get(str(w.get("layer")), "/opt/app/")]
         app_paths = [str(p) for p in app_paths if str(p).startswith("/")]
         exclude_args = " ".join(
             "--exclude=%s" % shlex.quote(pattern) for pattern in (
@@ -21980,9 +22229,9 @@ def r6_generate_bundle():
         else:
             # Deployment, StatefulSet and DaemonSet all run the same long-lived, probed
             # container shape - only the controller kind (and Service style) differs.
-            container["ports"] = [{"containerPort": 8080}]
-            container["readinessProbe"] = {"httpGet": {"path": health_path, "port": 8080}, "initialDelaySeconds": 5, "periodSeconds": 10}
-            container["livenessProbe"] = {"httpGet": {"path": health_path, "port": 8080}, "initialDelaySeconds": 15, "periodSeconds": 20}
+            container["ports"] = [{"containerPort": container_port}]
+            container["readinessProbe"] = {"httpGet": {"path": health_path, "port": container_port}, "initialDelaySeconds": 5, "periodSeconds": 10}
+            container["livenessProbe"] = {"httpGet": {"path": health_path, "port": container_port}, "initialDelaySeconds": 15, "periodSeconds": 20}
             if persistent_path:
                 container["volumeMounts"] = [{"name": "data", "mountPath": persistent_path}]
             pod_template = {"metadata": {"labels": {"app": comp}}, "spec": pod_spec_base}
@@ -22006,7 +22255,7 @@ def r6_generate_bundle():
                     "apiVersion": "v1", "kind": "Service", "metadata": {"name": comp, "namespace": slug},
                     # Headless (clusterIP: None) - required for StatefulSet pod DNS
                     # identity, not a load-balanced ClusterIP like a Deployment's Service.
-                    "spec": {"clusterIP": "None", "selector": {"app": comp}, "ports": [{"name": "http", "port": 80, "targetPort": 8080}]},
+                    "spec": {"clusterIP": "None", "selector": {"app": comp}, "ports": [{"name": "http", "port": 80, "targetPort": container_port}]},
                 })
             elif workload_kind == "DAEMONSET":
                 if persistent_path:
@@ -22029,7 +22278,7 @@ def r6_generate_bundle():
                 })
                 docs.append({
                     "apiVersion": "v1", "kind": "Service", "metadata": {"name": comp, "namespace": slug},
-                    "spec": {"selector": {"app": comp}, "ports": [{"name": "http", "port": 80, "targetPort": 8080}]},
+                    "spec": {"selector": {"app": comp}, "ports": [{"name": "http", "port": 80, "targetPort": container_port}]},
                 })
             # Standalone PVC only for Deployment/DaemonSet - StatefulSet gets one per
             # replica automatically via volumeClaimTemplates above, so a separate PVC here
@@ -22356,7 +22605,7 @@ def r6_generate_bundle():
             "spec": {
                 "podSelector": {"matchLabels": {"app": provider}}, "policyTypes": ["Ingress"],
                 "ingress": [{"from": [{"podSelector": {"matchLabels": {"app": c}}} for c in sorted(consumers)],
-                             "ports": [{"protocol": "TCP", "port": 8080}]}],
+                             "ports": [{"protocol": "TCP", "port": component_container_ports.get(provider, 8080)}]}],
             },
         })
     openstack_intent = []
@@ -22450,6 +22699,9 @@ def r6_generate_bundle():
                       default_flow_style=False, sort_keys=False))
 
     build_lines += ['echo "]" >> image-manifest.json', 'echo "Wrote image-manifest.json"']
+    _w("container-runtime-evidence.json", _json.dumps(container_runtime_evidence, indent=2, default=str))
+    _w("containerization-gap-closure.json", _json.dumps(container_gap_closure, indent=2, default=str))
+    _w("container-externalization-contract.json", _json.dumps({"rules": {"image_includes": ["approved application artifacts only"], "externalized": ["secrets", "databases", "TLS private keys", "persistent data", "VM identity", "kernel/network settings", "SSH access", "password hashes", "whole home directories"], "kubernetes_mapping": ["ports to Service", "cron to CronJob", "services to Deployment command/sidecar", "volumes to PVC", "env keys to ConfigMap/Secret contracts", "TLS to cert-manager/Secret", "DB restore to migration Job/operator"]}, "components": container_runtime_evidence}, indent=2, default=str))
     _w("image_build_plan.yaml", "\n".join(plan_yaml) + "\n")
     _w("build_and_push.sh", "\n".join(build_lines) + "\n")
     os.chmod(out_dir / "build_and_push.sh", 0o755)
@@ -23816,6 +24068,11 @@ def _workflow_dashboard_restart_process():
     os.execv(sys.executable, [sys.executable] + sys.argv)
 
 
+@app.get("/api/dev/restart-ready")
+def dev_restart_ready():
+    return jsonify({"ok": True, "pid": os.getpid(), "ready": True, "bootId": _CACHE_BUST})
+
+
 @app.post("/api/dev/restart-flask")
 def dev_restart_flask():
     remote = request.headers.get("X-Forwarded-For", request.remote_addr or "").split(",")[0].strip()
@@ -23824,10 +24081,10 @@ def dev_restart_flask():
     if app.config.get("TESTING") or os.environ.get("WORKFLOW_DASHBOARD_DISABLE_SELF_RESTART") == "1":
         return jsonify({"ok": True, "restart": "suppressed-for-test"})
     def _restart_later():
-        time.sleep(0.35)
+        time.sleep(1.0)
         _workflow_dashboard_restart_process()
     threading.Thread(target=_restart_later, daemon=True).start()
-    return jsonify({"ok": True, "restart": "scheduled", "pid": os.getpid()})
+    return jsonify({"ok": True, "restart": "scheduled", "pid": os.getpid(), "bootId": _CACHE_BUST})
 
 
 if __name__ == "__main__":
