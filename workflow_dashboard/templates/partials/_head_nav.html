@@ -689,19 +689,19 @@
       font-size:1em;
       color:transparent;
       animation-name:s0-title-lightup;
-      animation-duration:var(--s0wc,4s);
+      animation-duration:var(--s0wc,8s);
       animation-iteration-count:infinite;
       animation-timing-function:ease-in-out;
     }
-    /* Words light up round-robin; loop length driven by --s0wc (default 8s), user-configurable. */
+    /* One full sequence: Why → Who → What → When → FLEX → hub title → repeat. */
     .s0-title-why  { animation-delay:0s; }
-    .s0-title-who  { animation-delay:calc(var(--s0wc,4s)*0.25); }
-    .s0-title-what { animation-delay:calc(var(--s0wc,4s)*0.5); }
-    .s0-title-when { animation-delay:calc(var(--s0wc,4s)*0.75); }
+    .s0-title-who  { animation-delay:calc(var(--s0wc,8s)*0.15); }
+    .s0-title-what { animation-delay:calc(var(--s0wc,8s)*0.30); }
+    .s0-title-when { animation-delay:calc(var(--s0wc,8s)*0.45); }
     @keyframes s0-title-lightup {
-      0% { color:transparent; text-shadow:none; }
-      2%, 23% { color:#ffffff; text-shadow:0 0 12px rgba(224,242,254,0.95),0 0 26px rgba(56,189,248,0.82),0 0 46px rgba(14,165,233,0.46),0 2px 12px rgba(0,0,0,0.24); }
-      25%, 100% { color:transparent; text-shadow:none; }
+      0% { color:transparent; text-shadow:none; transform:scale(.98); }
+      2%, 10% { color:#ffffff; text-shadow:0 0 12px rgba(224,242,254,0.95),0 0 26px rgba(56,189,248,0.82),0 0 46px rgba(14,165,233,0.46),0 2px 12px rgba(0,0,0,0.24); transform:scale(1); }
+      12%, 100% { color:transparent; text-shadow:none; transform:scale(.98); }
     }
     .s0-dawn-title-highlight {
       display:inline-block;
@@ -719,13 +719,17 @@
       background:linear-gradient(90deg,rgba(37,99,235,0.92),rgba(96,165,250,0.82));
       text-shadow:0 0 8px rgba(224,242,254,.98),0 0 18px rgba(125,211,252,.82),0 2px 8px rgba(3,105,161,.28);
       box-shadow:0 8px 26px rgba(56,189,248,.30),0 0 20px rgba(186,230,253,.42);
-      animation:s0-flex-block-blink calc(var(--s0wc,4s)*0.92) ease-in-out infinite;
     }
-    /* After the Why/Who/What/When sweep, the whole FLEX block double-blinks (~78–88% of the 11s loop). */
-    @keyframes s0-flex-block-blink {
-      0%, 72%, 100% { filter:brightness(1); box-shadow:none; }
-      78%, 88% { filter:brightness(1.4); box-shadow:0 0 18px rgba(96,165,250,0.95),0 0 36px rgba(37,99,235,0.6); }
-      83%, 95% { filter:brightness(1); box-shadow:none; }
+    .s0-flex-word,.s0-flex-rest{display:inline-block;font:inherit;letter-spacing:inherit;animation-duration:var(--s0wc,8s);animation-iteration-count:infinite;animation-timing-function:ease-in-out;}
+    .s0-flex-word{animation-name:s0-flex-word-blink;}
+    .s0-flex-rest{animation-name:s0-flex-rest-blink;}
+    @keyframes s0-flex-word-blink {
+      0%, 61%, 73%, 100% { filter:brightness(1); transform:scale(1); text-shadow:inherit; }
+      64%, 70% { filter:brightness(1.72); transform:scale(1.035); text-shadow:0 0 14px rgba(255,255,255,1),0 0 34px rgba(125,211,252,.95),0 0 54px rgba(37,99,235,.72); }
+    }
+    @keyframes s0-flex-rest-blink {
+      0%, 72%, 91%, 100% { filter:brightness(1); transform:scale(1); text-shadow:inherit; }
+      76%, 87% { filter:brightness(1.55); transform:scale(1.018); text-shadow:0 0 12px rgba(255,255,255,1),0 0 28px rgba(125,211,252,.88),0 0 44px rgba(37,99,235,.62); }
     }
     .s0-dawn-desc {
       font-size:15px; line-height:1.7; color:#2a3a5a;
@@ -1934,7 +1938,14 @@ body.flex-skyline-mode #subBar2 > .ospc-dropdown > .ospc-dropdown-content {
   position: absolute !important;
   z-index: 10002 !important;
 }
-/* Uniform primary-stage typography: 20 percent larger and bold. */
+/* Production execution-mode banner: 2x taller with stronger readable labels. */
+#stageBar.stage-bar,
+body.flex-skyline-mode #stageBar.stage-bar {
+  min-height: 82px !important;
+  padding: 10px 6px !important;
+  gap: 8px !important;
+  align-items: stretch !important;
+}
 #stageBar > .stage-btn,
 #stageBar > .top-stage-dropdown > .top-stage-dropdown-trigger,
 #stageBar > .stage-btn.ai-now-stage,
@@ -1942,15 +1953,22 @@ body.flex-skyline-mode #stageBar > .stage-btn,
 body.flex-skyline-mode #stageBar > .top-stage-dropdown > .top-stage-dropdown-trigger,
 body.flex-skyline-mode #stageBar > .stage-btn.ai-now-stage {
   font-family: "Segoe UI", Tahoma, sans-serif !important;
-  font-size: 13.2px !important;
+  min-height: 64px !important;
+  padding: 12px 14px !important;
+  font-size: 18px !important;
   font-weight: 900 !important;
   letter-spacing: 0 !important;
+  line-height: 1.08 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex-direction: column !important;
 }
 #stageBar > .stage-btn small,
 #stageBar > .top-stage-dropdown > .top-stage-dropdown-trigger small,
 #stageBar > .stage-btn.ai-now-stage small {
   font-family: "Segoe UI", Tahoma, sans-serif !important;
-  font-size: 10.8px !important;
+  font-size: 14px !important;
   font-weight: 900 !important;
   letter-spacing: 0 !important;
   line-height: 1.1 !important;
@@ -1989,6 +2007,65 @@ body.flex-skyline-mode #stageBar > .top-stage-dropdown.ai-now-dropdown > .ai-now
   border-radius: 50%;
   background: #ffedd5;
   box-shadow: 0 0 5px #fff, 0 0 11px #fb923c, 0 0 20px #f97316;
+}
+
+/* Equal-size execution-mode banner boxes: every top-level stage item gets one grid cell. */
+#stageBar.stage-bar,
+body.flex-skyline-mode #stageBar.stage-bar {
+  display: grid !important;
+  grid-template-columns: repeat(8, minmax(0, 1fr)) !important;
+  grid-auto-rows: 76px !important;
+  overflow-x: auto !important;
+}
+#stageBar > .stage-btn,
+#stageBar > .top-stage-dropdown,
+body.flex-skyline-mode #stageBar > .stage-btn,
+body.flex-skyline-mode #stageBar > .top-stage-dropdown {
+  width: 100% !important;
+  min-width: 0 !important;
+  height: 76px !important;
+  min-height: 76px !important;
+  max-height: 76px !important;
+  margin: 0 !important;
+  box-sizing: border-box !important;
+}
+#stageBar > .top-stage-dropdown,
+body.flex-skyline-mode #stageBar > .top-stage-dropdown {
+  display: flex !important;
+  align-items: stretch !important;
+}
+#stageBar > .top-stage-dropdown > .top-stage-dropdown-trigger,
+body.flex-skyline-mode #stageBar > .top-stage-dropdown > .top-stage-dropdown-trigger {
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 76px !important;
+  max-height: 76px !important;
+  box-sizing: border-box !important;
+}
+#stageBar > .stage-btn,
+#stageBar > .top-stage-dropdown > .top-stage-dropdown-trigger,
+body.flex-skyline-mode #stageBar > .stage-btn,
+body.flex-skyline-mode #stageBar > .top-stage-dropdown > .top-stage-dropdown-trigger {
+  white-space: normal !important;
+  text-align: center !important;
+}
+#stageBar > .stage-btn,
+#stageBar > .top-stage-dropdown,
+#stageBar > .stage-btn[data-stage="s1"],
+#stageBar > .stage-btn[data-stage="s2"],
+#stageBar > .stage-btn.ai-now-stage,
+#stageBar > .stage-btn.ai-now-stage.active,
+body.flex-skyline-mode #stageBar > .stage-btn,
+body.flex-skyline-mode #stageBar > .top-stage-dropdown,
+body.flex-skyline-mode #stageBar > .stage-btn.ai-now-stage,
+body.flex-skyline-mode #stageBar > .stage-btn.ai-now-stage.active {
+  grid-column: span 1 !important;
+}
+@media (max-width: 1280px) {
+  #stageBar.stage-bar,
+  body.flex-skyline-mode #stageBar.stage-bar {
+    grid-template-columns: repeat(8, minmax(150px, 1fr)) !important;
+  }
 }
 .uat-s1-wrap { padding:18px 0; }
 .uat-s1-topbar { display:flex;justify-content:space-between;gap:14px;align-items:flex-start;margin-bottom:16px;flex-wrap:wrap; }

@@ -96,24 +96,37 @@
 
   <!-- R6 END-TO-END CONTAINERIZATION FLOW -->
   <section data-stage-output="r6-pipeline-flow" style="margin:14px 0;padding:16px;background:linear-gradient(135deg,#f8fbff,#eef6ff);border:1px solid #bfdbfe;border-radius:12px;box-shadow:0 4px 14px rgba(15,23,42,.06);">
-    <div style="font-size:14px;font-weight:900;color:#0f172a;margin-bottom:12px;">R6 Live VM to GitOps Flow</div>
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:12px;">
+      <div>
+        <div style="font-size:14px;font-weight:900;color:#0f172a;">R6 Live VM to GitOps Flow</div>
+        <div style="font-size:11px;color:#475569;margin-top:3px;">Synced with the active R6 workflow cards: preflight through final report, with Stage 9 split into snapshot, extraction and build.</div>
+      </div>
+      <span style="background:#dbeafe;color:#1d4ed8;border:1px solid #93c5fd;border-radius:999px;padding:4px 10px;font-size:10px;font-weight:900;white-space:nowrap;">0–14 pipeline</span>
+    </div>
     <div style="display:flex;align-items:stretch;gap:7px;overflow-x:auto;padding:2px 0 8px;">
-      <div class="r6-flow-node">Live VM</div><div class="r6-flow-arrow">&#8594;</div>
-      <div class="r6-flow-node">Discovery</div><div class="r6-flow-arrow">&#8594;</div>
-      <div class="r6-flow-node">Runtime Analysis</div><div class="r6-flow-arrow">&#8594;</div>
-      <div class="r6-flow-node">Workload Classification</div><div class="r6-flow-arrow">&#8594;</div>
-      <div class="r6-flow-node" style="min-width:220px;text-align:left;"><strong>Runtime Reconstruction</strong><div style="font-size:10px;font-weight:500;color:#475569;line-height:1.45;margin-top:5px;">Base image selection · Package reconstruction · Entrypoint · Environment variables · Volumes · Users/groups · Secrets externalization · Health checks</div></div><div class="r6-flow-arrow">&#8594;</div>
-      <div class="r6-flow-node">Copy Application Artifacts</div><div class="r6-flow-arrow">&#8594;</div>
-      <div class="r6-flow-node">Generate Dockerfile</div><div class="r6-flow-arrow">&#8594;</div>
-      <div class="r6-flow-node">Build Image</div><div class="r6-flow-arrow">&#8594;</div>
-      <div class="r6-flow-node">Smoke Tests</div><div class="r6-flow-arrow">&#8594;</div>
-      <div class="r6-flow-node">SBOM → Vulnerability Scan → Image Signing</div><div class="r6-flow-arrow">&#8594;</div>
-      <div class="r6-flow-node">Generate Kubernetes Manifests</div><div class="r6-flow-arrow">&#8594;</div>
-      <div class="r6-flow-node">GitOps Repository</div>
+      <div class="r6-flow-node"><strong>0 Preflight Check</strong><small>CLI tools · credentials · SSH · registry · GitOps · Kubernetes/OpenCenter</small></div><div class="r6-flow-arrow">&#8594;</div>
+      <div class="r6-flow-node"><strong>1 Select Source Business Apps System</strong><small>Import VMs · apps · databases · volumes · networks · IPs · dependencies</small></div><div class="r6-flow-arrow">&#8594;</div>
+      <div class="r6-flow-node"><strong>2 Apps Component Containers Mapping</strong><small>Category · endpoint · runtime · state · target resource · risk</small></div><div class="r6-flow-arrow">&#8594;</div>
+      <div class="r6-flow-node"><strong>3 Live Scan Application VMs</strong><small>Read-only SSH · processes · services · ports · files · mounts · users</small></div><div class="r6-flow-arrow">&#8594;</div>
+      <div class="r6-flow-node"><strong>4 Map Components</strong><small>Frontend · API · backend · worker · scheduler · database · cache · queue</small></div><div class="r6-flow-arrow">&#8594;</div>
+      <div class="r6-flow-node"><strong>5 Map Dependencies</strong><small>Consumer/provider links · protocols · ports · auth · TLS · startup order</small></div><div class="r6-flow-arrow">&#8594;</div>
+      <div class="r6-flow-node"><strong>6 Normalize Discovery Evidence</strong><small>Merge topology + live scan · mark unreachable VMs · snapshot fallback</small></div><div class="r6-flow-arrow">&#8594;</div>
+      <div class="r6-flow-node"><strong>7 Classify Components & Portability</strong><small>Stateless/stateful/mixed · licensing · hardware · identity · portability constraints</small></div><div class="r6-flow-arrow">&#8594;</div>
+      <div class="r6-flow-node"><strong>8 Containerization Decision & Risk</strong><small>Container · partial · K8s-native · operator · retained VM · external · blocked</small></div><div class="r6-flow-arrow">&#8594;</div>
+      <div class="r6-flow-node r6-flow-stage9"><strong>9A Build / Discover VM Snapshots</strong><small>Scan reusable lineage · create approved missing VM/volume snapshots</small></div><div class="r6-flow-arrow">&#8594;</div>
+      <div class="r6-flow-node r6-flow-stage9"><strong>9B Extract VM Data</strong><small>Read-only artifact extraction · sanitization · checksums · source lineage</small></div><div class="r6-flow-arrow">&#8594;</div>
+      <div class="r6-flow-node r6-flow-stage9"><strong>9C Build Containers</strong><small>Dockerfile · image build · smoke tests · SBOM · scan · sign · push digest</small></div><div class="r6-flow-arrow">&#8594;</div>
+      <div class="r6-flow-node"><strong>10 Generate Kubernetes & GitOps</strong><small>Workloads · Services · PVCs · NetworkPolicies · Gateway · Kustomize · Flux</small></div><div class="r6-flow-arrow">&#8594;</div>
+      <div class="r6-flow-node"><strong>11 Generate OpenCenter Bundle</strong><small>Unified bundle for Kubernetes, VM, network, storage, DNS, LB, SG, validation, rollback</small></div><div class="r6-flow-arrow">&#8594;</div>
+      <div class="r6-flow-node"><strong>12 Deploy to OpenCenter</strong><small>Validate bundle · copy to managed-services · commit/push GitOps · trigger Flux</small></div><div class="r6-flow-arrow">&#8594;</div>
+      <div class="r6-flow-node"><strong>13 Validate, UAT & Cutover</strong><small>Validation jobs · migrate data · business UAT · ramp traffic · rollback thresholds</small></div><div class="r6-flow-arrow">&#8594;</div>
+      <div class="r6-flow-node"><strong>14 Final Report & Day-2 Operations</strong><small>Evidence · monitoring · backup · scaling · drift · upgrades · rollback procedures</small></div>
     </div>
   </section>
   <style>
-    .r6-flow-node{display:flex;flex-direction:column;justify-content:center;min-width:120px;padding:10px 12px;background:#fff;border:1px solid #93c5fd;border-radius:9px;color:#0f172a;font-size:11px;font-weight:800;text-align:center;line-height:1.3;}
+    .r6-flow-node{display:flex;flex-direction:column;justify-content:center;min-width:168px;padding:10px 12px;background:#fff;border:1px solid #93c5fd;border-radius:9px;color:#0f172a;font-size:11px;font-weight:800;text-align:center;line-height:1.3;}
+    .r6-flow-node small{display:block;margin-top:5px;font-size:9px;font-weight:600;color:#475569;line-height:1.35;}
+    .r6-flow-stage9{background:#f0fdf4;border-color:#86efac;}
     .r6-flow-arrow{display:flex;align-items:center;color:#0284c7;font-size:19px;font-weight:900;}
   </style>
   <!-- SUMMARY CARDS -->

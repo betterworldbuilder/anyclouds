@@ -21384,40 +21384,133 @@ def _r6_origin_snapshot_inventory() -> List[Dict[str, str]]:
     return inventory
 
 
+def _r6_origin_server_inventory() -> List[Dict[str, str]]:
+    """Read source-region servers so Stage 9A can match snapshot names by VM name/id, not only business component name."""
+    try:
+        rows = _r6_openstack_json(["server", "list", "--long"])
+    except Exception:
+        return []
+    servers: List[Dict[str, str]] = []
+    for row in rows if isinstance(rows, list) else []:
+        if not isinstance(row, dict):
+            continue
+        server_id = str(row.get("ID") or row.get("Id") or row.get("id") or "").strip()
+        name = str(row.get("Name") or row.get("name") or "").strip()
+        text = " ".join(str(row.get(k) or "") for k in (
+            "Networks", "Addresses", "AccessIPv4", "accessIPv4", "Public Networks", "Private Networks"
+        ))
+        servers.append({"id": server_id, "name": name, "addresses": text, "raw": json.dumps(row, default=str)})
+    return servers
+
+
+def _r6_server_refs_for_source(source_ref: str, servers: List[Dict[str, str]]) -> List[str]:
+    ref = str(source_ref or "").strip()
+    refs: List[str] = []
+    if not ref:
+        return refs
+    ref_low = ref.lower()
+    for server in servers:
+        sid = str(server.get("id") or "")
+        name = str(server.get("name") or "")
+        raw = str(server.get("raw") or server.get("addresses") or "")
+        if ref_low in sid.lower() or ref_low in name.lower() or ref in raw:
+            refs.extend([sid, sid[:12], name])
+            if "-" in name:
+                refs.append(name.replace("-", " "))
+    return [x for x in refs if x]
+
+
+def _r6_snapshot_keywords(value: str) -> List[str]:
+    stop = {
+        "r6", "snap", "snapshot", "image", "img", "linsnap", "flex", "fresh",
+        "service", "server", "app", "application", "component", "the", "and",
+        "api", "http", "https", "local", "ospc", "mobile",
+    }
+    words = re.sub(r"[^A-Za-z0-9]+", " ", str(value or "").lower()).split()
+    out: List[str] = []
+    for word in words:
+        if len(word) < 3 or word in stop or word.isdigit():
+            continue
+        if re.fullmatch(r"20\d{6,}", word):
+            continue
+        if word not in out:
+            out.append(word)
+    return out
+
+
+def _r6_keyword_snapshot_candidates(inventory: List[Dict[str, str]], component_name: str, minimum: int = 3) -> List[Dict[str, Any]]:
+    """Return every active region snapshot, ranked from most probable to least probable for this Stage-1 component name."""
+    component_keywords = _r6_snapshot_keywords(component_name)
+    candidates: List[Dict[str, Any]] = []
+    for item in inventory:
+        image_name = str(item.get("name") or "")
+        image_keywords = set(_r6_snapshot_keywords(image_name))
+        matched = [kw for kw in component_keywords if kw in image_keywords]
+        candidate = dict(item)
+        candidate["matchedKeywords"] = matched
+        candidate["matchCount"] = len(matched)
+        candidate["componentKeywords"] = component_keywords
+        candidate["probable"] = len(matched) >= minimum
+        candidate["minimumKeywordMatch"] = minimum
+        # Stable score: exact keyword evidence dominates; name is only a deterministic tie-breaker.
+        candidate["score"] = (len(matched) * 1000) + min(len(matched), len(component_keywords))
+        candidates.append(candidate)
+    candidates.sort(key=lambda x: (int(x.get("matchCount") or 0), int(x.get("score") or 0), str(x.get("name") or "")), reverse=True)
+    return candidates
+
+
 def _r6_match_origin_snapshot(inventory: List[Dict[str, str]], *refs: str) -> Optional[Dict[str, str]]:
+    def norm(value: str) -> str:
+        return re.sub(r"[^a-z0-9]+", " ", str(value or "").lower()).strip()
+    def compact(value: str) -> str:
+        return re.sub(r"[^a-z0-9]+", "", str(value or "").lower())
     def tokens(value: str) -> List[str]:
-        return [x for x in re.sub(r"[^a-z0-9]+", " ", str(value or "").lower()).split()
-                if len(x) > 1 and x not in {"r6", "snap", "linsnap", "flex", "fresh"}]
+        stop = {"r6", "snap", "snapshot", "image", "img", "linsnap", "flex", "fresh", "server", "service"}
+        return [x for x in norm(value).split() if len(x) > 1 and x not in stop]
     best: Optional[Dict[str, str]] = None
     best_score = 0
+    ref_values = [str(r or "").strip() for r in refs if str(r or "").strip()]
     for item in inventory:
-        image_tokens = tokens(item.get("name") or "")
+        image_name = str(item.get("name") or "")
+        image_norm = norm(image_name)
+        image_compact = compact(image_name)
+        image_tokens = tokens(image_name)
         image_set = set(image_tokens)
         score = 0
-        for ref in refs:
+        for ref in ref_values:
+            ref_norm = norm(ref)
+            ref_compact = compact(ref)
             ref_tokens = tokens(ref)
-            if not ref_tokens:
+            if not ref_tokens and not ref_compact:
                 continue
+            if ref_compact and ref_compact in image_compact:
+                score = max(score, 120)
+            if ref_norm and ref_norm in image_norm:
+                score = max(score, 110)
+            if len(ref_compact) >= 8 and ref_compact[-8:] in image_compact:
+                score = max(score, 95)
             overlap = len(image_set.intersection(ref_tokens))
-            score = max(score, overlap * 10 + (20 if overlap == len(set(ref_tokens)) else 0))
+            if overlap:
+                coverage = overlap / max(len(set(ref_tokens)), 1)
+                score = max(score, int(overlap * 12 + coverage * 45))
         if score > best_score:
             best, best_score = item, score
-    return best if best_score >= 20 else None
+    return best if best_score >= 45 else None
 
 
 @app.post("/api/r6/capture-sources-build")
 def r6_capture_sources_build():
     """Stage 9 gate: capture only Stage-8-approved container sources, then reuse the
-    existing R6 bundle generator. Stage 9A first reuses/discovers an approved snapshot;
-    when none is available, it creates a VM image or volume snapshot with the existing
-    OpenStack snapshot builder. A VM snapshot is recorded as source lineage, never as
-    a container image."""
+    existing R6 bundle generator. Stage 9A uses a simple production-safe lineage:
+    create a fresh snapshot for every approved VM, then verify that the created
+    snapshots are active before Stage 9B extraction can proceed. A VM snapshot is
+    recorded as source lineage, never as a container image."""
     import hashlib as _hashlib, json as _json, time as _time
 
     data = request.get_json(silent=True) or {}
     dry_run = str(data.get("dry_run") or data.get("dryRun") or "").strip().lower() in ("1", "true", "yes", "on")
-    snapshot_action = str(data.get("snapshotAction") or ("scan" if data.get("snapshotOnly") else "create")).strip().lower()
-    scan_only = snapshot_action == "scan"
+    snapshot_action = str(data.get("snapshotAction") or ("verify" if data.get("snapshotOnly") else "create")).strip().lower()
+    verify_only = snapshot_action in {"scan", "verify"}
     incoming_cloud = data.get("cloud") if isinstance(data.get("cloud"), dict) else {}
     if incoming_cloud and not dry_run:
         try:
@@ -21460,23 +21553,23 @@ def r6_capture_sources_build():
     state_root = Path(os.environ.get("R6_CAPTURE_STATE_DIR") or (Path(os.path.expanduser("~")) / ".config" / "opencenter" / "r6" / "source-captures"))
     snapshots_path = state_root / "snapshot-index.json"
     snapshot_index = {}
-    if not dry_run:
-        state_root.mkdir(parents=True, exist_ok=True)
-        try:
-            snapshot_index = _json.loads(snapshots_path.read_text(encoding="utf-8")) if snapshots_path.exists() else {}
-        except Exception:
-            snapshot_index = {}
+    state_root.mkdir(parents=True, exist_ok=True)
+    try:
+        snapshot_index = _json.loads(snapshots_path.read_text(encoding="utf-8")) if snapshots_path.exists() else {}
+    except Exception:
+        snapshot_index = {}
 
     stamp = _time.strftime("%Y%m%d_%H%M%S")
     capture_rows: List[Dict[str, Any]] = []
     sanitized_workloads: List[Dict[str, Any]] = []
     blockers: List[str] = []
-    approved_count = reused_count = created_count = 0
+    approved_count = reused_count = created_count = verified_count = missing_count = 0
 
     try:
         origin_snapshots = _r6_origin_snapshot_inventory()
     except Exception as exc:
         return jsonify({"ok": False, "error": "Origin-region snapshot scan failed: %s" % exc}), 400
+    origin_servers: List[Dict[str, str]] = []
     origin_region = str((data.get("cloud") or {}).get("region") or os.environ.get("OS_REGION_NAME") or "origin")
 
     for w in workloads:
@@ -21536,68 +21629,83 @@ def r6_capture_sources_build():
         snapshot_ids = cached.get("snapshotIds") or []
         snapshot_names = cached.get("snapshotNames") or []
         snap_kind = cached.get("snapshotKind") or _r6_capture_snapshot_kind(component, paths)
-        reusable = bool(cached and cached.get("sourceChecksum") == checksum and snapshot_ids)
-        if reusable:
-            try:
-                reusable = all(_r6_snapshot_status(sid, snap_kind) in ({"AVAILABLE"} if snap_kind == "volume_snapshot" else {"ACTIVE", "AVAILABLE"}) for sid in snapshot_ids)
-            except Exception:
-                reusable = False
         try:
-            if reusable:
-                reused_count += 1
-                snapshot_status = "REUSED"
-            else:
-                found = _r6_match_origin_snapshot(origin_snapshots, name, w.get("sourceVmName"), source_vm)
-                if found:
-                    snap_kind = found["kind"]
-                    snapshot_ids = [found["id"]]
-                    snapshot_names = [found["name"]]
-                    reused_count += 1
-                    snapshot_status = "DISCOVERED"
+            if verify_only:
+                latest_active = bool(
+                    cached
+                    and cached.get("sourceChecksum") == checksum
+                    and snapshot_ids
+                    and all(_r6_snapshot_status(sid, snap_kind) in ({"AVAILABLE"} if snap_kind == "volume_snapshot" else {"ACTIVE", "AVAILABLE"}) for sid in snapshot_ids)
+                )
+                if latest_active:
+                    verified_count += 1
+                    snapshot_status = "VERIFIED_LATEST"
+                    row["verifiedLatest"] = True
+                    row["latestSnapshot"] = {
+                        "ids": snapshot_ids,
+                        "names": snapshot_names,
+                        "createdAt": cached.get("createdAt"),
+                        "region": cached.get("region") or origin_region,
+                    }
                 else:
-                    if scan_only:
-                        snap_kind = _r6_capture_snapshot_kind(component, paths)
-                        snapshot_ids = []
-                        snapshot_names = []
-                        snapshot_status = "MISSING"
-                    else:
-                        snapshot_name = "r6-%s-%s" % (re.sub(r"[^0-9A-Za-z_.-]+", "-", name).strip("-")[:48] or "component", stamp)
-                        if dry_run:
-                            snap_kind = _r6_capture_snapshot_kind(component, paths)
-                            snapshot_ids = ["dryrun-%s" % snapshot_name]
-                        else:
-                            snap_kind, snapshot_ids = _r6_create_snapshots(source_vm, volumes, snapshot_name)
-                        snapshot_names = [snapshot_name]
-                        created_count += len(snapshot_ids)
-                        snapshot_status = "DRY_RUN_CREATE" if dry_run else "CREATED"
-            if not dry_run:
+                    snapshot_ids = []
+                    snapshot_names = []
+                    missing_count += 1
+                    snapshot_status = "MISSING_FRESH_SNAPSHOT"
+                    row["verifiedLatest"] = False
+            else:
+                snapshot_name = "r6-%s-%s-%s" % (
+                    re.sub(r"[^0-9A-Za-z_.-]+", "-", name).strip("-")[:48] or "component",
+                    re.sub(r"[^0-9A-Za-z_.-]+", "-", source_vm).strip("-")[:24] or "vm",
+                    stamp,
+                )
+                if dry_run:
+                    snap_kind = _r6_capture_snapshot_kind(component, paths)
+                    snapshot_ids = ["dryrun-%s" % snapshot_name]
+                else:
+                    snap_kind, snapshot_ids = _r6_create_snapshots(source_vm, volumes, snapshot_name)
+                snapshot_names = [snapshot_name]
+                created_count += len(snapshot_ids)
+                verified_count += len(snapshot_ids)
+                snapshot_status = "DRY_RUN_CREATE" if dry_run else "CREATED_AND_VERIFIED"
+                row["verifiedLatest"] = True
+                row["latestSnapshot"] = {
+                    "ids": snapshot_ids,
+                    "names": snapshot_names,
+                    "createdAt": stamp,
+                    "region": origin_region,
+                }
+            if not dry_run and snapshot_ids:
                 snapshot_index[cache_key] = {
                     "component": name, "sourceVm": source_vm, "snapshotKind": snap_kind,
                     "snapshotIds": snapshot_ids, "snapshotNames": snapshot_names, "sourceChecksum": checksum,
-                    "createdAt": stamp, "status": "AVAILABLE",
+                    "createdAt": stamp, "region": origin_region, "status": "ACTIVE",
                 }
         except Exception as exc:
             row.update({"snapshotStatus": "BLOCKED", "extractionStatus": "BLOCKED", "buildStatus": "BLOCKED", "reason": str(exc)})
             blockers.append("%s: %s" % (name, exc))
             capture_rows.append(row)
             continue
-        if snapshot_status == "MISSING":
+        if snapshot_status == "MISSING_FRESH_SNAPSHOT":
             row.update({
-                "snapshotStatus": "MISSING", "snapshotIds": [], "snapshotNames": [],
+                "snapshotStatus": snapshot_status, "snapshotIds": [], "snapshotNames": [],
                 "snapshotRegion": origin_region, "snapshotMode": "OPENSTACK_CLI",
-                "extractionStatus": "WAITING_FOR_SNAPSHOT", "buildStatus": "WAITING_FOR_SNAPSHOT",
+                "extractionStatus": "WAITING_FOR_FRESH_SNAPSHOT",
+                "buildStatus": "WAITING_FOR_FRESH_SNAPSHOT",
                 "sourceChecksum": checksum,
                 "lineage": {"sourceVm": source_vm, "volumeIds": lineage_seed["volumes"], "snapshotIds": [], "sourceChecksum": checksum},
             })
             capture_rows.append(row)
-            sanitized_workloads.append(dict(w, readiness="WAITING_FOR_SNAPSHOT"))
+            sanitized_workloads.append(dict(w, readiness=snapshot_status))
             continue
-        if not paths:
+        if not paths and not data.get("snapshotOnly"):
             row.update({"snapshotStatus": "BLOCKED", "extractionStatus": "BLOCKED", "buildStatus": "BLOCKED",
                         "reason": "live scan did not define applicationPaths"})
             blockers.append("%s: live scan applicationPaths are required" % name)
             capture_rows.append(row)
             continue
+        if not paths and data.get("snapshotOnly"):
+            row.update({"extractionStatus": "NEEDS_LIVE_SCAN_PATHS", "buildStatus": "WAITING_FOR_EXTRACTION_PATHS"})
         row.update({
             "snapshotStatus": snapshot_status, "snapshotIds": snapshot_ids,
             "snapshotNames": snapshot_names, "snapshotRegion": origin_region,
@@ -21607,7 +21715,7 @@ def r6_capture_sources_build():
         })
         capture_rows.append(row)
         clean = dict(w)
-        clean.update({"sourcePath": paths[0], "applicationPaths": paths, "excludedPaths": excluded_paths, "sourceChecksum": checksum, "sourceLineage": row["lineage"]})
+        clean.update({"sourcePath": (paths[0] if paths else ""), "applicationPaths": paths, "excludedPaths": excluded_paths, "sourceChecksum": checksum, "sourceLineage": row["lineage"]})
         sanitized_workloads.append(clean)
 
     if approved_count == 0:
@@ -21617,16 +21725,35 @@ def r6_capture_sources_build():
 
     if not dry_run:
         snapshots_path.write_text(_json.dumps(snapshot_index, indent=2), encoding="utf-8")
+    try:
+        refreshed_origin_snapshots = _r6_origin_snapshot_inventory()
+    except Exception:
+        refreshed_origin_snapshots = origin_snapshots
+    snapshot_pairs = [
+        {
+            "component": r.get("component"),
+            "sourceVm": r.get("sourceVm"),
+            "snapshotStatus": r.get("snapshotStatus"),
+            "snapshotIds": r.get("snapshotIds") or [],
+            "snapshotNames": r.get("snapshotNames") or [],
+            "verifiedLatest": bool((r.get("snapshotIds") or []) and r.get("verifiedLatest") is not False),
+            "readyForExtract": bool((r.get("snapshotIds") or []) and r.get("verifiedLatest") is not False),
+        }
+        for r in capture_rows
+        if r.get("containerizationApproved")
+    ]
     capture = {
         "id": "r6-source-capture-%s" % stamp, "generatedAt": stamp,
         "approvedCount": approved_count, "reusedSnapshots": reused_count,
-        "createdSnapshots": created_count, "components": capture_rows, "blockers": [],
+        "createdSnapshots": created_count, "verifiedSnapshots": verified_count,
+        "missingSnapshots": missing_count, "components": capture_rows, "snapshotPairs": snapshot_pairs, "blockers": [],
         "snapshotMode": "OPENSTACK_CLI",
         "snapshotAction": snapshot_action,
-        "handoffStage": "9A_BUILD_VM_SNAPSHOTS",
+        "handoffStage": "9A_CREATE_AND_VERIFY_FRESH_VM_SNAPSHOTS",
         "nextStage": "9B_EXTRACT_VM_DATA",
         "originRegion": origin_region,
-        "discoveredSnapshots": origin_snapshots,
+        "discoveredSnapshots": refreshed_origin_snapshots,
+        "discoveredServers": origin_servers,
         "snapshotIndexPath": ("<dry-run:not-written>" if dry_run else str(snapshots_path)),
         "dryRun": dry_run,
     }
@@ -21659,6 +21786,50 @@ def r6_capture_sources_build():
         except Exception as exc:
             body.setdefault("bundle_validation", {}).setdefault("warnings", []).append("source capture evidence write failed: %s" % exc)
     return jsonify(body), status
+
+
+@app.post("/api/r6/validate-snapshot-matches")
+def r6_validate_snapshot_matches():
+    """Persist user-validated Stage 9A snapshot selections into the source-capture snapshot index."""
+    data = request.get_json(silent=True) or {}
+    matches = data.get("matches") if isinstance(data.get("matches"), list) else []
+    state_root = Path(os.environ.get("R6_CAPTURE_STATE_DIR") or (Path(os.path.expanduser("~")) / ".config" / "opencenter" / "r6" / "source-captures"))
+    snapshots_path = state_root / "snapshot-index.json"
+    state_root.mkdir(parents=True, exist_ok=True)
+    try:
+        snapshot_index = json.loads(snapshots_path.read_text(encoding="utf-8")) if snapshots_path.exists() else {}
+    except Exception:
+        snapshot_index = {}
+    saved: List[Dict[str, Any]] = []
+    errors: List[str] = []
+    for row in matches:
+        if not isinstance(row, dict):
+            continue
+        component = str(row.get("component") or "").strip()
+        source_vm = str(row.get("sourceVm") or "").strip()
+        checksum = str(row.get("sourceChecksum") or "").strip()
+        snapshot_id = str(row.get("snapshotId") or "").strip()
+        snapshot_name = str(row.get("snapshotName") or "").strip()
+        snapshot_kind = str(row.get("snapshotKind") or "vm_image_snapshot").strip() or "vm_image_snapshot"
+        if not (component and source_vm and checksum and snapshot_id):
+            errors.append("%s: component/source/checksum/snapshotId required" % (component or "unknown"))
+            continue
+        cache_key = "%s:%s:%s" % (source_vm, component, checksum[:16])
+        snapshot_index[cache_key] = {
+            "component": component,
+            "sourceVm": source_vm,
+            "snapshotKind": snapshot_kind,
+            "snapshotIds": [snapshot_id],
+            "snapshotNames": [snapshot_name] if snapshot_name else [],
+            "sourceChecksum": checksum,
+            "createdAt": time.strftime("%Y%m%d_%H%M%S"),
+            "status": "USER_VALIDATED",
+        }
+        saved.append({"component": component, "sourceVm": source_vm, "snapshotId": snapshot_id, "snapshotName": snapshot_name})
+    if errors:
+        return jsonify({"ok": False, "error": "; ".join(errors), "saved": saved}), 400
+    snapshots_path.write_text(json.dumps(snapshot_index, indent=2), encoding="utf-8")
+    return jsonify({"ok": True, "saved": saved, "snapshotIndexPath": str(snapshots_path)}), 200
 
 
 @app.post("/api/r6/generate-bundle")
