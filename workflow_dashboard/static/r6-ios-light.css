@@ -265,3 +265,165 @@ body.flex-skyline-mode #s2r6ace-pane#s2r6ace-pane button:disabled{
 #s2r6ace-pane .r6p-failed-checks td:last-child .r6p-btn{display:block!important;margin:0 0 6px 0!important;white-space:nowrap}
 #s2r6ace-pane .r6p-failed-checks td:nth-child(4){min-width:280px}
 #s2r6ace-pane .r6p-failed-checks td:nth-child(5){min-width:160px}
+
+/* R6 iOS full-pane hardening pass — presentation only, scoped to R6. */
+#s2r6ace-pane,
+#s2r6ace-pane input,
+#s2r6ace-pane select,
+#s2r6ace-pane button,
+#s2r6ace-pane textarea{
+  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","SF Pro Text","Helvetica Neue",Arial,sans-serif!important;
+}
+#s2r6ace-pane .r6p-stage-body-inner,
+#s2r6ace-pane .r6p-stage-body,
+#s2r6ace-pane .r6p-stages{
+  background:var(--ios-grouped)!important;
+}
+#s2r6ace-pane .r6p-stage-body-inner > div,
+#s2r6ace-pane .r6p-stage-body-inner > section,
+#s2r6ace-pane .r6p-stage-body-inner [style*="border:1px solid #bfdbfe"],
+#s2r6ace-pane .r6p-stage-body-inner [style*="border:1px solid #e2e8f0"],
+#s2r6ace-pane .r6p-stage-body-inner [style*="background:#f8fafc"],
+#s2r6ace-pane .r6p-stage-body-inner [style*="background:#fff"]{
+  background:rgba(255,255,255,.96)!important;
+  border-color:rgba(60,60,67,.16)!important;
+  border-radius:18px!important;
+  box-shadow:0 1px 2px rgba(0,0,0,.04),0 10px 28px rgba(0,0,0,.06)!important;
+}
+#s2r6ace-pane .r6p-stage-body-inner [style*="font-size:14px;font-weight:900"],
+#s2r6ace-pane .r6p-stage-title,
+#s2r6ace-pane h1,
+#s2r6ace-pane h2,
+#s2r6ace-pane h3{
+  color:var(--ios-label)!important;
+  letter-spacing:-.02em!important;
+  font-weight:800!important;
+}
+#s2r6ace-pane .r6p-stage-body-inner [style*="color:#475569"],
+#s2r6ace-pane .r6p-stage-body-inner [style*="color:#64748b"],
+#s2r6ace-pane small{
+  color:var(--ios-secondary)!important;
+}
+#s2r6ace-pane .r6p-btn,
+#s2r6ace-pane button{
+  border-radius:11px!important;
+  min-height:34px;
+  font-weight:800!important;
+  box-shadow:none!important;
+}
+#s2r6ace-pane .r6p-btn.primary,
+#s2r6ace-pane button.r6p-btn.primary{
+  background:var(--ios-blue-accessible)!important;
+  color:#fff!important;
+  border-color:var(--ios-blue-accessible)!important;
+}
+#s2r6ace-pane .r6p-btn.success,
+#s2r6ace-pane button.r6p-btn.success{
+  background:var(--ios-green-accessible)!important;
+  color:#fff!important;
+  border-color:var(--ios-green-accessible)!important;
+}
+#s2r6ace-pane .r6p-btn.secondary,
+#s2r6ace-pane button.r6p-btn.secondary,
+#s2r6ace-pane .r6p-hero-btn{
+  background:#fff!important;
+  color:var(--ios-blue-accessible)!important;
+  border:1px solid rgba(0,122,255,.28)!important;
+}
+#s2r6ace-pane input,
+#s2r6ace-pane select,
+#s2r6ace-pane textarea{
+  background:#fff!important;
+  border:1px solid var(--ios-separator)!important;
+  border-radius:11px!important;
+  color:var(--ios-label)!important;
+  min-height:34px;
+  outline:none!important;
+}
+#s2r6ace-pane input:focus,
+#s2r6ace-pane select:focus,
+#s2r6ace-pane textarea:focus{
+  border-color:var(--ios-blue)!important;
+  box-shadow:0 0 0 4px rgba(0,122,255,.14)!important;
+}
+#s2r6ace-pane .r6p-table,
+#s2r6ace-pane table{
+  background:#fff!important;
+  border-collapse:separate!important;
+  border-spacing:0!important;
+  border-radius:16px!important;
+  overflow:hidden!important;
+  border:1px solid rgba(60,60,67,.16)!important;
+}
+#s2r6ace-pane .r6p-table th,
+#s2r6ace-pane table th{
+  background:var(--ios-grouped)!important;
+  color:var(--ios-secondary)!important;
+  text-transform:uppercase!important;
+  letter-spacing:.035em!important;
+  font-size:10px!important;
+  font-weight:850!important;
+  border-bottom:1px solid var(--ios-separator)!important;
+}
+#s2r6ace-pane .r6p-table td,
+#s2r6ace-pane table td{
+  border-bottom:1px solid rgba(60,60,67,.12)!important;
+  color:var(--ios-label)!important;
+}
+#s2r6ace-pane .r6p-table tr:hover td,
+#s2r6ace-pane table tr:hover td{
+  background:rgba(0,122,255,.035)!important;
+}
+#s2r6ace-pane .r6p-terminal,
+#s2r6ace-pane pre[data-terminal-output]{
+  background:#1c1c1e!important;
+  color:#30d158!important;
+  border:1px solid rgba(60,60,67,.32)!important;
+  border-radius:16px!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.05),0 10px 30px rgba(0,0,0,.10)!important;
+  font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace!important;
+}
+#s2r6ace-pane #r6p-stage9b-cards{
+  display:grid!important;
+  grid-template-columns:repeat(auto-fit,minmax(300px,1fr))!important;
+  gap:14px!important;
+  min-width:0!important;
+  align-items:stretch!important;
+}
+#s2r6ace-pane #r6p-stage9b-cards > div{
+  background:rgba(255,255,255,.96)!important;
+  border:1px solid rgba(60,60,67,.16)!important;
+  border-radius:18px!important;
+  box-shadow:0 8px 24px rgba(0,0,0,.07)!important;
+  min-width:0!important;
+  overflow:hidden!important;
+}
+#s2r6ace-pane #r6p-stage9b-cards span,
+#s2r6ace-pane span[style*="READY"],
+#s2r6ace-pane span[style*="SNAPSHOT_READY"],
+#s2r6ace-pane span[style*="VERIFIED_LATEST"]{
+  max-width:100%;
+}
+#s2r6ace-pane #r6p-stage9b-cards > div > div:first-child > div:first-child{
+  min-width:0!important;
+  overflow-wrap:anywhere!important;
+  word-break:break-word!important;
+  max-width:calc(100% - 78px)!important;
+}
+@media (max-width:760px){
+  #s2r6ace-pane .r6p-summary{grid-template-columns:1fr!important;}
+  #s2r6ace-pane .r6p-stage-body-inner{padding:12px!important;}
+  #s2r6ace-pane #r6p-stage9b-cards{grid-template-columns:1fr!important;}
+}
+
+
+
+@keyframes r6p-ios-extract-pulse {
+  0%, 100% { box-shadow: 0 8px 24px rgba(255,149,0,.14); transform: translateY(0); }
+  50% { box-shadow: 0 10px 30px rgba(255,149,0,.38); border-color: #FF9500; transform: translateY(-1px); }
+}
+#s2r6ace-pane .r6p-stage9b-extraction-card { transition: background-color .2s ease, border-color .2s ease, box-shadow .2s ease; }
+#s2r6ace-pane .r6p-stage9b-card-ready { background: #EAF4FF; }
+#s2r6ace-pane .r6p-stage9b-card-extracting { background: #FFF4E5; }
+#s2r6ace-pane .r6p-stage9b-card-extracted { background: #E8F8EE; }
+#s2r6ace-pane .r6p-stage9b-card-failed { background: #FFECEB; }

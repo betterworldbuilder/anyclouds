@@ -1,10 +1,16 @@
   <div class="panel" id="panel-s0">
     <div style="padding:20px 16px; width:100%; box-sizing:border-box; margin:0 auto; overflow:auto; height:100%; background:#f8fafc;">
+      <!-- Shared migration-request workspace. The OSPC customer mockup embeds this
+           exact live DOM via ?stage=s0&only=migration_request, so both pages use one engine. -->
+      <div id="migration-request-workspace">
       <!-- Migration to FLEX Request Panel -->
       <div id="mig-flex-req-panel" style="background:#fff;border:1px solid #c7d2fe;border-radius:12px;margin-bottom:18px;overflow:hidden;box-shadow:0 4px 20px rgba(79,70,229,.12);">
         <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 20px;background:linear-gradient(135deg,#1e1b4b,#4f46e5);">
           <div style="font-size:14px;font-weight:900;color:#fff;letter-spacing:.06em;">🚀 New Migration Project</div>
-          <button onclick="var p=document.getElementById('mfr-body');p.style.display=p.style.display==='none'?'flex':'none'" style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;border-radius:6px;padding:4px 14px;font-size:12px;font-weight:700;cursor:pointer;">▼ Expand</button>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <button onclick="var f=document.getElementById('inline-mig-form');var willOpen=f.style.display==='none';f.style.display=willOpen?'block':'none';if(willOpen){if(typeof imfMountBusinessSystems==='function')imfMountBusinessSystems();f.scrollIntoView({behavior:'smooth',block:'start'});}" style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;border-radius:6px;padding:4px 14px;font-size:12px;font-weight:700;cursor:pointer;">+ New Request</button>
+            <button onclick="var p=document.getElementById('mfr-body');var willOpen=p.style.display==='none';p.style.display=willOpen?'flex':'none';if(willOpen&&typeof mfrMountBusinessSystems==='function')mfrMountBusinessSystems();" style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;border-radius:6px;padding:4px 14px;font-size:12px;font-weight:700;cursor:pointer;">▼ Expand</button>
+          </div>
         </div>
         <div id="mfr-body" style="display:none;flex-direction:column;">
           <!-- Form bar -->
@@ -23,13 +29,16 @@
             <div style="display:flex;flex-direction:column;gap:3px;min-width:110px;"><label style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;">Completion Date</label><input id="mfr-end" type="date" style="border:1px solid #d1d5db;border-radius:5px;padding:6px 9px;font-size:12px;"></div>
             <div style="display:flex;flex-direction:column;gap:3px;flex:3;min-width:150px;"><label style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;">Notes</label><input id="mfr-notes" type="text" placeholder="Compliance, cutover window…" style="border:1px solid #d1d5db;border-radius:5px;padding:6px 9px;font-size:12px;"></div>
           </div>
-          <!-- Business Systems iframe -->
-          <div style="flex:1;min-height:520px;border-bottom:1px solid #e2e8f0;">
-            <iframe src="/?only=biz_cards&stage=s4" style="display:block;width:100%;height:560px;border:0;" title="Business Systems"></iframe>
+          <!-- Business systems — the real #uatS1SystemsView engine (same cards, same
+               Business System Templates gallery, same Automatic Business System Mapping
+               button as Stage 2) gets re-parented in here via fsmMountBusinessSystemEngineTo,
+               not a hand-rebuilt copy of it. -->
+          <div style="flex:1;padding:14px 20px;border-bottom:1px solid #e2e8f0;">
+            <div id="mfr-sys-cards"></div>
           </div>
           <!-- Actions -->
           <div style="display:flex;justify-content:flex-end;gap:10px;padding:12px 20px;background:#f8fafc;">
-            <button onclick="document.getElementById('mfr-body').style.display='none'" style="background:#f1f5f9;color:#475569;border:1px solid #d1d5db;border-radius:7px;padding:9px 20px;font-size:13px;font-weight:700;cursor:pointer;">Cancel</button>
+            <button onclick="document.getElementById('mfr-body').style.display='none';if(typeof mfrRestoreBusinessSystems==='function')mfrRestoreBusinessSystems();" style="background:#f1f5f9;color:#475569;border:1px solid #d1d5db;border-radius:7px;padding:9px 20px;font-size:13px;font-weight:700;cursor:pointer;">Cancel</button>
             <button onclick="submitMfrPanel()" style="background:linear-gradient(135deg,#4f46e5,#0284c7);color:#fff;border:none;border-radius:7px;padding:9px 24px;font-size:13px;font-weight:900;cursor:pointer;">➕ Add to Migration Log</button>
           </div>
         </div>
@@ -40,8 +49,7 @@
         <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 20px;background:linear-gradient(135deg,#0c4a6e,#1e40af);">
           <div style="font-size:14px;font-weight:900;color:#fff;text-transform:uppercase;letter-spacing:.07em;">🚀 Customer Migration Request</div>
           <div style="display:flex;gap:8px;align-items:center;">
-            <button onclick="loadMigWaitingList()" style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;border-radius:6px;padding:4px 14px;font-size:12px;font-weight:700;cursor:pointer;">⟳ Refresh</button>
-            <button onclick="document.getElementById('inline-mig-form').style.display=document.getElementById('inline-mig-form').style.display==='none'?'block':'none'" style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;border-radius:6px;padding:4px 14px;font-size:12px;font-weight:700;cursor:pointer;">+ New Request</button>
+            <button onclick="openAnotherMigrationRequest()" style="background:linear-gradient(135deg,#dcfce7,#86efac);border:1px solid #4ade80;color:#14532d;border-radius:7px;padding:7px 16px;font-size:12px;font-weight:900;cursor:pointer;box-shadow:0 4px 12px rgba(34,197,94,.22);">＋ Add another Migration Request</button>
           </div>
         </div>
         <!-- Inline quick-add form -->
@@ -58,7 +66,14 @@
             <div style="display:flex;flex-direction:column;gap:3px;min-width:110px;"><label style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;">Start Date</label><input id="imf-start" type="date" style="border:1px solid #d1d5db;border-radius:5px;padding:6px 9px;font-size:12px;"></div>
             <div style="display:flex;flex-direction:column;gap:3px;min-width:110px;"><label style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;">Completion</label><input id="imf-end" type="date" style="border:1px solid #d1d5db;border-radius:5px;padding:6px 9px;font-size:12px;"></div>
             <div style="display:flex;flex-direction:column;gap:3px;flex:3;min-width:150px;"><label style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;">Notes</label><input id="imf-notes" type="text" placeholder="Compliance, cutover window…" style="border:1px solid #d1d5db;border-radius:5px;padding:6px 9px;font-size:12px;"></div>
-            <button onclick="submitInlineMigRequest()" style="background:linear-gradient(135deg,#0284c7,#4f46e5);color:#fff;border:none;border-radius:6px;padding:8px 18px;font-size:12px;font-weight:900;cursor:pointer;white-space:nowrap;height:32px;align-self:flex-end;">📨 Submit</button>
+            <button id="imf-cancel-btn" onclick="document.getElementById('inline-mig-form').style.display='none';if(typeof mfrRestoreBusinessSystems==='function')mfrRestoreBusinessSystems();" style="background:#f1f5f9;color:#475569;border:1px solid #d1d5db;border-radius:6px;padding:8px 18px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;height:32px;align-self:flex-end;">Cancel</button>
+            <button id="imf-submit-btn" onclick="submitInlineMigRequest()" style="background:linear-gradient(135deg,#0284c7,#4f46e5);color:#fff;border:none;border-radius:6px;padding:8px 18px;font-size:12px;font-weight:900;cursor:pointer;white-space:nowrap;height:32px;align-self:flex-end;">📨 Submit</button>
+          </div>
+          <!-- Business systems to attach to this request — the real #uatS1SystemsView
+               engine (same cards, templates gallery, Automatic Business System Mapping
+               button as Stage 2) gets re-parented in here, not a hand-rebuilt copy. -->
+          <div style="margin-top:14px;padding-top:12px;border-top:1px solid #bae6fd;">
+            <div id="imf-sys-cards"></div>
           </div>
         </div>
         <!-- Waiting list rows -->
@@ -84,6 +99,7 @@
         <!-- Business systems cards -->
         <div id="wld-systems" style="padding:16px 20px;display:grid;grid-template-columns:1fr;gap:12px;"></div>
         <div id="wld-empty" style="display:none;padding:30px;text-align:center;color:#94a3b8;font-size:13px;">No business systems recorded in this request. Use 🔄 Sync Business Systems to add systems from the UAT stage.</div>
+      </div>
       </div>
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
         <div>

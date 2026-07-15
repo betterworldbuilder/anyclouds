@@ -112,7 +112,7 @@
       </div>
 
       <!-- ── OpenCenter Quick Start Guide (collapsed) ── -->
-      <div style="margin-bottom:18px;border:2px solid #38bdf8;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(14,165,233,.2);">
+      <div id="ocqs-outer-wrap" style="margin-bottom:18px;border:2px solid #38bdf8;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(14,165,233,.2);">
         <div id="ocqs-inline-toggle" onclick="(function(){var b=document.getElementById('ocqs-inline-body');var a=document.getElementById('ocqs-inline-arrow');var open=b.style.display!=='none';b.style.display=open?'none':'block';a.textContent=open?'▶':'▼';})()" style="display:flex;align-items:center;justify-content:space-between;padding:14px 20px;background:linear-gradient(135deg,#0369a1,#0ea5e9,#38bdf8);cursor:pointer;user-select:none;">
           <div style="display:flex;align-items:center;gap:12px;">
             <span style="font-size:20px;">🚀</span>
@@ -225,7 +225,7 @@
               <tr><td><strong>OpenCenter CLI</strong></td><td><code>opencenter version</code></td><td><span id="ocqs-req-cli" class="ocqs-badge-missing">Missing</span></td></tr>
               <tr><td><strong>Git</strong></td><td><code>git --version</code></td><td><span id="ocqs-req-git" class="ocqs-badge-missing">Missing</span></td></tr>
               <tr><td><strong>GitHub/GitLab repo</strong></td><td>opencenter-my-cluster-gitops</td><td><span id="ocqs-req-repo" class="ocqs-badge-missing">Missing</span></td></tr>
-              <tr><td><strong>Git token</strong></td><td>~/.config/opencenter/tokens/git-token.txt</td><td><span id="ocqs-req-token" class="ocqs-badge-missing">Missing</span></td></tr>
+              <tr><td><strong>Git credential</strong></td><td>OpenCenter SSH key (token fallback)</td><td><span id="ocqs-req-token" class="ocqs-badge-missing">Missing</span></td></tr>
               <tr><td><strong>OpenStack App Cred ID</strong></td><td>from Horizon / App Credentials</td><td><span id="ocqs-req-credid" class="ocqs-badge-missing">Missing</span></td></tr>
               <tr><td><strong>OpenStack App Cred Secret</strong></td><td>from Horizon / App Credentials</td><td><span id="ocqs-req-credsec" class="ocqs-badge-missing">Missing</span></td></tr>
               <tr><td><strong>Region</strong></td><td>dfw3, sjc3, iad3</td><td><span id="ocqs-req-region" class="ocqs-badge-missing">Missing</span></td></tr>
@@ -402,10 +402,10 @@
             <label class="ocqs-label">Git Provider</label>
             <select class="ocqs-select" id="ocqs-gitprovider" onchange="ocqsUpdate()"><option value="github" selected>GitHub</option><option value="gitlab">GitLab</option><option value="other">Other HTTPS Git</option></select>
             <label class="ocqs-label" style="margin-top:8px;">GitOps Repository URL</label>
-            <input class="ocqs-input" id="ocqs-gitrepo" placeholder="https://github.com/YOUR_USER/opencenter-my-cluster-gitops.git" oninput="ocqsUpdate();ocqsReqCheck()">
+            <input class="ocqs-input" id="ocqs-gitrepo" placeholder="ssh://git@github.com/YOUR_USER/opencenter-my-cluster-gitops.git" oninput="ocqsUpdate();ocqsReqCheck()">
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px;">
               <div><label class="ocqs-label">Git Branch</label><input class="ocqs-input" id="ocqs-gitbranch" value="main" oninput="ocqsUpdate()"></div>
-              <div><label class="ocqs-label">Git Auth Method</label><select class="ocqs-select" id="ocqs-gitauth" onchange="ocqsUpdate();ocqsReqCheck()"><option value="ssh" selected>SSH key (git@ push)</option><option value="token">HTTPS token</option></select></div>
+              <div><label class="ocqs-label">Git Auth Method</label><select class="ocqs-select" id="ocqs-gitauth" onchange="ocqsUpdate();ocqsReqCheck()"><option value="token" selected>HTTPS token (default)</option><option value="ssh">SSH key (optional)</option></select></div>
             </div>
             <div id="ocqs-auth-token-fields">
               <label class="ocqs-label" style="margin-top:8px;">Token File Path</label>
@@ -415,8 +415,8 @@
             </div>
             <div id="ocqs-auth-ssh-fields">
               <label class="ocqs-label" style="margin-top:8px;">SSH Key Path <span style="color:#64748b;font-size:10px;">(for SSH auth — used in git push)</span></label>
-              <input class="ocqs-input" id="ocqs-sshkey" value="~/.ssh/id_rsa" oninput="ocqsUpdate()">
-              <div style="font-size:11px;color:#64748b;margin-top:4px;">Ensure the corresponding public key is added to your GitHub account.</div>
+              <input class="ocqs-input" id="ocqs-sshkey" placeholder="OpenCenter generated cluster SSH key" oninput="ocqsUpdate();ocqsReqCheck()">
+              <div style="font-size:11px;color:#64748b;margin-top:4px;">Defaults to the SSH key generated for this OpenCenter cluster. Add the corresponding <code>.pub</code> key to the Git provider as a deploy key.</div>
             </div>
             <label class="ocqs-label" style="margin-top:10px;">GitOps Repo Folder <span style="color:#64748b;font-size:10px;">(local generated repo — leave blank for default)</span></label>
             <input class="ocqs-input" id="ocqs-gitopsfolder" placeholder="/home/dzoan/.config/opencenter/clusters/gitops/my-org" oninput="ocqsUpdate()" style="font-size:11px;">
@@ -459,6 +459,31 @@
         }
         return raw;
       };
+      window.ocGitSSHURL = function(repo){
+        var raw = String(repo || '').trim();
+        if(!raw) return '';
+        if(/^ssh:\/\//i.test(raw)) return raw;
+        var scp = raw.match(/^git@([^:]+):(.+)$/i);
+        if(scp) return 'ssh://git@' + scp[1] + '/' + scp[2];
+        var web = raw.match(/^https?:\/\/([^/]+)\/(.+)$/i);
+        if(web) return 'ssh://git@' + web[1] + '/' + web[2];
+        return raw;
+      };
+      window.ocGitHTTPSURL = function(repo){
+        var raw = String(repo || '').trim();
+        if(!raw) return '';
+        if(/^https:\/\//i.test(raw)) return raw;
+        var ssh = raw.match(/^ssh:\/\/git@([^/]+)\/(.+)$/i);
+        if(ssh) return 'https://' + ssh[1] + '/' + ssh[2];
+        var scp = raw.match(/^git@([^:]+):(.+)$/i);
+        if(scp) return 'https://' + scp[1] + '/' + scp[2];
+        return raw;
+      };
+      window.ocOpenCenterSSHKey = function(prefix){
+        var org = _v(prefix + '-org') || 'my-org';
+        var cluster = _v(prefix + '-cluster') || 'my-cluster';
+        return '/home/dzoan/.config/opencenter/clusters/secrets/' + org + '/' + cluster + '/ssh/' + cluster;
+      };
       window._ocqsSensitiveMasked = true;
       window.ocqsToggleSensitiveMask = function(force){
         var masked = (typeof force === 'boolean') ? force : !window._ocqsSensitiveMasked;
@@ -490,9 +515,9 @@
             projectId:_v('ocqs-projectid'), credId:_v('ocqs-credid'), credSec:_v('ocqs-credsec'),
             floatNet:_v('ocqs-floatnet'), networkId:_v('ocqs-networkid'), subnetId:_v('ocqs-subnetid'),
             gitRepo:_v('ocqs-gitrepo'), gitBranch:_v('ocqs-gitbranch')||'main',
-            gitAuth:_v('ocqs-gitauth')||'ssh', gitopsFolder:_v('ocqs-gitopsfolder'),
+            gitAuth:_v('ocqs-gitauth')||'token', gitopsFolder:_v('ocqs-gitopsfolder'),
             tokFile:_v('ocqs-tokfile')||'/home/dzoan/.config/opencenter/tokens/git-token.txt',
-            tokVal:_v('ocqs-tokval'), sshKey:_v('ocqs-sshkey')||'~/.ssh/id_rsa', services:_svcs
+            tokVal:_v('ocqs-tokval'), sshKey:_v('ocqs-sshkey')||ocOpenCenterSSHKey('ocqs'), services:_svcs
           };
         }catch(e){return {};}
       };
@@ -507,7 +532,7 @@
             userDomain:s.userDomain,projDomain:s.projDomain,projectId:s.projectId,
             credId:s.credId,credSec:s.credSec,
             floatNet:s.floatNet,networkId:s.networkId,subnetId:s.subnetId,
-            gitRepo:s.gitRepo,gitBranch:s.gitBranch,gitAuth:s.gitAuth,gitopsFolder:s.gitopsFolder,tokFile:s.tokFile,tokVal:s.tokVal,
+            gitRepo:s.gitRepo,gitBranch:s.gitBranch,gitAuth:s.gitAuth,gitopsFolder:s.gitopsFolder,tokFile:s.tokFile,tokVal:s.tokVal,sshKey:s.sshKey,
             services:(window._qs&&window._qs.services)||s.services||{}
           }));
         }catch(e){}
@@ -883,7 +908,7 @@
           if(d.username||d.password||d.authUrl){
             localStorage.setItem('ocqs_creds_v2', JSON.stringify(d));
             // Also update ocqs_state so _ocqsRestore picks up credentials
-            try{ var st=JSON.parse(localStorage.getItem('ocqs_state')||'{}'); st.password=d.password; st.username=d.username; st.authUrl=d.authUrl; st.region=d.region; st.userDomain=d.userDomain; st.projDomain=d.projDomain; st.projectId=d.projectId; st.floatNet=d.floatNet; st.networkId=d.networkId; st.subnetId=d.subnetId; st.gitRepo=d.gitRepo; st.tokVal=d.tokVal; localStorage.setItem('ocqs_state',JSON.stringify(st)); }catch(e){}
+            try{ var st=JSON.parse(localStorage.getItem('ocqs_state')||'{}'); st.password=d.password; st.username=d.username; st.authUrl=d.authUrl; st.region=d.region; st.userDomain=d.userDomain; st.projDomain=d.projDomain; st.projectId=d.projectId; st.floatNet=d.floatNet; st.networkId=d.networkId; st.subnetId=d.subnetId; st.gitRepo=d.gitRepo; st.gitAuth=d.gitAuth||'token'; st.sshKey=d.sshKey; st.tokVal=d.tokVal; localStorage.setItem('ocqs_state',JSON.stringify(st)); }catch(e){}
           }
         }catch(e){}
       };
@@ -893,6 +918,7 @@
         try{
           var d = JSON.parse(localStorage.getItem('ocqs_creds_v2')||'null');
           if(!d) return;
+          if(d.sshKey === '~/.ssh/id_rsa') d.sshKey = '';
           Object.keys(d).forEach(function(k){
             var map = {authType:'ocqs-authtype',authUrl:'ocqs-authurl',region:'ocqs-region',
               username:'ocqs-username',password:'ocqs-password',userDomain:'ocqs-userdomain',
@@ -1241,7 +1267,7 @@ opencenter cluster validate my-cluster</div>
             <span class="ocqs-status ocqs-s-idle" id="ocqs-st-6">Not Started</span>
           </div>
           <p>Validates provider credentials, GitOps settings, services, secrets, and required fields. <strong>Do not deploy until this passes.</strong></p>
-          <div class="ocqs-cmd" id="ocqs-cmd-6">opencenter cluster validate my-cluster</div>
+          <div class="ocqs-cmd" id="ocqs-cmd-6">opencenter cluster validate my-org/my-cluster</div>
           <button class="ocqs-btn ocqs-btn-copy" onclick="ocqsCopyCmd('ocqs-cmd-6','ocqs-st-6')">📋 Copy</button><button id="ocqs-run-6" onclick="ocqsRunCmd('ocqs-cmd-6','ocqs-out-6','ocqs-run-6')" style="background:#1e3a5f;color:#7dd3fc;border:1px solid #334155;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#9654; Run</button><button onclick="ocqsCopyOut('ocqs-out-6',this)" style="background:#334155;color:#cbd5e1;border:1px solid #475569;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#128203; Copy Output</button>
           <div id="ocqs-out-6" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#00ff41;white-space:pre-wrap;word-break:break-all;max-height:240px;overflow-y:auto;margin-top:6px;">$ waiting...
           </div>
@@ -1296,7 +1322,7 @@ git push -u origin main</div>
               <tr><td><strong>SOPS age private key</strong></td><td style="font-size:11px;"><code>~/.config/opencenter/clusters/secrets/&lt;org&gt;/&lt;cluster&gt;/age/keys/&lt;cluster&gt;-key.txt</code></td><td style="font-size:12px;">Encrypts/decrypts all service secrets (secrets sync, Flux SOPS)</td><td style="font-size:11px;">cluster init</td></tr>
               <tr><td><strong>SOPS age public key</strong></td><td style="font-size:11px;"><code>same dir, &lt;cluster&gt;-key.pub</code></td><td style="font-size:12px;">Encryption recipient for new secrets</td><td style="font-size:11px;">cluster init</td></tr>
               <tr><td><strong>Cluster node SSH keypair</strong></td><td style="font-size:11px;"><code>~/.config/opencenter/clusters/secrets/&lt;org&gt;/&lt;cluster&gt;/ssh/&lt;cluster&gt; + .pub</code></td><td style="font-size:12px;">Injected into VMs; kubespray/Ansible node access</td><td style="font-size:11px;">cluster init</td></tr>
-              <tr><td><strong>GitOps SSH key</strong></td><td style="font-size:11px;"><code>~/.ssh/id_rsa + id_rsa.pub (gitops.auth.ssh)</code></td><td style="font-size:12px;">Git push + Flux bootstrap deploy key (SSH auth mode)</td><td style="font-size:11px;">You</td></tr>
+              <tr><td><strong>GitOps SSH key</strong></td><td style="font-size:11px;"><code>clusters/secrets/&lt;org&gt;/&lt;cluster&gt;/ssh/&lt;cluster&gt;[.pub]</code></td><td style="font-size:12px;">OpenCenter-generated key pair for Git push + Flux bootstrap (default)</td><td style="font-size:11px;">OpenCenter</td></tr>
               <tr><td><strong>SOPS config</strong></td><td style="font-size:11px;"><code>.sops.yaml in gitops repo</code></td><td style="font-size:12px;">Maps files to encryption keys</td><td style="font-size:11px;">cluster generate</td></tr>
               <tr><td><strong>Generated GitOps repo</strong></td><td style="font-size:11px;"><code>~/.config/opencenter/clusters/gitops/&lt;org&gt;/ (infra .tf, Flux kustomizations, helm overrides)</code></td><td style="font-size:12px;">Desired state deploy reconciles from &mdash; must be committed &amp; pushed</td><td style="font-size:11px;">cluster generate</td></tr>
               <tr><td><strong>Encrypted service secrets</strong></td><td style="font-size:11px;"><code>gitops repo: applications/overlays/&lt;cluster&gt;/services/*/secret.yaml</code></td><td style="font-size:12px;">Per-service credentials, SOPS-encrypted, applied by Flux</td><td style="font-size:11px;">secrets sync</td></tr>
@@ -1971,6 +1997,7 @@ kubectl describe kustomization &lt;name&gt; -n flux-system</div>
           <button class="oct-mini" onclick="ocqsAutoRunAll()" id="ocqs-autorun-btn2" style="background:#0284c7;color:#fff;border-color:#0284c7;">&#9889; AutoRun</button>
           <button class="oct-mini" onclick="ocqsAutoRestart()" style="background:#475569;color:#fff;border-color:#475569;">&#8635; Restart</button>
           <button class="oct-mini" onclick="var t=document.getElementById('ocqs-term');if(t)t.innerHTML='';">Clear</button>
+          <button class="oct-mini" onclick="octCopyLog('ocqs-term',this)" title="Copy all terminal output to the clipboard" style="background:#0f766e;color:#fff;border-color:#0f766e;">&#128203; Copy Log</button>
           <button class="oct-mini" onclick="document.getElementById('ocqs-term-float').classList.toggle('oct-min');this.textContent=this.textContent==='&#8722;'?'&#9634;':'&#8722;';">&#8722;</button>
         </div>
         <div class="oct-term-body" style="display:flex;flex-direction:column;flex:1;min-height:0;">
@@ -2073,6 +2100,49 @@ kubectl describe kustomization &lt;name&gt; -n flux-system</div>
           var ac = document.getElementById('ocqs-dstage-' + window._ocqsDsActive);
           if (ac) ac.querySelector('.ds-detail').textContent = tl.slice(0, 90);
         }
+      };
+
+      window.octCopyLog = async function(termId, button){
+        var out = document.getElementById(termId);
+        if (!out) return;
+        var pending = out._obuf && out._obuf.length ? out._obuf.join('\n') + '\n' : '';
+        var text = out.textContent || '';
+        if (pending && text && !text.endsWith('\n')) text += '\n';
+        text += pending;
+        var original = button ? button.innerHTML : '';
+        try {
+          if (navigator.clipboard && window.isSecureContext) {
+            await navigator.clipboard.writeText(text);
+          } else {
+            var area = document.createElement('textarea');
+            area.value = text;
+            area.setAttribute('readonly', '');
+            area.style.position = 'fixed';
+            area.style.left = '-9999px';
+            document.body.appendChild(area);
+            area.select();
+            if (!document.execCommand('copy')) throw new Error('Clipboard copy was rejected');
+            area.remove();
+          }
+          if (button) {
+            button.textContent = '✓ Copied';
+            button.style.background = '#15803d';
+            button.style.borderColor = '#15803d';
+          }
+        } catch (err) {
+          console.error('Copy terminal log failed', err);
+          if (button) {
+            button.textContent = 'Copy failed';
+            button.style.background = '#b91c1c';
+            button.style.borderColor = '#b91c1c';
+          }
+        }
+        setTimeout(function(){
+          if (!button) return;
+          button.innerHTML = original;
+          button.style.background = '#0f766e';
+          button.style.borderColor = '#0f766e';
+        }, 1600);
       };
       window.ocqsQuotaCheck = function(btn){
         var st = ocqsGetState();
@@ -2355,7 +2425,18 @@ kubectl describe kustomization &lt;name&gt; -n flux-system</div>
           setTrackLabel('STEP ' + (i+1) + '/' + steps.length + ': ' + steps[i].name.toUpperCase());
           ocqsVoice('Step ' + (i+1) + ' of ' + steps.length + ': ' + steps[i].name.replace(/-/g,' ') + '.');
           ocqsTermLine('', ''); ocqsTermLine('== STEP ' + (i+1) + '/' + steps.length + ' [' + steps[i].name + '] ==', 'hd');
-          var r = await runStepStream(steps[i]);
+          var r = '';
+          if (/^ocqs-cmd-(6|7|9)$/.test(steps[i].cmdId) && typeof ocqsApplyGitops === 'function'){
+            ocqsTermLine('Preparing the selected GitOps credential before validation...', 'dim');
+            var prepared = await ocqsApplyGitops(null);
+            if (!prepared || prepared.ok === false){
+              ocqsTermLine('[BLOCKED] ' + ((prepared && prepared.error) || 'GitOps credential could not be applied'), 'err');
+              r = 'fail';
+            } else {
+              ocqsTermLine('[READY] GitOps ' + (prepared.git_auth_mode || 'ssh') + ' credential is in the cluster config.', 'ok');
+            }
+          }
+          if (!r) r = await runStepStream(steps[i]);
           if (r === 'stop'){
             setStepStatus(i, 'skip'); skip++;
             ocqsTermLine('-- AutoRun stopped by user at [' + steps[i].name + '] --', 'hd');
@@ -2420,11 +2501,11 @@ kubectl describe kustomization &lt;name&gt; -n flux-system</div>
           subnetId: v('ocqs-subnetid'),
           gitRepo:v('ocqs-gitrepo'),
           gitBranch:v('ocqs-gitbranch')||'main',
-          gitAuth:v('ocqs-gitauth')||'ssh',
+          gitAuth:v('ocqs-gitauth')||'token',
           gitopsFolder:v('ocqs-gitopsfolder'),
           tokFile:v('ocqs-tokfile')||'/home/dzoan/.config/opencenter/tokens/git-token.txt',
           tokVal: v('ocqs-tokval'),
-          sshKey: v('ocqs-sshkey')||'~/.ssh/id_rsa',
+          sshKey: v('ocqs-sshkey')||ocOpenCenterSSHKey('ocqs'),
           services: _qs.services,
           svc: _qs.services
         };
@@ -2560,12 +2641,22 @@ kubectl describe kustomization &lt;name&gt; -n flux-system</div>
           }, 400);
         });
       }
-      window.ocqsRunCmd = function(cmdId, outId, btnId){
-        var cmd = ((document.getElementById(cmdId)||{}).textContent||'').trim();
-        if (!cmd) return;
+      window.ocqsRunCmd = async function(cmdId, outId, btnId){
         var out = document.getElementById(outId);
         var btn = document.getElementById(btnId);
         if (!out) return;
+        if (/^ocqs-cmd-(6|7|9)$/.test(cmdId) && typeof ocqsApplyGitops === 'function'){
+          out.textContent = '$ preparing GitOps credential for validation...\n';
+          var prepared = await ocqsApplyGitops(null);
+          if (!prepared || prepared.ok === false){
+            out.textContent += '[BLOCKED] ' + ((prepared && prepared.error) || 'GitOps credential could not be applied') + '\n';
+            out.style.borderColor = '#dc2626';
+            return;
+          }
+          out.textContent += '[READY] GitOps ' + (prepared.git_auth_mode || 'ssh') + ' credential applied.\n';
+        }
+        var cmd = ((document.getElementById(cmdId)||{}).textContent||'').trim();
+        if (!cmd) return;
         out.textContent = '$ ' + cmd + '\n'; if (window.octMirror){ octMirror('ocqs-term', ''); octMirror('ocqs-term', '$ ' + cmd); }
         if (btn) { btn.disabled = true; btn.textContent = '⏹ Stop'; btn.onclick = function(){ if(window._ocqsES) window._ocqsES.close(); btn.disabled=false; btn.textContent='▶ Run'; btn.onclick=function(){ ocqsRunCmd(cmdId,outId,btnId); }; }; }
         if (window._ocqsES) window._ocqsES.close();
@@ -2647,7 +2738,9 @@ kubectl describe kustomization &lt;name&gt; -n flux-system</div>
         _setLive('ocqs-live-grafana','grafana','ocqs-svc-grafana-url');
         if (window.ocqsAutoChecklist) ocqsAutoChecklist();
         var gitopsDefault = '/home/dzoan/.config/opencenter/clusters/gitops/'+s.org;
-        var gitopsPath = s.gitopsFolder || gitopsDefault;
+        var _customGitopsPath = String(s.gitopsFolder || '').trim();
+        var gitopsPath = /^(?:\/|~\/)/.test(_customGitopsPath) ? _customGitopsPath : gitopsDefault;
+        var sshInput = g('ocqs-sshkey'); if(sshInput) sshInput.placeholder = ocOpenCenterSSHKey('ocqs');
         var logPath    = '/home/dzoan/.local/state/opencenter/logs/bootstrap/'+s.org+'/'+s.cluster+'/';
 
         // Paths
@@ -2676,7 +2769,7 @@ var gf=g('ocqs-gitopsfolder'); if(gf) gf.placeholder=gitopsDefault;
 
         // Step 2
         var c2=g('ocqs-cmd-2');
-        if(c2) c2.textContent='opencenter cluster init '+s.cluster+' --org '+s.org+' || true';  // if exists, skip quietly
+        if(c2) c2.textContent='CONFIG="'+configPath+'"\nif test -f "$CONFIG"; then\n  echo "[OK] Existing cluster configuration: $CONFIG"\nelse\n  opencenter cluster init '+s.cluster+' --org '+s.org+'\nfi';
 var c2c=g('ocqs-cmd-2c');
         if(c2c) c2c.textContent='opencenter cluster use '+s.org+'/'+s.cluster;
 var c2b=g('ocqs-cmd-2b');
@@ -2704,15 +2797,16 @@ var c2b=g('ocqs-cmd-2b');
 // Step 4
         var _gitHostM=(s.gitRepo||'').match(/^https?:\/\/([^\/]+)\//);
         var _gitHost=_gitHostM?_gitHostM[1]:'github.com';
-        var _sshRemote=(s.gitRepo||'YOUR_GIT_REPO_URL').replace(/^https:\/\/([^\/]+)\//,'ssh://git@$1/');
+        var _sshRemote=ocGitSSHURL(s.gitRepo||'YOUR_GIT_REPO_URL');
+        var _httpsRemote=ocGitHTTPSURL(s.gitRepo||'YOUR_GIT_REPO_URL');
         var c4=g('ocqs-cmd-4');
         if(c4) c4.textContent = (s.gitAuth==='token')
           ? 'mkdir -p /home/dzoan/.config/opencenter/tokens\n# Write your token:\necho "'+( s.tokVal?'••••••••••••':'YOUR_GIT_TOKEN' )+'" > '+s.tokFile+'\nchmod 600 '+s.tokFile
-          : '# SSH auth selected — verify the key exists and '+_gitHost+' accepts it\nls -l '+(s.sshKey||'~/.ssh/id_rsa')+'\nssh -T -i '+(s.sshKey||'~/.ssh/id_rsa')+' -o StrictHostKeyChecking=no git@'+_gitHost+' 2>&1 | head -2';
+          : '# SSH auth selected — verify the OpenCenter key exists and '+_gitHost+' accepts it\nls -l '+s.sshKey+' '+s.sshKey+'.pub\nssh -T -i '+s.sshKey+' -o StrictHostKeyChecking=no git@'+_gitHost+' 2>&1 | head -2';
 var y4=g('ocqs-yaml-4');
         if(y4) y4.textContent = (s.gitAuth==='token')
           ? 'opencenter:\n  gitops:\n    repository:\n      url: "'+(s.gitRepo||'https://github.com/YOUR_USER/opencenter-my-cluster-gitops.git')+'"\n    auth:\n      token:\n        token_file: "'+s.tokFile+'"'
-          : 'opencenter:\n  gitops:\n    repository:\n      url: "'+_sshRemote+'"\n    auth:\n      ssh:\n        private_key: "'+(s.sshKey||'~/.ssh/id_rsa')+'"';
+          : 'opencenter:\n  gitops:\n    repository:\n      url: "'+_sshRemote+'"\n    auth:\n      ssh:\n        private_key: "'+s.sshKey+'"\n        public_key: "'+s.sshKey+'.pub"';
 
         // Step 5
         var c5=g('ocqs-cmd-5');
@@ -2721,23 +2815,25 @@ var y5=g('ocqs-yaml-5');
         if(y5) y5.textContent='opencenter:\n  services:\n    keycloak:\n      enabled: '+(_qs.services.keycloak?'true':'false')+'\n    loki:\n      enabled: '+(_qs.services.loki?'true':'false')+'\n    tempo:\n      enabled: '+(_qs.services.tempo?'true':'false')+'\n    velero:\n      enabled: '+(_qs.services.velero?'true':'false')+'\n    kube-prometheus-stack:\n      enabled: '+(_qs.services.monitoring?'true':'false');
 
         // Step 6
+        var _gitCredentialCheck = s.gitAuth==='token'
+          ? 'test -s '+s.tokFile+' || { echo "[BLOCKED] Git token file is missing" >&2; exit 42; }'
+          : 'test -r '+s.sshKey+' && test -r '+s.sshKey+'.pub || { echo "[BLOCKED] OpenCenter SSH key pair is missing" >&2; exit 42; }';
         var c6=g('ocqs-cmd-6');
-        if(c6) c6.textContent='opencenter cluster validate '+s.cluster;
-// Step 7
+        if(c6) c6.textContent=_gitCredentialCheck+'\nopencenter cluster validate '+s.org+'/'+s.cluster;
+        // Step 7
         var c7=g('ocqs-cmd-7');
-        if(c7) c7.textContent='opencenter cluster generate '+s.cluster+'\nopencenter secrets sync '+s.cluster+'\nopencenter cluster validate '+s.cluster;
+        if(c7) c7.textContent='set -e\n'+_gitCredentialCheck+'\nopencenter cluster generate '+s.org+'/'+s.cluster+'\nopencenter secrets sync '+s.org+'/'+s.cluster+'\nopencenter cluster validate '+s.org+'/'+s.cluster;
 var c7b=g('ocqs-cmd-7b');
         if(c7b) c7b.textContent='grep -R "CHANGEME" '+gitopsPath+' || true';
-// Step 8
+        // Step 8
         var c8=g('ocqs-cmd-8');
-        var _c8Head='cd '+gitopsPath+'\ngit status\ngit add .\ngit commit -m "Initial OpenCenter GitOps generation for '+s.cluster+'" || true\n';
-        var _c8Tail='\ngit branch -M '+s.gitBranch+'\ngit push -u origin '+s.gitBranch;
+        var _c8Head='set -e\ncd "'+gitopsPath+'"\ngit status\ngit add .\ngit commit -m "Initial OpenCenter GitOps generation for '+s.cluster+'" || true\n';
         if(c8) c8.textContent = (s.gitAuth==='token')
-          ? _c8Head+'TOKEN=$(cat '+s.tokFile+')\ngit remote set-url origin '+(s.gitRepo||'YOUR_GIT_REPO_URL').replace(/^https:\/\//,'https://oauth2:${TOKEN}@')+_c8Tail
-          : _c8Head+'git remote set-url origin '+_sshRemote+'\nexport GIT_SSH_COMMAND="ssh -i '+(s.sshKey||'~/.ssh/id_rsa')+' -o StrictHostKeyChecking=no"'+_c8Tail;
+          ? _c8Head+'TOKEN=$(tr -d "\\r\\n" < '+s.tokFile+')\ntest -n "$TOKEN" || { echo "[BLOCKED] Git token file is empty" >&2; exit 42; }\ngit remote set-url origin '+_httpsRemote+'\nAUTH=$(printf "oauth2:%s" "$TOKEN" | base64 | tr -d "\\r\\n")\ngit branch -M '+s.gitBranch+'\nif git -c http.extraHeader="Authorization: Basic $AUTH" ls-remote --exit-code --heads origin '+s.gitBranch+' >/dev/null 2>&1; then\n  git -c http.extraHeader="Authorization: Basic $AUTH" fetch origin '+s.gitBranch+'\n  git rebase origin/'+s.gitBranch+'\nfi\ngit -c http.extraHeader="Authorization: Basic $AUTH" push -u origin '+s.gitBranch+'\nunset TOKEN AUTH'
+          : _c8Head+'git remote set-url origin '+_sshRemote+'\nexport GIT_SSH_COMMAND="ssh -i '+s.sshKey+' -o StrictHostKeyChecking=no"\ngit branch -M '+s.gitBranch+'\nif git ls-remote --exit-code --heads origin '+s.gitBranch+' >/dev/null 2>&1; then\n  git fetch origin '+s.gitBranch+'\n  git rebase origin/'+s.gitBranch+'\nfi\ngit push -u origin '+s.gitBranch;
 // Step 9
         var c9=g('ocqs-cmd-9');
-        if(c9) c9.textContent='opencenter cluster validate '+s.cluster+'\nopencenter cluster deploy --break-lock --yes '+s.cluster;
+        if(c9) c9.textContent='set -e\n'+_gitCredentialCheck+'\nopencenter cluster validate '+s.org+'/'+s.cluster+'\nopencenter cluster deploy --break-lock --yes '+s.org+'/'+s.cluster;
 var c9l=g('ocqs-cmd-9logs');
         if(c9l) c9l.textContent='ls -lah '+logPath+'\ntail -f '+logPath+'*.log';
 var c9b=g('ocqs-cmd-9b');
@@ -2761,21 +2857,21 @@ var c9b=g('ocqs-cmd-9b');
 // YAML preview
         var yp=g('ocqs-yaml-preview');
         if(yp) yp.textContent=
-          'opencenter:\n  cluster:\n    cluster_name: "'+s.cluster+'"\n    organization: "'+s.org+'"\n\n  infrastructure:\n    provider: "'+s.provider+'"\n    cloud:\n      openstack:\n        auth_url: "'+s.authUrl+'"\n        region: "'+s.region+'"\n        application_credential_id: "'+(s.credId||'YOUR_OPENSTACK_APP_CRED_ID')+'"\n        application_credential_secret: "'+(s.credSec?'••••••••••••':'YOUR_OPENSTACK_APP_CRED_SECRET')+'"\n\n  gitops:\n    repository:\n      url: "'+(s.gitRepo||'YOUR_GITOPS_REPO_URL')+'"\n    auth:\n      token:\n        token_file: "'+s.tokFile+'"\n\n  services:\n    keycloak:\n      enabled: '+(_qs.services.keycloak)+'\n    loki:\n      enabled: '+(_qs.services.loki)+'\n    tempo:\n      enabled: '+(_qs.services.tempo)+'\n    velero:\n      enabled: '+(_qs.services.velero)+'\n    kube-prometheus-stack:\n      enabled: '+(_qs.services.monitoring);
+          'opencenter:\n  cluster:\n    cluster_name: "'+s.cluster+'"\n    organization: "'+s.org+'"\n\n  infrastructure:\n    provider: "'+s.provider+'"\n    cloud:\n      openstack:\n        auth_url: "'+s.authUrl+'"\n        region: "'+s.region+'"\n        application_credential_id: "'+(s.credId||'YOUR_OPENSTACK_APP_CRED_ID')+'"\n        application_credential_secret: "'+(s.credSec?'••••••••••••':'YOUR_OPENSTACK_APP_CRED_SECRET')+'"\n\n  gitops:\n    repository:\n      url: "'+(s.gitAuth==='token'?(s.gitRepo||'YOUR_HTTPS_GITOPS_REPO_URL'):_sshRemote)+'"\n    auth:\n'+(s.gitAuth==='token'?'      token:\n        token_file: "'+s.tokFile+'"':'      ssh:\n        private_key: "'+s.sshKey+'"\n        public_key: "'+s.sshKey+'.pub"')+'\n\n  services:\n    keycloak:\n      enabled: '+(_qs.services.keycloak)+'\n    loki:\n      enabled: '+(_qs.services.loki)+'\n    tempo:\n      enabled: '+(_qs.services.tempo)+'\n    velero:\n      enabled: '+(_qs.services.velero)+'\n    kube-prometheus-stack:\n      enabled: '+(_qs.services.monitoring);
 
         // Full flow
         var ff=g('ocqs-full-flow');
         if(ff) ff.textContent=
-          '# 1. Check CLI\nopencenter version\n\n'+
-          '# 2. Init config\nopencenter cluster init '+s.cluster+' --org '+s.org+'\n\n'+'# 3. Select active cluster\nopencenter cluster use '+s.org+'/'+s.cluster+'\n\n'+
+          'set -e\n# 1. Check CLI\nopencenter version\n\n'+
+          '# 2. Init config\n'+(c2?c2.textContent:'')+'\n\n'+'# 3. Select active cluster\nopencenter cluster use '+s.org+'/'+s.cluster+'\n\n'+
           '# 3. Edit config\nCONFIG="'+configPath+'"\nnano "$CONFIG"\n\n'+
           '# 4. Validate\nopencenter cluster validate '+s.cluster+'\n\n'+
-          '# 5. Sync secrets\nopencenter secrets sync '+s.cluster+'\n\n'+
-          '# 6. Validate again\nopencenter cluster validate '+s.cluster+'\n\n'+
-          '# 7. Generate GitOps repo\nopencenter cluster generate '+s.cluster+'\n\n'+
+          '# 5. Generate GitOps repo\nopencenter cluster generate '+s.org+'/'+s.cluster+'\n\n'+
+          '# 6. Sync and encrypt secrets\nopencenter secrets sync '+s.org+'/'+s.cluster+'\n\n'+
+          '# 7. Validate again\nopencenter cluster validate '+s.org+'/'+s.cluster+'\n\n'+
           '# 8. Check CHANGEME\ngrep -R "CHANGEME" '+gitopsPath+' || true\n\n'+
-          '# 9. Commit GitOps\ncd '+gitopsPath+'\ngit add .\ngit commit -m "Initial OpenCenter GitOps generation for '+s.cluster+'"\ngit push\n\n'+
-          '# 10. Deploy\nopencenter cluster deploy '+s.cluster;
+          '# 9. Commit, rebase, and push GitOps\n'+(c8?c8.textContent:'')+'\n\n'+
+          '# 10. Deploy\nopencenter cluster deploy '+s.org+'/'+s.cluster;
 
         // Validation hints
         var vs=g('ocqs-val-status');
@@ -2791,7 +2887,7 @@ var c9b=g('ocqs-cmd-9b');
             if(!s.tokVal) hints.push('<span style="color:#d97706;font-weight:700;">⚠ Git token not entered</span>');
             else hints.push('<span style="color:#15803d;font-weight:700;">✓ Git token entered</span>');
           } else {
-            hints.push('<span style="color:#15803d;font-weight:700;">✓ SSH auth ('+(s.sshKey||'~/.ssh/id_rsa')+')</span>');
+            hints.push('<span style="color:#15803d;font-weight:700;">✓ OpenCenter SSH auth ('+s.sshKey+')</span>');
           }
           if(!s.region) hints.push('<span style="color:#dc2626;font-weight:700;">✗ Region missing</span>');
           else hints.push('<span style="color:#15803d;font-weight:700;">✓ Region: '+s.region+'</span>');
@@ -2799,7 +2895,7 @@ var c9b=g('ocqs-cmd-9b');
         }
 
         // Persist state
-        try{ localStorage.setItem('ocqs_state',JSON.stringify({org:s.org,cluster:s.cluster,env:s.env,provider:s.provider,authType:s.authType,authUrl:s.authUrl,region:s.region,username:s.username,password:s.password,userDomain:s.userDomain,projDomain:s.projDomain,projectId:s.projectId,credId:s.credId,credSec:s.credSec,floatNet:s.floatNet,networkId:s.networkId,subnetId:s.subnetId,gitRepo:s.gitRepo,gitBranch:s.gitBranch,gitAuth:s.gitAuth,gitopsFolder:s.gitopsFolder,tokFile:s.tokFile,tokVal:s.tokVal,services:_qs.services})); }catch(e){}
+        try{ localStorage.setItem('ocqs_state',JSON.stringify({org:s.org,cluster:s.cluster,env:s.env,provider:s.provider,authType:s.authType,authUrl:s.authUrl,region:s.region,username:s.username,password:s.password,userDomain:s.userDomain,projDomain:s.projDomain,projectId:s.projectId,credId:s.credId,credSec:s.credSec,floatNet:s.floatNet,networkId:s.networkId,subnetId:s.subnetId,gitRepo:s.gitRepo,gitBranch:s.gitBranch,gitAuth:s.gitAuth,gitopsFolder:s.gitopsFolder,tokFile:s.tokFile,tokVal:s.tokVal,sshKey:s.sshKey,services:_qs.services})); }catch(e){}
       };
 
       window.ocqsReqCheck = function(){
@@ -2819,18 +2915,18 @@ var c9b=g('ocqs-cmd-9b');
         var st = g('ocqs-gitops-apply-status');
         var cfgEl = g('ocqs-configpath');
         var cfgPath = cfgEl ? cfgEl.textContent.trim() : '';
-        if(!cfgPath){ if(st){st.textContent='No config path — fill Stage 2 inputs.';st.style.color='#dc2626';} return; }
-        var fields = {'opencenter.gitops.repository.url': (s.gitAuth==='token') ? s.gitRepo : (s.gitRepo||'').replace(/^https:\/\/([^\/]+)\//,'ssh://git@$1/'),
+        if(!cfgPath){ if(st){st.textContent='No config path — fill Stage 2 inputs.';st.style.color='#dc2626';} return Promise.resolve({ok:false,error:'No config path'}); }
+        var fields = {'opencenter.gitops.repository.url': (s.gitAuth==='token') ? s.gitRepo : ocGitSSHURL(s.gitRepo),
           'opencenter.gitops.repository.branch': s.gitBranch};
         var _prov=(g('ocqs-gitprovider')||{}).value||'github'; if(_prov!=='github'&&_prov!=='gitlab'&&_prov!=='gitea') _prov='github';
         if(s.gitAuth==='token'){ fields['opencenter.gitops.auth.token.token_file'] = s.tokFile; fields['opencenter.gitops.auth.token.provider'] = _prov; }
         else { fields['opencenter.gitops.auth.ssh.private_key'] = s.sshKey; fields['opencenter.gitops.auth.ssh.public_key'] = s.sshKey+'.pub'; }
         if(st){ st.textContent='Applying...'; st.style.color='#0369a1'; }
         if(btn) btn.disabled=true;
-        fetch('/api/openrc/patch-config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({path:cfgPath,fields:fields})})
+        return fetch('/api/openrc/patch-config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({path:cfgPath,fields:fields,git_auth_mode:s.gitAuth,ensure_opencenter_credentials:true})})
           .then(function(r){return r.json();})
-          .then(function(d){ if(btn) btn.disabled=false; if(st){ if(d && d.ok!==false){ st.textContent='✓ GitOps settings applied to '+cfgPath; st.style.color='#15803d'; } else { st.textContent='✗ '+((d&&d.error)||'apply failed'); st.style.color='#dc2626'; } } })
-          .catch(function(e){ if(btn) btn.disabled=false; if(st){ st.textContent='✗ '+e; st.style.color='#dc2626'; } });
+          .then(function(d){ if(btn) btn.disabled=false; if(st){ if(d && d.ok!==false){ st.textContent='✓ '+(s.gitAuth==='ssh'?'SSH credential':'token fallback')+' applied and ready for validation'; st.style.color='#15803d'; } else { st.textContent='✗ '+((d&&d.error)||'apply failed'); st.style.color='#dc2626'; } } return d; })
+          .catch(function(e){ if(btn) btn.disabled=false; if(st){ st.textContent='✗ '+e; st.style.color='#dc2626'; } return {ok:false,error:String(e)}; });
       };
         set('ocqs-req-token',   s.gitAuth==='ssh' ? !!s.sshKey : !!(s.tokVal || s.tokFile));
         set('ocqs-req-region',  !!s.region);
@@ -2954,6 +3050,11 @@ var c9b=g('ocqs-cmd-9b');
         try{
           var saved=JSON.parse(localStorage.getItem('ocqs_state')||'null');
           if(!saved) return;
+          if(!localStorage.getItem('ocqs_token_default_v1')){
+            saved.gitAuth='token';
+            localStorage.setItem('ocqs_token_default_v1','1');
+          }
+          if(saved.gitopsFolder && !/^(?:\/|~\/)/.test(String(saved.gitopsFolder).trim())) saved.gitopsFolder='';
           var sv2=function(id,v){ if(v){ var el=g(id); if(el) el.value=v; } };
           sv2('ocqs-org',saved.org); sv2('ocqs-cluster',saved.cluster);
           sv2('ocqs-env',saved.env); sv2('ocqs-provider',saved.provider);
@@ -2966,6 +3067,7 @@ var c9b=g('ocqs-cmd-9b');
           sv2('ocqs-networkid',saved.networkId); sv2('ocqs-subnetid',saved.subnetId);
           sv2('ocqs-gitrepo',saved.gitRepo); sv2('ocqs-gitbranch',saved.gitBranch);
           sv2('ocqs-tokfile',saved.tokFile); sv2('ocqs-tokval',saved.tokVal);
+          if(saved.sshKey && saved.sshKey!=='~/.ssh/id_rsa') sv2('ocqs-sshkey',saved.sshKey);
           sv2('ocqs-gitopsfolder',saved.gitopsFolder);
           if(saved.gitAuth){ var ga=g('ocqs-gitauth'); if(ga) ga.value=saved.gitAuth; }
           if(saved.services){
@@ -2985,7 +3087,7 @@ var c9b=g('ocqs-cmd-9b');
         setTimeout(_ocqsRestore,150);
       }
       window.addEventListener('beforeunload',function(){
-        try{ if(typeof ocqsGetState==='function'){ var s=ocqsGetState(); localStorage.setItem('ocqs_state',JSON.stringify({org:s.org,cluster:s.cluster,env:s.env,provider:s.provider,authType:s.authType,authUrl:s.authUrl,region:s.region,username:s.username,password:s.password,userDomain:s.userDomain,projDomain:s.projDomain,projectId:s.projectId,credId:s.credId,credSec:s.credSec,floatNet:s.floatNet,networkId:s.networkId,subnetId:s.subnetId,gitRepo:s.gitRepo,gitBranch:s.gitBranch,gitAuth:s.gitAuth,gitopsFolder:s.gitopsFolder,tokFile:s.tokFile,tokVal:s.tokVal,services:_qs.services,optionalServicesDefaultVersion:'all-off-v2'})); } }catch(e){}
+        try{ if(typeof ocqsGetState==='function'){ var s=ocqsGetState(); localStorage.setItem('ocqs_state',JSON.stringify({org:s.org,cluster:s.cluster,env:s.env,provider:s.provider,authType:s.authType,authUrl:s.authUrl,region:s.region,username:s.username,password:s.password,userDomain:s.userDomain,projDomain:s.projDomain,projectId:s.projectId,credId:s.credId,credSec:s.credSec,floatNet:s.floatNet,networkId:s.networkId,subnetId:s.subnetId,gitRepo:s.gitRepo,gitBranch:s.gitBranch,gitAuth:s.gitAuth,gitopsFolder:s.gitopsFolder,tokFile:s.tokFile,tokVal:s.tokVal,sshKey:s.sshKey,services:_qs.services,optionalServicesDefaultVersion:'all-off-v2'})); } }catch(e){}
       });
 
     })();
@@ -2995,7 +3097,7 @@ var c9b=g('ocqs-cmd-9b');
       </div><!-- end quick start collapsed -->
 
       <!-- ── Real Production OpenCenter Deployment (R6-driven clone) ── -->
-      <div style="margin-bottom:18px;border:2px solid #4ade80;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(22,163,74,.2);">
+      <div id="ocqp-outer-wrap" style="margin-bottom:18px;border:2px solid #4ade80;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(22,163,74,.2);">
         <div id="ocqp-inline-toggle" onclick="(function(){var b=document.getElementById('ocqp-inline-body');var a=document.getElementById('ocqp-inline-arrow');var open=b.style.display!=='none';b.style.display=open?'none':'block';a.textContent=open?'▶':'▼';})()" style="display:flex;align-items:center;justify-content:space-between;padding:14px 20px;background:linear-gradient(135deg,#15803d,#22c55e,#4ade80);cursor:pointer;user-select:none;">
           <div style="display:flex;align-items:center;gap:12px;">
             <span style="font-size:20px;">🏭</span>
@@ -3109,7 +3211,7 @@ var c9b=g('ocqs-cmd-9b');
               <tr><td><strong>OpenCenter CLI</strong></td><td><code>opencenter version</code></td><td><span id="ocqp-req-cli" class="ocqs-badge-missing">Missing</span></td></tr>
               <tr><td><strong>Git</strong></td><td><code>git --version</code></td><td><span id="ocqp-req-git" class="ocqs-badge-missing">Missing</span></td></tr>
               <tr><td><strong>GitHub/GitLab repo</strong></td><td>opencenter-my-cluster-gitops</td><td><span id="ocqp-req-repo" class="ocqs-badge-missing">Missing</span></td></tr>
-              <tr><td><strong>Git token</strong></td><td>~/.config/opencenter/tokens/git-token.txt</td><td><span id="ocqp-req-token" class="ocqs-badge-missing">Missing</span></td></tr>
+              <tr><td><strong>Git credential</strong></td><td>OpenCenter SSH key (token fallback)</td><td><span id="ocqp-req-token" class="ocqs-badge-missing">Missing</span></td></tr>
               <tr><td><strong>OpenStack App Cred ID</strong></td><td>from Horizon / App Credentials</td><td><span id="ocqp-req-credid" class="ocqs-badge-missing">Missing</span></td></tr>
               <tr><td><strong>OpenStack App Cred Secret</strong></td><td>from Horizon / App Credentials</td><td><span id="ocqp-req-credsec" class="ocqs-badge-missing">Missing</span></td></tr>
               <tr><td><strong>Region</strong></td><td>dfw3, sjc3, iad3</td><td><span id="ocqp-req-region" class="ocqs-badge-missing">Missing</span></td></tr>
@@ -3286,10 +3388,10 @@ var c9b=g('ocqs-cmd-9b');
             <label class="ocqs-label">Git Provider</label>
             <select class="ocqs-select" id="ocqp-gitprovider" onchange="ocqpUpdate()"><option value="github" selected>GitHub</option><option value="gitlab">GitLab</option><option value="other">Other HTTPS Git</option></select>
             <label class="ocqs-label" style="margin-top:8px;">GitOps Repository URL</label>
-            <input class="ocqs-input" id="ocqp-gitrepo" placeholder="https://github.com/YOUR_USER/opencenter-my-cluster-gitops.git" oninput="ocqpUpdate();ocqpReqCheck()">
+            <input class="ocqs-input" id="ocqp-gitrepo" placeholder="ssh://git@github.com/YOUR_USER/opencenter-my-cluster-gitops.git" oninput="ocqpUpdate();ocqpReqCheck()">
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px;">
               <div><label class="ocqs-label">Git Branch</label><input class="ocqs-input" id="ocqp-gitbranch" value="main" oninput="ocqpUpdate()"></div>
-              <div><label class="ocqs-label">Git Auth Method</label><select class="ocqs-select" id="ocqp-gitauth" onchange="ocqpUpdate();ocqpReqCheck()"><option value="ssh" selected>SSH key (git@ push)</option><option value="token">HTTPS token</option></select></div>
+              <div><label class="ocqs-label">Git Auth Method</label><select class="ocqs-select" id="ocqp-gitauth" onchange="ocqpUpdate();ocqpReqCheck()"><option value="token" selected>HTTPS token (default)</option><option value="ssh">SSH key (optional)</option></select></div>
             </div>
             <div id="ocqp-auth-token-fields">
               <label class="ocqs-label" style="margin-top:8px;">Token File Path</label>
@@ -3299,8 +3401,8 @@ var c9b=g('ocqs-cmd-9b');
             </div>
             <div id="ocqp-auth-ssh-fields">
               <label class="ocqs-label" style="margin-top:8px;">SSH Key Path <span style="color:#64748b;font-size:10px;">(for SSH auth — used in git push)</span></label>
-              <input class="ocqs-input" id="ocqp-sshkey" value="~/.ssh/id_rsa" oninput="ocqpUpdate()">
-              <div style="font-size:11px;color:#64748b;margin-top:4px;">Ensure the corresponding public key is added to your GitHub account.</div>
+              <input class="ocqs-input" id="ocqp-sshkey" placeholder="OpenCenter generated cluster SSH key" oninput="ocqpUpdate();ocqpReqCheck()">
+              <div style="font-size:11px;color:#64748b;margin-top:4px;">Defaults to the SSH key generated for this OpenCenter cluster. Add the corresponding <code>.pub</code> key to the Git provider as a deploy key.</div>
             </div>
             <label class="ocqs-label" style="margin-top:10px;">GitOps Repo Folder <span style="color:#64748b;font-size:10px;">(local generated repo — leave blank for default)</span></label>
             <input class="ocqs-input" id="ocqp-gitopsfolder" placeholder="/home/dzoan/.config/opencenter/clusters/gitops/my-org" oninput="ocqpUpdate()" style="font-size:11px;">
@@ -3374,9 +3476,9 @@ var c9b=g('ocqs-cmd-9b');
             projectId:_v('ocqp-projectid'), credId:_v('ocqp-credid'), credSec:_v('ocqp-credsec'),
             floatNet:_v('ocqp-floatnet'), networkId:_v('ocqp-networkid'), subnetId:_v('ocqp-subnetid'),
             gitRepo:_v('ocqp-gitrepo'), gitBranch:_v('ocqp-gitbranch')||'main',
-            gitAuth:_v('ocqp-gitauth')||'ssh', gitopsFolder:_v('ocqp-gitopsfolder'),
+            gitAuth:_v('ocqp-gitauth')||'token', gitopsFolder:_v('ocqp-gitopsfolder'),
             tokFile:_v('ocqp-tokfile')||'/home/dzoan/.config/opencenter/tokens/git-token.txt',
-            tokVal:_v('ocqp-tokval'), sshKey:_v('ocqp-sshkey')||'~/.ssh/id_rsa', services:_svcs
+            tokVal:_v('ocqp-tokval'), sshKey:_v('ocqp-sshkey')||ocOpenCenterSSHKey('ocqp'), services:_svcs
           };
         }catch(e){return {};}
       };
@@ -3391,7 +3493,7 @@ var c9b=g('ocqs-cmd-9b');
             userDomain:s.userDomain,projDomain:s.projDomain,projectId:s.projectId,
             credId:s.credId,credSec:s.credSec,
             floatNet:s.floatNet,networkId:s.networkId,subnetId:s.subnetId,
-            gitRepo:s.gitRepo,gitBranch:s.gitBranch,gitAuth:s.gitAuth,gitopsFolder:s.gitopsFolder,tokFile:s.tokFile,tokVal:s.tokVal,
+            gitRepo:s.gitRepo,gitBranch:s.gitBranch,gitAuth:s.gitAuth,gitopsFolder:s.gitopsFolder,tokFile:s.tokFile,tokVal:s.tokVal,sshKey:s.sshKey,
             services:(window._qp&&window._qp.services)||s.services||{}
           }));
         }catch(e){}
@@ -3767,7 +3869,7 @@ var c9b=g('ocqs-cmd-9b');
           if(d.username||d.password||d.authUrl){
             localStorage.setItem('ocqp_creds_v2', JSON.stringify(d));
             // Also update ocqp_state so _ocqpRestore picks up credentials
-            try{ var st=JSON.parse(localStorage.getItem('ocqp_state')||'{}'); st.password=d.password; st.username=d.username; st.authUrl=d.authUrl; st.region=d.region; st.userDomain=d.userDomain; st.projDomain=d.projDomain; st.projectId=d.projectId; st.floatNet=d.floatNet; st.networkId=d.networkId; st.subnetId=d.subnetId; st.gitRepo=d.gitRepo; st.tokVal=d.tokVal; localStorage.setItem('ocqp_state',JSON.stringify(st)); }catch(e){}
+            try{ var st=JSON.parse(localStorage.getItem('ocqp_state')||'{}'); st.password=d.password; st.username=d.username; st.authUrl=d.authUrl; st.region=d.region; st.userDomain=d.userDomain; st.projDomain=d.projDomain; st.projectId=d.projectId; st.floatNet=d.floatNet; st.networkId=d.networkId; st.subnetId=d.subnetId; st.gitRepo=d.gitRepo; st.gitAuth=d.gitAuth||'token'; st.sshKey=d.sshKey; st.tokVal=d.tokVal; localStorage.setItem('ocqp_state',JSON.stringify(st)); }catch(e){}
           }
         }catch(e){}
       };
@@ -3777,6 +3879,7 @@ var c9b=g('ocqs-cmd-9b');
         try{
           var d = JSON.parse(localStorage.getItem('ocqp_creds_v2')||'null');
           if(!d) return;
+          if(d.sshKey === '~/.ssh/id_rsa') d.sshKey = '';
           Object.keys(d).forEach(function(k){
             var map = {authType:'ocqp-authtype',authUrl:'ocqp-authurl',region:'ocqp-region',
               username:'ocqp-username',password:'ocqp-password',userDomain:'ocqp-userdomain',
@@ -4180,7 +4283,7 @@ git push -u origin main</div>
               <tr><td><strong>SOPS age private key</strong></td><td style="font-size:11px;"><code>~/.config/opencenter/clusters/secrets/&lt;org&gt;/&lt;cluster&gt;/age/keys/&lt;cluster&gt;-key.txt</code></td><td style="font-size:12px;">Encrypts/decrypts all service secrets (secrets sync, Flux SOPS)</td><td style="font-size:11px;">cluster init</td></tr>
               <tr><td><strong>SOPS age public key</strong></td><td style="font-size:11px;"><code>same dir, &lt;cluster&gt;-key.pub</code></td><td style="font-size:12px;">Encryption recipient for new secrets</td><td style="font-size:11px;">cluster init</td></tr>
               <tr><td><strong>Cluster node SSH keypair</strong></td><td style="font-size:11px;"><code>~/.config/opencenter/clusters/secrets/&lt;org&gt;/&lt;cluster&gt;/ssh/&lt;cluster&gt; + .pub</code></td><td style="font-size:12px;">Injected into VMs; kubespray/Ansible node access</td><td style="font-size:11px;">cluster init</td></tr>
-              <tr><td><strong>GitOps SSH key</strong></td><td style="font-size:11px;"><code>~/.ssh/id_rsa + id_rsa.pub (gitops.auth.ssh)</code></td><td style="font-size:12px;">Git push + Flux bootstrap deploy key (SSH auth mode)</td><td style="font-size:11px;">You</td></tr>
+              <tr><td><strong>GitOps SSH key</strong></td><td style="font-size:11px;"><code>clusters/secrets/&lt;org&gt;/&lt;cluster&gt;/ssh/&lt;cluster&gt;[.pub]</code></td><td style="font-size:12px;">OpenCenter-generated key pair for Git push + Flux bootstrap (default)</td><td style="font-size:11px;">OpenCenter</td></tr>
               <tr><td><strong>SOPS config</strong></td><td style="font-size:11px;"><code>.sops.yaml in gitops repo</code></td><td style="font-size:12px;">Maps files to encryption keys</td><td style="font-size:11px;">cluster generate</td></tr>
               <tr><td><strong>Generated GitOps repo</strong></td><td style="font-size:11px;"><code>~/.config/opencenter/clusters/gitops/&lt;org&gt;/ (infra .tf, Flux kustomizations, helm overrides)</code></td><td style="font-size:12px;">Desired state deploy reconciles from &mdash; must be committed &amp; pushed</td><td style="font-size:11px;">cluster generate</td></tr>
               <tr><td><strong>Encrypted service secrets</strong></td><td style="font-size:11px;"><code>gitops repo: applications/overlays/&lt;cluster&gt;/services/*/secret.yaml</code></td><td style="font-size:12px;">Per-service credentials, SOPS-encrypted, applied by Flux</td><td style="font-size:11px;">secrets sync</td></tr>
@@ -4855,6 +4958,7 @@ kubectl describe kustomization &lt;name&gt; -n flux-system</div>
           <button class="oct-mini" onclick="ocqpAutoRunAll()" id="ocqp-autorun-btn2" style="background:#0284c7;color:#fff;border-color:#0284c7;">&#9889; AutoRun</button>
           <button class="oct-mini" onclick="ocqpAutoRestart()" style="background:#475569;color:#fff;border-color:#475569;">&#8635; Restart</button>
           <button class="oct-mini" onclick="var t=document.getElementById('ocqp-term');if(t)t.innerHTML='';">Clear</button>
+          <button class="oct-mini" onclick="octCopyLog('ocqp-term',this)" title="Copy all terminal output to the clipboard" style="background:#0f766e;color:#fff;border-color:#0f766e;">&#128203; Copy Log</button>
           <button class="oct-mini" onclick="document.getElementById('ocqp-term-float').classList.toggle('oct-min');this.textContent=this.textContent==='&#8722;'?'&#9634;':'&#8722;';">&#8722;</button>
         </div>
         <div class="oct-term-body" style="display:flex;flex-direction:column;flex:1;min-height:0;">
@@ -5239,7 +5343,18 @@ kubectl describe kustomization &lt;name&gt; -n flux-system</div>
           setTrackLabel('STEP ' + (i+1) + '/' + steps.length + ': ' + steps[i].name.toUpperCase());
           ocqpVoice('Step ' + (i+1) + ' of ' + steps.length + ': ' + steps[i].name.replace(/-/g,' ') + '.');
           ocqpTermLine('', ''); ocqpTermLine('== STEP ' + (i+1) + '/' + steps.length + ' [' + steps[i].name + '] ==', 'hd');
-          var r = await runStepStream(steps[i]);
+          var r = '';
+          if (/^ocqp-cmd-(6|7|9)$/.test(steps[i].cmdId) && typeof ocqpApplyGitops === 'function'){
+            ocqpTermLine('Preparing the selected GitOps credential before validation...', 'dim');
+            var prepared = await ocqpApplyGitops(null);
+            if (!prepared || prepared.ok === false){
+              ocqpTermLine('[BLOCKED] ' + ((prepared && prepared.error) || 'GitOps credential could not be applied'), 'err');
+              r = 'fail';
+            } else {
+              ocqpTermLine('[READY] GitOps ' + (prepared.git_auth_mode || 'ssh') + ' credential is in the cluster config.', 'ok');
+            }
+          }
+          if (!r) r = await runStepStream(steps[i]);
           if (r === 'stop'){
             setStepStatus(i, 'skip'); skip++;
             ocqpTermLine('-- AutoRun stopped by user at [' + steps[i].name + '] --', 'hd');
@@ -5304,11 +5419,11 @@ kubectl describe kustomization &lt;name&gt; -n flux-system</div>
           subnetId: v('ocqp-subnetid'),
           gitRepo:v('ocqp-gitrepo'),
           gitBranch:v('ocqp-gitbranch')||'main',
-          gitAuth:v('ocqp-gitauth')||'ssh',
+          gitAuth:v('ocqp-gitauth')||'token',
           gitopsFolder:v('ocqp-gitopsfolder'),
           tokFile:v('ocqp-tokfile')||'/home/dzoan/.config/opencenter/tokens/git-token.txt',
           tokVal: v('ocqp-tokval'),
-          sshKey: v('ocqp-sshkey')||'~/.ssh/id_rsa',
+          sshKey: v('ocqp-sshkey')||ocOpenCenterSSHKey('ocqp'),
           services: _qp.services,
           svc: _qp.services
         };
@@ -5444,12 +5559,22 @@ kubectl describe kustomization &lt;name&gt; -n flux-system</div>
           }, 400);
         });
       }
-      window.ocqpRunCmd = function(cmdId, outId, btnId){
-        var cmd = ((document.getElementById(cmdId)||{}).textContent||'').trim();
-        if (!cmd) return;
+      window.ocqpRunCmd = async function(cmdId, outId, btnId){
         var out = document.getElementById(outId);
         var btn = document.getElementById(btnId);
         if (!out) return;
+        if (/^ocqp-cmd-(6|7|9)$/.test(cmdId) && typeof ocqpApplyGitops === 'function'){
+          out.textContent = '$ preparing GitOps credential for validation...\n';
+          var prepared = await ocqpApplyGitops(null);
+          if (!prepared || prepared.ok === false){
+            out.textContent += '[BLOCKED] ' + ((prepared && prepared.error) || 'GitOps credential could not be applied') + '\n';
+            out.style.borderColor = '#dc2626';
+            return;
+          }
+          out.textContent += '[READY] GitOps ' + (prepared.git_auth_mode || 'ssh') + ' credential applied.\n';
+        }
+        var cmd = ((document.getElementById(cmdId)||{}).textContent||'').trim();
+        if (!cmd) return;
         out.textContent = '$ ' + cmd + '\n'; if (window.octMirror){ octMirror('ocqp-term', ''); octMirror('ocqp-term', '$ ' + cmd); }
         if (btn) { btn.disabled = true; btn.textContent = '⏹ Stop'; btn.onclick = function(){ if(window._ocqpES) window._ocqpES.close(); btn.disabled=false; btn.textContent='▶ Run'; btn.onclick=function(){ ocqpRunCmd(cmdId,outId,btnId); }; }; }
         if (window._ocqpES) window._ocqpES.close();
@@ -5531,7 +5656,9 @@ kubectl describe kustomization &lt;name&gt; -n flux-system</div>
         _setLive('ocqp-live-grafana','grafana','ocqp-svc-grafana-url');
         if (window.ocqpAutoChecklist) ocqpAutoChecklist();
         var gitopsDefault = '/home/dzoan/.config/opencenter/clusters/gitops/'+s.org;
-        var gitopsPath = s.gitopsFolder || gitopsDefault;
+        var _customGitopsPath = String(s.gitopsFolder || '').trim();
+        var gitopsPath = /^(?:\/|~\/)/.test(_customGitopsPath) ? _customGitopsPath : gitopsDefault;
+        var sshInput = g('ocqp-sshkey'); if(sshInput) sshInput.placeholder = ocOpenCenterSSHKey('ocqp');
         var logPath    = '/home/dzoan/.local/state/opencenter/logs/bootstrap/'+s.org+'/'+s.cluster+'/';
 
         // Paths
@@ -5560,7 +5687,7 @@ var gf=g('ocqp-gitopsfolder'); if(gf) gf.placeholder=gitopsDefault;
 
         // Step 2
         var c2=g('ocqp-cmd-2');
-        if(c2) c2.textContent='opencenter cluster init '+s.cluster+' --org '+s.org+' || true';  // if exists, skip quietly
+        if(c2) c2.textContent='CONFIG="'+configPath+'"\nif test -f "$CONFIG"; then\n  echo "[OK] Existing cluster configuration: $CONFIG"\nelse\n  opencenter cluster init '+s.cluster+' --org '+s.org+'\nfi';
 var c2c=g('ocqp-cmd-2c');
         if(c2c) c2c.textContent='opencenter cluster use '+s.org+'/'+s.cluster;
 var c2b=g('ocqp-cmd-2b');
@@ -5588,15 +5715,16 @@ var c2b=g('ocqp-cmd-2b');
 // Step 4
         var _gitHostM=(s.gitRepo||'').match(/^https?:\/\/([^\/]+)\//);
         var _gitHost=_gitHostM?_gitHostM[1]:'github.com';
-        var _sshRemote=(s.gitRepo||'YOUR_GIT_REPO_URL').replace(/^https:\/\/([^\/]+)\//,'ssh://git@$1/');
+        var _sshRemote=ocGitSSHURL(s.gitRepo||'YOUR_GIT_REPO_URL');
+        var _httpsRemote=ocGitHTTPSURL(s.gitRepo||'YOUR_GIT_REPO_URL');
         var c4=g('ocqp-cmd-4');
         if(c4) c4.textContent = (s.gitAuth==='token')
           ? 'mkdir -p /home/dzoan/.config/opencenter/tokens\n# Write your token:\necho "'+( s.tokVal?'••••••••••••':'YOUR_GIT_TOKEN' )+'" > '+s.tokFile+'\nchmod 600 '+s.tokFile
-          : '# SSH auth selected — verify the key exists and '+_gitHost+' accepts it\nls -l '+(s.sshKey||'~/.ssh/id_rsa')+'\nssh -T -i '+(s.sshKey||'~/.ssh/id_rsa')+' -o StrictHostKeyChecking=no git@'+_gitHost+' 2>&1 | head -2';
+          : '# SSH auth selected — verify the OpenCenter key exists and '+_gitHost+' accepts it\nls -l '+s.sshKey+' '+s.sshKey+'.pub\nssh -T -i '+s.sshKey+' -o StrictHostKeyChecking=no git@'+_gitHost+' 2>&1 | head -2';
 var y4=g('ocqp-yaml-4');
         if(y4) y4.textContent = (s.gitAuth==='token')
           ? 'opencenter:\n  gitops:\n    repository:\n      url: "'+(s.gitRepo||'https://github.com/YOUR_USER/opencenter-my-cluster-gitops.git')+'"\n    auth:\n      token:\n        token_file: "'+s.tokFile+'"'
-          : 'opencenter:\n  gitops:\n    repository:\n      url: "'+_sshRemote+'"\n    auth:\n      ssh:\n        private_key: "'+(s.sshKey||'~/.ssh/id_rsa')+'"';
+          : 'opencenter:\n  gitops:\n    repository:\n      url: "'+_sshRemote+'"\n    auth:\n      ssh:\n        private_key: "'+s.sshKey+'"\n        public_key: "'+s.sshKey+'.pub"';
 
         // Step 5
         var c5=g('ocqp-cmd-5');
@@ -5605,23 +5733,25 @@ var y5=g('ocqp-yaml-5');
         if(y5) y5.textContent='opencenter:\n  services:\n    keycloak:\n      enabled: '+(_qp.services.keycloak?'true':'false')+'\n    loki:\n      enabled: '+(_qp.services.loki?'true':'false')+'\n    tempo:\n      enabled: '+(_qp.services.tempo?'true':'false')+'\n    velero:\n      enabled: '+(_qp.services.velero?'true':'false')+'\n    kube-prometheus-stack:\n      enabled: '+(_qp.services.monitoring?'true':'false');
 
         // Step 6
+        var _gitCredentialCheck = s.gitAuth==='token'
+          ? 'test -s '+s.tokFile+' || { echo "[BLOCKED] Git token file is missing" >&2; exit 42; }'
+          : 'test -r '+s.sshKey+' && test -r '+s.sshKey+'.pub || { echo "[BLOCKED] OpenCenter SSH key pair is missing" >&2; exit 42; }';
         var c6=g('ocqp-cmd-6');
-        if(c6) c6.textContent='opencenter cluster validate '+s.cluster;
-// Step 7
+        if(c6) c6.textContent=_gitCredentialCheck+'\nopencenter cluster validate '+s.org+'/'+s.cluster;
+        // Step 7
         var c7=g('ocqp-cmd-7');
-        if(c7) c7.textContent='opencenter cluster generate '+s.cluster+'\nopencenter secrets sync '+s.cluster+'\nopencenter cluster validate '+s.cluster;
+        if(c7) c7.textContent='set -e\n'+_gitCredentialCheck+'\nopencenter cluster generate '+s.org+'/'+s.cluster+'\nopencenter secrets sync '+s.org+'/'+s.cluster+'\nopencenter cluster validate '+s.org+'/'+s.cluster;
 var c7b=g('ocqp-cmd-7b');
         if(c7b) c7b.textContent='grep -R "CHANGEME" '+gitopsPath+' || true';
-// Step 8
+        // Step 8
         var c8=g('ocqp-cmd-8');
-        var _c8Head='cd '+gitopsPath+'\ngit status\ngit add .\ngit commit -m "Initial OpenCenter GitOps generation for '+s.cluster+'" || true\n';
-        var _c8Tail='\ngit branch -M '+s.gitBranch+'\ngit push -u origin '+s.gitBranch;
+        var _c8Head='set -e\ncd "'+gitopsPath+'"\ngit status\ngit add .\ngit commit -m "Initial OpenCenter GitOps generation for '+s.cluster+'" || true\n';
         if(c8) c8.textContent = (s.gitAuth==='token')
-          ? _c8Head+'TOKEN=$(cat '+s.tokFile+')\ngit remote set-url origin '+(s.gitRepo||'YOUR_GIT_REPO_URL').replace(/^https:\/\//,'https://oauth2:${TOKEN}@')+_c8Tail
-          : _c8Head+'git remote set-url origin '+_sshRemote+'\nexport GIT_SSH_COMMAND="ssh -i '+(s.sshKey||'~/.ssh/id_rsa')+' -o StrictHostKeyChecking=no"'+_c8Tail;
+          ? _c8Head+'TOKEN=$(tr -d "\\r\\n" < '+s.tokFile+')\ntest -n "$TOKEN" || { echo "[BLOCKED] Git token file is empty" >&2; exit 42; }\ngit remote set-url origin '+_httpsRemote+'\nAUTH=$(printf "oauth2:%s" "$TOKEN" | base64 | tr -d "\\r\\n")\ngit branch -M '+s.gitBranch+'\nif git -c http.extraHeader="Authorization: Basic $AUTH" ls-remote --exit-code --heads origin '+s.gitBranch+' >/dev/null 2>&1; then\n  git -c http.extraHeader="Authorization: Basic $AUTH" fetch origin '+s.gitBranch+'\n  git rebase origin/'+s.gitBranch+'\nfi\ngit -c http.extraHeader="Authorization: Basic $AUTH" push -u origin '+s.gitBranch+'\nunset TOKEN AUTH'
+          : _c8Head+'git remote set-url origin '+_sshRemote+'\nexport GIT_SSH_COMMAND="ssh -i '+s.sshKey+' -o StrictHostKeyChecking=no"\ngit branch -M '+s.gitBranch+'\nif git ls-remote --exit-code --heads origin '+s.gitBranch+' >/dev/null 2>&1; then\n  git fetch origin '+s.gitBranch+'\n  git rebase origin/'+s.gitBranch+'\nfi\ngit push -u origin '+s.gitBranch;
 // Step 9
         var c9=g('ocqp-cmd-9');
-        if(c9) c9.textContent='opencenter cluster validate '+s.cluster+'\nopencenter cluster deploy --break-lock --yes '+s.cluster;
+        if(c9) c9.textContent='set -e\n'+_gitCredentialCheck+'\nopencenter cluster validate '+s.org+'/'+s.cluster+'\nopencenter cluster deploy --break-lock --yes '+s.org+'/'+s.cluster;
 var c9l=g('ocqp-cmd-9logs');
         if(c9l) c9l.textContent='ls -lah '+logPath+'\ntail -f '+logPath+'*.log';
 var c9b=g('ocqp-cmd-9b');
@@ -5645,21 +5775,21 @@ var c9b=g('ocqp-cmd-9b');
 // YAML preview
         var yp=g('ocqp-yaml-preview');
         if(yp) yp.textContent=
-          'opencenter:\n  cluster:\n    cluster_name: "'+s.cluster+'"\n    organization: "'+s.org+'"\n\n  infrastructure:\n    provider: "'+s.provider+'"\n    cloud:\n      openstack:\n        auth_url: "'+s.authUrl+'"\n        region: "'+s.region+'"\n        application_credential_id: "'+(s.credId||'YOUR_OPENSTACK_APP_CRED_ID')+'"\n        application_credential_secret: "'+(s.credSec?'••••••••••••':'YOUR_OPENSTACK_APP_CRED_SECRET')+'"\n\n  gitops:\n    repository:\n      url: "'+(s.gitRepo||'YOUR_GITOPS_REPO_URL')+'"\n    auth:\n      token:\n        token_file: "'+s.tokFile+'"\n\n  services:\n    keycloak:\n      enabled: '+(_qp.services.keycloak)+'\n    loki:\n      enabled: '+(_qp.services.loki)+'\n    tempo:\n      enabled: '+(_qp.services.tempo)+'\n    velero:\n      enabled: '+(_qp.services.velero)+'\n    kube-prometheus-stack:\n      enabled: '+(_qp.services.monitoring);
+          'opencenter:\n  cluster:\n    cluster_name: "'+s.cluster+'"\n    organization: "'+s.org+'"\n\n  infrastructure:\n    provider: "'+s.provider+'"\n    cloud:\n      openstack:\n        auth_url: "'+s.authUrl+'"\n        region: "'+s.region+'"\n        application_credential_id: "'+(s.credId||'YOUR_OPENSTACK_APP_CRED_ID')+'"\n        application_credential_secret: "'+(s.credSec?'••••••••••••':'YOUR_OPENSTACK_APP_CRED_SECRET')+'"\n\n  gitops:\n    repository:\n      url: "'+(s.gitAuth==='token'?(s.gitRepo||'YOUR_HTTPS_GITOPS_REPO_URL'):_sshRemote)+'"\n    auth:\n'+(s.gitAuth==='token'?'      token:\n        token_file: "'+s.tokFile+'"':'      ssh:\n        private_key: "'+s.sshKey+'"\n        public_key: "'+s.sshKey+'.pub"')+'\n\n  services:\n    keycloak:\n      enabled: '+(_qp.services.keycloak)+'\n    loki:\n      enabled: '+(_qp.services.loki)+'\n    tempo:\n      enabled: '+(_qp.services.tempo)+'\n    velero:\n      enabled: '+(_qp.services.velero)+'\n    kube-prometheus-stack:\n      enabled: '+(_qp.services.monitoring);
 
         // Full flow
         var ff=g('ocqp-full-flow');
         if(ff) ff.textContent=
-          '# 1. Check CLI\nopencenter version\n\n'+
-          '# 2. Init config\nopencenter cluster init '+s.cluster+' --org '+s.org+'\n\n'+'# 3. Select active cluster\nopencenter cluster use '+s.org+'/'+s.cluster+'\n\n'+
+          'set -e\n# 1. Check CLI\nopencenter version\n\n'+
+          '# 2. Init config\n'+(c2?c2.textContent:'')+'\n\n'+'# 3. Select active cluster\nopencenter cluster use '+s.org+'/'+s.cluster+'\n\n'+
           '# 3. Edit config\nCONFIG="'+configPath+'"\nnano "$CONFIG"\n\n'+
           '# 4. Validate\nopencenter cluster validate '+s.cluster+'\n\n'+
-          '# 5. Sync secrets\nopencenter secrets sync '+s.cluster+'\n\n'+
-          '# 6. Validate again\nopencenter cluster validate '+s.cluster+'\n\n'+
-          '# 7. Generate GitOps repo\nopencenter cluster generate '+s.cluster+'\n\n'+
+          '# 5. Generate GitOps repo\nopencenter cluster generate '+s.org+'/'+s.cluster+'\n\n'+
+          '# 6. Sync and encrypt secrets\nopencenter secrets sync '+s.org+'/'+s.cluster+'\n\n'+
+          '# 7. Validate again\nopencenter cluster validate '+s.org+'/'+s.cluster+'\n\n'+
           '# 8. Check CHANGEME\ngrep -R "CHANGEME" '+gitopsPath+' || true\n\n'+
-          '# 9. Commit GitOps\ncd '+gitopsPath+'\ngit add .\ngit commit -m "Initial OpenCenter GitOps generation for '+s.cluster+'"\ngit push\n\n'+
-          '# 10. Deploy\nopencenter cluster deploy '+s.cluster;
+          '# 9. Commit, rebase, and push GitOps\n'+(c8?c8.textContent:'')+'\n\n'+
+          '# 10. Deploy\nopencenter cluster deploy '+s.org+'/'+s.cluster;
 
         // Validation hints
         var vs=g('ocqp-val-status');
@@ -5675,7 +5805,7 @@ var c9b=g('ocqp-cmd-9b');
             if(!s.tokVal) hints.push('<span style="color:#d97706;font-weight:700;">⚠ Git token not entered</span>');
             else hints.push('<span style="color:#15803d;font-weight:700;">✓ Git token entered</span>');
           } else {
-            hints.push('<span style="color:#15803d;font-weight:700;">✓ SSH auth ('+(s.sshKey||'~/.ssh/id_rsa')+')</span>');
+            hints.push('<span style="color:#15803d;font-weight:700;">✓ OpenCenter SSH auth ('+s.sshKey+')</span>');
           }
           if(!s.region) hints.push('<span style="color:#dc2626;font-weight:700;">✗ Region missing</span>');
           else hints.push('<span style="color:#15803d;font-weight:700;">✓ Region: '+s.region+'</span>');
@@ -5683,7 +5813,7 @@ var c9b=g('ocqp-cmd-9b');
         }
 
         // Persist state
-        try{ localStorage.setItem('ocqp_state',JSON.stringify({org:s.org,cluster:s.cluster,env:s.env,provider:s.provider,authType:s.authType,authUrl:s.authUrl,region:s.region,username:s.username,password:s.password,userDomain:s.userDomain,projDomain:s.projDomain,projectId:s.projectId,credId:s.credId,credSec:s.credSec,floatNet:s.floatNet,networkId:s.networkId,subnetId:s.subnetId,gitRepo:s.gitRepo,gitBranch:s.gitBranch,gitAuth:s.gitAuth,gitopsFolder:s.gitopsFolder,tokFile:s.tokFile,tokVal:s.tokVal,services:_qp.services})); }catch(e){}
+        try{ localStorage.setItem('ocqp_state',JSON.stringify({org:s.org,cluster:s.cluster,env:s.env,provider:s.provider,authType:s.authType,authUrl:s.authUrl,region:s.region,username:s.username,password:s.password,userDomain:s.userDomain,projDomain:s.projDomain,projectId:s.projectId,credId:s.credId,credSec:s.credSec,floatNet:s.floatNet,networkId:s.networkId,subnetId:s.subnetId,gitRepo:s.gitRepo,gitBranch:s.gitBranch,gitAuth:s.gitAuth,gitopsFolder:s.gitopsFolder,tokFile:s.tokFile,tokVal:s.tokVal,sshKey:s.sshKey,services:_qp.services})); }catch(e){}
       };
 
       window.ocqpReqCheck = function(){
@@ -5703,18 +5833,18 @@ var c9b=g('ocqp-cmd-9b');
         var st = g('ocqp-gitops-apply-status');
         var cfgEl = g('ocqp-configpath');
         var cfgPath = cfgEl ? cfgEl.textContent.trim() : '';
-        if(!cfgPath){ if(st){st.textContent='No config path — fill Stage 2 inputs.';st.style.color='#dc2626';} return; }
-        var fields = {'opencenter.gitops.repository.url': (s.gitAuth==='token') ? s.gitRepo : (s.gitRepo||'').replace(/^https:\/\/([^\/]+)\//,'ssh://git@$1/'),
+        if(!cfgPath){ if(st){st.textContent='No config path — fill Stage 2 inputs.';st.style.color='#dc2626';} return Promise.resolve({ok:false,error:'No config path'}); }
+        var fields = {'opencenter.gitops.repository.url': (s.gitAuth==='token') ? s.gitRepo : ocGitSSHURL(s.gitRepo),
           'opencenter.gitops.repository.branch': s.gitBranch};
         var _prov=(g('ocqp-gitprovider')||{}).value||'github'; if(_prov!=='github'&&_prov!=='gitlab'&&_prov!=='gitea') _prov='github';
         if(s.gitAuth==='token'){ fields['opencenter.gitops.auth.token.token_file'] = s.tokFile; fields['opencenter.gitops.auth.token.provider'] = _prov; }
         else { fields['opencenter.gitops.auth.ssh.private_key'] = s.sshKey; fields['opencenter.gitops.auth.ssh.public_key'] = s.sshKey+'.pub'; }
         if(st){ st.textContent='Applying...'; st.style.color='#0369a1'; }
         if(btn) btn.disabled=true;
-        fetch('/api/openrc/patch-config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({path:cfgPath,fields:fields})})
+        return fetch('/api/openrc/patch-config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({path:cfgPath,fields:fields,git_auth_mode:s.gitAuth,ensure_opencenter_credentials:true})})
           .then(function(r){return r.json();})
-          .then(function(d){ if(btn) btn.disabled=false; if(st){ if(d && d.ok!==false){ st.textContent='✓ GitOps settings applied to '+cfgPath; st.style.color='#15803d'; } else { st.textContent='✗ '+((d&&d.error)||'apply failed'); st.style.color='#dc2626'; } } })
-          .catch(function(e){ if(btn) btn.disabled=false; if(st){ st.textContent='✗ '+e; st.style.color='#dc2626'; } });
+          .then(function(d){ if(btn) btn.disabled=false; if(st){ if(d && d.ok!==false){ st.textContent='✓ '+(s.gitAuth==='ssh'?'SSH credential':'token fallback')+' applied and ready for validation'; st.style.color='#15803d'; } else { st.textContent='✗ '+((d&&d.error)||'apply failed'); st.style.color='#dc2626'; } } return d; })
+          .catch(function(e){ if(btn) btn.disabled=false; if(st){ st.textContent='✗ '+e; st.style.color='#dc2626'; } return {ok:false,error:String(e)}; });
       };
         set('ocqp-req-token',   s.gitAuth==='ssh' ? !!s.sshKey : !!(s.tokVal || s.tokFile));
         set('ocqp-req-region',  !!s.region);
@@ -5838,6 +5968,11 @@ var c9b=g('ocqp-cmd-9b');
         try{
           var saved=JSON.parse(localStorage.getItem('ocqp_state')||'null');
           if(!saved) return;
+          if(!localStorage.getItem('ocqp_token_default_v1')){
+            saved.gitAuth='token';
+            localStorage.setItem('ocqp_token_default_v1','1');
+          }
+          if(saved.gitopsFolder && !/^(?:\/|~\/)/.test(String(saved.gitopsFolder).trim())) saved.gitopsFolder='';
           var sv2=function(id,v){ if(v){ var el=g(id); if(el) el.value=v; } };
           sv2('ocqp-org',saved.org); sv2('ocqp-cluster',saved.cluster);
           sv2('ocqp-env',saved.env); sv2('ocqp-provider',saved.provider);
@@ -5850,6 +5985,7 @@ var c9b=g('ocqp-cmd-9b');
           sv2('ocqp-networkid',saved.networkId); sv2('ocqp-subnetid',saved.subnetId);
           sv2('ocqp-gitrepo',saved.gitRepo); sv2('ocqp-gitbranch',saved.gitBranch);
           sv2('ocqp-tokfile',saved.tokFile); sv2('ocqp-tokval',saved.tokVal);
+          if(saved.sshKey && saved.sshKey!=='~/.ssh/id_rsa') sv2('ocqp-sshkey',saved.sshKey);
           sv2('ocqp-gitopsfolder',saved.gitopsFolder);
           if(saved.gitAuth){ var ga=g('ocqp-gitauth'); if(ga) ga.value=saved.gitAuth; }
           if(saved.services){
@@ -5869,7 +6005,7 @@ var c9b=g('ocqp-cmd-9b');
         setTimeout(_ocqpRestore,150);
       }
       window.addEventListener('beforeunload',function(){
-        try{ if(typeof ocqpGetState==='function'){ var s=ocqpGetState(); localStorage.setItem('ocqp_state',JSON.stringify({org:s.org,cluster:s.cluster,env:s.env,provider:s.provider,authType:s.authType,authUrl:s.authUrl,region:s.region,username:s.username,password:s.password,userDomain:s.userDomain,projDomain:s.projDomain,projectId:s.projectId,credId:s.credId,credSec:s.credSec,floatNet:s.floatNet,networkId:s.networkId,subnetId:s.subnetId,gitRepo:s.gitRepo,gitBranch:s.gitBranch,gitAuth:s.gitAuth,gitopsFolder:s.gitopsFolder,tokFile:s.tokFile,tokVal:s.tokVal,services:_qp.services,optionalServicesDefaultVersion:'all-off-v2'})); } }catch(e){}
+        try{ if(typeof ocqpGetState==='function'){ var s=ocqpGetState(); localStorage.setItem('ocqp_state',JSON.stringify({org:s.org,cluster:s.cluster,env:s.env,provider:s.provider,authType:s.authType,authUrl:s.authUrl,region:s.region,username:s.username,password:s.password,userDomain:s.userDomain,projDomain:s.projDomain,projectId:s.projectId,credId:s.credId,credSec:s.credSec,floatNet:s.floatNet,networkId:s.networkId,subnetId:s.subnetId,gitRepo:s.gitRepo,gitBranch:s.gitBranch,gitAuth:s.gitAuth,gitopsFolder:s.gitopsFolder,tokFile:s.tokFile,tokVal:s.tokVal,sshKey:s.sshKey,services:_qp.services,optionalServicesDefaultVersion:'all-off-v2'})); } }catch(e){}
       });
 
     })();
@@ -6081,6 +6217,22 @@ mise run build
 
       {% include "_opencenter_platform.html" %}
 
+      <script>
+        // Move the Quick Start / Real Production banners to below the OpenCenter
+        // overview + "Other Tutorials" links, without physically relocating the
+        // ~6,000 lines of markup/scripts that make up those two collapsible sections —
+        // a plain DOM move preserves every id, handler and already-run init script.
+        (function() {
+          var qs = document.getElementById('ocqs-outer-wrap');
+          var qp = document.getElementById('ocqp-outer-wrap');
+          var overview = document.getElementById('oc-what-open-body');
+          if (!overview || !overview.parentNode) return;
+          var parent = overview.parentNode;
+          var afterOverview = overview.nextSibling;
+          if (qs) parent.insertBefore(qs, afterOverview);
+          if (qp) parent.insertBefore(qp, afterOverview);
+        })();
+      </script>
 
       <!-- Hidden (2026-07-09): redundant with the green "Deploy Production Cloud
            Native Apps with OpenCenter" section above. Kept in DOM (display:none)

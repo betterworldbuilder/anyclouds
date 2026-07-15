@@ -324,7 +324,7 @@
     body { background: #f8fafc; }
     .ospc-customer-intro {
       position:relative; overflow:hidden;
-      padding:32px 24px 30px;
+      padding:48px 24px 44px;
       background:linear-gradient(135deg,#071b3c 0%,#0c3f78 48%,#087ea4 100%);
       color:#fff;
       border-bottom:1px solid rgba(125,211,252,.55);
@@ -344,23 +344,20 @@
     }
     .ospc-customer-intro-inner {
       position:relative; z-index:1; max-width:1120px; margin:0 auto;
-      text-align:center;
     }
     .ospc-customer-kicker {
-      display:inline-flex; align-items:center; gap:8px; margin-bottom:12px;
+      display:inline-flex; align-items:center; gap:8px; margin-bottom:16px;
       padding:6px 12px; border:1px solid rgba(186,230,253,.45); border-radius:999px;
       background:rgba(14,165,233,.16); color:#bae6fd;
       font-size:11px; font-weight:800; letter-spacing:.12em; text-transform:uppercase;
     }
     .ospc-customer-intro h1 {
-      max-width:1060px; margin:0 auto 16px; color:#fff;
-      font-size:clamp(24px,2.2vw,34px); line-height:1.2; letter-spacing:-.02em;
-      font-weight:800;
+      max-width:900px; margin:0 0 20px; color:#fff;
+      font-size:clamp(28px,3.4vw,48px); line-height:1.1; letter-spacing:-.035em;
     }
     .ospc-customer-copy {
-      max-width:1080px; display:grid; gap:10px; margin:0 auto;
-      color:#dbeafe; font-size:clamp(14px,1vw,16px); line-height:1.62;
-      text-align:left;
+      max-width:1040px; display:grid; gap:14px;
+      color:#dbeafe; font-size:clamp(15px,1.25vw,18px); line-height:1.72;
     }
     .ospc-customer-copy p { margin:0; }
     .ospc-customer-copy strong { color:#fff; font-weight:800; }
@@ -531,7 +528,7 @@
     .why-flex-callout p { margin:0; color:#92400e; font-size:14px; line-height:1.65; font-style:italic; }
     .why-flex-callout small { display:block; margin-top:6px; color:#78350f; font-size:13px; font-weight:750; }
     @media (max-width:700px) {
-      .ospc-customer-intro { padding:28px 20px; }
+      .ospc-customer-intro { padding:34px 20px; }
       .ospc-customer-copy { line-height:1.6; }
     }
     @media (max-width:760px) {
@@ -549,7 +546,7 @@
 <body>
     <div id="s0-container" style="background:#f8fafc; padding:0; max-width:100%; margin:0; overflow:auto; height:100%;">
 
-      {% if ospc_customer_intro|default(false) %}
+      
       <section class="ospc-customer-intro" aria-labelledby="ospc-customer-intro-title">
         <div class="ospc-customer-intro-inner">
           <div class="ospc-customer-kicker">A message to our OSPC customers</div>
@@ -561,7 +558,7 @@
           </div>
         </div>
       </section>
-      {% endif %}
+      
 
       <!-- Hero banner — Dawn Sky Edition -->
       <div class="s0-dawn-hero">
@@ -1398,6 +1395,42 @@
           </div>
         </div>
 
+        <!-- OSPC vs FLEX Services table (moved to bottom) -->
+        <div style="order:50;margin-top:40px;padding:0 0 8px;">
+          <!-- OSPC vs FLEX Services table -->
+          <div style="margin-bottom:28px;">
+            <details style="border:1px solid #dbeafe;border-radius:14px;background:#fff;box-shadow:0 1px 8px rgba(0,0,0,0.05);overflow:hidden;">
+              <summary style="list-style:none;cursor:pointer;padding:18px 22px;background:linear-gradient(135deg,#eff6ff,#f8fafc);display:flex;align-items:center;justify-content:space-between;gap:16px;">
+                <span>
+                  <span style="display:block;color:#1e3a8a;font-size:17px;font-weight:800;margin-bottom:4px;">OpenStack Service Compatibility</span>
+                  <span style="display:block;color:#64748b;font-size:13px;">OpenStack service availability &mdash; OSPC (2024.2 Dalmatian) vs FLEX (2025.1 Epoxy+)</span>
+                </span>
+                <span style="background:#2563eb;color:#fff;border-radius:999px;padding:8px 14px;font-size:12px;font-weight:800;white-space:nowrap;">Show Table</span>
+              </summary>
+            <div style="border-top:1px solid #e2e8f0;overflow:hidden;">
+              <table style="width:100%;border-collapse:collapse;font-size:13px;table-layout:fixed;">
+                <colgroup>
+                  <col style="width:13%"><col style="width:15%"><col style="width:7%"><col style="width:7%">
+                  <col style="width:13%"><col style="width:14%"><col style="width:17%"><col style="width:14%">
+                </colgroup>
+                <thead style="background:#f8fafc;border-bottom:2px solid #e2e8f0;">
+                  <tr>
+                    <th style="padding:11px 14px;text-align:left;color:#475569;font-weight:700;font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;">Service</th>
+                    <th style="padding:11px 14px;text-align:left;color:#475569;font-weight:700;font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;">Role</th>
+                    <th style="padding:11px 14px;text-align:center;color:#475569;font-weight:700;font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;">OSPC</th>
+                    <th style="padding:11px 14px;text-align:center;color:#475569;font-weight:700;font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;">FLEX</th>
+                    <th style="padding:11px 14px;text-align:left;color:#475569;font-weight:700;font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;">OSPC Ver.</th>
+                    <th style="padding:11px 14px;text-align:left;color:#475569;font-weight:700;font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;">FLEX Min Ver.</th>
+                    <th style="padding:11px 14px;text-align:left;color:#475569;font-weight:700;font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;">What it does</th>
+                    <th style="padding:11px 14px;text-align:left;color:#475569;font-weight:700;font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;">Benefit</th>
+                  </tr>
+                </thead>
+                <tbody id="compatTbody"></tbody>
+              </table>
+            </div>
+            </details>
+          </div>
+        </div>
 
 
       </div>
@@ -1405,5 +1438,6 @@
   </div>
   </div>
 
+<script src="/static/stage_output_cache.js?v=1"></script>
 </body>
 </html>

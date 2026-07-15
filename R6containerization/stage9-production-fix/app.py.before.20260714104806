@@ -3510,23 +3510,9 @@ def why_flex_ui():
     return render_template("why_flex.html")
 
 
-@app.get("/ospc-why-flex/")
-def ospc_why_flex_ui():
-    """OSPC customer edition used only by the cloud-console mockup."""
-    return render_template("why_flex.html", ospc_customer_intro=True)
-
-
 @app.get("/migration-strategy/")
 def migration_strategy_ui():
     return render_template("migration_strategy.html")
-
-
-@app.get("/flex-skyline-demo")
-def flex_skyline_demo_ui():
-    # Same-origin copy of the Flex Skyline mockup for the OSPC mockup's "FLEX UI Demo"
-    # tab — the standalone :5005 copy is plain http and would be blocked as mixed
-    # content when embedded in the https mockup page.
-    return send_from_directory(str(BASE_DIR), "Flex-Skyline-New-Ui.html")
 
 
 @app.get("/opencenter")
@@ -3705,7 +3691,7 @@ def _feedback_smtp_settings():
     }
 
 
-def _feedback_send_mail(subject, body, admin_email, cc_email=None):
+def _feedback_send_mail(subject, body, admin_email):
     """Send via the configured relay. Returns a status string for the UI."""
     if not admin_email:
         return "no admin email configured"
@@ -3719,8 +3705,6 @@ def _feedback_send_mail(subject, body, admin_email, cc_email=None):
         msg["Subject"] = subject
         msg["From"] = st["sender"]
         msg["To"] = admin_email
-        if cc_email:
-            msg["Cc"] = cc_email
         msg.set_content(body)
         if st["port"] == 465:
             import ssl
@@ -3812,65 +3796,6 @@ def feedback_submit():
     items.append(entry)
     _feedback_save(items)
     return jsonify({"ok": True, "id": entry["id"], "email_status": entry["email_status"]})
-
-
-@app.post("/api/migration-request/submit")
-def migration_request_submit():
-    """Customer self-service migration request: sends a confirmation email to the
-    submitting customer, reusing the same SMTP relay as Improvement Feedbacks."""
-    data = request.get_json(silent=True) or {}
-    company = str(data.get("company") or "").strip()[:200]
-    contact = str(data.get("contact") or "").strip()[:200]
-    email = str(data.get("email") or "").strip()[:200]
-    if not company or not contact or not email:
-        return jsonify({"ok": False, "error": "company, contact and email are required"}), 400
-    send_to = str(data.get("sendTo") or "").strip()[:200]
-    cc_email = str(data.get("ccEmail") or "").strip()[:200]
-    # "Send Request To" is the primary destination when set (e.g. an intake/ops
-    # address); the customer's own email always rides along as a Cc so they keep
-    # a copy, unless it's also the primary recipient.
-    primary_to = send_to or email
-    cc_list = [addr for addr in ([email] if send_to else []) + [cc_email] if addr and addr != primary_to]
-    cc_combined = ", ".join(dict.fromkeys(cc_list)) or None
-    tenant = str(data.get("tenant") or "").strip()[:200]
-    region = str(data.get("region") or "").strip()[:200]
-    start_date = str(data.get("startDate") or "").strip()[:50]
-    completion_date = str(data.get("completionDate") or "").strip()[:50]
-    notes = str(data.get("notes") or "").strip()[:2000]
-    system_name = str(data.get("systemName") or "").strip()[:200]
-    archetype = str(data.get("archetype") or "").strip()[:100]
-    components = data.get("components") if isinstance(data.get("components"), list) else []
-
-    lines = [
-        f"Thanks {contact} - your migration to FLEX request has been received.",
-        "",
-        f"Company: {company}",
-        f"Tenant ID: {tenant}",
-        f"Target FLEX Region: {region}",
-        f"Start Date: {start_date}",
-        f"Completion Date: {completion_date}",
-    ]
-    if notes:
-        lines.append(f"Notes: {notes}")
-    lines += ["", f"Business System: {system_name} ({archetype})", "Components:"]
-    for c in components[:100]:
-        if not isinstance(c, dict):
-            continue
-        comp_name = str(c.get("name") or "").strip()[:200]
-        ospc_ip = str(c.get("ospcUrl") or "").strip()[:200]
-        flex_ip = str(c.get("flexUrl") or "").strip()[:200]
-        health_path = str(c.get("healthPath") or "").strip()[:200]
-        if comp_name:
-            lines.append(
-                f"  - {comp_name}: OSPC Source {ospc_ip or '(not yet provided)'} "
-                f"-> FLEX Target {flex_ip or '(not yet provided)'} "
-                f"[health: {health_path or '/health'}]"
-            )
-    lines += ["", "Our team will review and update you in the Migration Log."]
-
-    subject = f"[FLEX Migration Request] {company} - {system_name or archetype or 'New Request'}"
-    status = _feedback_send_mail(subject, "\n".join(lines), primary_to, cc_email=cc_combined)
-    return jsonify({"ok": True, "email_status": status})
 
 
 @app.get("/opencenter-intro-light")
@@ -21399,49 +21324,6 @@ def _r6_ref_is_ip(value: str) -> bool:
         return False
 
 
-def _r6_source_host_from_ref(value: str) -> str:
-    ref = str(value or '').strip()
-    if not ref:
-        return ''
-    if '://' in ref:
-        try:
-            from urllib.parse import urlparse
-            return (urlparse(ref).hostname or '').strip()
-        except Exception:
-            return ''
-    if '/' in ref:
-        return ''
-    if '@' in ref:
-        ref = ref.rsplit('@', 1)[-1]
-    if ':' in ref and ref.count(':') == 1:
-        ref = ref.rsplit(':', 1)[0]
-    return ref.strip()
-
-
-def _r6_is_vm_extractable_workload(name: str, form: str, workload: Dict[str, Any], component: Dict[str, Any]) -> Tuple[bool, str]:
-    form = str(form or "").strip().upper()
-    if form not in {"CONTAINERIZED", "PARTIALLY_CONTAINERIZED"}:
-        return False, "not a VM-backed container image target"
-    text = " ".join(str(x or "") for x in (
-        name,
-        workload.get("component"), workload.get("name"), workload.get("layer"),
-        workload.get("targetRuntimeResource"), workload.get("targetResource"), workload.get("kubernetesKind"),
-        component.get("name"), component.get("type"), component.get("componentType"), component.get("category"),
-        component.get("role"), component.get("runtime"), component.get("product"),
-        component.get("targetRuntimeResource"), component.get("targetResource"), component.get("containerizationDecision"),
-    )).lower().replace("_", " ").replace("-", " ")
-    if "gateway api" in text or "api gateway" in text or "gateway mobile ap" in text:
-        return False, "native/API gateway target - no VM application payload extraction"
-    source_lineage = workload.get("sourceLineage") if isinstance(workload.get("sourceLineage"), dict) else {}
-    source_ref = _r6_source_host_from_ref(str(
-        source_lineage.get("sourceVm") or workload.get("sourceVmId") or workload.get("vmId") or component.get("vmId") or component.get("serverId") or component.get("instanceId")
-        or workload.get("targetIp") or component.get("targetIp") or component.get("tgt") or component.get("ip") or ""
-    ))
-    if not source_ref:
-        return False, "no VM-backed source host available"
-    return True, ""
-
-
 def _r6_resolve_openstack_server_id(server_ref: str) -> str:
     ref = str(server_ref or "").strip()
     if not ref or not _r6_ref_is_ip(ref):
@@ -21502,133 +21384,38 @@ def _r6_origin_snapshot_inventory() -> List[Dict[str, str]]:
     return inventory
 
 
-def _r6_origin_server_inventory() -> List[Dict[str, str]]:
-    """Read source-region servers so Stage 9A can match snapshot names by VM name/id, not only business component name."""
-    try:
-        rows = _r6_openstack_json(["server", "list", "--long"])
-    except Exception:
-        return []
-    servers: List[Dict[str, str]] = []
-    for row in rows if isinstance(rows, list) else []:
-        if not isinstance(row, dict):
-            continue
-        server_id = str(row.get("ID") or row.get("Id") or row.get("id") or "").strip()
-        name = str(row.get("Name") or row.get("name") or "").strip()
-        text = " ".join(str(row.get(k) or "") for k in (
-            "Networks", "Addresses", "AccessIPv4", "accessIPv4", "Public Networks", "Private Networks"
-        ))
-        servers.append({"id": server_id, "name": name, "addresses": text, "raw": json.dumps(row, default=str)})
-    return servers
-
-
-def _r6_server_refs_for_source(source_ref: str, servers: List[Dict[str, str]]) -> List[str]:
-    ref = str(source_ref or "").strip()
-    refs: List[str] = []
-    if not ref:
-        return refs
-    ref_low = ref.lower()
-    for server in servers:
-        sid = str(server.get("id") or "")
-        name = str(server.get("name") or "")
-        raw = str(server.get("raw") or server.get("addresses") or "")
-        if ref_low in sid.lower() or ref_low in name.lower() or ref in raw:
-            refs.extend([sid, sid[:12], name])
-            if "-" in name:
-                refs.append(name.replace("-", " "))
-    return [x for x in refs if x]
-
-
-def _r6_snapshot_keywords(value: str) -> List[str]:
-    stop = {
-        "r6", "snap", "snapshot", "image", "img", "linsnap", "flex", "fresh",
-        "service", "server", "app", "application", "component", "the", "and",
-        "api", "http", "https", "local", "ospc", "mobile",
-    }
-    words = re.sub(r"[^A-Za-z0-9]+", " ", str(value or "").lower()).split()
-    out: List[str] = []
-    for word in words:
-        if len(word) < 3 or word in stop or word.isdigit():
-            continue
-        if re.fullmatch(r"20\d{6,}", word):
-            continue
-        if word not in out:
-            out.append(word)
-    return out
-
-
-def _r6_keyword_snapshot_candidates(inventory: List[Dict[str, str]], component_name: str, minimum: int = 3) -> List[Dict[str, Any]]:
-    """Return every active region snapshot, ranked from most probable to least probable for this Stage-1 component name."""
-    component_keywords = _r6_snapshot_keywords(component_name)
-    candidates: List[Dict[str, Any]] = []
-    for item in inventory:
-        image_name = str(item.get("name") or "")
-        image_keywords = set(_r6_snapshot_keywords(image_name))
-        matched = [kw for kw in component_keywords if kw in image_keywords]
-        candidate = dict(item)
-        candidate["matchedKeywords"] = matched
-        candidate["matchCount"] = len(matched)
-        candidate["componentKeywords"] = component_keywords
-        candidate["probable"] = len(matched) >= minimum
-        candidate["minimumKeywordMatch"] = minimum
-        # Stable score: exact keyword evidence dominates; name is only a deterministic tie-breaker.
-        candidate["score"] = (len(matched) * 1000) + min(len(matched), len(component_keywords))
-        candidates.append(candidate)
-    candidates.sort(key=lambda x: (int(x.get("matchCount") or 0), int(x.get("score") or 0), str(x.get("name") or "")), reverse=True)
-    return candidates
-
-
 def _r6_match_origin_snapshot(inventory: List[Dict[str, str]], *refs: str) -> Optional[Dict[str, str]]:
-    def norm(value: str) -> str:
-        return re.sub(r"[^a-z0-9]+", " ", str(value or "").lower()).strip()
-    def compact(value: str) -> str:
-        return re.sub(r"[^a-z0-9]+", "", str(value or "").lower())
     def tokens(value: str) -> List[str]:
-        stop = {"r6", "snap", "snapshot", "image", "img", "linsnap", "flex", "fresh", "server", "service"}
-        return [x for x in norm(value).split() if len(x) > 1 and x not in stop]
+        return [x for x in re.sub(r"[^a-z0-9]+", " ", str(value or "").lower()).split()
+                if len(x) > 1 and x not in {"r6", "snap", "linsnap", "flex", "fresh"}]
     best: Optional[Dict[str, str]] = None
     best_score = 0
-    ref_values = [str(r or "").strip() for r in refs if str(r or "").strip()]
     for item in inventory:
-        image_name = str(item.get("name") or "")
-        image_norm = norm(image_name)
-        image_compact = compact(image_name)
-        image_tokens = tokens(image_name)
+        image_tokens = tokens(item.get("name") or "")
         image_set = set(image_tokens)
         score = 0
-        for ref in ref_values:
-            ref_norm = norm(ref)
-            ref_compact = compact(ref)
+        for ref in refs:
             ref_tokens = tokens(ref)
-            if not ref_tokens and not ref_compact:
+            if not ref_tokens:
                 continue
-            if ref_compact and ref_compact in image_compact:
-                score = max(score, 120)
-            if ref_norm and ref_norm in image_norm:
-                score = max(score, 110)
-            if len(ref_compact) >= 8 and ref_compact[-8:] in image_compact:
-                score = max(score, 95)
             overlap = len(image_set.intersection(ref_tokens))
-            if overlap:
-                coverage = overlap / max(len(set(ref_tokens)), 1)
-                score = max(score, int(overlap * 12 + coverage * 45))
+            score = max(score, overlap * 10 + (20 if overlap == len(set(ref_tokens)) else 0))
         if score > best_score:
             best, best_score = item, score
-    return best if best_score >= 45 else None
+    return best if best_score >= 20 else None
 
 
 @app.post("/api/r6/capture-sources-build")
 def r6_capture_sources_build():
     """Stage 9 gate: capture only Stage-8-approved container sources, then reuse the
-    existing R6 bundle generator. Stage 9A uses a simple production-safe lineage:
-    create a fresh snapshot for every approved VM, then verify that the created
-    snapshots are active before Stage 9B extraction can proceed. A VM snapshot is
-    recorded as source lineage, never as a container image."""
+    existing R6 bundle generator. Stage 9A first reuses/discovers an approved snapshot;
+    when none is available, it creates a VM image or volume snapshot with the existing
+    OpenStack snapshot builder. A VM snapshot is recorded as source lineage, never as
+    a container image."""
     import hashlib as _hashlib, json as _json, time as _time
 
     data = request.get_json(silent=True) or {}
     dry_run = str(data.get("dry_run") or data.get("dryRun") or "").strip().lower() in ("1", "true", "yes", "on")
-    snapshot_action = str(data.get("snapshotAction") or ("verify" if data.get("snapshotOnly") else "create")).strip().lower()
-    verify_only = snapshot_action in {"scan", "verify"}
     incoming_cloud = data.get("cloud") if isinstance(data.get("cloud"), dict) else {}
     if incoming_cloud and not dry_run:
         try:
@@ -21671,23 +21458,23 @@ def r6_capture_sources_build():
     state_root = Path(os.environ.get("R6_CAPTURE_STATE_DIR") or (Path(os.path.expanduser("~")) / ".config" / "opencenter" / "r6" / "source-captures"))
     snapshots_path = state_root / "snapshot-index.json"
     snapshot_index = {}
-    state_root.mkdir(parents=True, exist_ok=True)
-    try:
-        snapshot_index = _json.loads(snapshots_path.read_text(encoding="utf-8")) if snapshots_path.exists() else {}
-    except Exception:
-        snapshot_index = {}
+    if not dry_run:
+        state_root.mkdir(parents=True, exist_ok=True)
+        try:
+            snapshot_index = _json.loads(snapshots_path.read_text(encoding="utf-8")) if snapshots_path.exists() else {}
+        except Exception:
+            snapshot_index = {}
 
     stamp = _time.strftime("%Y%m%d_%H%M%S")
     capture_rows: List[Dict[str, Any]] = []
     sanitized_workloads: List[Dict[str, Any]] = []
     blockers: List[str] = []
-    approved_count = reused_count = created_count = verified_count = missing_count = 0
+    approved_count = reused_count = created_count = 0
 
     try:
         origin_snapshots = _r6_origin_snapshot_inventory()
     except Exception as exc:
         return jsonify({"ok": False, "error": "Origin-region snapshot scan failed: %s" % exc}), 400
-    origin_servers: List[Dict[str, str]] = []
     origin_region = str((data.get("cloud") or {}).get("region") or os.environ.get("OS_REGION_NAME") or "origin")
 
     for w in workloads:
@@ -21698,7 +21485,6 @@ def r6_capture_sources_build():
         component = comp_by_name.get(name, {})
         paths = _r6_capture_paths(w, component)
         source_vm = str(w.get("sourceVmId") or w.get("vmId") or component.get("vmId") or component.get("serverId") or component.get("instanceId") or w.get("targetIp") or component.get("targetIp") or component.get("tgt") or component.get("ip") or (data.get("source_vm") or {}).get("host") or "").strip()
-        source_vm = _r6_source_host_from_ref(source_vm)
         row: Dict[str, Any] = {
             "component": name, "targetForm": form, "sourceVm": source_vm,
             "applicationPaths": paths, "excludedPaths": excluded_paths,
@@ -21707,20 +21493,10 @@ def r6_capture_sources_build():
             "snapshotIds": [], "extractionStatus": "N/A", "buildStatus": "N/A",
             "sourceChecksum": None, "lineage": {},
         }
-        extractable, extract_skip_reason = _r6_is_vm_extractable_workload(name, form, w, component)
-        if form in excluded_forms or form not in approved_forms or not extractable:
-            row["containerizationApproved"] = False
-            row["reason"] = extract_skip_reason or "not a Stage 8 VM-backed container-source target"
-            row.update({"snapshotStatus": "NOT_APPLICABLE", "extractionStatus": "N/A", "buildStatus": "N/A"})
+        if form in excluded_forms or form not in approved_forms:
+            row["reason"] = "not a Stage 8 container-source target"
             capture_rows.append(row)
-            skip_workload = dict(w)
-            skip_workload.update({
-                "readiness": "KEEP_ON_VM_FOR_NOW",
-                "extractionStatus": "N/A",
-                "buildStatus": "SKIPPED",
-                "skipReason": row["reason"],
-            })
-            sanitized_workloads.append(skip_workload)
+            sanitized_workloads.append(dict(w, readiness="KEEP_ON_VM_FOR_NOW") if form not in approved_forms else dict(w))
             continue
 
         approved_count += 1
@@ -21758,83 +21534,51 @@ def r6_capture_sources_build():
         snapshot_ids = cached.get("snapshotIds") or []
         snapshot_names = cached.get("snapshotNames") or []
         snap_kind = cached.get("snapshotKind") or _r6_capture_snapshot_kind(component, paths)
+        reusable = bool(cached and cached.get("sourceChecksum") == checksum and snapshot_ids)
+        if reusable:
+            try:
+                reusable = all(_r6_snapshot_status(sid, snap_kind) in ({"AVAILABLE"} if snap_kind == "volume_snapshot" else {"ACTIVE", "AVAILABLE"}) for sid in snapshot_ids)
+            except Exception:
+                reusable = False
         try:
-            if verify_only:
-                latest_active = bool(
-                    cached
-                    and cached.get("sourceChecksum") == checksum
-                    and snapshot_ids
-                    and all(_r6_snapshot_status(sid, snap_kind) in ({"AVAILABLE"} if snap_kind == "volume_snapshot" else {"ACTIVE", "AVAILABLE"}) for sid in snapshot_ids)
-                )
-                if latest_active:
-                    verified_count += 1
-                    snapshot_status = "VERIFIED_LATEST"
-                    row["verifiedLatest"] = True
-                    row["latestSnapshot"] = {
-                        "ids": snapshot_ids,
-                        "names": snapshot_names,
-                        "createdAt": cached.get("createdAt"),
-                        "region": cached.get("region") or origin_region,
-                    }
-                else:
-                    snapshot_ids = []
-                    snapshot_names = []
-                    missing_count += 1
-                    snapshot_status = "MISSING_FRESH_SNAPSHOT"
-                    row["verifiedLatest"] = False
+            if reusable:
+                reused_count += 1
+                snapshot_status = "REUSED"
             else:
-                snapshot_name = "r6-%s-%s-%s" % (
-                    re.sub(r"[^0-9A-Za-z_.-]+", "-", name).strip("-")[:48] or "component",
-                    re.sub(r"[^0-9A-Za-z_.-]+", "-", source_vm).strip("-")[:24] or "vm",
-                    stamp,
-                )
-                if dry_run:
-                    snap_kind = _r6_capture_snapshot_kind(component, paths)
-                    snapshot_ids = ["dryrun-%s" % snapshot_name]
+                found = _r6_match_origin_snapshot(origin_snapshots, name, w.get("sourceVmName"), source_vm)
+                if found:
+                    snap_kind = found["kind"]
+                    snapshot_ids = [found["id"]]
+                    snapshot_names = [found["name"]]
+                    reused_count += 1
+                    snapshot_status = "DISCOVERED"
                 else:
-                    snap_kind, snapshot_ids = _r6_create_snapshots(source_vm, volumes, snapshot_name)
-                snapshot_names = [snapshot_name]
-                created_count += len(snapshot_ids)
-                verified_count += len(snapshot_ids)
-                snapshot_status = "DRY_RUN_CREATE" if dry_run else "CREATED_AND_VERIFIED"
-                row["verifiedLatest"] = True
-                row["latestSnapshot"] = {
-                    "ids": snapshot_ids,
-                    "names": snapshot_names,
-                    "createdAt": stamp,
-                    "region": origin_region,
-                }
-            if not dry_run and snapshot_ids:
+                    snapshot_name = "r6-%s-%s" % (re.sub(r"[^0-9A-Za-z_.-]+", "-", name).strip("-")[:48] or "component", stamp)
+                    if dry_run:
+                        snap_kind = _r6_capture_snapshot_kind(component, paths)
+                        snapshot_ids = ["dryrun-%s" % snapshot_name]
+                    else:
+                        snap_kind, snapshot_ids = _r6_create_snapshots(source_vm, volumes, snapshot_name)
+                    snapshot_names = [snapshot_name]
+                    created_count += len(snapshot_ids)
+                    snapshot_status = "DRY_RUN_CREATE" if dry_run else "CREATED"
+            if not dry_run:
                 snapshot_index[cache_key] = {
                     "component": name, "sourceVm": source_vm, "snapshotKind": snap_kind,
                     "snapshotIds": snapshot_ids, "snapshotNames": snapshot_names, "sourceChecksum": checksum,
-                    "createdAt": stamp, "region": origin_region, "status": "ACTIVE",
+                    "createdAt": stamp, "status": "AVAILABLE",
                 }
         except Exception as exc:
             row.update({"snapshotStatus": "BLOCKED", "extractionStatus": "BLOCKED", "buildStatus": "BLOCKED", "reason": str(exc)})
             blockers.append("%s: %s" % (name, exc))
             capture_rows.append(row)
             continue
-        if snapshot_status == "MISSING_FRESH_SNAPSHOT":
-            row.update({
-                "snapshotStatus": snapshot_status, "snapshotIds": [], "snapshotNames": [],
-                "snapshotRegion": origin_region, "snapshotMode": "OPENSTACK_CLI",
-                "extractionStatus": "WAITING_FOR_FRESH_SNAPSHOT",
-                "buildStatus": "WAITING_FOR_FRESH_SNAPSHOT",
-                "sourceChecksum": checksum,
-                "lineage": {"sourceVm": source_vm, "volumeIds": lineage_seed["volumes"], "snapshotIds": [], "sourceChecksum": checksum},
-            })
-            capture_rows.append(row)
-            sanitized_workloads.append(dict(w, readiness=snapshot_status))
-            continue
-        if not paths and not data.get("snapshotOnly"):
+        if not paths:
             row.update({"snapshotStatus": "BLOCKED", "extractionStatus": "BLOCKED", "buildStatus": "BLOCKED",
                         "reason": "live scan did not define applicationPaths"})
             blockers.append("%s: live scan applicationPaths are required" % name)
             capture_rows.append(row)
             continue
-        if not paths and data.get("snapshotOnly"):
-            row.update({"extractionStatus": "NEEDS_LIVE_SCAN_PATHS", "buildStatus": "WAITING_FOR_EXTRACTION_PATHS"})
         row.update({
             "snapshotStatus": snapshot_status, "snapshotIds": snapshot_ids,
             "snapshotNames": snapshot_names, "snapshotRegion": origin_region,
@@ -21844,7 +21588,7 @@ def r6_capture_sources_build():
         })
         capture_rows.append(row)
         clean = dict(w)
-        clean.update({"sourcePath": (paths[0] if paths else ""), "applicationPaths": paths, "excludedPaths": excluded_paths, "sourceChecksum": checksum, "sourceLineage": row["lineage"]})
+        clean.update({"sourcePath": paths[0], "applicationPaths": paths, "excludedPaths": excluded_paths, "sourceChecksum": checksum, "sourceLineage": row["lineage"]})
         sanitized_workloads.append(clean)
 
     if approved_count == 0:
@@ -21854,35 +21598,15 @@ def r6_capture_sources_build():
 
     if not dry_run:
         snapshots_path.write_text(_json.dumps(snapshot_index, indent=2), encoding="utf-8")
-    try:
-        refreshed_origin_snapshots = _r6_origin_snapshot_inventory()
-    except Exception:
-        refreshed_origin_snapshots = origin_snapshots
-    snapshot_pairs = [
-        {
-            "component": r.get("component"),
-            "sourceVm": r.get("sourceVm"),
-            "snapshotStatus": r.get("snapshotStatus"),
-            "snapshotIds": r.get("snapshotIds") or [],
-            "snapshotNames": r.get("snapshotNames") or [],
-            "verifiedLatest": bool((r.get("snapshotIds") or []) and r.get("verifiedLatest") is not False),
-            "readyForExtract": bool((r.get("snapshotIds") or []) and r.get("verifiedLatest") is not False),
-        }
-        for r in capture_rows
-        if r.get("containerizationApproved") and r.get("extractionStatus") != "N/A"
-    ]
     capture = {
         "id": "r6-source-capture-%s" % stamp, "generatedAt": stamp,
         "approvedCount": approved_count, "reusedSnapshots": reused_count,
-        "createdSnapshots": created_count, "verifiedSnapshots": verified_count,
-        "missingSnapshots": missing_count, "components": capture_rows, "snapshotPairs": snapshot_pairs, "blockers": [],
+        "createdSnapshots": created_count, "components": capture_rows, "blockers": [],
         "snapshotMode": "OPENSTACK_CLI",
-        "snapshotAction": snapshot_action,
-        "handoffStage": "9A_CREATE_AND_VERIFY_FRESH_VM_SNAPSHOTS",
+        "handoffStage": "9A_BUILD_VM_SNAPSHOTS",
         "nextStage": "9B_EXTRACT_VM_DATA",
         "originRegion": origin_region,
-        "discoveredSnapshots": refreshed_origin_snapshots,
-        "discoveredServers": origin_servers,
+        "discoveredSnapshots": origin_snapshots,
         "snapshotIndexPath": ("<dry-run:not-written>" if dry_run else str(snapshots_path)),
         "dryRun": dry_run,
     }
@@ -21906,7 +21630,7 @@ def r6_capture_sources_build():
             (out_dir / "source-capture-manifest.json").write_text(_json.dumps(capture, indent=2), encoding="utf-8")
             (out_dir / "source-lineage.json").write_text(_json.dumps({
                 "businessSystem": bundle.get("businessSystemName"),
-                "components": [{"component": r["component"], "lineage": r.get("lineage", {})} for r in capture_rows if r.get("containerizationApproved") and r.get("lineage")],
+                "components": [{"component": r["component"], "lineage": r.get("lineage", {})} for r in capture_rows if r.get("containerizationApproved")],
             }, indent=2), encoding="utf-8")
             files = body.setdefault("files", [])
             for rel in ("source-capture-manifest.json", "source-lineage.json"):
@@ -21915,50 +21639,6 @@ def r6_capture_sources_build():
         except Exception as exc:
             body.setdefault("bundle_validation", {}).setdefault("warnings", []).append("source capture evidence write failed: %s" % exc)
     return jsonify(body), status
-
-
-@app.post("/api/r6/validate-snapshot-matches")
-def r6_validate_snapshot_matches():
-    """Persist user-validated Stage 9A snapshot selections into the source-capture snapshot index."""
-    data = request.get_json(silent=True) or {}
-    matches = data.get("matches") if isinstance(data.get("matches"), list) else []
-    state_root = Path(os.environ.get("R6_CAPTURE_STATE_DIR") or (Path(os.path.expanduser("~")) / ".config" / "opencenter" / "r6" / "source-captures"))
-    snapshots_path = state_root / "snapshot-index.json"
-    state_root.mkdir(parents=True, exist_ok=True)
-    try:
-        snapshot_index = json.loads(snapshots_path.read_text(encoding="utf-8")) if snapshots_path.exists() else {}
-    except Exception:
-        snapshot_index = {}
-    saved: List[Dict[str, Any]] = []
-    errors: List[str] = []
-    for row in matches:
-        if not isinstance(row, dict):
-            continue
-        component = str(row.get("component") or "").strip()
-        source_vm = str(row.get("sourceVm") or "").strip()
-        checksum = str(row.get("sourceChecksum") or "").strip()
-        snapshot_id = str(row.get("snapshotId") or "").strip()
-        snapshot_name = str(row.get("snapshotName") or "").strip()
-        snapshot_kind = str(row.get("snapshotKind") or "vm_image_snapshot").strip() or "vm_image_snapshot"
-        if not (component and source_vm and checksum and snapshot_id):
-            errors.append("%s: component/source/checksum/snapshotId required" % (component or "unknown"))
-            continue
-        cache_key = "%s:%s:%s" % (source_vm, component, checksum[:16])
-        snapshot_index[cache_key] = {
-            "component": component,
-            "sourceVm": source_vm,
-            "snapshotKind": snapshot_kind,
-            "snapshotIds": [snapshot_id],
-            "snapshotNames": [snapshot_name] if snapshot_name else [],
-            "sourceChecksum": checksum,
-            "createdAt": time.strftime("%Y%m%d_%H%M%S"),
-            "status": "USER_VALIDATED",
-        }
-        saved.append({"component": component, "sourceVm": source_vm, "snapshotId": snapshot_id, "snapshotName": snapshot_name})
-    if errors:
-        return jsonify({"ok": False, "error": "; ".join(errors), "saved": saved}), 400
-    snapshots_path.write_text(json.dumps(snapshot_index, indent=2), encoding="utf-8")
-    return jsonify({"ok": True, "saved": saved, "snapshotIndexPath": str(snapshots_path)}), 200
 
 
 @app.post("/api/r6/generate-bundle")
@@ -22028,22 +21708,7 @@ def r6_generate_bundle():
         login = 'docker login %s -u "$REGISTRY_USER" -p "$REGISTRY_PASSWORD"' % reg_host
 
     workloads = bundle.get("workloads") or []
-    # Defense in depth: bundle generation is an API boundary and must not trust UI
-    # readiness alone. Only VM-backed CONTAINERIZED/PARTIALLY_CONTAINERIZED rows may
-    # produce Dockerfiles or extraction commands. Kubernetes-native gateways, retained
-    # VMs, databases and operator-managed services remain in topology/platform output.
-    deployable = []
-    for workload in workloads:
-        if not isinstance(workload, dict) or str(workload.get("readiness")) == "KEEP_ON_VM_FOR_NOW":
-            continue
-        candidate = dict(workload)
-        if not (candidate.get("sourceLineage") or candidate.get("sourceVmId") or candidate.get("vmId") or candidate.get("targetIp")):
-            candidate["targetIp"] = vm_host
-        candidate_name = str(candidate.get("component") or candidate.get("name") or "component")
-        candidate_form = str(candidate.get("targetForm") or "").strip().upper()
-        extractable, _skip_reason = _r6_is_vm_extractable_workload(candidate_name, candidate_form, candidate, {})
-        if extractable:
-            deployable.append(workload)
+    deployable = [w for w in workloads if str(w.get("readiness")) != "KEEP_ON_VM_FOR_NOW"]
     tag = stamp
 
     # Platform requirements derived from real per-component decisions, not invented: an
@@ -22324,19 +21989,12 @@ def r6_generate_bundle():
         )
         extract_lines += ['echo "== extract approved application paths for %s =="' % comp,
                           'rm -rf "dockerfiles/%s/app" && mkdir -p "dockerfiles/%s/app"' % (comp, comp)]
-        component_vm_host = _r6_source_host_from_ref(str((w.get("sourceLineage") or {}).get("sourceVm") or w.get("sourceVmId") or w.get("targetIp") or vm_host or ""))
-        if not component_vm_host:
-            raise ValueError("%s: no VM-backed source host available for extraction" % comp)
-        extract_lines.append('command -v scp >/dev/null 2>&1 || { echo "[BLOCKED] OpenSSH scp client is required" >&2; exit 43; }')
         for src_path in app_paths:
-            # Force the SFTP subsystem. Unlike rsync-over-ssh, SFTP does not execute the
-            # remote login shell, so banners/.bashrc output cannot corrupt its protocol.
             extract_lines.append(
-                'scp -s -r -q -i "$SSH_KEY" -o BatchMode=yes -o StrictHostKeyChecking=no '
-                '"$VM_USER@%s:%s/." "dockerfiles/%s/app/"' % (shlex.quote(component_vm_host), src_path.rstrip("/"), comp)
+                'rsync -a --relative %s -e "ssh -i $SSH_KEY -o StrictHostKeyChecking=no" '
+                '"$VM_USER@$VM_HOST:%s" "dockerfiles/%s/app/"' % (exclude_args, src_path, comp)
             )
         extract_lines += [
-            'find "dockerfiles/%s/app" -depth \\( -type d \\( -name .ssh -o -path "*/var/log" -o -path "*/tmp" -o -path "*/etc/ssh" -o -path "*/var/lib/postgresql" -o -path "*/var/lib/mysql" -o -path "*/var/lib/mongodb" -o -path "*/var/lib/redis" \\) -o -type f \\( -name "*.pem" -o -name "*.key" -o -name "*.p12" -o -name "*.pfx" -o -name "*.bak" -o -name "*.backup" -o -name "*~" \\) \\) -exec rm -rf -- {} +' % comp,
             'if grep -RIlE --exclude-dir=.git \'-----BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY-----|'
             '(password|client_secret|secret_key|api_key)[[:space:]]*[:=][[:space:]]*[^$[:space:]]\' '
             '"dockerfiles/%s/app"; then echo "[BLOCKED] secret material remains in %s build context" >&2; exit 41; fi' % (comp, comp),
@@ -24146,9 +23804,6 @@ def patch_config_file():
     body = request.get_json(force=True, silent=True) or {}
     cfg_path = (body.get("path") or "").strip()
     fields = body.get("fields") or {}
-    delete_fields = body.get("delete_fields") or []
-    git_auth_mode = str(body.get("git_auth_mode") or "").strip().lower()
-    ensure_opencenter_credentials = bool(body.get("ensure_opencenter_credentials"))
     disable_services = body.get("disable_services") or []
     enable_services  = body.get("enable_services")  or []
     if not cfg_path:
@@ -24232,83 +23887,6 @@ def patch_config_file():
             if set_nested(data, dot_path, value):
                 patched += 1
 
-        for dot_path in delete_fields:
-            if delete_nested(data, str(dot_path)):
-                patched += 1
-
-        # GitOps auth is mutually exclusive in the OpenCenter v2 schema. Cluster
-        # init defaults to HTTPS/token, so selecting SSH in the dashboard must also
-        # remove that default token block; merely adding auth.ssh leaves validation
-        # with two auth methods (or with the old HTTPS URL).
-        if git_auth_mode:
-            if git_auth_mode not in {"ssh", "token"}:
-                return jsonify({"ok": False, "error": "git_auth_mode must be ssh or token"}), 400
-            opposite = (
-                "opencenter.gitops.auth.token"
-                if git_auth_mode == "ssh"
-                else "opencenter.gitops.auth.ssh"
-            )
-            if delete_nested(data, opposite):
-                patched += 1
-            repo_path = "opencenter.gitops.repository.url"
-            repo_url = str(get_nested(data, repo_path) or "").strip()
-            if git_auth_mode == "ssh":
-                web_match = re.match(r"^https?://([^/]+)/(.+)$", repo_url, re.IGNORECASE)
-                scp_match = re.match(r"^git@([^:]+):(.+)$", repo_url, re.IGNORECASE)
-                if web_match:
-                    repo_url = f"ssh://git@{web_match.group(1)}/{web_match.group(2)}"
-                elif scp_match:
-                    repo_url = f"ssh://git@{scp_match.group(1)}/{scp_match.group(2)}"
-            elif git_auth_mode == "token":
-                ssh_match = re.match(r"^ssh://(?:git@)?([^/]+)/(.+)$", repo_url, re.IGNORECASE)
-                if ssh_match:
-                    repo_url = f"https://{ssh_match.group(1)}/{ssh_match.group(2)}"
-            if not repo_url:
-                return jsonify({
-                    "ok": False,
-                    "error": "GitOps repository URL is required before validation",
-                }), 400
-            if repo_url and set_nested(data, repo_path, repo_url):
-                patched += 1
-
-        generated_credentials = []
-        if ensure_opencenter_credentials:
-            # Headlamp is part of the generated platform and its OIDC secret cannot
-            # remain CHANGEME. Generate it server-side so it never has to be entered
-            # into or exposed by the browser form.
-            import secrets as _secrets
-            headlamp_path = "secrets.headlamp.oidc_client_secret"
-            headlamp_secret = str(get_nested(data, headlamp_path) or "").strip()
-            if not headlamp_secret or headlamp_secret.upper() == "CHANGEME":
-                if set_nested(data, headlamp_path, _secrets.token_urlsafe(36)):
-                    patched += 1
-                generated_credentials.append(headlamp_path)
-
-        credential_checks = {}
-        if git_auth_mode == "ssh":
-            private_key = str(get_nested(data, "opencenter.gitops.auth.ssh.private_key") or "").strip()
-            public_key = str(get_nested(data, "opencenter.gitops.auth.ssh.public_key") or "").strip()
-            private_path = os.path.expanduser(private_key)
-            public_path = os.path.expanduser(public_key)
-            credential_checks = {
-                "auth_mode": "ssh",
-                "private_key": private_key,
-                "private_key_exists": bool(private_key and os.path.isfile(private_path)),
-                "public_key": public_key,
-                "public_key_exists": bool(public_key and os.path.isfile(public_path)),
-            }
-            if not credential_checks["private_key_exists"] or not credential_checks["public_key_exists"]:
-                missing = []
-                if not credential_checks["private_key_exists"]:
-                    missing.append(private_key or "private key path")
-                if not credential_checks["public_key_exists"]:
-                    missing.append(public_key or "public key path")
-                return jsonify({
-                    "ok": False,
-                    "error": "OpenCenter SSH credential is missing: " + ", ".join(missing),
-                    "credential_checks": credential_checks,
-                }), 400
-
         openstack_fields = fields if isinstance(fields, dict) else {}
         target_region = normalize_flex_region(
             str(
@@ -24389,14 +23967,7 @@ def patch_config_file():
 
         with open(cfg_path, "w", encoding="utf-8") as f:
             yaml.safe_dump(data, f, sort_keys=False, default_flow_style=False)
-        return jsonify({
-            "ok": True,
-            "patched": patched,
-            "path": cfg_path,
-            "git_auth_mode": git_auth_mode or None,
-            "credential_checks": credential_checks,
-            "generated_credentials": generated_credentials,
-        })
+        return jsonify({"ok": True, "patched": patched, "path": cfg_path})
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500
 

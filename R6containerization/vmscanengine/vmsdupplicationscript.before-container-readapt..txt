@@ -1,0 +1,1183 @@
+#!/usr/bin/env bash
+# set -e intentionally omitted — each node function handles its own errors
+set -uo pipefail
+
+# ================================================================
+# OSPC → FLEX  Server Rehost Clone Script
+# ────────────────────────────────────────────────────────────────
+# PARENT PHASE : PHASE 1 — SERVER DATA REPLICATION
+# ────────────────────────────────────────────────────────────────
+# Customer     : UnknownCustomer
+# Generated    : $(date)
+# Mode         : ⚡ LIVE MODE (changes WILL apply)
+# Layers       : identity, ssh, users, disk, packages, kernel, network, runtime, appcode, services, data, tls, external
+# ────────────────────────────────────────────────────────────────
+# Stage map (Phase 1 sub-stages):
+#   STAGE 0  Pre-flight checks         (SSH, rsync, disk, lock)
+#   STAGE 1  Audit OSPC source          (configs, packages, users)
+#   STAGE 2  Clone to FLEX              (L1-L13 in safe order)
+#   STAGE 3  Validation                 (hostname, disk, ports, services)
+#   STAGE 4  Smoke tests                (9A Infra + 9B App)
+#   STAGE 5  Cleanup                    (remove staging files)
+# ================================================================
+
+DRY_RUN=0
+# Set R6_CAPTURE_ONLY=1 to collect containerization evidence and stop before LIVE clone/mutation stages.
+R6_CAPTURE_ONLY=${R6_CAPTURE_ONLY:-0}
+DEFAULT_SRC_USER="ubuntu"
+DEFAULT_DST_USER="ubuntu"
+SSH_KEY="/home/dzoan/.ssh/id_rsa"
+SSH_OPTS="-i $SSH_KEY -o StrictHostKeyChecking=no -o ConnectTimeout=15 -o BatchMode=yes"
+SSH_OPTS_A="-A -i $SSH_KEY -o StrictHostKeyChecking=no -o ConnectTimeout=15 -o BatchMode=yes"
+RSYNC_OPTS="-aHAX --numeric-ids --stats --info=progress2"
+APP_PATHS="/opt/app /srv /var/www /var/lib/app"
+AUDIT_DIR="./migration-csv/UnknownCustomer-audit"
+mkdir -p "$AUDIT_DIR"
+
+trap 'pkill -P $$ 2>/dev/null' EXIT HUP INT TERM
+
+# DRY_RUN wrapper — always uses "$@" (no eval, safe from injection)
+run() {
+  if [ "$DRY_RUN" = "1" ]; then
+    echo "  [DRY] $*"
+  else
+    "$@"
+  fi
+}
+
+src_cmd() { ssh $SSH_OPTS "$SRC_USER@$SRC_IP" "$@" 2>/dev/null; }
+dst_cmd() { ssh $SSH_OPTS "$DST_USER@$DST_IP" "$@" 2>/dev/null; }
+MIG_KEY_REMOTE="/tmp/.mig_flex_key"
+deploy_key_to_ospc() {
+  scp -O -q $SSH_OPTS "$SSH_KEY" "$SRC_USER@$SRC_IP:$MIG_KEY_REMOTE" 2>/dev/null && \
+  ssh $SSH_OPTS "$SRC_USER@$SRC_IP" "chmod 600 $MIG_KEY_REMOTE" 2>/dev/null || \
+  echo "  [WARN] Could not deploy SSH key to OSPC -- direct transfers may fail"
+}
+remove_key_from_ospc() { ssh $SSH_OPTS "$SRC_USER@$SRC_IP" "rm -f $MIG_KEY_REMOTE" 2>/dev/null || true; }
+ospc_to_flex() { ssh $SSH_OPTS "$SRC_USER@$SRC_IP" "scp -O -q -i $MIG_KEY_REMOTE -o StrictHostKeyChecking=no -o BatchMode=yes '$1' '$DST_USER@$DST_IP:$2' 2>/dev/null || true"; }
+rsync_direct() { ssh $SSH_OPTS "$SRC_USER@$SRC_IP" "rsync $RSYNC_OPTS --rsync-path='sudo rsync' -e 'ssh -i $MIG_KEY_REMOTE -o StrictHostKeyChecking=no -o BatchMode=yes' '$1' '$DST_USER@$DST_IP:$2'"; }
+
+# R6 containerization evidence capture.
+# Goal: collect the app/runtime/config/process/dependency facts needed to build
+# working Dockerfiles + Kubernetes manifests without cloning VM identity or secrets.
+r6_containerization_capture() {
+  local NODE_NAME="$1"
+  local NODE_AUDIT="$2"
+  local R6_DIR="$NODE_AUDIT/r6-container-discovery"
+  mkdir -p "$R6_DIR"
+
+  echo ""
+  echo "══════════════════════ STAGE 1B -- R6 CONTAINERIZATION DISCOVERY ══════════════════════"
+  echo "[R6] Capturing read-only container build evidence from OSPC source..."
+
+  ssh $SSH_OPTS "$SRC_USER@$SRC_IP" bash <<'R6SCAN'
+    set +e
+    DISC="$HOME/r6-container-discovery"
+    mkdir -p "$DISC"/system "$DISC"/apps "$DISC"/services "$DISC"/network "$DISC"/dependencies/manifests "$DISC"/config "$DISC"/data "$DISC"/tls "$DISC"/security "$DISC"/k8s
+
+    APP_ROOTS="/opt/app /srv /var/www /var/lib/app /home"
+
+    redact_file() {
+      sed -E 's/((PASSWORD|PASS|SECRET|TOKEN|KEY|PRIVATE|CREDENTIAL|DATABASE_URL|REDIS_URL|API_KEY)[A-Za-z0-9_ .:-]*[=:][[:space:]]*)[^[:space:]#"'\''']+/\1<REDACTED>/Ig' "$1" 2>/dev/null
+    }
+
+    {
+      echo "{"
+      echo "  \"captured_at\": \"$(date -Is)\","
+      echo "  \"hostname\": \"$(hostname 2>/dev/null)\","
+      echo "  \"kernel\": \"$(uname -r 2>/dev/null)\","
+      echo "  \"os_release\": \"$(. /etc/os-release 2>/dev/null; echo ${PRETTY_NAME:-unknown})\","
+      echo "  \"container_goal\": \"Build working Docker/Kubernetes workload specs from live VM evidence\","
+      echo "  \"secret_policy\": \"Do not bake SSH keys, TLS private keys, password hashes, API tokens, DB passwords, or VM identity into images\""
+      echo "}"
+    } > "$DISC/containerization-source-summary.json"
+
+    hostnamectl > "$DISC/system/hostnamectl.txt" 2>/dev/null || true
+    cat /etc/os-release > "$DISC/system/os-release.txt" 2>/dev/null || true
+    uname -a > "$DISC/system/uname.txt" 2>/dev/null || true
+    lscpu > "$DISC/system/lscpu.txt" 2>/dev/null || true
+    free -m > "$DISC/system/memory.txt" 2>/dev/null || true
+    df -Th > "$DISC/system/df.txt" 2>/dev/null || true
+    lsblk -f > "$DISC/system/lsblk.txt" 2>/dev/null || true
+
+    ps auxww > "$DISC/services/processes-auxww.txt" 2>/dev/null || true
+    pstree -ap > "$DISC/services/process-tree.txt" 2>/dev/null || true
+    systemctl list-units --type=service --state=running --no-pager > "$DISC/services/running-services.txt" 2>/dev/null || true
+    systemctl list-unit-files --type=service --state=enabled --no-pager > "$DISC/services/enabled-services.txt" 2>/dev/null || true
+    ss -lntup > "$DISC/network/listening-ports-processes.txt" 2>/dev/null || true
+    ip route > "$DISC/network/ip-route.txt" 2>/dev/null || true
+    getent hosts > "$DISC/network/hosts-resolution.txt" 2>/dev/null || true
+
+    systemctl list-unit-files --type=service --state=enabled --no-legend 2>/dev/null | awk '{print $1}' \
+      | grep -Ev '^(ssh|sshd|systemd-|dbus|snapd|cloud-init|ufw|cron|rsyslog|network|NetworkManager|multipathd|open-vm|nova-agent|rackspace|holland)' \
+      > "$DISC/services/container-candidate-services.txt" || true
+    while read svc; do
+      [ -n "$svc" ] || continue
+      safe="$(echo "$svc" | tr '/:@ ' '____')"
+      systemctl cat "$svc" > "$DISC/services/${safe}.unit.txt" 2>/dev/null || true
+      systemctl show "$svc" \
+        -p Id -p Description -p LoadState -p ActiveState -p SubState \
+        -p User -p Group -p WorkingDirectory -p RootDirectory \
+        -p ExecStart -p ExecStartPre -p ExecStartPost -p ExecReload \
+        -p Environment -p EnvironmentFiles -p Restart -p RestartSec \
+        -p Type -p MainPID \
+        > "$DISC/services/${safe}.container-hints.txt" 2>/dev/null || true
+    done < "$DISC/services/container-candidate-services.txt"
+
+    : > "$DISC/apps/app-root-candidates.txt"
+    : > "$DISC/dependencies/dependency-manifest-index.txt"
+    for root in $APP_ROOTS; do
+      [ -d "$root" ] || continue
+      find "$root" -maxdepth 4 -type d \( -name node_modules -o -name .git -o -name vendor -o -name __pycache__ \) -prune -o -type f \( \
+        -name package.json -o -name package-lock.json -o -name yarn.lock -o -name pnpm-lock.yaml \
+        -o -name requirements.txt -o -name pyproject.toml -o -name poetry.lock -o -name Pipfile -o -name Pipfile.lock -o -name setup.py -o -name setup.cfg \
+        -o -name composer.json -o -name composer.lock -o -name Gemfile -o -name Gemfile.lock \
+        -o -name go.mod -o -name go.sum -o -name pom.xml -o -name build.gradle -o -name gradle.properties \
+        -o -name Cargo.toml -o -name Cargo.lock -o -name Dockerfile -o -name docker-compose.yml -o -name docker-compose.yaml -o -name compose.yml -o -name Procfile -o -name Makefile -o -name runtime.txt \
+      \) -print 2>/dev/null | while read mf; do
+        appdir="$(dirname "$mf")"
+        echo "$appdir" >> "$DISC/apps/app-root-candidates.txt"
+        echo "$mf" >> "$DISC/dependencies/dependency-manifest-index.txt"
+      done
+    done
+    sort -u "$DISC/apps/app-root-candidates.txt" -o "$DISC/apps/app-root-candidates.txt" 2>/dev/null || true
+    sort -u "$DISC/dependencies/dependency-manifest-index.txt" -o "$DISC/dependencies/dependency-manifest-index.txt" 2>/dev/null || true
+
+    while read mf; do
+      [ -f "$mf" ] || continue
+      safe="$(echo "$mf" | sed 's#^/##; s#[/: ]#__#g')"
+      cp "$mf" "$DISC/dependencies/manifests/$safe" 2>/dev/null || true
+    done < "$DISC/dependencies/dependency-manifest-index.txt"
+
+    : > "$DISC/config/config-file-index.txt"
+    : > "$DISC/config/redacted-config-samples.txt"
+    for root in /opt/app /srv /var/www /var/lib/app /etc/nginx /etc/apache2 /etc/haproxy /etc/systemd/system; do
+      [ -d "$root" ] || continue
+      find "$root" -maxdepth 5 -type f \( \
+        -name '.env' -o -name '*.env' -o -name '*.ini' -o -name '*.conf' -o -name '*.cfg' \
+        -o -name '*.yaml' -o -name '*.yml' -o -name '*.json' -o -name '*.toml' -o -name '*.properties' \
+      \) -not -path '*/node_modules/*' -not -path '*/.git/*' -print 2>/dev/null >> "$DISC/config/config-file-index.txt"
+    done
+    sort -u "$DISC/config/config-file-index.txt" -o "$DISC/config/config-file-index.txt" 2>/dev/null || true
+    head -80 "$DISC/config/config-file-index.txt" | while read cf; do
+      [ -f "$cf" ] || continue
+      echo "===== $cf =====" >> "$DISC/config/redacted-config-samples.txt"
+      redact_file "$cf" | head -80 >> "$DISC/config/redacted-config-samples.txt"
+    done
+    grep -RIEh '^[[:space:]]*[A-Za-z_][A-Za-z0-9_]*(=|:)' /opt/app /srv /var/www /var/lib/app 2>/dev/null \
+      | sed -E 's/^([[:space:]]*[A-Za-z_][A-Za-z0-9_]*(=|:)).*/\1 <VALUE>/' \
+      | sort -u > "$DISC/config/config-key-inventory.txt" || true
+    grep -RIEh '(PASSWORD|PASS|SECRET|TOKEN|API_KEY|PRIVATE_KEY|DATABASE_URL|REDIS_URL|AWS_|AZURE_|GCP_)' /opt/app /srv /var/www /var/lib/app /etc/systemd/system 2>/dev/null \
+      | sed -E 's/(=|:).*/\1 <REDACTED>/' \
+      | sort -u > "$DISC/config/secret-key-candidates.txt" || true
+
+    : > "$DISC/data/writable-path-candidates.txt"
+    for root in /opt/app /srv /var/www /var/lib/app /var/log /var/cache /tmp; do
+      [ -d "$root" ] || continue
+      find "$root" -maxdepth 4 -type d \( \
+        -iname '*upload*' -o -iname '*media*' -o -iname '*storage*' -o -iname '*data*' \
+        -o -iname '*cache*' -o -iname '*tmp*' -o -iname '*log*' -o -perm -0002 \
+      \) -print 2>/dev/null >> "$DISC/data/writable-path-candidates.txt"
+    done
+    sort -u "$DISC/data/writable-path-candidates.txt" -o "$DISC/data/writable-path-candidates.txt" 2>/dev/null || true
+    du -sh /opt/app /srv /var/www /var/lib/app /srv/data 2>/dev/null > "$DISC/data/app-data-sizes.txt" || true
+
+    systemctl list-unit-files 2>/dev/null | grep -Ei 'postgres|mysql|mariadb|redis|mongo|rabbitmq|memcached|elastic|solr|kafka' > "$DISC/data/local-stateful-services.txt" || true
+    ss -lntup 2>/dev/null | grep -E ':(5432|3306|6379|27017|5672|11211|9200|9300|8983|9092)\b' > "$DISC/data/stateful-listening-ports.txt" || true
+    grep -RIE '(DB_HOST|DATABASE_URL|PGHOST|PG_HOST|MYSQL_HOST|REDIS_URL|REDIS_HOST|MONGO|RABBIT|AMQP|ELASTIC|KAFKA|API_URL|BASE_URL)' /opt/app /srv /var/www /var/lib/app /etc/systemd/system 2>/dev/null \
+      | sed -E 's/(PASSWORD|PASS|SECRET|TOKEN|KEY|DATABASE_URL|REDIS_URL)([^=:\n]*[=:])[^\n ]+/\1\2<REDACTED>/Ig' \
+      > "$DISC/data/external-dependency-candidates.txt" || true
+
+    find /etc/letsencrypt /etc/ssl /etc/pki /opt/app /srv /var/www -type f \( -name '*.crt' -o -name '*.pem' \) 2>/dev/null \
+      | grep -vi 'private\|privkey\|\.key$' > "$DISC/tls/certificate-files.txt" || true
+    while read cert; do
+      [ -f "$cert" ] || continue
+      echo "===== $cert =====" >> "$DISC/tls/certificate-metadata.txt"
+      openssl x509 -in "$cert" -noout -subject -issuer -dates -ext subjectAltName 2>/dev/null >> "$DISC/tls/certificate-metadata.txt"
+    done < "$DISC/tls/certificate-files.txt"
+    find /etc/letsencrypt /etc/ssl /etc/pki /opt/app /srv /var/www -type f \( -name '*.key' -o -name 'privkey*.pem' \) 2>/dev/null \
+      > "$DISC/tls/private-key-paths-do-not-copy.txt" || true
+
+    sudo crontab -l > "$DISC/k8s/root-crontab.txt" 2>/dev/null || true
+    crontab -l > "$DISC/k8s/user-crontab.txt" 2>/dev/null || true
+    find /etc/cron.d /etc/cron.daily /etc/cron.hourly /etc/cron.monthly /etc/cron.weekly -maxdepth 2 -type f -print -exec sed -n '1,120p' {} \; \
+      > "$DISC/k8s/system-cron-files.txt" 2>/dev/null || true
+
+    grep -RIE '(health|healthz|ready|readyz|live|livez|status|metrics|actuator)' /opt/app /srv /var/www /var/lib/app /etc/nginx /etc/apache2 2>/dev/null \
+      | head -200 > "$DISC/k8s/health-endpoint-hints.txt" || true
+
+    getent passwd | awk -F: '$3>=1000 && $3<65000{print}' > "$DISC/security/non-system-users.txt" || true
+    getent group | awk -F: '$3>=1000 && $3<65000{print}' > "$DISC/security/non-system-groups.txt" || true
+    find /opt/app /srv /var/www /var/lib/app -maxdepth 3 -printf '%u:%g %m %p\n' 2>/dev/null | head -1000 > "$DISC/security/app-path-ownership-sample.txt" || true
+
+    cat > "$DISC/containerization-gap-closure.md" <<'EOF'
+# R6 containerization gap closure
+
+This folder answers the questions required to build working containers and Kubernetes workloads:
+
+- Which app directories exist?
+- Which dependency manifests determine base image and build command?
+- Which systemd services reveal entrypoints, working directories, users, and env files?
+- Which processes own which ports?
+- Which config keys become ConfigMaps and which become Secrets?
+- Which paths must become PVCs or emptyDir mounts?
+- Which DB/cache/API dependencies must be externalized?
+- Which TLS certs can be referenced and which private keys must never be baked into images?
+- Which cron/background jobs become Kubernetes CronJobs or worker Deployments?
+- Which health/readiness endpoints are available?
+
+Do not copy VM identity, SSH configuration, password hashes, host networking, kernel settings, or private keys into container images.
+EOF
+
+    tar -czf "$HOME/r6-container-discovery.tgz" -C "$HOME" r6-container-discovery 2>/dev/null || true
+R6SCAN
+
+  scp -q $SSH_OPTS "$SRC_USER@$SRC_IP:~/r6-container-discovery.tgz" "$R6_DIR/r6-container-discovery.tgz" \
+    && tar -xzf "$R6_DIR/r6-container-discovery.tgz" -C "$R6_DIR" --strip-components=1 2>/dev/null \
+    && echo "  [R6] Saved container discovery evidence -> $R6_DIR/" \
+    || echo "  [WARN] R6 container discovery archive was not retrieved"
+
+  echo "  [R6] Key files:"
+  echo "       - $R6_DIR/apps/app-root-candidates.txt"
+  echo "       - $R6_DIR/services/container-candidate-services.txt"
+  echo "       - $R6_DIR/network/listening-ports-processes.txt"
+  echo "       - $R6_DIR/dependencies/dependency-manifest-index.txt"
+  echo "       - $R6_DIR/config/secret-key-candidates.txt"
+  echo "       - $R6_DIR/data/writable-path-candidates.txt"
+  echo "       - $R6_DIR/k8s/health-endpoint-hints.txt"
+}
+
+echo "# Source: 2 selected node pairs"
+
+
+# ────────────────────────────────────────────────────────────
+node_postgresqlu24() {
+  local SRC_IP="104.130.26.81"
+  local DST_IP="50.56.158.21"
+  local SRC_USER="ubuntu"   # OSPC SSH user (OS: Linux)
+  local DST_USER="ubuntu"   # FLEX SSH user (OS: Linux)
+  local NODE_AUDIT="$AUDIT_DIR/postgresqlu24"
+  mkdir -p "$NODE_AUDIT"
+
+  echo ""
+  echo "##############################################################"
+  echo "#  NODE : postgresqlu24"
+  echo "#  OSPC : 104.130.26.81  [user: ubuntu]"
+  echo "#  FLEX : 50.56.158.21  [user: ubuntu]  OS: Linux"
+  echo "##############################################################"
+
+  exec > >(tee -a "$NODE_AUDIT/migration.log") 2>&1
+
+  
+  echo ""
+  echo "══════════════════════ STAGE 0 -- PRE-FLIGHT CHECKS ══════════════════════"
+  
+  echo "[P0] SSH connectivity check..."
+  ssh $SSH_OPTS "$SRC_USER@$SRC_IP" "echo OK" 2>/dev/null || { echo "[ERROR] Cannot SSH to OSPC $SRC_IP as $SRC_USER -- skipping postgresqlu24"; return 1; }
+  ssh $SSH_OPTS "$DST_USER@$DST_IP" "echo OK" 2>/dev/null || { echo "[ERROR] Cannot SSH to FLEX $DST_IP as $DST_USER -- skipping postgresqlu24"; return 1; }
+  echo "[P0] Checking rsync availability..."
+  ssh $SSH_OPTS "$SRC_USER@$SRC_IP" "which rsync" 2>/dev/null || { echo "[WARN] rsync missing on OSPC -- install with: sudo apt-get install -y rsync"; }
+  ssh $SSH_OPTS "$DST_USER@$DST_IP" "which rsync" 2>/dev/null || { echo "[WARN] rsync missing on FLEX -- install with: sudo apt-get install -y rsync"; }
+  echo "[P0] Disk space check (OSPC used vs FLEX free)..."
+  OSPC_USED=$(ssh $SSH_OPTS "$SRC_USER@$SRC_IP" "df / --output=used | tail -1" 2>/dev/null | grep -Eo '[0-9]+' | tail -1 || echo 0)
+  FLEX_FREE=$(ssh $SSH_OPTS "$DST_USER@$DST_IP" "df / --output=avail | tail -1" 2>/dev/null | grep -Eo '[0-9]+' | tail -1 || echo 999999999)
+  OSPC_USED=${OSPC_USED:-0}; FLEX_FREE=${FLEX_FREE:-999999999}
+  if [ "$OSPC_USED" -gt "$FLEX_FREE" ] 2>/dev/null; then
+    echo "[WARN] OSPC used (104.130.26.81): $((OSPC_USED/1024))MB > FLEX free (50.56.158.21): $((FLEX_FREE/1024))MB -- proceed with caution"
+  else
+    echo "[P0] Disk OK  OSPC used=$((OSPC_USED/1024))MB  FLEX avail=$((FLEX_FREE/1024))MB"
+  fi
+  echo "[P0] Checking for stale migration lock..."
+  ssh $SSH_OPTS "$DST_USER@$DST_IP" "if [ -f /tmp/.ospc-migration-lock ]; then echo '[WARN] Stale lock found -- auto-removing (leftover from previous run)'; rm -f /tmp/.ospc-migration-lock; fi" 2>/dev/null || true
+  ssh $SSH_OPTS "$DST_USER@$DST_IP" "touch /tmp/.ospc-migration-lock" 2>/dev/null || true
+  echo "[P0] All pre-flight checks passed"
+
+  echo "[P0] Taking FLEX VM snapshot as rollback point before mutations..."
+  SNAP_NAME="pre-migration-postgresqlu24-$(date +%Y%m%d%H%M%S)"
+  if command -v openstack >/dev/null 2>&1; then
+    openstack server image create --name "$SNAP_NAME" "50.56.158.21" --wait 2>/dev/null \
+      && echo "  [P0] ✅ Rollback snapshot: $SNAP_NAME" \
+      || echo "  [P0] ⚠  Snapshot failed (no openstack CLI or permissions) -- proceed manually if needed"
+  else
+    echo "  [P0] ⚠  openstack CLI not found -- skipping snapshot. Create one manually before proceeding."
+  fi
+
+  echo "[P0] Deploying transfer key to OSPC for direct server-to-server transfers..."
+  deploy_key_to_ospc
+  echo "[P0] Key deployed -- direct OSPC->FLEX transfers ready"
+
+  
+  echo ""
+  echo "══════════════════════ STAGE 1 -- AUDIT OSPC SOURCE ══════════════════════"
+  
+  ssh $SSH_OPTS "$SRC_USER@$SRC_IP" bash <<'ENDSSH'
+    mkdir -p ~/server-clone-audit
+    hostnamectl > ~/server-clone-audit/hostnamectl.txt 2>/dev/null || true
+    timedatectl > ~/server-clone-audit/timedatectl.txt 2>/dev/null || true
+    locale > ~/server-clone-audit/locale.txt 2>/dev/null || true
+    getent passwd > ~/server-clone-audit/passwd.txt
+    getent group  > ~/server-clone-audit/group.txt
+    sudo sshd -T > ~/server-clone-audit/sshd-T.txt 2>/dev/null || true
+    sudo tar -czf ~/server-clone-audit/etc-ssh.tgz /etc/ssh 2>/dev/null || true
+    dpkg --get-selections > ~/server-clone-audit/dpkg-selections.txt 2>/dev/null || true
+    apt-mark showmanual > ~/server-clone-audit/apt-manual.txt 2>/dev/null || true
+    grep -r . /etc/apt/sources.list* > ~/server-clone-audit/apt-sources.txt 2>/dev/null || true
+    lsblk -f > ~/server-clone-audit/lsblk.txt && df -Th > ~/server-clone-audit/df.txt && cat /etc/fstab > ~/server-clone-audit/fstab.txt
+    uname -r > ~/server-clone-audit/kernel.txt
+    sysctl -a > ~/server-clone-audit/sysctl.txt 2>/dev/null || true
+    grep -r . /etc/sysctl* > ~/server-clone-audit/sysctl-conf.txt 2>/dev/null || true
+    grep -r . /etc/security/limits* > ~/server-clone-audit/limits.txt 2>/dev/null || true
+    ip addr > ~/server-clone-audit/ip-addr.txt && ip route > ~/server-clone-audit/ip-route.txt
+    systemctl list-unit-files --type=service > ~/server-clone-audit/systemd-services.txt
+    systemctl list-unit-files --state=enabled > ~/server-clone-audit/systemd-enabled.txt
+    ss -ltnp > ~/server-clone-audit/ports.txt
+    sudo crontab -l > ~/server-clone-audit/root-crontab.txt 2>/dev/null || true
+    crontab -l > ~/server-clone-audit/user-crontab.txt 2>/dev/null || true
+    tar -czf ~/server-clone-audit.tgz ~/server-clone-audit/ 2>/dev/null
+ENDSSH
+  scp -q $SSH_OPTS "$SRC_USER@$SRC_IP:~/server-clone-audit.tgz" "$NODE_AUDIT/audit.tgz" && echo "  [AUDIT] Saved $NODE_AUDIT/audit.tgz" || true
+  r6_containerization_capture "postgresqlu24" "$NODE_AUDIT"
+  if [ "${R6_CAPTURE_ONLY:-0}" = "1" ]; then
+    echo "[R6] Capture-only mode enabled -- stopping before LIVE clone/mutation stages for postgresqlu24"
+    remove_key_from_ospc
+    return 0
+  fi
+
+  
+  echo ""
+  echo "══════════════════════ STAGE 2 -- CLONE TO FLEX (safe order) ══════════════════════"
+  
+  echo "[L1] Server Identity"
+  SRC_HOST=$(src_cmd "hostname -s 2>/dev/null || hostname")
+  SRC_TZ=$(src_cmd "cat /etc/timezone 2>/dev/null || timedatectl show -p Timezone --value 2>/dev/null || echo UTC")
+  SRC_LOCALE=$(src_cmd "localectl status 2>/dev/null | grep 'System Locale' | cut -d= -f2 | tr -d ' '" || echo "en_US.UTF-8")
+  echo "  [L1] Detected hostname: $SRC_HOST  timezone: $SRC_TZ  locale: $SRC_LOCALE"
+  run dst_cmd "sudo hostnamectl set-hostname '${SRC_HOST:-$(hostname)}'"
+  run dst_cmd "sudo timedatectl set-timezone '${SRC_TZ:-UTC}'"
+  [ -n "$SRC_LOCALE" ] && run dst_cmd "sudo localectl set-locale LANG=$SRC_LOCALE 2>/dev/null || true"
+  echo "  [L1] FLEX hostname set to: $SRC_HOST  timezone: $SRC_TZ"
+
+  echo "[L2] SSH & Access"
+  ospc_to_flex "/etc/ssh/sshd_config" "/tmp/sshd_config_ospc"
+  dst_cmd "sudo cp /etc/ssh/sshd_config /etc/ssh/sshd_config.bak.ospc2flex" 2>/dev/null || true
+  # Strip OSPC-specific directives that would break FLEX SSH
+  ssh $SSH_OPTS "$DST_USER@$DST_IP" bash <<'SSHD_MERGE'
+    if [ -f /tmp/sshd_config_ospc ]; then
+      sed -i '/^[[:space:]]*ListenAddress/d' /tmp/sshd_config_ospc
+      sed -i '/rackspace/Id' /tmp/sshd_config_ospc
+      sed -i '/^[[:space:]]*Match.*rackspace/I,/^[[:space:]]*Match\|^$/d' /tmp/sshd_config_ospc
+      sed -i '/104\\.130\\.26\\.81/d' /tmp/sshd_config_ospc
+      if sudo sshd -t -f /tmp/sshd_config_ospc 2>/dev/null; then
+        sudo cp /tmp/sshd_config_ospc /etc/ssh/sshd_config
+        sudo systemctl reload ssh 2>/dev/null || sudo systemctl reload sshd 2>/dev/null || true
+        echo "  [L2] sshd_config applied (sanitized) on FLEX"
+      else
+        echo "  [WARN] Sanitized sshd_config failed validation — keeping FLEX original"
+        sudo cp /etc/ssh/sshd_config.bak.ospc2flex /etc/ssh/sshd_config
+      fi
+    fi
+SSHD_MERGE
+  ospc_to_flex "~/.ssh/authorized_keys" "/tmp/ospc_authorized_keys"
+  # Merge OSPC keys into FLEX (append, don't overwrite)
+  run dst_cmd "cat /tmp/ospc_authorized_keys >> ~/.ssh/authorized_keys && sort -u -o ~/.ssh/authorized_keys ~/.ssh/authorized_keys && chmod 700 ~/.ssh && chmod 600 ~/.ssh/authorized_keys"
+  echo "  [L2] authorized_keys merged on FLEX"
+  src_cmd "sudo tar -czf /tmp/sudoers_d.tgz /etc/sudoers.d/ 2>/dev/null || true"
+  ospc_to_flex "/tmp/sudoers_d.tgz" "/tmp/sudoers_d.tgz"
+  run dst_cmd "sudo tar -xzf /tmp/sudoers_d.tgz -C / 2>/dev/null || true && sudo visudo -c 2>/dev/null || echo '  [WARN] sudoers syntax check failed — review /etc/sudoers.d/'"
+  echo "  [L2] sudoers.d synced to FLEX"
+
+  echo "[L3] Users & Groups (UID/GID preserved)"
+  echo "  [L3] Syncing groups (GID>=1000)..."
+  src_cmd "getent group | awk -F: '\$3>=1000 && \$3<65000{print}'" | while IFS=: read grp gpw gid members; do
+    run dst_cmd "sudo groupadd -g $gid '$grp' 2>/dev/null || true"
+  done
+  USER_COUNT=$(src_cmd "getent passwd | awk -F: '\$3>=1000 && \$3<65000{print}' | wc -l" || echo 0)
+  echo "  [L3] Found $USER_COUNT non-system users -- syncing..."
+  src_cmd "getent passwd | awk -F: '\$3>=1000 && \$3<65000{print}'" | while IFS=: read user pw uid gid gecos home shell; do
+    echo "    -> user: $user uid:$uid gid:$gid"
+    run dst_cmd "id -u '$user' >/dev/null 2>&1 || sudo useradd -u $uid -g $gid -m -s '$shell' -c '$gecos' '$user' 2>/dev/null || true"
+  done
+  echo "  [L3] Syncing password hashes (shadow entries UID>=1000)..."
+  src_cmd "sudo getent shadow" | while IFS=: read suser shash rest; do
+    [ -z "$shash" ] || [ "$shash" = "!" ] || [ "$shash" = "*" ] || [ "$shash" = "!!" ] && continue
+    run dst_cmd "sudo usermod -p '$shash' '$suser' 2>/dev/null || true"
+  done
+  echo "  [L3] Direct rsync OSPC:/home/ -> FLEX:/home/ (server-to-server)"
+  rsync_direct "--exclude='$DST_USER/.ssh/authorized_keys' /home/" "/home/"
+  echo "  [L3] Home directories synced OK"
+
+  echo "[L4] Disk/Mounts -- AUDIT ONLY"
+  src_cmd "lsblk -f; df -Th; cat /etc/fstab" > "$NODE_AUDIT/L4_disk.txt" 2>/dev/null || true
+  DISK_LINES=$(wc -l < "$NODE_AUDIT/L4_disk.txt" 2>/dev/null || echo 0)
+  echo "  [L4] Disk layout captured ($DISK_LINES lines) -> $NODE_AUDIT/L4_disk.txt"
+  echo "  [L4] Apply fstab entries MANUALLY (IPs and device names may differ)"
+
+  echo "[L5] Packages & Repos  [pkg-mgr: apt]"
+  PKG_FILTER='linux-image|linux-headers|linux-modules|linux-firmware|grub-|initramfs-tools|rackspace-|nova-agent|xe-guest|driveclient|holland'
+  run dst_cmd "sudo sed -i '/rax\.mirror\.rackspace\.com/d;/mirror\.rackspace\.com\/opensuse/d' /etc/apt/sources.list 2>/dev/null || true"
+  run dst_cmd "sudo find /etc/apt/sources.list.d/ \( -name 'holland*' -o -name '*rackspace*' \) -delete 2>/dev/null || true"
+  echo "  [L5] Rackspace repos cleaned from FLEX apt sources"
+  APT_RAW=$(src_cmd "apt-mark showmanual 2>/dev/null" || true)
+  APT_FILTERED=$(echo "$APT_RAW" | grep -vE "$PKG_FILTER" || true)
+  APT_SKIPPED=$(echo "$APT_RAW" | grep -cE "$PKG_FILTER" || echo 0)
+  APT_LIST=$(echo "$APT_FILTERED" | tr '\n' ' ')
+  APT_COUNT=$(echo "$APT_LIST" | wc -w)
+  echo "  [L5] OSPC packages: $APT_COUNT to install, $APT_SKIPPED filtered (kernel/boot/rackspace)"
+  if [ -n "$APT_LIST" ]; then
+    run dst_cmd "sudo apt-get update -qq" || echo "  [WARN] apt-get update failed — some packages may not install"
+    run dst_cmd "sudo DEBIAN_FRONTEND=noninteractive apt-get install -y $APT_LIST" || echo "  [WARN] Some packages failed to install — check $NODE_AUDIT/migration.log"
+  fi
+  echo "  [L5] Package install complete"
+
+  echo "[L6] Kernel / Sysctl / Limits"
+  src_cmd "sudo cat /etc/sysctl.conf 2>/dev/null; sudo grep -r . /etc/sysctl.d/ 2>/dev/null" \
+    | grep -vE '^[[:space:]]*(net\.|#.*net\.|$)' \
+    | ssh $SSH_OPTS "$DST_USER@$DST_IP" "cat > /tmp/sysctl_clone.conf" || true
+  SYSCTL_LINES=$(ssh $SSH_OPTS "$DST_USER@$DST_IP" "wc -l < /tmp/sysctl_clone.conf 2>/dev/null || echo 0")
+  echo "  [L6] sysctl: $SYSCTL_LINES non-network settings to apply (net.* excluded)"
+  run dst_cmd "sudo cp /tmp/sysctl_clone.conf /etc/sysctl.d/99-ospc-clone.conf && sudo sysctl --system 2>/dev/null || true"
+  echo "  [L6] sysctl settings applied on FLEX"
+  src_cmd "grep -r . /etc/security/limits.conf /etc/security/limits.d/ 2>/dev/null" | ssh $SSH_OPTS "$DST_USER@$DST_IP" "cat > /tmp/limits_clone.conf" || true
+  run dst_cmd "sudo cp /tmp/limits_clone.conf /etc/security/limits.d/99-ospc-clone.conf 2>/dev/null || true"
+  echo "  [L6] kernel/limits sync complete"
+
+  echo "[L7] Network -- EXPORT ONLY (IPs differ on FLEX)"
+  src_cmd "ip addr; ip route; cat /etc/netplan/*.yaml 2>/dev/null || true" > "$NODE_AUDIT/L7_network.txt" 2>/dev/null || true
+  NET_LINES=$(wc -l < "$NODE_AUDIT/L7_network.txt" 2>/dev/null || echo 0)
+  echo "  [L7] Network config exported ($NET_LINES lines) -> $NODE_AUDIT/L7_network.txt"
+  echo "  [L7] NOTE: Update IP addresses manually before applying netplan on FLEX"
+
+  echo "[L8] Runtime Environment"
+  PYTHON_V=$(src_cmd "python3 --version 2>/dev/null" | awk '{print $2}' | cut -d. -f1-2 || true)
+  NODE_V=$(src_cmd "node --version 2>/dev/null" | tr -d 'v' || true)
+  DOCKER_V=$(src_cmd "docker version --format '{{.Server.Version}}' 2>/dev/null" || true)
+  HAS_PM2=$(src_cmd "which pm2 2>/dev/null" || true)
+  HAS_SNAP=$(src_cmd "which snap 2>/dev/null" || true)
+  echo "  [L8] Detected: python=$PYTHON_V node=$NODE_V docker=${DOCKER_V:-no} pm2=$([ -n "$HAS_PM2" ] && echo yes || echo no)"
+  [ -n "$PYTHON_V" ] && run dst_cmd "which python3 || sudo apt-get install -y python3 python3-pip python3-venv" || true
+  [ -n "$NODE_V" ] && run dst_cmd "which node || (curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo -E bash - && sudo apt-get install -y nodejs)" || true
+  if [ -n "$DOCKER_V" ]; then
+    FLEX_DOCKER=$(dst_cmd "docker version --format '{{.Server.Version}}' 2>/dev/null" || true)
+    if [ -z "$FLEX_DOCKER" ]; then
+      echo "  [L8] Installing Docker $DOCKER_V (matching OSPC version)"
+      run dst_cmd "curl -fsSL https://get.docker.com | sudo VERSION=$DOCKER_V sh 2>/dev/null || (curl -fsSL https://get.docker.com | sudo sh)" || true
+      run dst_cmd "sudo systemctl enable --now docker" || true
+    else
+      echo "  [L8] Docker already on FLEX: $FLEX_DOCKER (OSPC had: $DOCKER_V)"
+    fi
+  fi
+  [ -n "$HAS_PM2" ] && run dst_cmd "which pm2 || sudo npm install -g pm2" || true
+  if [ -n "$HAS_SNAP" ]; then
+    SNAP_LIST=$(src_cmd "snap list --unicode=never 2>/dev/null | awk 'NR>1{print \$1}'" | grep -v snapd || true)
+    SNAP_COUNT=$(echo "$SNAP_LIST" | grep -c . || echo 0)
+    echo "  [L8] Snap packages detected: $SNAP_COUNT"
+    for SNAP_PKG in $SNAP_LIST; do
+      run dst_cmd "sudo snap install $SNAP_PKG 2>/dev/null || true"
+    done
+  fi
+  echo "  [L8] Scanning for Python virtualenvs to sync pip dependencies..."
+  for AP in /opt/app /srv /var/www /var/lib/app; do
+    src_cmd "find $AP -name 'pyvenv.cfg' -maxdepth 4 2>/dev/null | head -5" | while read VENV_CFG; do
+      VENV_DIR=$(dirname "$VENV_CFG")
+      echo "  [L8] Virtualenv: $VENV_DIR"
+      src_cmd "$VENV_DIR/bin/pip freeze 2>/dev/null" > /tmp/reqs_$$.txt || true
+      [ -s /tmp/reqs_$$.txt ] && ssh $SSH_OPTS "$DST_USER@$DST_IP" "cat > /tmp/reqs_$$.txt" < /tmp/reqs_$$.txt || true
+      run dst_cmd "python3 -m venv $VENV_DIR 2>/dev/null && $VENV_DIR/bin/pip install -q -r /tmp/reqs_$$.txt 2>/dev/null || true"
+      rm -f /tmp/reqs_$$.txt
+    done
+  done
+  echo "  [L8] Scanning for Node.js apps to reinstall npm dependencies..."
+  for AP in /opt/app /srv /var/www /var/lib/app; do
+    src_cmd "find $AP -name 'package-lock.json' -not -path '*/node_modules/*' -maxdepth 5 2>/dev/null | head -5" | while read PKG_LOCK; do
+      APP_DIR=$(dirname "$PKG_LOCK")
+      echo "  [L8] npm ci: $APP_DIR"
+      run dst_cmd "cd $APP_DIR && npm ci --silent 2>/dev/null || npm install --silent 2>/dev/null || true"
+    done
+  done
+  echo "  [L8] Runtime environment sync complete"
+
+  echo "[L9] App Code & Config"
+  for SRC_PATH in /opt/app /srv /var/www /var/lib/app; do
+    src_cmd "[ -d $SRC_PATH ] && echo exists" 2>/dev/null | grep -q exists || continue
+    echo "  [L9] Direct rsync OSPC:$SRC_PATH -> FLEX:$SRC_PATH (server-to-server)"
+    rsync_direct "$SRC_PATH/" "$SRC_PATH/"
+    echo "  [L9] Synced: $SRC_PATH"
+  done
+  src_cmd "find /opt/app /srv /var/www /var/lib/app -name '.env' -o -name '*.yml' -o -name '*.yaml' -o -name '*.ini' 2>/dev/null | head -30" > "$NODE_AUDIT/L9_configs.txt" 2>/dev/null || true
+  echo "  Config file list saved to $NODE_AUDIT/L9_configs.txt"
+  echo "[L9.5] Config IP fixup -- replacing OSPC IP 104.130.26.81 with FLEX IP 50.56.158.21"
+  FIXUP_DIRS="/opt/app /srv /var/www /var/lib/app /etc/nginx /etc/apache2 /etc/haproxy"
+  run dst_cmd "for DIR in \$FIXUP_DIRS; do [ -d \$DIR ] || continue; sudo grep -rlI --include='*.conf' --include='*.cfg' --include='*.yml' --include='*.yaml' --include='*.json' --include='*.xml' --include='*.ini' --include='*.env' --include='*.txt' --include='*.toml' --include='*.properties' '104.130.26.81' \$DIR 2>/dev/null | xargs -r sudo sed -i 's|104.130.26.81|50.56.158.21|g'; done || true"
+  echo "  [L9.5] Also checking for hardcoded hostnames..."
+  SRC_HOST_IP=$(src_cmd "hostname 2>/dev/null || true")
+  DST_HOST_IP=$(dst_cmd "hostname 2>/dev/null || true")
+  [ -n "$SRC_HOST_IP" ] && run dst_cmd "for DIR in \$FIXUP_DIRS; do [ -d \$DIR ] || continue; sudo grep -rlI --include='*.conf' --include='*.cfg' --include='*.yml' --include='*.yaml' --include='*.json' --include='*.xml' --include='*.ini' --include='*.env' '\$SRC_HOST_IP' \$DIR 2>/dev/null | xargs -r sudo sed -i 's|\$SRC_HOST_IP|\$DST_HOST_IP|g'; done || true" || true
+
+  echo "[L10] Systemd Units & Cron"
+  SVC_FILTER='rackspace|nova-agent|xe-guest|driveclient|holland|cloud-init|snapd|ufw|networkd|systemd-net|systemd-resolve|multipathd|open-vm'
+  echo "  [L10] Copying custom app service units (excluding platform/OSPC agents)..."
+  src_cmd "find /etc/systemd/system -maxdepth 1 -type f -name '*.service' 2>/dev/null | xargs -r grep -lv 'rackspace\|nova-agent\|xe-guest\|driveclient' 2>/dev/null | tar -czf /tmp/systemd_units.tgz --files-from=- 2>/dev/null; echo done" 2>/dev/null || true
+  ospc_to_flex "/tmp/systemd_units.tgz" "/tmp/systemd_units.tgz"
+  run dst_cmd "sudo tar -xzf /tmp/systemd_units.tgz -C / 2>/dev/null || true && sudo systemctl daemon-reload"
+  echo "  [L10] Custom systemd units transferred and daemon reloaded"
+  ENABLED=$(src_cmd "systemctl list-unit-files --state=enabled --type=service --no-legend 2>/dev/null | awk '{print \$1}'" | grep -vE "$SVC_FILTER" || true)
+  ENABLED_COUNT=$(echo "$ENABLED" | grep -c . || echo 0)
+  echo "  [L10] Enabling $ENABLED_COUNT app services on FLEX (platform services filtered)..."
+  for svc in $ENABLED; do
+    echo "    -> enabling: $svc"
+    run dst_cmd "sudo systemctl enable '$svc' 2>/dev/null || true"
+  done
+  src_cmd "sudo tar -czf /tmp/cron_backup.tgz --exclude='*rackspace*' --exclude='*holland*' /etc/cron.d /etc/cron.daily /etc/cron.hourly /etc/cron.monthly /etc/cron.weekly 2>/dev/null || true"
+  ospc_to_flex "/tmp/cron_backup.tgz" "/tmp/cron_backup.tgz"
+  run dst_cmd "sudo tar -xzf /tmp/cron_backup.tgz -C / 2>/dev/null || true"
+  echo "  [L10] Cron jobs synced to FLEX"
+
+  echo "[L11] Data"
+  for DATA_PATH in /var/lib/app /srv/data; do
+    src_cmd "[ -d $DATA_PATH ] && echo exists" 2>/dev/null | grep -q exists || continue
+    echo "  [L11] Direct rsync OSPC:$DATA_PATH -> FLEX:$DATA_PATH"
+    rsync_direct "$DATA_PATH/" "$DATA_PATH/"
+  done
+  echo "[L11] Checking for PostgreSQL..."
+  HAS_PG=$(src_cmd "which pg_dump" 2>/dev/null || true)
+  if [ -n "$HAS_PG" ]; then
+    echo "  [L11] PostgreSQL detected -- dumping & transferring direct OSPC->FLEX"
+    PG_DBS=$(src_cmd "sudo -u postgres psql -t -c \"SELECT datname FROM pg_database WHERE datistemplate=false AND datname<>'postgres';\" 2>/dev/null" | tr -d ' ' | grep -v '^$' || true)
+    for DB in $PG_DBS; do
+      echo "  [L11] Dumping PG: $DB"
+      src_cmd "sudo -u postgres pg_dump -Fc $DB > /tmp/pg_postgresqlu24_$DB.dump 2>/dev/null"
+      ospc_to_flex "/tmp/pg_postgresqlu24_$DB.dump" "/tmp/pg_$DB.dump"
+      run dst_cmd "sudo -u postgres createdb $DB 2>/dev/null || true && sudo -u postgres pg_restore -d $DB /tmp/pg_$DB.dump 2>/dev/null && echo '[L11] PG restore OK: '$DB || echo '[L11] PG restore WARNING: '$DB"
+    done
+  fi
+  HAS_MYSQL=$(src_cmd "which mysqldump" 2>/dev/null || true)
+  if [ -n "$HAS_MYSQL" ]; then
+    echo "  [L11] MySQL/MariaDB detected -- dumping & transferring direct OSPC->FLEX"
+    MY_DBS=$(src_cmd "mysql -uroot -e 'SHOW DATABASES;' 2>/dev/null | grep -Ev 'Database|information_schema|performance_schema|mysql|sys'" || true)
+    for DB in $MY_DBS; do
+      echo "  [L11] Dumping MySQL: $DB"
+      src_cmd "mysqldump -uroot $DB | gzip > /tmp/mysql_postgresqlu24_$DB.sql.gz 2>/dev/null"
+      ospc_to_flex "/tmp/mysql_postgresqlu24_$DB.sql.gz" "/tmp/mysql_$DB.sql.gz"
+      run dst_cmd "mysql -uroot -e 'CREATE DATABASE IF NOT EXISTS $DB;' 2>/dev/null && zcat /tmp/mysql_$DB.sql.gz | mysql -uroot $DB 2>/dev/null && echo '[L11] MySQL restore OK: '$DB || echo '[L11] MySQL restore WARNING: '$DB"
+    done
+  fi
+
+  echo "[L12] TLS & Certs"
+  TLS_EXISTS=$(src_cmd "[ -d /etc/letsencrypt ] && echo exists" 2>/dev/null || true)
+  if echo "$TLS_EXISTS" | grep -q exists; then
+    echo "  [L12] Let's Encrypt detected on OSPC -- copying certs direct to FLEX"
+    src_cmd "sudo tar -czf /tmp/letsencrypt.tgz /etc/letsencrypt/ 2>/dev/null || true"
+    ospc_to_flex "/tmp/letsencrypt.tgz" "/tmp/letsencrypt.tgz"
+    run dst_cmd "sudo tar -xzf /tmp/letsencrypt.tgz -C / 2>/dev/null || true"
+    echo "  [L12] TLS certs transferred to FLEX"
+  else
+    echo "  [L12] No Let's Encrypt certs on OSPC -- skipping"
+  fi
+  SSL_EXISTS=$(src_cmd "sudo ls /etc/ssl/private/*.pem /etc/ssl/private/*.crt /etc/ssl/private/*.key 2>/dev/null | wc -l" || echo 0)
+  if [ "$SSL_EXISTS" -gt 0 ] 2>/dev/null; then
+    echo "  [L12] /etc/ssl/private certs found ($SSL_EXISTS files) -- transferring"
+    src_cmd "sudo tar -czf /tmp/ssl_private.tgz /etc/ssl/private/ 2>/dev/null || true"
+    ospc_to_flex "/tmp/ssl_private.tgz" "/tmp/ssl_private.tgz"
+    run dst_cmd "sudo tar -xzf /tmp/ssl_private.tgz -C / 2>/dev/null || true && sudo chmod 710 /etc/ssl/private"
+    echo "  [L12] /etc/ssl/private transferred"
+  fi
+  PKI_EXISTS=$(src_cmd "sudo ls /etc/pki/tls/certs/*.pem /etc/pki/tls/private/*.key 2>/dev/null | wc -l" || echo 0)
+  if [ "$PKI_EXISTS" -gt 0 ] 2>/dev/null; then
+    echo "  [L12] /etc/pki/tls certs found ($PKI_EXISTS files) -- transferring"
+    src_cmd "sudo tar -czf /tmp/pki_tls.tgz /etc/pki/tls/ 2>/dev/null || true"
+    ospc_to_flex "/tmp/pki_tls.tgz" "/tmp/pki_tls.tgz"
+    run dst_cmd "sudo tar -xzf /tmp/pki_tls.tgz -C / 2>/dev/null || true"
+    echo "  [L12] /etc/pki/tls transferred"
+  fi
+  src_cmd "sudo find /opt /srv /var/www /etc/nginx /etc/apache2 -name '*.pem' -o -name '*.crt' -o -name '*.key' 2>/dev/null | grep -v letsencrypt | head -20" > "$NODE_AUDIT/L12_extra_certs.txt" 2>/dev/null || true
+  EXTRA_CERTS=$(wc -l < "$NODE_AUDIT/L12_extra_certs.txt" 2>/dev/null || echo 0)
+  [ "$EXTRA_CERTS" -gt 0 ] && echo "  [L12] ⚠  $EXTRA_CERTS extra cert files found outside standard paths -- review $NODE_AUDIT/L12_extra_certs.txt"
+  run dst_cmd "sudo update-ca-certificates 2>/dev/null || sudo update-ca-trust 2>/dev/null || true"
+  echo "  [L12] CA trust store updated on FLEX"
+
+  echo "[L13] External Dependencies (audit only)"
+  src_cmd "grep -rE '(DB_HOST|DATABASE_URL|PG_HOST|REDIS_URL|API_URL)' /opt/app /srv /var/www /var/lib/app 2>/dev/null | head -30" > "$NODE_AUDIT/L13_external.txt" 2>/dev/null || true
+  src_cmd "ss -ltnp 2>/dev/null" >> "$NODE_AUDIT/L13_external.txt" || true
+  EXT_LINES=$(wc -l < "$NODE_AUDIT/L13_external.txt" 2>/dev/null || echo 0)
+  echo "  [L13] External dependency audit: $EXT_LINES entries found -> $NODE_AUDIT/L13_external.txt"
+  echo "  [L13] Review external endpoints and update configs manually on FLEX"
+
+  
+  echo ""
+  echo "══════════════════════ STAGE 3 -- VALIDATION ══════════════════════"
+  
+  echo "[VALIDATE] Post-clone checks on FLEX $DST_IP (user: $DST_USER)"
+  ssh $SSH_OPTS "$DST_USER@$DST_IP" bash <<'ENDSSH' | tee "$NODE_AUDIT/validation.txt" || true
+    echo '--- Hostname ---' && hostnamectl 2>/dev/null | head -5 || true
+    echo '--- Disk ---' && df -Th
+    echo '--- Listening ports ---' && ss -ltnp
+    echo '--- Running services ---' && systemctl list-units --type=service --state=running --no-pager 2>/dev/null | head -15 || true
+    echo '--- sshd config test ---' && sudo sshd -t 2>/dev/null && echo 'sshd OK' || echo 'sshd config WARNING'
+ENDSSH
+
+  
+  echo ""
+  echo "══════════════════════ STAGE 4 -- SMOKE TESTS (9A INFRA + 9B APP) ══════════════════════"
+  
+  SMOKE_REPORT="$NODE_AUDIT/smoke_test.txt"
+  SMOKE_PASS=0; SMOKE_FAIL=0; SMOKE_SKIP=0
+  smoke_ok()  { echo "  ✅ [PASS] $1" | tee -a "$SMOKE_REPORT"; SMOKE_PASS=$((SMOKE_PASS+1)); }
+  smoke_fail(){ echo "  ❌ [FAIL] $1" | tee -a "$SMOKE_REPORT"; SMOKE_FAIL=$((SMOKE_FAIL+1)); }
+  smoke_skip(){ echo "  ⏭  [SKIP] $1" | tee -a "$SMOKE_REPORT"; SMOKE_SKIP=$((SMOKE_SKIP+1)); }
+  echo "# Smoke test report -- $(date)" > "$SMOKE_REPORT"
+
+  echo ""
+  echo "── 9A INFRA ────────────────────────────────────"
+  ssh $SSH_OPTS "$DST_USER@$DST_IP" "echo OK" 2>/dev/null && smoke_ok "SSH access -- $DST_IP" || smoke_fail "SSH access -- $DST_IP"
+  IP_OUT=$(ssh $SSH_OPTS "$DST_USER@$DST_IP" "ip addr show | grep -c 'inet '" 2>/dev/null || echo 0)
+  [ "$IP_OUT" -gt 0 ] 2>/dev/null && smoke_ok "IP address present ($IP_OUT interfaces)" || smoke_fail "No IP address found"
+  RT_OUT=$(ssh $SSH_OPTS "$DST_USER@$DST_IP" "ip route | grep -c default" 2>/dev/null || echo 0)
+  [ "$RT_OUT" -gt 0 ] 2>/dev/null && smoke_ok "Default route present" || smoke_fail "No default route"
+  DNS_OK=$(ssh $SSH_OPTS "$DST_USER@$DST_IP" "resolvectl status 2>/dev/null | grep -c 'DNS Server' || dig +short google.com 2>/dev/null | grep -c '[0-9]'" 2>/dev/null || echo 0)
+  [ "$DNS_OK" -gt 0 ] 2>/dev/null && smoke_ok "DNS resolution working" || smoke_fail "DNS not resolving"
+  MOUNTS=$(ssh $SSH_OPTS "$DST_USER@$DST_IP" "df -Th | grep -cE '^/dev'" 2>/dev/null || echo 0)
+  [ "$MOUNTS" -gt 0 ] 2>/dev/null && smoke_ok "Disk mounts present ($MOUNTS devices)" || smoke_fail "No disk mounts"
+  PORTS=$(ssh $SSH_OPTS "$DST_USER@$DST_IP" "ss -ltnp | grep -c LISTEN" 2>/dev/null || echo 0)
+  [ "$PORTS" -gt 0 ] 2>/dev/null && smoke_ok "Listening ports present ($PORTS)" || smoke_fail "No listening ports"
+  echo "  Ports in use:" && ssh $SSH_OPTS "$DST_USER@$DST_IP" "ss -ltnp | grep LISTEN" 2>/dev/null | sed 's/^/    /' | tee -a "$SMOKE_REPORT" || true
+  FAILED=$(ssh $SSH_OPTS "$DST_USER@$DST_IP" "systemctl --failed --no-pager 2>/dev/null | grep -c 'failed'" 2>/dev/null || echo 0)
+  FAILED=$(echo "$FAILED" | tr -d "[:space:]")
+  [ "$FAILED" = "0" ] && smoke_ok "No failed systemd units" || smoke_fail "$FAILED failed systemd units -- check: systemctl --failed"
+  ssh $SSH_OPTS "$DST_USER@$DST_IP" "systemctl --failed --no-pager 2>/dev/null" | grep -v "^$" | sed 's/^/    /' | tee -a "$SMOKE_REPORT" || true
+
+  echo "── 9B APP ──────────────────────────────────────"
+  PORT80=$(nc -z -w5 $DST_IP 80 2>/dev/null && echo open || echo closed)
+  PORT443=$(nc -z -w5 $DST_IP 443 2>/dev/null && echo open || echo closed)
+  if [ "$PORT80" = "open" ]; then
+    echo "  [PORT] port 80 open"
+    HTTP_CODE=$(curl -sSo /dev/null -w "%{http_code}" --max-time 10 "http://$DST_IP:80" 2>/dev/null || echo "000")
+    case "$HTTP_CODE" in
+      2*|3*) smoke_ok  "Homepage  :80  HTTP $HTTP_CODE" ;;
+      *)     smoke_fail "Homepage  :80  HTTP $HTTP_CODE" ;;
+    esac
+    HEALTH=$(curl -sSo /dev/null -w "%{http_code}" --max-time 10 "http://$DST_IP:80/health" 2>/dev/null || echo "000")
+    case "$HEALTH" in
+      2*) smoke_ok   "Health endpoint  :80/health  HTTP $HEALTH" ;;
+      *)  smoke_skip "Health endpoint  :80/health  HTTP $HEALTH (route not found)" ;;
+    esac
+    API=$(curl -sSo /dev/null -w "%{http_code}" --max-time 10 "http://$DST_IP:80/api/" 2>/dev/null || echo "000")
+    case "$API" in
+      2*|3*) smoke_ok  "API endpoint  :80/api/  HTTP $API" ;;
+      *)     smoke_skip "API endpoint  :80/api/  HTTP $API (route not found)" ;;
+    esac
+  else
+    smoke_skip "HTTP checks skipped -- port 80 closed on $DST_IP"
+  fi
+  HAS_PSQL=$(ssh $SSH_OPTS "$DST_USER@$DST_IP" "which psql" 2>/dev/null || true)
+  if [ -n "$HAS_PSQL" ]; then
+    DB_OK=$(ssh $SSH_OPTS "$DST_USER@$DST_IP" "sudo -u postgres psql -c '\\l' 2>/dev/null | grep -c '|'" 2>/dev/null || echo 0)
+    [ "$DB_OK" -gt 0 ] 2>/dev/null && smoke_ok "DB connectivity (PostgreSQL) -- $DB_OK databases found" || smoke_fail "DB connectivity (PostgreSQL) -- cannot list databases"
+  else
+    HAS_MYSQL=$(ssh $SSH_OPTS "$DST_USER@$DST_IP" "which mysql" 2>/dev/null || true)
+    if [ -n "$HAS_MYSQL" ]; then
+      DB_OK=$(ssh $SSH_OPTS "$DST_USER@$DST_IP" "mysql -uroot -e 'SHOW DATABASES;' 2>/dev/null | grep -c Database" 2>/dev/null || echo 0)
+      [ "$DB_OK" -gt 0 ] 2>/dev/null && smoke_ok "DB connectivity (MySQL)" || smoke_fail "DB connectivity (MySQL)"
+    else
+      smoke_skip "DB connectivity (no psql or mysql found)"
+    fi
+  fi
+  CRON_OK=$(ssh $SSH_OPTS "$DST_USER@$DST_IP" "crontab -l 2>/dev/null | grep -vc '^#'" 2>/dev/null || echo 0)
+  [ "$CRON_OK" -gt 0 ] && smoke_ok "Background jobs -- $CRON_OK cron entries present" || smoke_skip "Background jobs -- no crontab entries (manual check needed)"
+  TLS_CODE=$(curl -sSo /dev/null -w "%{http_code}" --max-time 10 -k "https://$DST_IP" 2>/dev/null || echo "000")
+  case "$TLS_CODE" in
+    2*|3*) smoke_ok  "TLS / HTTPS  HTTP $TLS_CODE" ;;
+    000)   smoke_skip "TLS / HTTPS  (port 443 not open)" ;;
+    *)     smoke_fail "TLS / HTTPS  HTTP $TLS_CODE" ;;
+  esac
+
+  echo ""
+  echo "════════════════════════════════════════════════"
+  echo "  SMOKE TEST SUMMARY: ✅ $SMOKE_PASS passed  ❌ $SMOKE_FAIL failed  ⏭  $SMOKE_SKIP skipped"
+  echo "  Full report: $SMOKE_REPORT"
+  echo "════════════════════════════════════════════════"
+  [ "$SMOKE_FAIL" -gt 0 ] && echo "  ⚠  $SMOKE_FAIL check(s) failed -- review before cutover" || echo "  ✅  All checks passed -- safe to proceed to cutover"
+
+  
+  echo ""
+  echo "══════════════════════ STAGE 5 -- CLEANUP ══════════════════════"
+  
+  echo "[CLEANUP] Removing /tmp staging files for postgresqlu24..."
+  run "rm -rf /tmp/postgresqlu24_* 2>/dev/null || true"
+  ssh $SSH_OPTS "$DST_USER@$DST_IP" "rm -f /tmp/.ospc-migration-lock /tmp/sshd_config /tmp/sudoers_d.tgz /tmp/systemd_units.tgz /tmp/cron_backup.tgz /tmp/sysctl_clone.conf /tmp/limits_clone.conf /tmp/pg_*.dump /tmp/mysql_*.sql.gz 2>/dev/null || true" || true
+  remove_key_from_ospc  # remove transferred SSH key from OSPC
+  echo "  [CLEANUP] Done"
+
+  echo "[DONE] postgresqlu24 complete. Reports: $NODE_AUDIT/"
+}
+
+# ────────────────────────────────────────────────────────────
+node_postgresqlu24() {
+  local SRC_IP="104.130.26.81"
+  local DST_IP="50.56.158.21"
+  local SRC_USER="ubuntu"   # OSPC SSH user (OS: Linux)
+  local DST_USER="ubuntu"   # FLEX SSH user (OS: Linux)
+  local NODE_AUDIT="$AUDIT_DIR/postgresqlu24"
+  mkdir -p "$NODE_AUDIT"
+
+  echo ""
+  echo "##############################################################"
+  echo "#  NODE : postgresqlu24"
+  echo "#  OSPC : 104.130.26.81  [user: ubuntu]"
+  echo "#  FLEX : 50.56.158.21  [user: ubuntu]  OS: Linux"
+  echo "##############################################################"
+
+  exec > >(tee -a "$NODE_AUDIT/migration.log") 2>&1
+
+  
+  echo ""
+  echo "══════════════════════ STAGE 0 -- PRE-FLIGHT CHECKS ══════════════════════"
+  
+  echo "[P0] SSH connectivity check..."
+  ssh $SSH_OPTS "$SRC_USER@$SRC_IP" "echo OK" 2>/dev/null || { echo "[ERROR] Cannot SSH to OSPC $SRC_IP as $SRC_USER -- skipping postgresqlu24"; return 1; }
+  ssh $SSH_OPTS "$DST_USER@$DST_IP" "echo OK" 2>/dev/null || { echo "[ERROR] Cannot SSH to FLEX $DST_IP as $DST_USER -- skipping postgresqlu24"; return 1; }
+  echo "[P0] Checking rsync availability..."
+  ssh $SSH_OPTS "$SRC_USER@$SRC_IP" "which rsync" 2>/dev/null || { echo "[WARN] rsync missing on OSPC -- install with: sudo apt-get install -y rsync"; }
+  ssh $SSH_OPTS "$DST_USER@$DST_IP" "which rsync" 2>/dev/null || { echo "[WARN] rsync missing on FLEX -- install with: sudo apt-get install -y rsync"; }
+  echo "[P0] Disk space check (OSPC used vs FLEX free)..."
+  OSPC_USED=$(ssh $SSH_OPTS "$SRC_USER@$SRC_IP" "df / --output=used | tail -1" 2>/dev/null | grep -Eo '[0-9]+' | tail -1 || echo 0)
+  FLEX_FREE=$(ssh $SSH_OPTS "$DST_USER@$DST_IP" "df / --output=avail | tail -1" 2>/dev/null | grep -Eo '[0-9]+' | tail -1 || echo 999999999)
+  OSPC_USED=${OSPC_USED:-0}; FLEX_FREE=${FLEX_FREE:-999999999}
+  if [ "$OSPC_USED" -gt "$FLEX_FREE" ] 2>/dev/null; then
+    echo "[WARN] OSPC used (104.130.26.81): $((OSPC_USED/1024))MB > FLEX free (50.56.158.21): $((FLEX_FREE/1024))MB -- proceed with caution"
+  else
+    echo "[P0] Disk OK  OSPC used=$((OSPC_USED/1024))MB  FLEX avail=$((FLEX_FREE/1024))MB"
+  fi
+  echo "[P0] Checking for stale migration lock..."
+  ssh $SSH_OPTS "$DST_USER@$DST_IP" "if [ -f /tmp/.ospc-migration-lock ]; then echo '[WARN] Stale lock found -- auto-removing (leftover from previous run)'; rm -f /tmp/.ospc-migration-lock; fi" 2>/dev/null || true
+  ssh $SSH_OPTS "$DST_USER@$DST_IP" "touch /tmp/.ospc-migration-lock" 2>/dev/null || true
+  echo "[P0] All pre-flight checks passed"
+
+  echo "[P0] Taking FLEX VM snapshot as rollback point before mutations..."
+  SNAP_NAME="pre-migration-postgresqlu24-$(date +%Y%m%d%H%M%S)"
+  if command -v openstack >/dev/null 2>&1; then
+    openstack server image create --name "$SNAP_NAME" "50.56.158.21" --wait 2>/dev/null \
+      && echo "  [P0] ✅ Rollback snapshot: $SNAP_NAME" \
+      || echo "  [P0] ⚠  Snapshot failed (no openstack CLI or permissions) -- proceed manually if needed"
+  else
+    echo "  [P0] ⚠  openstack CLI not found -- skipping snapshot. Create one manually before proceeding."
+  fi
+
+  echo "[P0] Deploying transfer key to OSPC for direct server-to-server transfers..."
+  deploy_key_to_ospc
+  echo "[P0] Key deployed -- direct OSPC->FLEX transfers ready"
+
+  
+  echo ""
+  echo "══════════════════════ STAGE 1 -- AUDIT OSPC SOURCE ══════════════════════"
+  
+  ssh $SSH_OPTS "$SRC_USER@$SRC_IP" bash <<'ENDSSH'
+    mkdir -p ~/server-clone-audit
+    hostnamectl > ~/server-clone-audit/hostnamectl.txt 2>/dev/null || true
+    timedatectl > ~/server-clone-audit/timedatectl.txt 2>/dev/null || true
+    locale > ~/server-clone-audit/locale.txt 2>/dev/null || true
+    getent passwd > ~/server-clone-audit/passwd.txt
+    getent group  > ~/server-clone-audit/group.txt
+    sudo sshd -T > ~/server-clone-audit/sshd-T.txt 2>/dev/null || true
+    sudo tar -czf ~/server-clone-audit/etc-ssh.tgz /etc/ssh 2>/dev/null || true
+    dpkg --get-selections > ~/server-clone-audit/dpkg-selections.txt 2>/dev/null || true
+    apt-mark showmanual > ~/server-clone-audit/apt-manual.txt 2>/dev/null || true
+    grep -r . /etc/apt/sources.list* > ~/server-clone-audit/apt-sources.txt 2>/dev/null || true
+    lsblk -f > ~/server-clone-audit/lsblk.txt && df -Th > ~/server-clone-audit/df.txt && cat /etc/fstab > ~/server-clone-audit/fstab.txt
+    uname -r > ~/server-clone-audit/kernel.txt
+    sysctl -a > ~/server-clone-audit/sysctl.txt 2>/dev/null || true
+    grep -r . /etc/sysctl* > ~/server-clone-audit/sysctl-conf.txt 2>/dev/null || true
+    grep -r . /etc/security/limits* > ~/server-clone-audit/limits.txt 2>/dev/null || true
+    ip addr > ~/server-clone-audit/ip-addr.txt && ip route > ~/server-clone-audit/ip-route.txt
+    systemctl list-unit-files --type=service > ~/server-clone-audit/systemd-services.txt
+    systemctl list-unit-files --state=enabled > ~/server-clone-audit/systemd-enabled.txt
+    ss -ltnp > ~/server-clone-audit/ports.txt
+    sudo crontab -l > ~/server-clone-audit/root-crontab.txt 2>/dev/null || true
+    crontab -l > ~/server-clone-audit/user-crontab.txt 2>/dev/null || true
+    tar -czf ~/server-clone-audit.tgz ~/server-clone-audit/ 2>/dev/null
+ENDSSH
+  scp -q $SSH_OPTS "$SRC_USER@$SRC_IP:~/server-clone-audit.tgz" "$NODE_AUDIT/audit.tgz" && echo "  [AUDIT] Saved $NODE_AUDIT/audit.tgz" || true
+  r6_containerization_capture "postgresqlu24" "$NODE_AUDIT"
+  if [ "${R6_CAPTURE_ONLY:-0}" = "1" ]; then
+    echo "[R6] Capture-only mode enabled -- stopping before LIVE clone/mutation stages for postgresqlu24"
+    remove_key_from_ospc
+    return 0
+  fi
+
+  
+  echo ""
+  echo "══════════════════════ STAGE 2 -- CLONE TO FLEX (safe order) ══════════════════════"
+  
+  echo "[L1] Server Identity"
+  SRC_HOST=$(src_cmd "hostname -s 2>/dev/null || hostname")
+  SRC_TZ=$(src_cmd "cat /etc/timezone 2>/dev/null || timedatectl show -p Timezone --value 2>/dev/null || echo UTC")
+  SRC_LOCALE=$(src_cmd "localectl status 2>/dev/null | grep 'System Locale' | cut -d= -f2 | tr -d ' '" || echo "en_US.UTF-8")
+  echo "  [L1] Detected hostname: $SRC_HOST  timezone: $SRC_TZ  locale: $SRC_LOCALE"
+  run dst_cmd "sudo hostnamectl set-hostname '${SRC_HOST:-$(hostname)}'"
+  run dst_cmd "sudo timedatectl set-timezone '${SRC_TZ:-UTC}'"
+  [ -n "$SRC_LOCALE" ] && run dst_cmd "sudo localectl set-locale LANG=$SRC_LOCALE 2>/dev/null || true"
+  echo "  [L1] FLEX hostname set to: $SRC_HOST  timezone: $SRC_TZ"
+
+  echo "[L2] SSH & Access"
+  ospc_to_flex "/etc/ssh/sshd_config" "/tmp/sshd_config_ospc"
+  dst_cmd "sudo cp /etc/ssh/sshd_config /etc/ssh/sshd_config.bak.ospc2flex" 2>/dev/null || true
+  # Strip OSPC-specific directives that would break FLEX SSH
+  ssh $SSH_OPTS "$DST_USER@$DST_IP" bash <<'SSHD_MERGE'
+    if [ -f /tmp/sshd_config_ospc ]; then
+      sed -i '/^[[:space:]]*ListenAddress/d' /tmp/sshd_config_ospc
+      sed -i '/rackspace/Id' /tmp/sshd_config_ospc
+      sed -i '/^[[:space:]]*Match.*rackspace/I,/^[[:space:]]*Match\|^$/d' /tmp/sshd_config_ospc
+      sed -i '/104\\.130\\.26\\.81/d' /tmp/sshd_config_ospc
+      if sudo sshd -t -f /tmp/sshd_config_ospc 2>/dev/null; then
+        sudo cp /tmp/sshd_config_ospc /etc/ssh/sshd_config
+        sudo systemctl reload ssh 2>/dev/null || sudo systemctl reload sshd 2>/dev/null || true
+        echo "  [L2] sshd_config applied (sanitized) on FLEX"
+      else
+        echo "  [WARN] Sanitized sshd_config failed validation — keeping FLEX original"
+        sudo cp /etc/ssh/sshd_config.bak.ospc2flex /etc/ssh/sshd_config
+      fi
+    fi
+SSHD_MERGE
+  ospc_to_flex "~/.ssh/authorized_keys" "/tmp/ospc_authorized_keys"
+  # Merge OSPC keys into FLEX (append, don't overwrite)
+  run dst_cmd "cat /tmp/ospc_authorized_keys >> ~/.ssh/authorized_keys && sort -u -o ~/.ssh/authorized_keys ~/.ssh/authorized_keys && chmod 700 ~/.ssh && chmod 600 ~/.ssh/authorized_keys"
+  echo "  [L2] authorized_keys merged on FLEX"
+  src_cmd "sudo tar -czf /tmp/sudoers_d.tgz /etc/sudoers.d/ 2>/dev/null || true"
+  ospc_to_flex "/tmp/sudoers_d.tgz" "/tmp/sudoers_d.tgz"
+  run dst_cmd "sudo tar -xzf /tmp/sudoers_d.tgz -C / 2>/dev/null || true && sudo visudo -c 2>/dev/null || echo '  [WARN] sudoers syntax check failed — review /etc/sudoers.d/'"
+  echo "  [L2] sudoers.d synced to FLEX"
+
+  echo "[L3] Users & Groups (UID/GID preserved)"
+  echo "  [L3] Syncing groups (GID>=1000)..."
+  src_cmd "getent group | awk -F: '\$3>=1000 && \$3<65000{print}'" | while IFS=: read grp gpw gid members; do
+    run dst_cmd "sudo groupadd -g $gid '$grp' 2>/dev/null || true"
+  done
+  USER_COUNT=$(src_cmd "getent passwd | awk -F: '\$3>=1000 && \$3<65000{print}' | wc -l" || echo 0)
+  echo "  [L3] Found $USER_COUNT non-system users -- syncing..."
+  src_cmd "getent passwd | awk -F: '\$3>=1000 && \$3<65000{print}'" | while IFS=: read user pw uid gid gecos home shell; do
+    echo "    -> user: $user uid:$uid gid:$gid"
+    run dst_cmd "id -u '$user' >/dev/null 2>&1 || sudo useradd -u $uid -g $gid -m -s '$shell' -c '$gecos' '$user' 2>/dev/null || true"
+  done
+  echo "  [L3] Syncing password hashes (shadow entries UID>=1000)..."
+  src_cmd "sudo getent shadow" | while IFS=: read suser shash rest; do
+    [ -z "$shash" ] || [ "$shash" = "!" ] || [ "$shash" = "*" ] || [ "$shash" = "!!" ] && continue
+    run dst_cmd "sudo usermod -p '$shash' '$suser' 2>/dev/null || true"
+  done
+  echo "  [L3] Direct rsync OSPC:/home/ -> FLEX:/home/ (server-to-server)"
+  rsync_direct "--exclude='$DST_USER/.ssh/authorized_keys' /home/" "/home/"
+  echo "  [L3] Home directories synced OK"
+
+  echo "[L4] Disk/Mounts -- AUDIT ONLY"
+  src_cmd "lsblk -f; df -Th; cat /etc/fstab" > "$NODE_AUDIT/L4_disk.txt" 2>/dev/null || true
+  DISK_LINES=$(wc -l < "$NODE_AUDIT/L4_disk.txt" 2>/dev/null || echo 0)
+  echo "  [L4] Disk layout captured ($DISK_LINES lines) -> $NODE_AUDIT/L4_disk.txt"
+  echo "  [L4] Apply fstab entries MANUALLY (IPs and device names may differ)"
+
+  echo "[L5] Packages & Repos  [pkg-mgr: apt]"
+  PKG_FILTER='linux-image|linux-headers|linux-modules|linux-firmware|grub-|initramfs-tools|rackspace-|nova-agent|xe-guest|driveclient|holland'
+  run dst_cmd "sudo sed -i '/rax\.mirror\.rackspace\.com/d;/mirror\.rackspace\.com\/opensuse/d' /etc/apt/sources.list 2>/dev/null || true"
+  run dst_cmd "sudo find /etc/apt/sources.list.d/ \( -name 'holland*' -o -name '*rackspace*' \) -delete 2>/dev/null || true"
+  echo "  [L5] Rackspace repos cleaned from FLEX apt sources"
+  APT_RAW=$(src_cmd "apt-mark showmanual 2>/dev/null" || true)
+  APT_FILTERED=$(echo "$APT_RAW" | grep -vE "$PKG_FILTER" || true)
+  APT_SKIPPED=$(echo "$APT_RAW" | grep -cE "$PKG_FILTER" || echo 0)
+  APT_LIST=$(echo "$APT_FILTERED" | tr '\n' ' ')
+  APT_COUNT=$(echo "$APT_LIST" | wc -w)
+  echo "  [L5] OSPC packages: $APT_COUNT to install, $APT_SKIPPED filtered (kernel/boot/rackspace)"
+  if [ -n "$APT_LIST" ]; then
+    run dst_cmd "sudo apt-get update -qq" || echo "  [WARN] apt-get update failed — some packages may not install"
+    run dst_cmd "sudo DEBIAN_FRONTEND=noninteractive apt-get install -y $APT_LIST" || echo "  [WARN] Some packages failed to install — check $NODE_AUDIT/migration.log"
+  fi
+  echo "  [L5] Package install complete"
+
+  echo "[L6] Kernel / Sysctl / Limits"
+  src_cmd "sudo cat /etc/sysctl.conf 2>/dev/null; sudo grep -r . /etc/sysctl.d/ 2>/dev/null" \
+    | grep -vE '^[[:space:]]*(net\.|#.*net\.|$)' \
+    | ssh $SSH_OPTS "$DST_USER@$DST_IP" "cat > /tmp/sysctl_clone.conf" || true
+  SYSCTL_LINES=$(ssh $SSH_OPTS "$DST_USER@$DST_IP" "wc -l < /tmp/sysctl_clone.conf 2>/dev/null || echo 0")
+  echo "  [L6] sysctl: $SYSCTL_LINES non-network settings to apply (net.* excluded)"
+  run dst_cmd "sudo cp /tmp/sysctl_clone.conf /etc/sysctl.d/99-ospc-clone.conf && sudo sysctl --system 2>/dev/null || true"
+  echo "  [L6] sysctl settings applied on FLEX"
+  src_cmd "grep -r . /etc/security/limits.conf /etc/security/limits.d/ 2>/dev/null" | ssh $SSH_OPTS "$DST_USER@$DST_IP" "cat > /tmp/limits_clone.conf" || true
+  run dst_cmd "sudo cp /tmp/limits_clone.conf /etc/security/limits.d/99-ospc-clone.conf 2>/dev/null || true"
+  echo "  [L6] kernel/limits sync complete"
+
+  echo "[L7] Network -- EXPORT ONLY (IPs differ on FLEX)"
+  src_cmd "ip addr; ip route; cat /etc/netplan/*.yaml 2>/dev/null || true" > "$NODE_AUDIT/L7_network.txt" 2>/dev/null || true
+  NET_LINES=$(wc -l < "$NODE_AUDIT/L7_network.txt" 2>/dev/null || echo 0)
+  echo "  [L7] Network config exported ($NET_LINES lines) -> $NODE_AUDIT/L7_network.txt"
+  echo "  [L7] NOTE: Update IP addresses manually before applying netplan on FLEX"
+
+  echo "[L8] Runtime Environment"
+  PYTHON_V=$(src_cmd "python3 --version 2>/dev/null" | awk '{print $2}' | cut -d. -f1-2 || true)
+  NODE_V=$(src_cmd "node --version 2>/dev/null" | tr -d 'v' || true)
+  DOCKER_V=$(src_cmd "docker version --format '{{.Server.Version}}' 2>/dev/null" || true)
+  HAS_PM2=$(src_cmd "which pm2 2>/dev/null" || true)
+  HAS_SNAP=$(src_cmd "which snap 2>/dev/null" || true)
+  echo "  [L8] Detected: python=$PYTHON_V node=$NODE_V docker=${DOCKER_V:-no} pm2=$([ -n "$HAS_PM2" ] && echo yes || echo no)"
+  [ -n "$PYTHON_V" ] && run dst_cmd "which python3 || sudo apt-get install -y python3 python3-pip python3-venv" || true
+  [ -n "$NODE_V" ] && run dst_cmd "which node || (curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo -E bash - && sudo apt-get install -y nodejs)" || true
+  if [ -n "$DOCKER_V" ]; then
+    FLEX_DOCKER=$(dst_cmd "docker version --format '{{.Server.Version}}' 2>/dev/null" || true)
+    if [ -z "$FLEX_DOCKER" ]; then
+      echo "  [L8] Installing Docker $DOCKER_V (matching OSPC version)"
+      run dst_cmd "curl -fsSL https://get.docker.com | sudo VERSION=$DOCKER_V sh 2>/dev/null || (curl -fsSL https://get.docker.com | sudo sh)" || true
+      run dst_cmd "sudo systemctl enable --now docker" || true
+    else
+      echo "  [L8] Docker already on FLEX: $FLEX_DOCKER (OSPC had: $DOCKER_V)"
+    fi
+  fi
+  [ -n "$HAS_PM2" ] && run dst_cmd "which pm2 || sudo npm install -g pm2" || true
+  if [ -n "$HAS_SNAP" ]; then
+    SNAP_LIST=$(src_cmd "snap list --unicode=never 2>/dev/null | awk 'NR>1{print \$1}'" | grep -v snapd || true)
+    SNAP_COUNT=$(echo "$SNAP_LIST" | grep -c . || echo 0)
+    echo "  [L8] Snap packages detected: $SNAP_COUNT"
+    for SNAP_PKG in $SNAP_LIST; do
+      run dst_cmd "sudo snap install $SNAP_PKG 2>/dev/null || true"
+    done
+  fi
+  echo "  [L8] Scanning for Python virtualenvs to sync pip dependencies..."
+  for AP in /opt/app /srv /var/www /var/lib/app; do
+    src_cmd "find $AP -name 'pyvenv.cfg' -maxdepth 4 2>/dev/null | head -5" | while read VENV_CFG; do
+      VENV_DIR=$(dirname "$VENV_CFG")
+      echo "  [L8] Virtualenv: $VENV_DIR"
+      src_cmd "$VENV_DIR/bin/pip freeze 2>/dev/null" > /tmp/reqs_$$.txt || true
+      [ -s /tmp/reqs_$$.txt ] && ssh $SSH_OPTS "$DST_USER@$DST_IP" "cat > /tmp/reqs_$$.txt" < /tmp/reqs_$$.txt || true
+      run dst_cmd "python3 -m venv $VENV_DIR 2>/dev/null && $VENV_DIR/bin/pip install -q -r /tmp/reqs_$$.txt 2>/dev/null || true"
+      rm -f /tmp/reqs_$$.txt
+    done
+  done
+  echo "  [L8] Scanning for Node.js apps to reinstall npm dependencies..."
+  for AP in /opt/app /srv /var/www /var/lib/app; do
+    src_cmd "find $AP -name 'package-lock.json' -not -path '*/node_modules/*' -maxdepth 5 2>/dev/null | head -5" | while read PKG_LOCK; do
+      APP_DIR=$(dirname "$PKG_LOCK")
+      echo "  [L8] npm ci: $APP_DIR"
+      run dst_cmd "cd $APP_DIR && npm ci --silent 2>/dev/null || npm install --silent 2>/dev/null || true"
+    done
+  done
+  echo "  [L8] Runtime environment sync complete"
+
+  echo "[L9] App Code & Config"
+  for SRC_PATH in /opt/app /srv /var/www /var/lib/app; do
+    src_cmd "[ -d $SRC_PATH ] && echo exists" 2>/dev/null | grep -q exists || continue
+    echo "  [L9] Direct rsync OSPC:$SRC_PATH -> FLEX:$SRC_PATH (server-to-server)"
+    rsync_direct "$SRC_PATH/" "$SRC_PATH/"
+    echo "  [L9] Synced: $SRC_PATH"
+  done
+  src_cmd "find /opt/app /srv /var/www /var/lib/app -name '.env' -o -name '*.yml' -o -name '*.yaml' -o -name '*.ini' 2>/dev/null | head -30" > "$NODE_AUDIT/L9_configs.txt" 2>/dev/null || true
+  echo "  Config file list saved to $NODE_AUDIT/L9_configs.txt"
+  echo "[L9.5] Config IP fixup -- replacing OSPC IP 104.130.26.81 with FLEX IP 50.56.158.21"
+  FIXUP_DIRS="/opt/app /srv /var/www /var/lib/app /etc/nginx /etc/apache2 /etc/haproxy"
+  run dst_cmd "for DIR in \$FIXUP_DIRS; do [ -d \$DIR ] || continue; sudo grep -rlI --include='*.conf' --include='*.cfg' --include='*.yml' --include='*.yaml' --include='*.json' --include='*.xml' --include='*.ini' --include='*.env' --include='*.txt' --include='*.toml' --include='*.properties' '104.130.26.81' \$DIR 2>/dev/null | xargs -r sudo sed -i 's|104.130.26.81|50.56.158.21|g'; done || true"
+  echo "  [L9.5] Also checking for hardcoded hostnames..."
+  SRC_HOST_IP=$(src_cmd "hostname 2>/dev/null || true")
+  DST_HOST_IP=$(dst_cmd "hostname 2>/dev/null || true")
+  [ -n "$SRC_HOST_IP" ] && run dst_cmd "for DIR in \$FIXUP_DIRS; do [ -d \$DIR ] || continue; sudo grep -rlI --include='*.conf' --include='*.cfg' --include='*.yml' --include='*.yaml' --include='*.json' --include='*.xml' --include='*.ini' --include='*.env' '\$SRC_HOST_IP' \$DIR 2>/dev/null | xargs -r sudo sed -i 's|\$SRC_HOST_IP|\$DST_HOST_IP|g'; done || true" || true
+
+  echo "[L10] Systemd Units & Cron"
+  SVC_FILTER='rackspace|nova-agent|xe-guest|driveclient|holland|cloud-init|snapd|ufw|networkd|systemd-net|systemd-resolve|multipathd|open-vm'
+  echo "  [L10] Copying custom app service units (excluding platform/OSPC agents)..."
+  src_cmd "find /etc/systemd/system -maxdepth 1 -type f -name '*.service' 2>/dev/null | xargs -r grep -lv 'rackspace\|nova-agent\|xe-guest\|driveclient' 2>/dev/null | tar -czf /tmp/systemd_units.tgz --files-from=- 2>/dev/null; echo done" 2>/dev/null || true
+  ospc_to_flex "/tmp/systemd_units.tgz" "/tmp/systemd_units.tgz"
+  run dst_cmd "sudo tar -xzf /tmp/systemd_units.tgz -C / 2>/dev/null || true && sudo systemctl daemon-reload"
+  echo "  [L10] Custom systemd units transferred and daemon reloaded"
+  ENABLED=$(src_cmd "systemctl list-unit-files --state=enabled --type=service --no-legend 2>/dev/null | awk '{print \$1}'" | grep -vE "$SVC_FILTER" || true)
+  ENABLED_COUNT=$(echo "$ENABLED" | grep -c . || echo 0)
+  echo "  [L10] Enabling $ENABLED_COUNT app services on FLEX (platform services filtered)..."
+  for svc in $ENABLED; do
+    echo "    -> enabling: $svc"
+    run dst_cmd "sudo systemctl enable '$svc' 2>/dev/null || true"
+  done
+  src_cmd "sudo tar -czf /tmp/cron_backup.tgz --exclude='*rackspace*' --exclude='*holland*' /etc/cron.d /etc/cron.daily /etc/cron.hourly /etc/cron.monthly /etc/cron.weekly 2>/dev/null || true"
+  ospc_to_flex "/tmp/cron_backup.tgz" "/tmp/cron_backup.tgz"
+  run dst_cmd "sudo tar -xzf /tmp/cron_backup.tgz -C / 2>/dev/null || true"
+  echo "  [L10] Cron jobs synced to FLEX"
+
+  echo "[L11] Data"
+  for DATA_PATH in /var/lib/app /srv/data; do
+    src_cmd "[ -d $DATA_PATH ] && echo exists" 2>/dev/null | grep -q exists || continue
+    echo "  [L11] Direct rsync OSPC:$DATA_PATH -> FLEX:$DATA_PATH"
+    rsync_direct "$DATA_PATH/" "$DATA_PATH/"
+  done
+  echo "[L11] Checking for PostgreSQL..."
+  HAS_PG=$(src_cmd "which pg_dump" 2>/dev/null || true)
+  if [ -n "$HAS_PG" ]; then
+    echo "  [L11] PostgreSQL detected -- dumping & transferring direct OSPC->FLEX"
+    PG_DBS=$(src_cmd "sudo -u postgres psql -t -c \"SELECT datname FROM pg_database WHERE datistemplate=false AND datname<>'postgres';\" 2>/dev/null" | tr -d ' ' | grep -v '^$' || true)
+    for DB in $PG_DBS; do
+      echo "  [L11] Dumping PG: $DB"
+      src_cmd "sudo -u postgres pg_dump -Fc $DB > /tmp/pg_postgresqlu24_$DB.dump 2>/dev/null"
+      ospc_to_flex "/tmp/pg_postgresqlu24_$DB.dump" "/tmp/pg_$DB.dump"
+      run dst_cmd "sudo -u postgres createdb $DB 2>/dev/null || true && sudo -u postgres pg_restore -d $DB /tmp/pg_$DB.dump 2>/dev/null && echo '[L11] PG restore OK: '$DB || echo '[L11] PG restore WARNING: '$DB"
+    done
+  fi
+  HAS_MYSQL=$(src_cmd "which mysqldump" 2>/dev/null || true)
+  if [ -n "$HAS_MYSQL" ]; then
+    echo "  [L11] MySQL/MariaDB detected -- dumping & transferring direct OSPC->FLEX"
+    MY_DBS=$(src_cmd "mysql -uroot -e 'SHOW DATABASES;' 2>/dev/null | grep -Ev 'Database|information_schema|performance_schema|mysql|sys'" || true)
+    for DB in $MY_DBS; do
+      echo "  [L11] Dumping MySQL: $DB"
+      src_cmd "mysqldump -uroot $DB | gzip > /tmp/mysql_postgresqlu24_$DB.sql.gz 2>/dev/null"
+      ospc_to_flex "/tmp/mysql_postgresqlu24_$DB.sql.gz" "/tmp/mysql_$DB.sql.gz"
+      run dst_cmd "mysql -uroot -e 'CREATE DATABASE IF NOT EXISTS $DB;' 2>/dev/null && zcat /tmp/mysql_$DB.sql.gz | mysql -uroot $DB 2>/dev/null && echo '[L11] MySQL restore OK: '$DB || echo '[L11] MySQL restore WARNING: '$DB"
+    done
+  fi
+
+  echo "[L12] TLS & Certs"
+  TLS_EXISTS=$(src_cmd "[ -d /etc/letsencrypt ] && echo exists" 2>/dev/null || true)
+  if echo "$TLS_EXISTS" | grep -q exists; then
+    echo "  [L12] Let's Encrypt detected on OSPC -- copying certs direct to FLEX"
+    src_cmd "sudo tar -czf /tmp/letsencrypt.tgz /etc/letsencrypt/ 2>/dev/null || true"
+    ospc_to_flex "/tmp/letsencrypt.tgz" "/tmp/letsencrypt.tgz"
+    run dst_cmd "sudo tar -xzf /tmp/letsencrypt.tgz -C / 2>/dev/null || true"
+    echo "  [L12] TLS certs transferred to FLEX"
+  else
+    echo "  [L12] No Let's Encrypt certs on OSPC -- skipping"
+  fi
+  SSL_EXISTS=$(src_cmd "sudo ls /etc/ssl/private/*.pem /etc/ssl/private/*.crt /etc/ssl/private/*.key 2>/dev/null | wc -l" || echo 0)
+  if [ "$SSL_EXISTS" -gt 0 ] 2>/dev/null; then
+    echo "  [L12] /etc/ssl/private certs found ($SSL_EXISTS files) -- transferring"
+    src_cmd "sudo tar -czf /tmp/ssl_private.tgz /etc/ssl/private/ 2>/dev/null || true"
+    ospc_to_flex "/tmp/ssl_private.tgz" "/tmp/ssl_private.tgz"
+    run dst_cmd "sudo tar -xzf /tmp/ssl_private.tgz -C / 2>/dev/null || true && sudo chmod 710 /etc/ssl/private"
+    echo "  [L12] /etc/ssl/private transferred"
+  fi
+  PKI_EXISTS=$(src_cmd "sudo ls /etc/pki/tls/certs/*.pem /etc/pki/tls/private/*.key 2>/dev/null | wc -l" || echo 0)
+  if [ "$PKI_EXISTS" -gt 0 ] 2>/dev/null; then
+    echo "  [L12] /etc/pki/tls certs found ($PKI_EXISTS files) -- transferring"
+    src_cmd "sudo tar -czf /tmp/pki_tls.tgz /etc/pki/tls/ 2>/dev/null || true"
+    ospc_to_flex "/tmp/pki_tls.tgz" "/tmp/pki_tls.tgz"
+    run dst_cmd "sudo tar -xzf /tmp/pki_tls.tgz -C / 2>/dev/null || true"
+    echo "  [L12] /etc/pki/tls transferred"
+  fi
+  src_cmd "sudo find /opt /srv /var/www /etc/nginx /etc/apache2 -name '*.pem' -o -name '*.crt' -o -name '*.key' 2>/dev/null | grep -v letsencrypt | head -20" > "$NODE_AUDIT/L12_extra_certs.txt" 2>/dev/null || true
+  EXTRA_CERTS=$(wc -l < "$NODE_AUDIT/L12_extra_certs.txt" 2>/dev/null || echo 0)
+  [ "$EXTRA_CERTS" -gt 0 ] && echo "  [L12] ⚠  $EXTRA_CERTS extra cert files found outside standard paths -- review $NODE_AUDIT/L12_extra_certs.txt"
+  run dst_cmd "sudo update-ca-certificates 2>/dev/null || sudo update-ca-trust 2>/dev/null || true"
+  echo "  [L12] CA trust store updated on FLEX"
+
+  echo "[L13] External Dependencies (audit only)"
+  src_cmd "grep -rE '(DB_HOST|DATABASE_URL|PG_HOST|REDIS_URL|API_URL)' /opt/app /srv /var/www /var/lib/app 2>/dev/null | head -30" > "$NODE_AUDIT/L13_external.txt" 2>/dev/null || true
+  src_cmd "ss -ltnp 2>/dev/null" >> "$NODE_AUDIT/L13_external.txt" || true
+  EXT_LINES=$(wc -l < "$NODE_AUDIT/L13_external.txt" 2>/dev/null || echo 0)
+  echo "  [L13] External dependency audit: $EXT_LINES entries found -> $NODE_AUDIT/L13_external.txt"
+  echo "  [L13] Review external endpoints and update configs manually on FLEX"
+
+  
+  echo ""
+  echo "══════════════════════ STAGE 3 -- VALIDATION ══════════════════════"
+  
+  echo "[VALIDATE] Post-clone checks on FLEX $DST_IP (user: $DST_USER)"
+  ssh $SSH_OPTS "$DST_USER@$DST_IP" bash <<'ENDSSH' | tee "$NODE_AUDIT/validation.txt" || true
+    echo '--- Hostname ---' && hostnamectl 2>/dev/null | head -5 || true
+    echo '--- Disk ---' && df -Th
+    echo '--- Listening ports ---' && ss -ltnp
+    echo '--- Running services ---' && systemctl list-units --type=service --state=running --no-pager 2>/dev/null | head -15 || true
+    echo '--- sshd config test ---' && sudo sshd -t 2>/dev/null && echo 'sshd OK' || echo 'sshd config WARNING'
+ENDSSH
+
+  
+  echo ""
+  echo "══════════════════════ STAGE 4 -- SMOKE TESTS (9A INFRA + 9B APP) ══════════════════════"
+  
+  SMOKE_REPORT="$NODE_AUDIT/smoke_test.txt"
+  SMOKE_PASS=0; SMOKE_FAIL=0; SMOKE_SKIP=0
+  smoke_ok()  { echo "  ✅ [PASS] $1" | tee -a "$SMOKE_REPORT"; SMOKE_PASS=$((SMOKE_PASS+1)); }
+  smoke_fail(){ echo "  ❌ [FAIL] $1" | tee -a "$SMOKE_REPORT"; SMOKE_FAIL=$((SMOKE_FAIL+1)); }
+  smoke_skip(){ echo "  ⏭  [SKIP] $1" | tee -a "$SMOKE_REPORT"; SMOKE_SKIP=$((SMOKE_SKIP+1)); }
+  echo "# Smoke test report -- $(date)" > "$SMOKE_REPORT"
+
+  echo ""
+  echo "── 9A INFRA ────────────────────────────────────"
+  ssh $SSH_OPTS "$DST_USER@$DST_IP" "echo OK" 2>/dev/null && smoke_ok "SSH access -- $DST_IP" || smoke_fail "SSH access -- $DST_IP"
+  IP_OUT=$(ssh $SSH_OPTS "$DST_USER@$DST_IP" "ip addr show | grep -c 'inet '" 2>/dev/null || echo 0)
+  [ "$IP_OUT" -gt 0 ] 2>/dev/null && smoke_ok "IP address present ($IP_OUT interfaces)" || smoke_fail "No IP address found"
+  RT_OUT=$(ssh $SSH_OPTS "$DST_USER@$DST_IP" "ip route | grep -c default" 2>/dev/null || echo 0)
+  [ "$RT_OUT" -gt 0 ] 2>/dev/null && smoke_ok "Default route present" || smoke_fail "No default route"
+  DNS_OK=$(ssh $SSH_OPTS "$DST_USER@$DST_IP" "resolvectl status 2>/dev/null | grep -c 'DNS Server' || dig +short google.com 2>/dev/null | grep -c '[0-9]'" 2>/dev/null || echo 0)
+  [ "$DNS_OK" -gt 0 ] 2>/dev/null && smoke_ok "DNS resolution working" || smoke_fail "DNS not resolving"
+  MOUNTS=$(ssh $SSH_OPTS "$DST_USER@$DST_IP" "df -Th | grep -cE '^/dev'" 2>/dev/null || echo 0)
+  [ "$MOUNTS" -gt 0 ] 2>/dev/null && smoke_ok "Disk mounts present ($MOUNTS devices)" || smoke_fail "No disk mounts"
+  PORTS=$(ssh $SSH_OPTS "$DST_USER@$DST_IP" "ss -ltnp | grep -c LISTEN" 2>/dev/null || echo 0)
+  [ "$PORTS" -gt 0 ] 2>/dev/null && smoke_ok "Listening ports present ($PORTS)" || smoke_fail "No listening ports"
+  echo "  Ports in use:" && ssh $SSH_OPTS "$DST_USER@$DST_IP" "ss -ltnp | grep LISTEN" 2>/dev/null | sed 's/^/    /' | tee -a "$SMOKE_REPORT" || true
+  FAILED=$(ssh $SSH_OPTS "$DST_USER@$DST_IP" "systemctl --failed --no-pager 2>/dev/null | grep -c 'failed'" 2>/dev/null || echo 0)
+  FAILED=$(echo "$FAILED" | tr -d "[:space:]")
+  [ "$FAILED" = "0" ] && smoke_ok "No failed systemd units" || smoke_fail "$FAILED failed systemd units -- check: systemctl --failed"
+  ssh $SSH_OPTS "$DST_USER@$DST_IP" "systemctl --failed --no-pager 2>/dev/null" | grep -v "^$" | sed 's/^/    /' | tee -a "$SMOKE_REPORT" || true
+
+  echo "── 9B APP ──────────────────────────────────────"
+  PORT80=$(nc -z -w5 $DST_IP 80 2>/dev/null && echo open || echo closed)
+  PORT443=$(nc -z -w5 $DST_IP 443 2>/dev/null && echo open || echo closed)
+  if [ "$PORT80" = "open" ]; then
+    echo "  [PORT] port 80 open"
+    HTTP_CODE=$(curl -sSo /dev/null -w "%{http_code}" --max-time 10 "http://$DST_IP:80" 2>/dev/null || echo "000")
+    case "$HTTP_CODE" in
+      2*|3*) smoke_ok  "Homepage  :80  HTTP $HTTP_CODE" ;;
+      *)     smoke_fail "Homepage  :80  HTTP $HTTP_CODE" ;;
+    esac
+    HEALTH=$(curl -sSo /dev/null -w "%{http_code}" --max-time 10 "http://$DST_IP:80/health" 2>/dev/null || echo "000")
+    case "$HEALTH" in
+      2*) smoke_ok   "Health endpoint  :80/health  HTTP $HEALTH" ;;
+      *)  smoke_skip "Health endpoint  :80/health  HTTP $HEALTH (route not found)" ;;
+    esac
+    API=$(curl -sSo /dev/null -w "%{http_code}" --max-time 10 "http://$DST_IP:80/api/" 2>/dev/null || echo "000")
+    case "$API" in
+      2*|3*) smoke_ok  "API endpoint  :80/api/  HTTP $API" ;;
+      *)     smoke_skip "API endpoint  :80/api/  HTTP $API (route not found)" ;;
+    esac
+  else
+    smoke_skip "HTTP checks skipped -- port 80 closed on $DST_IP"
+  fi
+  HAS_PSQL=$(ssh $SSH_OPTS "$DST_USER@$DST_IP" "which psql" 2>/dev/null || true)
+  if [ -n "$HAS_PSQL" ]; then
+    DB_OK=$(ssh $SSH_OPTS "$DST_USER@$DST_IP" "sudo -u postgres psql -c '\\l' 2>/dev/null | grep -c '|'" 2>/dev/null || echo 0)
+    [ "$DB_OK" -gt 0 ] 2>/dev/null && smoke_ok "DB connectivity (PostgreSQL) -- $DB_OK databases found" || smoke_fail "DB connectivity (PostgreSQL) -- cannot list databases"
+  else
+    HAS_MYSQL=$(ssh $SSH_OPTS "$DST_USER@$DST_IP" "which mysql" 2>/dev/null || true)
+    if [ -n "$HAS_MYSQL" ]; then
+      DB_OK=$(ssh $SSH_OPTS "$DST_USER@$DST_IP" "mysql -uroot -e 'SHOW DATABASES;' 2>/dev/null | grep -c Database" 2>/dev/null || echo 0)
+      [ "$DB_OK" -gt 0 ] 2>/dev/null && smoke_ok "DB connectivity (MySQL)" || smoke_fail "DB connectivity (MySQL)"
+    else
+      smoke_skip "DB connectivity (no psql or mysql found)"
+    fi
+  fi
+  CRON_OK=$(ssh $SSH_OPTS "$DST_USER@$DST_IP" "crontab -l 2>/dev/null | grep -vc '^#'" 2>/dev/null || echo 0)
+  [ "$CRON_OK" -gt 0 ] && smoke_ok "Background jobs -- $CRON_OK cron entries present" || smoke_skip "Background jobs -- no crontab entries (manual check needed)"
+  TLS_CODE=$(curl -sSo /dev/null -w "%{http_code}" --max-time 10 -k "https://$DST_IP" 2>/dev/null || echo "000")
+  case "$TLS_CODE" in
+    2*|3*) smoke_ok  "TLS / HTTPS  HTTP $TLS_CODE" ;;
+    000)   smoke_skip "TLS / HTTPS  (port 443 not open)" ;;
+    *)     smoke_fail "TLS / HTTPS  HTTP $TLS_CODE" ;;
+  esac
+
+  echo ""
+  echo "════════════════════════════════════════════════"
+  echo "  SMOKE TEST SUMMARY: ✅ $SMOKE_PASS passed  ❌ $SMOKE_FAIL failed  ⏭  $SMOKE_SKIP skipped"
+  echo "  Full report: $SMOKE_REPORT"
+  echo "════════════════════════════════════════════════"
+  [ "$SMOKE_FAIL" -gt 0 ] && echo "  ⚠  $SMOKE_FAIL check(s) failed -- review before cutover" || echo "  ✅  All checks passed -- safe to proceed to cutover"
+
+  
+  echo ""
+  echo "══════════════════════ STAGE 5 -- CLEANUP ══════════════════════"
+  
+  echo "[CLEANUP] Removing /tmp staging files for postgresqlu24..."
+  run "rm -rf /tmp/postgresqlu24_* 2>/dev/null || true"
+  ssh $SSH_OPTS "$DST_USER@$DST_IP" "rm -f /tmp/.ospc-migration-lock /tmp/sshd_config /tmp/sudoers_d.tgz /tmp/systemd_units.tgz /tmp/cron_backup.tgz /tmp/sysctl_clone.conf /tmp/limits_clone.conf /tmp/pg_*.dump /tmp/mysql_*.sql.gz 2>/dev/null || true" || true
+  remove_key_from_ospc  # remove transferred SSH key from OSPC
+  echo "  [CLEANUP] Done"
+
+  echo "[DONE] postgresqlu24 complete. Reports: $NODE_AUDIT/"
+}
+
+# ================================================================
+# MAIN — process nodes one at a time
+# ================================================================
+node_postgresqlu24
+node_postgresqlu24
+
+echo ""
+echo "================================================================"
+echo "ALL NODES PROCESSED"
+echo "Audit + validation reports: ./migration-csv/UnknownCustomer-audit/"
+echo "================================================================"

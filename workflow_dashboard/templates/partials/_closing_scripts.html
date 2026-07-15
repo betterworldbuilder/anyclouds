@@ -5818,11 +5818,29 @@ ${certContent}
     requestAnimationFrame(syncVisibleIframeHeights);
   }
 
+  function openAnotherMigrationRequest() {
+    var form = document.getElementById('inline-mig-form');
+    var waitingBanner = document.getElementById('mig-waiting-list-banner');
+    var noRequests = document.getElementById('mig-no-requests');
+    var details = document.getElementById('wl-details-panel');
+    if (waitingBanner) waitingBanner.style.setProperty('display', 'none', 'important');
+    if (noRequests) noRequests.style.setProperty('display', 'none', 'important');
+    if (details) details.style.display = 'none';
+    if (form) {
+      form.style.setProperty('display', 'block', 'important');
+      if (typeof imfMountBusinessSystems === 'function') imfMountBusinessSystems();
+      form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }
+  window.openAnotherMigrationRequest = openAnotherMigrationRequest;
+
   function submitInlineMigRequest() {
     var company = (document.getElementById('imf-company')||{}).value||'';
     var contact = (document.getElementById('imf-contact')||{}).value||'';
     var email   = (document.getElementById('imf-email')||{}).value||'';
     if (!company || !contact || !email) { alert('Company, Contact and Email are required.'); return; }
+    var selectedSystems = [];
+    try { selectedSystems = JSON.parse(localStorage.getItem('uatS1_systems') || '[]'); } catch(e) { selectedSystems = []; }
     var req = {
       id: 'REQ-'+Date.now(), submittedAt: new Date().toISOString(), status: 'Waiting List',
       company, contact, email,
@@ -5831,7 +5849,7 @@ ${certContent}
       startDate: (document.getElementById('imf-start')||{}).value||'',
       completionDate: (document.getElementById('imf-end')||{}).value||'',
       notes:   (document.getElementById('imf-notes')||{}).value||'',
-      strategy:'', systems: []
+      strategy:'', systems: selectedSystems
     };
     try {
       var list = JSON.parse(localStorage.getItem('flex_migration_waiting_list')||'[]');
@@ -5852,7 +5870,7 @@ ${certContent}
     var email   = (document.getElementById('mfr-email')||{}).value||'';
     if (!company||!contact||!email) { alert('Company, Contact and Email are required.'); return; }
     var systems = [];
-    try { systems = JSON.parse(localStorage.getItem('uatS1_systems')||'[]'); } catch(e) {}
+    try { systems = JSON.parse(localStorage.getItem('uatS1_systems')||'[]'); } catch(e) { systems = []; }
     var item = {
       id:'REQ-'+Date.now(), submittedAt:new Date().toISOString(), status:'Active',
       company:company, contact:contact, email:email,
@@ -5940,7 +5958,6 @@ ${certContent}
           + (sysCnt ? '<span style="background:#dcfce7;color:#15803d;border-radius:4px;padding:2px 7px;font-size:10px;font-weight:800;">' + sysCnt + ' systems</span>' : '')
           + '<div style="margin-left:auto;display:flex;gap:8px;">'
           + '<button onclick="showWLDetails(' + i + ')" style="background:#f0f9ff;color:#0284c7;border:1px solid #bae6fd;border-radius:6px;padding:5px 12px;font-size:11px;font-weight:900;cursor:pointer;white-space:nowrap;">🔍 Show Details</button>'
-          + '<button onclick="addWLToTracker(' + i + ')" style="background:linear-gradient(135deg,#0284c7,#4f46e5);color:#fff;border:none;border-radius:6px;padding:5px 12px;font-size:11px;font-weight:900;cursor:pointer;white-space:nowrap;">➕ Add to Migration Log</button>'
           + '</div>'
           + '</div>';
       }).join('');
@@ -6018,6 +6035,14 @@ ${certContent}
     return html;
   }
 
+  /* Local escape helper — showWLDetails lives outside the business-system-engine
+     closure that defines _h, so it can't reach that private function. */
+  function _wldEsc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function(ch) {
+      return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]);
+    });
+  }
+
   function showWLDetails(idx) {
     try {
       var items = JSON.parse(localStorage.getItem('flex_migration_waiting_list') || '[]');
@@ -6031,7 +6056,10 @@ ${certContent}
       var sBar  = document.getElementById('wld-strategy-bar');
       var sysCt = document.getElementById('wld-systems');
       var empty = document.getElementById('wld-empty');
-      if (!panel) return;
+      if (!panel || !title || !meta || !cBar || !sBar || !sysCt || !empty) {
+        alert('Could not open Request Details — the details panel is missing from this page. Please reload and try again.');
+        return;
+      }
 
       // Header
       title.textContent = '📋 ' + (item.company||'Migration') + ' — Request Details';
@@ -6052,7 +6080,8 @@ ${certContent}
         + (item.notes ? '<span style="color:#64748b;">📝 ' + item.notes + '</span>' : '');
 
       // Business systems — use item.systems if present, else fall back to uatS1_systems
-      var systems = Array.isArray(item.systems) && item.systems.length ? item.systems : [];
+      var usingItemSystems = Array.isArray(item.systems) && item.systems.length > 0;
+      var systems = usingItemSystems ? item.systems : [];
       if (!systems.length) {
         try { systems = JSON.parse(localStorage.getItem('uatS1_systems') || '[]'); } catch(e) {}
       }
@@ -6065,76 +6094,68 @@ ${certContent}
         // Store current item idx for save callbacks
         panel.setAttribute('data-wl-idx', idx);
 
+        // Same compact .uat-s1-sys-card used by Stage 2 "Select Business System for UAT"
+        // (see _render() below) instead of the old full per-component config table.
         sysCt.innerHTML = systems.map(function(sys, si) {
           var comps = sys.components || [];
-          var critColor = {Critical:'#dc2626',High:'#f59e0b',Medium:'#2563eb',Low:'#16a34a'}[sys.criticality] || '#64748b';
-          var statusColor = sys.status === 'Active' ? '#16a34a' : '#9ca3af';
-          var inScopeCnt = comps.filter(function(c){ return c.inScope !== false; }).length;
-          var typeCount = {};
-          comps.forEach(function(c){ var t=(c.type||'').toLowerCase(); typeCount[t]=(typeCount[t]||0)+1; });
-          var refArch = Object.keys(typeCount).map(function(t){ return typeCount[t]+' '+t; }).join(', ') || comps.map(function(c){ return c.name||c.type; }).join(', ');
-
-          // Component rows — full editable config matching the UAT modal right panel
-          var compRows = comps.map(function(c, ci) {
-            var inScope = c.inScope !== false;
-            var scopeBg = inScope ? '#16a34a' : '#e2e8f0';
-            var scopeColor = inScope ? '#fff' : '#64748b';
-            var scopeLabel = inScope ? 'In Scope' : 'Out of Scope';
-            return '<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 12px;margin-bottom:8px;">'
-              // Component header
-              + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">'
-              + '<div>'
-              + '<div style="font-weight:800;font-size:13px;color:#0f172a;">' + (c.name||c.type||'Component') + '</div>'
-              + '<div style="font-size:10px;color:#94a3b8;">Component Type: ' + (c.type||'') + '</div>'
-              + '</div>'
-              + '<div style="display:flex;gap:6px;align-items:center;">'
-              + '<button onclick="wldToggleScope(' + idx + ',' + si + ',' + ci + ',this)" style="background:' + scopeBg + ';color:' + scopeColor + ';border:none;border-radius:5px;padding:4px 10px;font-size:11px;font-weight:800;cursor:pointer;">' + scopeLabel + '</button>'
-              + '</div></div>'
-              // 3-column inputs
-              + '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">'
-              + '<div>'
-              + '<div style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px;">OSPC Source IP / URL</div>'
-              + '<input type="text" value="' + (c.ospcUrl||'').replace(/"/g,'&quot;') + '" oninput="wldSaveComp(' + idx + ',' + si + ',' + ci + ',\'ospcUrl\',this.value)" placeholder="http://OSPC-IP:80" style="width:100%;border:1px solid #d1d5db;border-radius:5px;padding:5px 8px;font-size:11px;color:#0f172a;background:#fff;box-sizing:border-box;">'
-              + '</div>'
-              + '<div>'
-              + '<div style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px;">FLEX Target IP / URL</div>'
-              + '<input type="text" value="' + (c.flexUrl||'').replace(/"/g,'&quot;') + '" oninput="wldSaveComp(' + idx + ',' + si + ',' + ci + ',\'flexUrl\',this.value)" placeholder="http://FLEX-IP:80" style="width:100%;border:1px solid #d1d5db;border-radius:5px;padding:5px 8px;font-size:11px;color:#0f172a;background:#fff;box-sizing:border-box;">'
-              + '</div>'
-              + '<div>'
-              + '<div style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px;">Health / Test Path</div>'
-              + '<input type="text" value="' + (c.healthPath||'').replace(/"/g,'&quot;') + '" oninput="wldSaveComp(' + idx + ',' + si + ',' + ci + ',\'healthPath\',this.value)" placeholder="/health" style="width:100%;border:1px solid #d1d5db;border-radius:5px;padding:5px 8px;font-size:11px;color:#0f172a;background:#fff;box-sizing:border-box;">'
-              + '</div>'
-              + '</div>'
-              + '</div>';
-          }).join('');
-
-          return '<div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.06);margin-bottom:4px;">'
-            // System header
-            + '<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:linear-gradient(135deg,#f8fafc,#f0f9ff);border-bottom:1px solid #e2e8f0;">'
-            + '<div style="display:flex;align-items:center;gap:10px;">'
-            + '<div style="width:40px;height:40px;border-radius:8px;background:' + critColor + ';color:#fff;font-weight:900;font-size:14px;display:flex;align-items:center;justify-content:center;">' + (sys.name||'').slice(0,2).toUpperCase() + '</div>'
-            + '<div>'
-            + '<div style="font-weight:900;font-size:15px;color:#0f172a;">' + (sys.name||'') + '</div>'
-            + '<div style="font-size:11px;color:#64748b;">' + [sys.archetype, sys.criticality, sys.towner, sys.wave, sys.env].filter(Boolean).join(' • ') + '</div>'
-            + '</div></div>'
-            + '<div style="display:flex;align-items:center;gap:8px;">'
-            + '<span style="background:#f0fdf4;color:#16a34a;border:1px solid #86efac;border-radius:4px;padding:2px 8px;font-size:10px;font-weight:700;">✅ ' + inScopeCnt + '/' + comps.length + ' In Scope</span>'
-            + '<span style="background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;border-radius:4px;padding:2px 8px;font-size:10px;font-weight:700;">🏗 ' + refArch + '</span>'
-            + '<span style="border:1px solid ' + statusColor + ';color:' + statusColor + ';border-radius:5px;padding:2px 9px;font-size:11px;font-weight:800;">' + (sys.status||'') + '</span>'
-            + '<button onclick="(function(){ try { uatS1OpenModal(\'' + (sys.id||'') + '\'); } catch(e){} })()" style="background:#fef2f2;color:#dc2626;border:1px solid #fecaca;border-radius:5px;padding:5px 14px;font-size:11px;font-weight:800;cursor:pointer;">✏ Edit in UAT</button>'
-            + '</div></div>'
-            // Component Configuration section
-            + '<div style="padding:12px 16px;">'
-            + '<div style="font-size:11px;font-weight:900;color:#475569;text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px;">Component Configuration</div>'
-            + (compRows || '<div style="color:#94a3b8;font-size:12px;padding:10px 0;">No components configured.</div>')
+          var scol = sys.status === 'Draft' ? 'gray' : 'green';
+          var dbInScope = comps.some(function(c){ return (c.name||'').indexOf('Database') !== -1; });
+          var removeBtn = usingItemSystems
+            ? '<button onclick="wldRemoveSystem(' + idx + ',' + si + ')" class="uat-s1-btn-muted" style="font-size:11px;padding:5px 10px;color:#dc2626;">Remove</button>'
+            : '';
+          return '<div class="uat-s1-sys-card">'
+            + '<div class="uat-s1-sys-head">'
+            + '<div class="uat-s1-sys-name">'
+            + '<div class="uat-s1-sys-avatar">' + _wldEsc((sys.name||'').slice(0,2).toUpperCase()) + '</div>'
+            + '<div><h4>' + _wldEsc(sys.name||'') + '</h4><p>' + _wldEsc([sys.archetype, sys.criticality, sys.towner, sys.wave].filter(Boolean).join(' • ')) + '</p></div>'
+            + '</div>'
+            + (sys.region ? '<span style="background:#eff6ff;color:#2563eb;border:1px solid #bfdbfe;border-radius:999px;padding:2px 10px;font-size:11px;font-weight:700;margin-right:8px;">&#127760; ' + _wldEsc(sys.region) + '</span>' : '')
+            + '<span class="uat-s1-pill ' + scol + '">' + _wldEsc(sys.status||'') + '</span>'
+            + '</div>'
+            + '<div class="uat-s1-comp-map">' + comps.slice(0,6).map(function(c){ return '<span class="uat-s1-comp-chip">' + _wldEsc(c.name||'') + '</span>'; }).join('') + '</div>'
+            + '<div class="uat-s1-status-line">'
+            + '<span>Generated tests: <b>' + (comps.length * 3) + '</b></span>'
+            + '<span>DB: <b>' + (dbInScope ? 'In Scope' : 'Out of Scope') + '</b></span>'
+            + '<span>Cutover: <b>' + (sys.status === 'Draft' ? 'Pending' : 'Ready after UAT') + '</b></span>'
+            + '</div>'
+            + '<div style="margin-top:8px;display:flex;gap:6px;">'
+            + '<button data-wl-edit-sys="' + _wldEsc(sys.id||'') + '" class="uat-s1-btn-muted" style="font-size:11px;padding:5px 10px;">Edit</button>'
+            + removeBtn
             + '</div>'
             + '</div>';
         }).join('');
+        // Wire Edit via addEventListener (not inline onclick) so a missing system id
+        // or absent editor never fails silently — matches the Stage 2 card wiring pattern.
+        sysCt.querySelectorAll('[data-wl-edit-sys]').forEach(function(btn) {
+          btn.addEventListener('click', function() {
+            var sysId = btn.getAttribute('data-wl-edit-sys');
+            if (typeof uatS1OpenModal !== 'function') {
+              alert('Business system editor is unavailable on this page — please reload and try again.');
+              return;
+            }
+            uatS1OpenModal(sysId);
+          });
+        });
       }
 
       panel.style.display = 'block';
       panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    } catch(e) { console.error('showWLDetails', e); }
+    } catch(e) {
+      console.error('showWLDetails', e);
+      alert('Could not open Request Details: ' + e.message);
+    }
+  }
+
+  function wldRemoveSystem(itemIdx, sysIdx) {
+    if (!confirm('Remove this business system from the request?')) return;
+    try {
+      var items = JSON.parse(localStorage.getItem('flex_migration_waiting_list') || '[]');
+      var item = items[itemIdx];
+      if (!item || !Array.isArray(item.systems)) return;
+      item.systems.splice(sysIdx, 1);
+      localStorage.setItem('flex_migration_waiting_list', JSON.stringify(items));
+      showWLDetails(itemIdx);
+    } catch(e) { alert('Remove failed: ' + e.message); }
   }
 
   function addWLToTracker(idx) {
@@ -6408,7 +6429,12 @@ ${certContent}
         b.style.removeProperty('text-shadow');
       }
     });
-    panels.forEach(p => p.classList.toggle('active', p.id === 'panel-' + stageId));
+    panels.forEach(p => {
+      // applyOnlyFocus() pins panels with inline display styles; clear them so
+      // the .active class toggle below actually controls visibility again.
+      p.style.display = '';
+      p.classList.toggle('active', p.id === 'panel-' + stageId);
+    });
     if(subBar1) subBar1.classList.toggle('visible', stageId === 's1');
     if(subBar2) subBar2.classList.toggle('visible', migrationHubStages.includes(stageId));
     if (stageId === 's1' || migrationHubStages.includes(stageId)) {
@@ -6505,9 +6531,14 @@ ${certContent}
     var params = new URLSearchParams(window.location.search || '');
     var only = (params.get('only') || '').toLowerCase();
     if (!only) return;
-    var targetId = only === 'aipower' ? 'panel-sai' : (only === 'opencenter' ? 'panel-s9' : (only === 's_why' ? 'panel-s_why' : (only === 'biz_systems' ? 'panel-s4' : (only === 'biz_cards' ? 'uatS1SystemsView' : null))));
+    var targetId = only === 'aipower' ? 'panel-sai' : (only === 'opencenter' ? 'panel-s9' : (only === 's_why' ? 'panel-s_why' : (only === 'biz_systems' ? 'panel-s4' : (only === 'biz_cards' ? 'uatS1SystemsView' : (only === 'migration_request' ? 'migration-request-workspace' : (only === 's2opencenter' ? 's2opencenter-pane' : null))))));
     var target = targetId ? document.getElementById(targetId) : null;
-    if (!target) return;
+    if (!target) {
+      // Unknown token / missing element: reveal the page anyway (full dashboard is a
+      // visible failure the user can report; a permanently blank embed is not).
+      document.documentElement.classList.add('only-focus-ready');
+      return;
+    }
     var node = target;
     while (node && node !== document.body) {
       var parent = node.parentElement;
@@ -6539,8 +6570,58 @@ ${certContent}
         if (sv) { sv.style.display = 'block'; sv.style.padding = '0'; }
       }, 120);
     }
+    if (only === 'migration_request') {
+      target.style.width = '100%';
+      target.style.boxSizing = 'border-box';
+      var operatorProject = document.getElementById('mig-flex-req-panel');
+      var customerForm = document.getElementById('inline-mig-form');
+      var waitingBanner = document.getElementById('mig-waiting-list-banner');
+      var noRequests = document.getElementById('mig-no-requests');
+      var cancelRequest = document.getElementById('imf-cancel-btn');
+      var submitRequest = document.getElementById('imf-submit-btn');
+      var systemsView = document.getElementById('uatS1SystemsView');
+      var unwantedSystemsBand = systemsView ? systemsView.querySelector('.uat-s1-card-head') : null;
+      if (operatorProject) operatorProject.style.display = 'none';
+      if (customerForm) customerForm.style.display = 'block';
+      if (waitingBanner) waitingBanner.style.setProperty('display', 'none', 'important');
+      if (noRequests) noRequests.style.setProperty('display', 'none', 'important');
+      if (cancelRequest) cancelRequest.style.setProperty('display', 'none', 'important');
+      if (unwantedSystemsBand) unwantedSystemsBand.style.setProperty('display', 'none', 'important');
+      if (submitRequest) {
+        submitRequest.textContent = 'Submit your Migration Request to our Team';
+        submitRequest.style.background = 'linear-gradient(135deg,#dcfce7,#86efac)';
+        submitRequest.style.color = '#14532d';
+        submitRequest.style.border = '2px solid #4ade80';
+        submitRequest.style.borderRadius = '10px';
+        submitRequest.style.padding = '12px 24px';
+        submitRequest.style.fontSize = '14px';
+        submitRequest.style.minWidth = '330px';
+        submitRequest.style.height = '44px';
+        submitRequest.style.boxShadow = '0 7px 20px rgba(34,197,94,.28)';
+      }
+      setTimeout(function() {
+        try {
+          if (typeof imfMountBusinessSystems === 'function') imfMountBusinessSystems();
+          var mountedSystemsView = document.getElementById('uatS1SystemsView');
+          var mountedBand = mountedSystemsView ? mountedSystemsView.querySelector('.uat-s1-card-head') : null;
+          if (mountedBand) mountedBand.style.setProperty('display', 'none', 'important');
+          if (waitingBanner) waitingBanner.style.setProperty('display', 'none', 'important');
+          if (noRequests) noRequests.style.setProperty('display', 'none', 'important');
+        } finally {
+          // The focus DOM is complete. Reveal it now, so the embedded customer page
+          // never exposes the full dashboard while this view is being selected.
+          document.documentElement.classList.add('only-focus-ready');
+        }
+      }, 150);
+    }
     applyStageGreenRoll();
     applySkyTopStages();
+    // Focus DOM is settled — reveal the page (body stays hidden until this class
+    // lands, so embeds never flash the full dashboard). migration_request reveals
+    // itself later, after its own 150ms mount step above.
+    if (only !== 'migration_request') {
+      document.documentElement.classList.add('only-focus-ready');
+    }
   }
 
   function applySkyTopStages() {
@@ -6598,10 +6679,23 @@ ${certContent}
     if (!requested && (hash === 'opencenter' || hash === 's9' || hash === 'stage7')) requested = 's9';
     var onlyParam = (params.get('only') || '').toLowerCase();
     if (!requested) { if (onlyParam) setTimeout(applyOnlyFocus, 80); return; }
+    /* Sub-stages under Stage 2 (s4, s5, s5c, s6, s7, s7a, ...) have a real panel-<id>
+       but no top-level nav button of their own — only Stage 2's own button exists
+       (data-stage="s2"), reached via in-panel sub-tabs. Gating on a literal button
+       match here silently dropped every ?stage=s4 deep link (including the
+       ?only=biz_cards&stage=s4 focus-mode embed) before activateStage() or
+       applyOnlyFocus() ever ran. Fall back to checking the panel itself exists. */
     var btn = document.querySelector('.stage-btn[data-stage="' + requested + '"]');
-    if (!btn) return;
+    var panelExists = !!document.getElementById('panel-' + requested);
+    if (!btn && !panelExists) return;
     window.__activatingStageFromUrl = true;
     activateStage(requested);
+    // ?sub=<paneId> deep-links a Stage 2 sub-pane (e.g. sub=s2opencenter) through the
+    // same path the sub-bar buttons use, so pane setup logic runs identically.
+    var subParam = params.get('sub');
+    if (subParam && typeof stage2OpenPath === 'function') {
+      try { stage2OpenPath(subParam); } catch (e) { console.warn('sub deep-link failed', subParam, e); }
+    }
     window.__activatingStageFromUrl = false;
     if (onlyParam) setTimeout(applyOnlyFocus, 80);
     if (hash === 'opencenter' || requested === 's9') {
@@ -6618,6 +6712,41 @@ ${certContent}
     setTimeout(activateStageFromUrl, 0);
   }
   window.addEventListener('hashchange', activateStageFromUrl);
+
+  // Deep-link straight into the real Add/Edit Business System modal — used by the
+  // customer-facing ospc_cloud_mockup.html page, which can't share this page's DOM
+  // (separate document) so it opens this page in a new tab with ?newBiz=<archetype>
+  // or ?editBiz=<systemId> instead of building its own copy of this modal.
+  (function() {
+    var qp = new URLSearchParams(window.location.search || '');
+    var editBiz = qp.get('editBiz');
+    var newBiz = qp.get('newBiz');
+    if (!editBiz && !newBiz) return;
+    var tries = 0;
+    function openWhenReady() {
+      // newBiz must go through the same selectArch() path the in-page template
+      // gallery uses (window.uatS1SelectTemplateFromDas), not a bare uatS1OpenModal
+      // call — that path also resets Business System Name / Owner fields for the
+      // new template; calling uatS1OpenModal(null, key) directly skipped that reset
+      // and left the previously-edited system's name/owners showing under the newly
+      // selected archetype's components.
+      var ready = editBiz
+        ? typeof window.uatS1OpenModal === 'function'
+        : typeof window.uatS1SelectTemplateFromDas === 'function';
+      if (!ready) {
+        if (++tries > 40) return; // ~6s — give up rather than retry forever
+        setTimeout(openWhenReady, 150);
+        return;
+      }
+      if (editBiz) window.uatS1OpenModal(editBiz);
+      else window.uatS1SelectTemplateFromDas(newBiz);
+    }
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', function() { setTimeout(openWhenReady, 200); });
+    } else {
+      setTimeout(openWhenReady, 200);
+    }
+  })();
 
   // ═══════════════════════════════════════════════════════════════════════════
   // Stage 7 — Performance Gain  (import-based, no hardcoded values)
@@ -9716,6 +9845,7 @@ ${certContent}
       try { window.dispatchEvent(new CustomEvent('uatS1:businessSystemsChanged')); } catch(e) {}
     }
   }
+
   window.uatS1ReloadFromStorage = function() {
     try { var d = localStorage.getItem('uatS1_systems'); _state.systems = d ? (JSON.parse(d) || []) : []; } catch(e) { _state.systems = []; }
     _state.systems = _dedupeSystems(_state.systems);
@@ -9829,7 +9959,10 @@ ${certContent}
     var originalName = saved.originalName || saved.name || name;
     var col = role.includes('Database')?'green':role.includes('Queue')?'purple':'blue';
     var sv = saved.src || _sSrc(role);
-    var tv = saved.tgt || _sTgt(role);
+    /* FLEX target IP isn't known/assignable until actual deployment, so default new
+       components to "Not Required" rather than a fabricated FLEX-IP placeholder that
+       looks like real data. Operators can still overwrite it once a real IP exists. */
+    var tv = saved.tgt || 'Not Required';
     var pv = saved.path || _sPath(role);
     return '<div class="uat-s1-comp-row" data-comp="'+_uatS1EscAttr(name)+'" data-comp-id="'+_uatS1EscAttr(id)+'" data-catalog-name="'+_uatS1EscAttr(role)+'" data-original-name="'+_uatS1EscAttr(originalName)+'" style="display:block;">'
       +'<div style="display:grid;grid-template-columns:minmax(220px,1fr) auto;align-items:end;gap:12px;margin-bottom:9px;">'
@@ -10332,7 +10465,7 @@ ${certContent}
         targetForm:_decisionTargetForm((row.querySelector('[data-field="containerizationDecision"]')||{value:''}).value) };
     }) : _activeComps.map(function(n){
       var componentId = _componentId();
-      return { id:componentId, componentId:componentId, name:n, catalogName:n, previousNames:[], type:_sType(n), src:_sSrc(n), tgt:_sTgt(n), path:_sPath(n) };
+      return { id:componentId, componentId:componentId, name:n, catalogName:n, previousNames:[], type:_sType(n), src:_sSrc(n), tgt:'Not Required', path:_sPath(n) };
     });
   }
 
@@ -13777,6 +13910,9 @@ ${certContent}
   }
   window.ocqsMountBusinessSystems = function(){ fsmMountBusinessSystemEngineTo('ocqs-fsm-uat-engine-host'); };
   window.ocqpMountBusinessSystems = function(){ fsmMountBusinessSystemEngineTo('ocqp-fsm-uat-engine-host'); };
+  window.mfrMountBusinessSystems = function(){ fsmMountBusinessSystemEngineTo('mfr-sys-cards'); };
+  window.imfMountBusinessSystems = function(){ fsmMountBusinessSystemEngineTo('imf-sys-cards'); };
+  window.mfrRestoreBusinessSystems = function(){ fsmRestoreBusinessSystemEngine(); };
   /* Deliberately NOT auto-mounting here on page load: #uatS1SystemsView is a single
      shared element, and Stage 2's fsmAutoSeedRetry (below) already auto-claims it on
      every page load. Racing both on load left the mount target in flux and could break

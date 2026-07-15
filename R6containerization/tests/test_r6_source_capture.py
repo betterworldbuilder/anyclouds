@@ -1,0 +1,301 @@
+"""Regression tests for R6 Stage 9 source capture gating."""
+import copy
+import pathlib
+import sys
+
+import pytest
+
+sys.path.insert(0, str(pathlib.Path(__file__).parent.parent))
+
+import workflow_dashboard.app as dashboard
+
+app = dashboard.app
+
+
+@pytest.fixture(autouse=True)
+def fake_openstack(monkeypatch, tmp_path):
+    calls = []
+    counter = {"value": 0}
+
+    def run(args):
+        calls.append(list(args))
+        if "create" in args:
+            counter["value"] += 1
+            return {"id": "snapshot-%s" % counter["value"]}
+        return {"status": "available"}
+
+    monkeypatch.setenv("R6_CAPTURE_STATE_DIR", str(tmp_path / "captures"))
+    monkeypatch.setattr(dashboard, "_r6_openstack_json", run)
+    return calls
+
+
+def _payload():
+    return {
+        "stage8Approved": True,
+        "org": "rackspace-flex",
+        "cluster": "flex-prod-k8s",
+        "region": "iad3",
+        "registry": {"type": "harbor", "project": "flex-apps"},
+        "source_vm": {"host": "10.0.0.10", "user": "root"},
+        "auto_commit": False,
+        "import_to_gitops": False,
+        "businessSystem": {
+            "name": "Capture Regression",
+            "components": [
+                {"name": "api", "tgt": "10.0.0.10", "path": "/opt/api", "volumes": ["vol-api"]},
+                {"name": "db", "tgt": "10.0.0.11", "path": "/var/lib/postgresql"},
+            ],
+        },
+        "bundle": {
+            "id": "capture-regression",
+            "businessSystemName": "Capture Regression",
+            "workloads": [
+                {
+                    "component": "api",
+                    "targetForm": "CONTAINERIZED",
+                    "targetIp": "10.0.0.10",
+                    "sourcePath": "/opt/api",
+                    "readiness": "READY",
+                    "image": "debian:stable-slim",
+                    "startCommand": "python3 -m http.server 8080",
+                    "persistentPath": "None - stateless",
+                },
+                {
+                    "component": "db",
+                    "targetForm": "OPERATOR_MANAGED",
+                    "targetIp": "10.0.0.11",
+                    "sourcePath": "/var/lib/postgresql",
+                    "readiness": "KEEP_ON_VM_FOR_NOW",
+                    "image": "postgres:16",
+                },
+            ],
+        },
+    }
+
+
+def test_capture_requires_stage8_approval(fake_openstack):
+    client = app.test_client()
+    payload = _payload()
+    payload["stage8Approved"] = False
+    response = client.post("/api/r6/capture-sources-build", json=payload)
+    assert response.status_code == 400
+    assert "Stage 8 approval" in response.get_json()["error"]
+    assert fake_openstack == []
+
+
+def test_capture_only_snapshots_container_targets_and_records_lineage(fake_openstack):
+    client = app.test_client()
+    response = client.post("/api/r6/capture-sources-build", json=_payload())
+    data = response.get_json()
+    assert response.status_code == 200
+    assert data["ok"] is True
+    assert data["capture"]["approvedCount"] == 1
+    api = next(row for row in data["capture"]["components"] if row["component"] == "api")
+    db = next(row for row in data["capture"]["components"] if row["component"] == "db")
+    assert api["containerizationApproved"] is True
+    assert api["snapshotIds"]
+    assert api["lineage"]["sourceChecksum"]
+    assert db["containerizationApproved"] is False
+    assert db["snapshotStatus"] == "NOT_APPLICABLE"
+    assert "source-capture-manifest.json" in data["files"]
+    assert "source-lineage.json" in data["files"]
+    creates = [call for call in fake_openstack if "create" in call]
+    assert len(creates) == 1
+    assert "vol-api" in creates[0]
+    assert "10.0.0.11" not in str(creates)
+
+
+def test_capture_blocks_database_paths_for_container_images():
+    client = app.test_client()
+    payload = _payload()
+    payload["bundle"]["workloads"][0]["sourcePath"] = "/var/lib/mysql"
+    response = client.post("/api/r6/capture-sources-build", json=payload)
+    assert response.status_code == 400
+    assert "blocked path" in response.get_json()["error"]
+
+
+def test_capture_blocks_secret_like_metadata():
+    client = app.test_client()
+    payload = _payload()
+    payload["bundle"]["workloads"][0]["env"] = {"R6_TEST": "password=supersecret"}
+    response = client.post("/api/r6/capture-sources-build", json=payload)
+    assert response.status_code == 400
+    assert "secret-like material" in response.get_json()["error"]
+
+
+def test_capture_reuses_existing_snapshot_lineage(fake_openstack):
+    client = app.test_client()
+    first = client.post("/api/r6/capture-sources-build", json=_payload())
+    assert first.status_code == 200
+    second = client.post("/api/r6/capture-sources-build", json=copy.deepcopy(_payload()))
+    data = second.get_json()
+    assert second.status_code == 200
+    assert data["capture"]["reusedSnapshots"] >= 1
+    assert len([call for call in fake_openstack if "create" in call]) == 1
+
+
+def test_vm_snapshot_and_image_lineage_is_recorded(fake_openstack):
+    payload = _payload()
+    payload["businessSystem"]["components"][0]["volumes"] = []
+    payload["businessSystem"]["components"][0]["vmId"] = "vm-api-id"
+    response = app.test_client().post("/api/r6/capture-sources-build", json=payload)
+    assert response.status_code == 200
+    row = response.get_json()["capture"]["components"][0]
+    assert row["lineage"]["sourceVm"] == "vm-api-id"
+    assert row["lineage"]["volumeIds"] == []
+    assert row["lineage"]["snapshotIds"] == ["snapshot-1"]
+    assert row["lineage"]["sourceChecksum"]
+    assert any(call[:3] == ["server", "image", "create"] for call in fake_openstack)
+    data = response.get_json()
+    build_script = (pathlib.Path(data["bundle_dir"]) / "build_and_push.sh").read_text()
+    assert "sourceChecksum" in build_script
+    assert '"snapshotIds":["snapshot-1"]' in build_script
+    assert '"digest":"%s"' in build_script
+
+
+def test_all_component_scan_freezes_operator_credentials_for_batch():
+    script = (pathlib.Path(__file__).parent.parent / "workflow_dashboard" / "static" / "r6ace.js").read_text()
+    assert "var batchCredentials=" in script
+    assert "r6pRunLiveScan(function(ok){if(ok)passed++;else failed++;next();},true,batchCredentials)" in script
+    assert "credentials&&credentials.user" in script
+    assert "credentials&&credentials.key" in script
+
+
+def test_live_scan_does_not_use_stale_operator_known_hosts():
+    script = (pathlib.Path(__file__).parent.parent / "workflow_dashboard" / "static" / "r6ace.js").read_text()
+    assert "-o UserKnownHostsFile=/dev/null" in script
+    assert "-o GlobalKnownHostsFile=/dev/null" in script
+
+
+def test_stage9_button_filters_capture_payload_after_stage8_only():
+    script = (pathlib.Path(__file__).parent.parent / "workflow_dashboard" / "static" / "r6ace.js").read_text()
+    func = script.split("window.r6pGenRealDockerfiles=function(snapshotOnly){", 1)[1].split("fetch('/api/r6/capture-sources-build'", 1)[0]
+    assert "r6pStage8ApprovedForCapture()" in func
+    assert "Stage 8 approval required before source capture" in func
+    assert "r6pStage9ApprovedContainerTargets().filter(function(c){return c.tgt;})" in func
+    assert "var comps=R6P.components.filter(function(c){return c.tgt;});" not in func
+    assert "sourceVmId:c.vmId||c.serverId||c.instanceId||''" in func
+    assert "volumeIds:c.volumes||c.volumeIds||[]" in func
+    assert "var cloudCreds={" in func
+    assert "r6pStage9ManualSourceRegion" in func
+    assert "R6P.bs&&(R6P.bs.region||R6P.bs.flexRegion||R6P.bs.sourceRegion)" in func
+    assert "var stage9Region=cloudCreds.region" in func
+    assert "region:stage9Region" in func and "cloud:cloudCreds" in func
+    assert "cloud:cloudCreds" in func
+
+
+def test_stage9_ui_excludes_database_like_components_from_capture_targets():
+    script = (pathlib.Path(__file__).parent.parent / "workflow_dashboard" / "static" / "r6ace.js").read_text()
+    assert "r6pStage9IsDatabaseLike" in script
+    assert "form==='DATA_MIGRATION_REQUIRED'" in script
+    assert "txt.indexOf('database')>=0" in script
+    assert "!r6pStage9IsDatabaseLike(c)" in script
+    assert "Retained VMs, operators, databases, external services, blocked and excluded components are skipped" in script
+
+
+def test_stage9_has_separate_snapshot_and_container_actions():
+    script = (pathlib.Path(__file__).parent.parent / "workflow_dashboard" / "static" / "r6ace.js").read_text()
+    assert "Stage 9A — Build VM Snapshots" in script
+    assert "Stage 9B — Build Containers" in script
+    assert "r6pGenRealDockerfiles(true)" in script
+    assert "r6pGenRealDockerfiles(false)" in script
+    assert "Build VM Snapshots first. Container build uses the snapshot lineage" in script
+    assert "snapshotOnly:snapshotOnly" in script
+    assert "id="r6p-stage9a-log"" in script
+    assert "r6pSetStage9SnapshotLog" in script
+    assert "r6pCopyStage9SnapshotLog" in script
+
+
+def test_snapshot_only_capture_returns_before_bundle_generation(fake_openstack):
+    client = app.test_client()
+    payload = _payload()
+    payload["snapshotOnly"] = True
+    response = client.post("/api/r6/capture-sources-build", json=payload)
+    data = response.get_json()
+    assert response.status_code == 200
+    assert data["snapshotOnly"] is True
+    assert data["capture"]["handoffStage"] == "9A_BUILD_VM_SNAPSHOTS"
+    assert data["capture"]["nextStage"] == "9B_BUILD_CONTAINERS"
+    assert "source-capture-manifest.json" in data["files"]
+
+
+def test_openstack_bin_reports_missing_cli_cleanly(monkeypatch):
+    monkeypatch.setenv("OPENSTACK_CLI", "/definitely/missing/openstack")
+    monkeypatch.setattr(dashboard.shutil, "which", lambda *a, **k: None)
+    monkeypatch.setattr(dashboard.os.path, "exists", lambda p: False)
+    with pytest.raises(RuntimeError) as exc:
+        dashboard._r6_openstack_bin()
+    assert "OpenStack CLI not found for Stage 9A" in str(exc.value)
+    assert "set OPENSTACK_CLI/PATH" in str(exc.value)
+
+
+
+def test_openstack_auth_env_uses_saved_r6_cloud_credentials(monkeypatch):
+    monkeypatch.delenv("OS_AUTH_URL", raising=False)
+    monkeypatch.setattr(dashboard, "_r6_saved_cloud_credentials", lambda: {
+        "authUrl": "https://keystone.api.iad3.rackspacecloud.com/v3/",
+        "authType": "password",
+        "username": "demo-user",
+        "password": "demo-pass",
+        "proj": "project-id-123",
+        "domain": "rackspace_cloud_domain",
+        "region": "IAD3 -- Northern Virginia (US)",
+    })
+    env = dashboard._r6_openstack_auth_env()
+    assert env["OS_AUTH_URL"] == "https://keystone.api.iad3.rackspacecloud.com/v3"
+    assert env["OS_USERNAME"] == "demo-user"
+    assert env["OS_PASSWORD"] == "demo-pass"
+    assert env["OS_PROJECT_ID"] == "project-id-123"
+    assert env["OS_USER_DOMAIN_NAME"] == "rackspace_cloud_domain"
+    assert env["OS_PROJECT_DOMAIN_NAME"] == "rackspace_cloud_domain"
+    assert env["OS_AUTH_TYPE"] == "password"
+
+
+def test_openstack_auth_env_reports_missing_stage9a_auth(monkeypatch):
+    monkeypatch.delenv("OS_AUTH_URL", raising=False)
+    monkeypatch.setattr(dashboard, "_r6_saved_cloud_credentials", lambda: {})
+    with pytest.raises(RuntimeError) as exc:
+        dashboard._r6_openstack_auth_env()
+    assert "OpenStack auth is not configured for Stage 9A" in str(exc.value)
+    assert "Preflight > Test Cloud Login" in str(exc.value)
+
+
+def test_vm_snapshot_resolves_target_ip_to_openstack_server_id(monkeypatch):
+    calls = []
+    def run(args):
+        calls.append(list(args))
+        if args[:3] == ["server", "list", "--long"]:
+            return [{"ID": "server-123", "Name": "web", "Networks": "public=174.143.59.106, private=10.0.0.5"}]
+        if args[:3] == ["server", "image", "create"]:
+            return {"id": "snapshot-ip-resolved"}
+        return {"status": "active"}
+    monkeypatch.setattr(dashboard, "_r6_openstack_json", run)
+    payload = _payload()
+    payload["businessSystem"]["components"][0]["volumes"] = []
+    payload["businessSystem"]["components"][0].pop("vmId", None)
+    payload["businessSystem"]["components"][0]["tgt"] = "174.143.59.106"
+    payload["bundle"]["workloads"][0].pop("sourceVmId", None)
+    payload["bundle"]["workloads"][0].pop("vmId", None)
+    payload["bundle"]["workloads"][0]["targetIp"] = "174.143.59.106"
+    response = app.test_client().post("/api/r6/capture-sources-build", json=payload)
+    assert response.status_code == 200
+    assert any(call[:3] == ["server", "list", "--long"] for call in calls)
+    assert any(call[:3] == ["server", "image", "create"] and call[-1] == "server-123" for call in calls)
+
+
+def test_stage9_backend_prefers_source_vm_id_over_target_ip(fake_openstack):
+    payload = _payload()
+    payload["businessSystem"]["components"][0]["volumes"] = []
+    payload["bundle"]["workloads"][0]["sourceVmId"] = "server-from-workload"
+    payload["bundle"]["workloads"][0]["targetIp"] = "174.143.59.106"
+    response = app.test_client().post("/api/r6/capture-sources-build", json=payload)
+    assert response.status_code == 200
+    assert any(call[:3] == ["server", "image", "create"] and call[-1] == "server-from-workload" for call in fake_openstack)
+
+
+
+def test_openstack_json_has_invalid_region_retry_path():
+    source = (pathlib.Path(__file__).parent.parent / "workflow_dashboard" / "app.py").read_text()
+    assert "retry_env.pop(\"OS_REGION_NAME\", None)" in source
+    assert "region not found" in source
+    assert "endpoint" in source

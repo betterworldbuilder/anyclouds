@@ -1,0 +1,14 @@
+Tue Jul 14 01:41:08 UTC 2026
+R6 containerization backup
+R6containerization/BACKUP_MANIFEST.txt
+R6containerization/server_deep_scan.py
+R6containerization/tests/test_r6_source_capture.py
+R6containerization/vmscanengine/vmsdupplicationscript.txt
+R6containerization/workflow_dashboard/app.py
+R6containerization/workflow_dashboard/static/r6ace.js
+R6containerization/workflow_dashboard/templates/partials/r6ace_pane.html
+R6containerization/workflow_dashboard/templates/r6ace_pane.html
+2026-07-14T08:47:49+07:00
+backed up vmscanengine/vmsdupplicationscript.txt before R6 container scan gap-fill
+2026-07-14T08:52:52+07:00 backed up vmscanengine/vmsdupplicationscript.txt before full containerization readapt -> R6containerization/vmscanengine/vmsdupplicationscript.before-container-readapt..txt
+2026-07-14T09:01:50+07:00 backup before production gap-fill: R6containerization/vmscanengine/vmsdupplicationscript.before-prod-gapfill..txt

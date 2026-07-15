@@ -1,0 +1,432 @@
+#!/usr/bin/env bash
+# R6 Containerization Discovery Script
+# Read-only capture from live VM evidence for Docker/Kubernetes generation.
+set -uo pipefail
+
+# ================================================================
+# OSPC/FLEX VM → R6 Containerization Evidence Capture
+# ────────────────────────────────────────────────────────────────
+# Goal         : capture all application/runtime/config/process/data
+#                evidence needed to build working containers in K8s
+# Mode         : READ-ONLY CAPTURE (no FLEX mutation, no VM clone)
+# Output       : ./migration-csv/UnknownCustomer-audit/<node>/r6-container-discovery/
+# Security     : redact likely secrets; record private key paths only
+# ================================================================
+
+DRY_RUN=${DRY_RUN:-0}
+DEFAULT_SRC_USER="ubuntu"
+SSH_KEY="/home/dzoan/.ssh/id_rsa"
+SSH_OPTS="-i $SSH_KEY -o StrictHostKeyChecking=no -o ConnectTimeout=15 -o BatchMode=yes"
+AUDIT_DIR="./migration-csv/UnknownCustomer-audit"
+APP_PATHS="${APP_PATHS:-/opt/app /srv /var/www /var/lib/app /home}"
+mkdir -p "$AUDIT_DIR"
+
+trap 'pkill -P $$ 2>/dev/null || true' EXIT HUP INT TERM
+
+run() {
+  if [ "$DRY_RUN" = "1" ]; then
+    echo "  [DRY] $*"
+  else
+    "$@"
+  fi
+}
+
+src_cmd() { ssh $SSH_OPTS "$SRC_USER@$SRC_IP" "$@" 2>/dev/null; }
+
+copy_from_src() {
+  local remote_path="$1"
+  local local_path="$2"
+  scp -q $SSH_OPTS "$SRC_USER@$SRC_IP:$remote_path" "$local_path" 2>/dev/null
+}
+
+capture_r6_container_evidence() {
+  local NODE_NAME="$1"
+  local NODE_AUDIT="$2"
+  local R6_DIR="$NODE_AUDIT/r6-container-discovery"
+  local REMOTE_TGZ="~/r6-container-discovery-${NODE_NAME}.tgz"
+  mkdir -p "$R6_DIR"
+
+  echo ""
+  echo "══════════════════════ R6 -- CONTAINERIZATION DISCOVERY ══════════════════════"
+  echo "[R6] Node: $NODE_NAME"
+  echo "[R6] Source VM: $SRC_IP [$SRC_USER]"
+  echo "[R6] Output: $R6_DIR"
+  echo "[R6] Capturing read-only evidence for Dockerfiles, K8s manifests, ConfigMaps, Secrets, PVCs, Services, probes, CronJobs/workers, and dependency contracts."
+
+  ssh $SSH_OPTS "$SRC_USER@$SRC_IP" "APP_PATHS='$APP_PATHS' NODE_NAME='$NODE_NAME' bash -s" <<'R6REMOTE'
+set +e
+NODE_NAME="${NODE_NAME:-unknown-node}"
+APP_PATHS="${APP_PATHS:-/opt/app /srv /var/www /var/lib/app /home}"
+DISC="$HOME/r6-container-discovery-${NODE_NAME}"
+mkdir -p "$DISC"/00_summary "$DISC"/01_system "$DISC"/02_processes "$DISC"/03_services "$DISC"/04_ports_network "$DISC"/05_apps "$DISC"/06_dependencies/manifests "$DISC"/07_config "$DISC"/08_data_volumes "$DISC"/09_external_deps "$DISC"/10_tls "$DISC"/11_k8s "$DISC"/12_security "$DISC"/13_container_contract
+
+redact_stream() {
+  sed -E 's/((PASSWORD|PASS|SECRET|TOKEN|API[_-]?KEY|PRIVATE[_-]?KEY|CREDENTIAL|DATABASE_URL|REDIS_URL|AWS_SECRET|AZURE_CLIENT_SECRET|GCP_KEY)[A-Za-z0-9_ .:-]*[=:][[:space:]]*)[^[:space:]#"'\''']+/\1<REDACTED>/Ig'
+}
+
+redact_file() {
+  [ -f "$1" ] && redact_stream < "$1" 2>/dev/null
+}
+
+json_escape() {
+  sed 's/\\/\\\\/g; s/"/\\"/g' | tr -d '\r'
+}
+
+OS_PRETTY="$(. /etc/os-release 2>/dev/null; echo "${PRETTY_NAME:-unknown}")"
+HOSTNAME_NOW="$(hostname 2>/dev/null || echo unknown)"
+{
+  echo "{"
+  echo "  \"schema\": \"r6-containerization-evidence/v1\","
+  echo "  \"captured_at\": \"$(date -Is)\","
+  echo "  \"node\": \"$(printf '%s' "$NODE_NAME" | json_escape)\","
+  echo "  \"hostname\": \"$(printf '%s' "$HOSTNAME_NOW" | json_escape)\","
+  echo "  \"os\": \"$(printf '%s' "$OS_PRETTY" | json_escape)\","
+  echo "  \"kernel\": \"$(uname -r 2>/dev/null | json_escape)\","
+  echo "  \"purpose\": \"Generate Dockerfiles and Kubernetes manifests from live VM application evidence\","
+  echo "  \"must_not_bake_into_images\": [\"ssh keys\", \"password hashes\", \"TLS private keys\", \"host network config\", \"kernel settings\", \"cloud agent identity\", \"raw secrets\"]"
+  echo "}"
+} > "$DISC/00_summary/containerization-source-summary.json"
+
+# 01 system facts: useful for base-image/runtime inference, not VM cloning.
+hostnamectl > "$DISC/01_system/hostnamectl.txt" 2>/dev/null || true
+cat /etc/os-release > "$DISC/01_system/os-release.txt" 2>/dev/null || true
+uname -a > "$DISC/01_system/uname.txt" 2>/dev/null || true
+lscpu > "$DISC/01_system/lscpu.txt" 2>/dev/null || true
+free -m > "$DISC/01_system/memory-mb.txt" 2>/dev/null || true
+df -Th > "$DISC/01_system/filesystems.txt" 2>/dev/null || true
+lsblk -f > "$DISC/01_system/block-devices.txt" 2>/dev/null || true
+
+# 02 processes: exact commands, working dirs, and process ownership for ENTRYPOINT/CMD.
+ps auxww > "$DISC/02_processes/processes-auxww.txt" 2>/dev/null || true
+pstree -ap > "$DISC/02_processes/process-tree.txt" 2>/dev/null || true
+: > "$DISC/02_processes/process-cwd-cmd-user.tsv"
+for proc in /proc/[0-9]*; do
+  pid="${proc##*/}"
+  [ -r "$proc/cmdline" ] || continue
+  cmd="$(tr '\0' ' ' < "$proc/cmdline" 2>/dev/null | sed 's/[[:space:]]*$//')"
+  [ -n "$cmd" ] || continue
+  cwd="$(readlink "$proc/cwd" 2>/dev/null || true)"
+  user="$(stat -c '%U' "$proc" 2>/dev/null || true)"
+  printf '%s\t%s\t%s\t%s\n' "$pid" "$user" "$cwd" "$cmd" >> "$DISC/02_processes/process-cwd-cmd-user.tsv"
+done
+
+# 03 services: systemd-to-container hints.
+systemctl list-units --type=service --state=running --no-pager > "$DISC/03_services/running-services.txt" 2>/dev/null || true
+systemctl list-unit-files --type=service --state=enabled --no-pager > "$DISC/03_services/enabled-services.txt" 2>/dev/null || true
+systemctl list-unit-files --type=service --state=enabled --no-legend 2>/dev/null | awk '{print $1}' \
+  | grep -Ev '^(ssh|sshd|systemd-|dbus|snapd|cloud-init|ufw|cron|rsyslog|network|NetworkManager|multipathd|open-vm|nova-agent|rackspace|holland)' \
+  > "$DISC/03_services/container-candidate-services.txt" || true
+while read svc; do
+  [ -n "$svc" ] || continue
+  safe="$(echo "$svc" | tr '/:@ ' '____')"
+  systemctl cat "$svc" > "$DISC/03_services/${safe}.unit.txt" 2>/dev/null || true
+  systemctl show "$svc" \
+    -p Id -p Description -p LoadState -p ActiveState -p SubState -p Type -p MainPID \
+    -p User -p Group -p WorkingDirectory -p RootDirectory \
+    -p ExecStart -p ExecStartPre -p ExecStartPost -p ExecReload \
+    -p Environment -p EnvironmentFiles -p Restart -p RestartSec \
+    > "$DISC/03_services/${safe}.container-hints.txt" 2>/dev/null || true
+  pid="$(systemctl show "$svc" -p MainPID --value 2>/dev/null)"
+  if [ -n "$pid" ] && [ "$pid" != "0" ] && [ -r "/proc/$pid/environ" ]; then
+    tr '\0' '\n' < "/proc/$pid/environ" 2>/dev/null | redact_stream > "$DISC/03_services/${safe}.redacted-runtime-env.txt"
+  fi
+done < "$DISC/03_services/container-candidate-services.txt"
+
+# 04 networking: service ports and routing context for Service/Ingress generation.
+ss -lntup > "$DISC/04_ports_network/listening-ports-processes.txt" 2>/dev/null || true
+ss -ntup > "$DISC/04_ports_network/active-connections.txt" 2>/dev/null || true
+ip addr > "$DISC/04_ports_network/ip-addr.txt" 2>/dev/null || true
+ip route > "$DISC/04_ports_network/ip-route.txt" 2>/dev/null || true
+cat /etc/hosts > "$DISC/04_ports_network/etc-hosts.txt" 2>/dev/null || true
+getent hosts > "$DISC/04_ports_network/hosts-resolution.txt" 2>/dev/null || true
+
+# 05/06 app roots and dependency manifests: base images and build commands.
+: > "$DISC/05_apps/app-root-candidates.txt"
+: > "$DISC/06_dependencies/dependency-manifest-index.txt"
+for root in $APP_PATHS; do
+  [ -d "$root" ] || continue
+  find "$root" -maxdepth 6 -type d \( -name node_modules -o -name .git -o -name vendor -o -name __pycache__ -o -name .venv \) -prune -o -type f \( \
+    -name package.json -o -name package-lock.json -o -name yarn.lock -o -name pnpm-lock.yaml -o -name .nvmrc -o -name .node-version \
+    -o -name requirements.txt -o -name constraints.txt -o -name pyproject.toml -o -name poetry.lock -o -name Pipfile -o -name Pipfile.lock -o -name setup.py -o -name setup.cfg \
+    -o -name composer.json -o -name composer.lock -o -name Gemfile -o -name Gemfile.lock \
+    -o -name go.mod -o -name go.sum -o -name pom.xml -o -name build.gradle -o -name gradle.properties \
+    -o -name Cargo.toml -o -name Cargo.lock -o -name Dockerfile -o -name docker-compose.yml -o -name docker-compose.yaml -o -name compose.yml -o -name Procfile -o -name Makefile -o -name runtime.txt \
+  \) -print 2>/dev/null | while read mf; do
+    echo "$(dirname "$mf")" >> "$DISC/05_apps/app-root-candidates.txt"
+    echo "$mf" >> "$DISC/06_dependencies/dependency-manifest-index.txt"
+  done
+done
+sort -u "$DISC/05_apps/app-root-candidates.txt" -o "$DISC/05_apps/app-root-candidates.txt" 2>/dev/null || true
+sort -u "$DISC/06_dependencies/dependency-manifest-index.txt" -o "$DISC/06_dependencies/dependency-manifest-index.txt" 2>/dev/null || true
+while read mf; do
+  [ -f "$mf" ] || continue
+  safe="$(echo "$mf" | sed 's#^/##; s#[/: ]#__#g')"
+  cp "$mf" "$DISC/06_dependencies/manifests/$safe" 2>/dev/null || true
+done < "$DISC/06_dependencies/dependency-manifest-index.txt"
+
+# Runtime version inventory.
+{
+  echo "python=$(python3 --version 2>/dev/null || true)"
+  echo "node=$(node --version 2>/dev/null || true)"
+  echo "npm=$(npm --version 2>/dev/null || true)"
+  echo "yarn=$(yarn --version 2>/dev/null || true)"
+  echo "pnpm=$(pnpm --version 2>/dev/null || true)"
+  echo "php=$(php --version 2>/dev/null | head -1 || true)"
+  echo "composer=$(composer --version 2>/dev/null || true)"
+  echo "ruby=$(ruby --version 2>/dev/null || true)"
+  echo "bundle=$(bundle --version 2>/dev/null || true)"
+  echo "go=$(go version 2>/dev/null || true)"
+  echo "java=$(java -version 2>&1 | head -1 || true)"
+  echo "docker=$(docker version --format '{{.Server.Version}}' 2>/dev/null || true)"
+  echo "pm2=$(pm2 --version 2>/dev/null || true)"
+} > "$DISC/06_dependencies/runtime-versions.txt"
+
+# 07 config and secrets: values redacted, keys preserved for ConfigMap/Secret contracts.
+: > "$DISC/07_config/config-file-index.txt"
+: > "$DISC/07_config/redacted-config-samples.txt"
+for root in $APP_PATHS /etc/nginx /etc/apache2 /etc/haproxy /etc/systemd/system; do
+  [ -d "$root" ] || continue
+  find "$root" -maxdepth 6 -type f \( \
+    -name '.env' -o -name '*.env' -o -name '*.ini' -o -name '*.conf' -o -name '*.cfg' \
+    -o -name '*.yaml' -o -name '*.yml' -o -name '*.json' -o -name '*.toml' -o -name '*.properties' \
+  \) -not -path '*/node_modules/*' -not -path '*/.git/*' -print 2>/dev/null >> "$DISC/07_config/config-file-index.txt"
+done
+sort -u "$DISC/07_config/config-file-index.txt" -o "$DISC/07_config/config-file-index.txt" 2>/dev/null || true
+head -120 "$DISC/07_config/config-file-index.txt" | while read cf; do
+  [ -f "$cf" ] || continue
+  echo "===== $cf =====" >> "$DISC/07_config/redacted-config-samples.txt"
+  redact_file "$cf" | head -120 >> "$DISC/07_config/redacted-config-samples.txt"
+done
+grep -RIEh '^[[:space:]]*[A-Za-z_][A-Za-z0-9_]*(=|:)' $APP_PATHS 2>/dev/null \
+  | sed -E 's/^([[:space:]]*[A-Za-z_][A-Za-z0-9_]*(=|:)).*/\1 <VALUE>/' \
+  | sort -u > "$DISC/07_config/config-key-inventory.txt" || true
+grep -RIEh '(PASSWORD|PASS|SECRET|TOKEN|API_KEY|PRIVATE_KEY|DATABASE_URL|REDIS_URL|AWS_|AZURE_|GCP_|MYSQL_|PGPASSWORD)' $APP_PATHS /etc/systemd/system 2>/dev/null \
+  | sed -E 's/(=|:).*/\1 <REDACTED>/' \
+  | sort -u > "$DISC/07_config/secret-key-candidates.txt" || true
+
+# 08 data/writable paths: PVC or emptyDir decisions.
+: > "$DISC/08_data_volumes/writable-path-candidates.txt"
+for root in $APP_PATHS /var/log /var/cache /tmp; do
+  [ -d "$root" ] || continue
+  find "$root" -maxdepth 5 -type d \( \
+    -iname '*upload*' -o -iname '*media*' -o -iname '*storage*' -o -iname '*data*' \
+    -o -iname '*cache*' -o -iname '*tmp*' -o -iname '*log*' -o -perm -0002 \
+  \) -print 2>/dev/null >> "$DISC/08_data_volumes/writable-path-candidates.txt"
+done
+sort -u "$DISC/08_data_volumes/writable-path-candidates.txt" -o "$DISC/08_data_volumes/writable-path-candidates.txt" 2>/dev/null || true
+du -sh $APP_PATHS /srv/data 2>/dev/null > "$DISC/08_data_volumes/app-data-sizes.txt" || true
+
+# 09 external dependencies/stateful services: externalize DB/cache/queues/API endpoints.
+systemctl list-unit-files 2>/dev/null | grep -Ei 'postgres|mysql|mariadb|redis|mongo|rabbitmq|memcached|elastic|solr|kafka' > "$DISC/09_external_deps/local-stateful-services.txt" || true
+ss -lntup 2>/dev/null | grep -E ':(5432|3306|6379|27017|5672|11211|9200|9300|8983|9092)\b' > "$DISC/09_external_deps/stateful-listening-ports.txt" || true
+grep -RIE '(DB_HOST|DATABASE_URL|PGHOST|PG_HOST|MYSQL_HOST|REDIS_URL|REDIS_HOST|MONGO|RABBIT|AMQP|ELASTIC|KAFKA|API_URL|BASE_URL)' $APP_PATHS /etc/systemd/system 2>/dev/null \
+  | redact_stream > "$DISC/09_external_deps/external-dependency-candidates.txt" || true
+if command -v psql >/dev/null 2>&1; then
+  sudo -u postgres psql -tAc "SELECT datname FROM pg_database WHERE datistemplate=false;" > "$DISC/09_external_deps/postgresql-database-names.txt" 2>/dev/null || true
+fi
+if command -v mysql >/dev/null 2>&1; then
+  mysql -uroot -e 'SHOW DATABASES;' > "$DISC/09_external_deps/mysql-database-names.txt" 2>/dev/null || true
+fi
+
+# 10 TLS: cert metadata only. Private key paths are recorded as exclusions.
+find /etc/letsencrypt /etc/ssl /etc/pki $APP_PATHS -type f \( -name '*.crt' -o -name '*.pem' \) 2>/dev/null \
+  | grep -vi 'private\|privkey\|\.key$' > "$DISC/10_tls/certificate-files.txt" || true
+: > "$DISC/10_tls/certificate-metadata.txt"
+while read cert; do
+  [ -f "$cert" ] || continue
+  echo "===== $cert =====" >> "$DISC/10_tls/certificate-metadata.txt"
+  openssl x509 -in "$cert" -noout -subject -issuer -dates -ext subjectAltName 2>/dev/null >> "$DISC/10_tls/certificate-metadata.txt"
+done < "$DISC/10_tls/certificate-files.txt"
+find /etc/letsencrypt /etc/ssl /etc/pki $APP_PATHS -type f \( -name '*.key' -o -name 'privkey*.pem' \) 2>/dev/null \
+  > "$DISC/10_tls/private-key-paths-do-not-copy.txt" || true
+
+# 11 K8s workload hints: probes, cron, workers, ingress/web-server configs.
+sudo crontab -l > "$DISC/11_k8s/root-crontab.txt" 2>/dev/null || true
+crontab -l > "$DISC/11_k8s/user-crontab.txt" 2>/dev/null || true
+find /etc/cron.d /etc/cron.daily /etc/cron.hourly /etc/cron.monthly /etc/cron.weekly -maxdepth 2 -type f -print -exec sed -n '1,120p' {} \; \
+  > "$DISC/11_k8s/system-cron-files.txt" 2>/dev/null || true
+grep -RIE '(health|healthz|ready|readyz|live|livez|status|metrics|actuator)' $APP_PATHS /etc/nginx /etc/apache2 2>/dev/null \
+  | head -300 > "$DISC/11_k8s/health-endpoint-hints.txt" || true
+find /etc/nginx /etc/apache2 /etc/haproxy -type f -maxdepth 4 2>/dev/null > "$DISC/11_k8s/proxy-config-files.txt" || true
+
+# 12 security: non-root UID/GID and ownership choices.
+getent passwd | awk -F: '$3>=1000 && $3<65000{print}' > "$DISC/12_security/non-system-users.txt" || true
+getent group | awk -F: '$3>=1000 && $3<65000{print}' > "$DISC/12_security/non-system-groups.txt" || true
+find $APP_PATHS -maxdepth 3 -printf '%u:%g %m %p\n' 2>/dev/null | head -2000 > "$DISC/12_security/app-path-ownership-sample.txt" || true
+
+# 13 contract: make downstream bundle generation deterministic.
+cat > "$DISC/13_container_contract/containerization-gap-closure.md" <<'EOF'
+# R6 containerization gap closure contract
+
+Use this capture to generate:
+
+- Dockerfiles from dependency manifests and runtime versions.
+- ENTRYPOINT/CMD from systemd ExecStart, process commands, working directories, and runtime users.
+- Kubernetes Deployments/StatefulSets/CronJobs from service, cron, and worker evidence.
+- Services/Ingress from listening ports and web/proxy configs.
+- ConfigMaps from non-secret config keys and redacted config samples.
+- Secrets from secret-key candidates only; never bake values into images.
+- PVCs/emptyDir mounts from writable-path and data-size candidates.
+- Readiness/liveness probes from health endpoint hints and listening ports.
+- External dependency contracts from DB/cache/queue/API findings.
+
+Never bake into images:
+
+- SSH keys or authorized_keys
+- /etc/shadow password hashes
+- TLS private keys
+- host network config or IP identity
+- kernel/sysctl/bootloader settings
+- Rackspace/OpenStack/cloud agent identity
+- raw secret values
+EOF
+
+cat > "$DISC/13_container_contract/r6-required-inputs-map.tsv" <<'EOF'
+container_need	evidence_file
+app_roots	05_apps/app-root-candidates.txt
+base_image_and_build	06_dependencies/dependency-manifest-index.txt + 06_dependencies/runtime-versions.txt
+entrypoint_cmd	03_services/*.container-hints.txt + 02_processes/process-cwd-cmd-user.tsv
+container_ports	04_ports_network/listening-ports-processes.txt
+configmaps	07_config/config-key-inventory.txt + 07_config/redacted-config-samples.txt
+secrets	07_config/secret-key-candidates.txt
+persistent_volumes	08_data_volumes/writable-path-candidates.txt + 08_data_volumes/app-data-sizes.txt
+external_services	09_external_deps/external-dependency-candidates.txt + 09_external_deps/local-stateful-services.txt
+probes	11_k8s/health-endpoint-hints.txt
+cronjobs_workers	11_k8s/*crontab* + 03_services/container-candidate-services.txt
+tls_ingress	10_tls/certificate-metadata.txt + 11_k8s/proxy-config-files.txt
+security_context	12_security/non-system-users.txt + 12_security/app-path-ownership-sample.txt
+EOF
+
+tar -czf "$HOME/r6-container-discovery-${NODE_NAME}.tgz" -C "$HOME" "r6-container-discovery-${NODE_NAME}" 2>/dev/null || true
+R6REMOTE
+
+  if copy_from_src "$REMOTE_TGZ" "$R6_DIR/r6-container-discovery.tgz"; then
+    tar -xzf "$R6_DIR/r6-container-discovery.tgz" -C "$R6_DIR" --strip-components=1 2>/dev/null || true
+    echo "  [R6] Saved and extracted evidence: $R6_DIR"
+  else
+    echo "  [ERROR] Could not retrieve remote R6 evidence archive from $SRC_IP"
+    return 1
+  fi
+
+  echo "  [R6] Capture complete. Critical outputs:"
+  echo "       $R6_DIR/13_container_contract/r6-required-inputs-map.tsv"
+  echo "       $R6_DIR/05_apps/app-root-candidates.txt"
+  echo "       $R6_DIR/06_dependencies/dependency-manifest-index.txt"
+  echo "       $R6_DIR/03_services/container-candidate-services.txt"
+  echo "       $R6_DIR/04_ports_network/listening-ports-processes.txt"
+  echo "       $R6_DIR/07_config/secret-key-candidates.txt"
+  echo "       $R6_DIR/08_data_volumes/writable-path-candidates.txt"
+  echo "       $R6_DIR/11_k8s/health-endpoint-hints.txt"
+}
+
+node_postgresqlu24() {
+  local NODE_NAME="postgresqlu24"
+  local SRC_IP="104.130.26.81"
+  local SRC_USER="ubuntu"
+  local LEGACY_FLEX_IP="50.56.158.21"
+  local NODE_AUDIT="$AUDIT_DIR/$NODE_NAME"
+  mkdir -p "$NODE_AUDIT"
+
+  echo ""
+  echo "##############################################################"
+  echo "#  R6 NODE CAPTURE : $NODE_NAME"
+  echo "#  SOURCE VM       : $SRC_IP [user: $SRC_USER]"
+  echo "#  LEGACY FLEX IP  : $LEGACY_FLEX_IP (context only; no mutation)"
+  echo "#  MODE            : READ-ONLY CONTAINERIZATION DISCOVERY"
+  echo "##############################################################"
+
+  exec > >(tee -a "$NODE_AUDIT/r6-containerization-capture.log") 2>&1
+
+  echo ""
+  echo "══════════════════════ STAGE 0 -- SAFE PRE-FLIGHT ══════════════════════"
+  echo "[P0] SSH connectivity check..."
+  ssh $SSH_OPTS "$SRC_USER@$SRC_IP" "echo OK" 2>/dev/null || {
+    echo "[ERROR] Cannot SSH to source $SRC_IP as $SRC_USER -- skipping $NODE_NAME"
+    return 1
+  }
+  echo "[P0] Source reachable"
+
+  echo "[P0] Tool availability snapshot..."
+  src_cmd "for c in bash tar gzip find awk sed grep ss systemctl ps stat readlink openssl; do command -v \$c >/dev/null 2>&1 && echo OK:\$c || echo MISSING:\$c; done" \
+    > "$NODE_AUDIT/r6-tool-availability.txt" || true
+
+  echo "[P0] Disk space for local audit output..."
+  df -h . | tee "$NODE_AUDIT/local-disk-space.txt" || true
+
+  echo ""
+  echo "══════════════════════ STAGE 1 -- SOURCE BASELINE AUDIT ══════════════════════"
+  ssh $SSH_OPTS "$SRC_USER@$SRC_IP" bash <<'ENDSSH'
+    mkdir -p ~/server-clone-audit
+    hostnamectl > ~/server-clone-audit/hostnamectl.txt 2>/dev/null || true
+    timedatectl > ~/server-clone-audit/timedatectl.txt 2>/dev/null || true
+    locale > ~/server-clone-audit/locale.txt 2>/dev/null || true
+    getent passwd > ~/server-clone-audit/passwd.txt 2>/dev/null || true
+    getent group  > ~/server-clone-audit/group.txt 2>/dev/null || true
+    dpkg --get-selections > ~/server-clone-audit/dpkg-selections.txt 2>/dev/null || true
+    apt-mark showmanual > ~/server-clone-audit/apt-manual.txt 2>/dev/null || true
+    lsblk -f > ~/server-clone-audit/lsblk.txt 2>/dev/null || true
+    df -Th > ~/server-clone-audit/df.txt 2>/dev/null || true
+    uname -r > ~/server-clone-audit/kernel.txt 2>/dev/null || true
+    ip addr > ~/server-clone-audit/ip-addr.txt 2>/dev/null || true
+    ip route > ~/server-clone-audit/ip-route.txt 2>/dev/null || true
+    systemctl list-unit-files --type=service > ~/server-clone-audit/systemd-services.txt 2>/dev/null || true
+    systemctl list-unit-files --state=enabled > ~/server-clone-audit/systemd-enabled.txt 2>/dev/null || true
+    ss -ltnp > ~/server-clone-audit/ports.txt 2>/dev/null || true
+    tar -czf ~/server-clone-audit.tgz ~/server-clone-audit/ 2>/dev/null || true
+ENDSSH
+  copy_from_src "~/server-clone-audit.tgz" "$NODE_AUDIT/source-baseline-audit.tgz" \
+    && echo "  [AUDIT] Saved baseline audit: $NODE_AUDIT/source-baseline-audit.tgz" \
+    || echo "  [WARN] Baseline audit archive not retrieved"
+
+  capture_r6_container_evidence "$NODE_NAME" "$NODE_AUDIT"
+
+  echo ""
+  echo "══════════════════════ STAGE 2 -- LOCAL VALIDATION ══════════════════════"
+  local REQUIRED=(
+    "$NODE_AUDIT/r6-container-discovery/13_container_contract/r6-required-inputs-map.tsv"
+    "$NODE_AUDIT/r6-container-discovery/05_apps/app-root-candidates.txt"
+    "$NODE_AUDIT/r6-container-discovery/06_dependencies/dependency-manifest-index.txt"
+    "$NODE_AUDIT/r6-container-discovery/03_services/container-candidate-services.txt"
+    "$NODE_AUDIT/r6-container-discovery/04_ports_network/listening-ports-processes.txt"
+    "$NODE_AUDIT/r6-container-discovery/07_config/secret-key-candidates.txt"
+    "$NODE_AUDIT/r6-container-discovery/08_data_volumes/writable-path-candidates.txt"
+    "$NODE_AUDIT/r6-container-discovery/11_k8s/health-endpoint-hints.txt"
+  )
+  local missing=0
+  for f in "${REQUIRED[@]}"; do
+    if [ -f "$f" ]; then
+      echo "  ✅ present: $f"
+    else
+      echo "  ❌ missing: $f"
+      missing=$((missing+1))
+    fi
+  done
+
+  echo ""
+  echo "══════════════════════ STAGE 3 -- SUMMARY ══════════════════════"
+  echo "[R6] App roots:      $(wc -l < "$NODE_AUDIT/r6-container-discovery/05_apps/app-root-candidates.txt" 2>/dev/null || echo 0)"
+  echo "[R6] Manifests:      $(wc -l < "$NODE_AUDIT/r6-container-discovery/06_dependencies/dependency-manifest-index.txt" 2>/dev/null || echo 0)"
+  echo "[R6] Services:       $(wc -l < "$NODE_AUDIT/r6-container-discovery/03_services/container-candidate-services.txt" 2>/dev/null || echo 0)"
+  echo "[R6] Writable paths: $(wc -l < "$NODE_AUDIT/r6-container-discovery/08_data_volumes/writable-path-candidates.txt" 2>/dev/null || echo 0)"
+  echo "[R6] Secret keys:    $(wc -l < "$NODE_AUDIT/r6-container-discovery/07_config/secret-key-candidates.txt" 2>/dev/null || echo 0)"
+
+  if [ "$missing" -gt 0 ]; then
+    echo "[R6] Completed with $missing missing expected file(s). Review log: $NODE_AUDIT/r6-containerization-capture.log"
+    return 1
+  fi
+
+  echo "[R6] Containerization evidence capture complete for $NODE_NAME"
+  echo "[R6] Reports: $NODE_AUDIT/r6-container-discovery/"
+}
+
+# ================================================================
+# MAIN
+# ================================================================
+echo "# Source: 1 selected node for R6 containerization capture"
+node_postgresqlu24
+
+echo ""
+echo "================================================================"
+echo "R6 CONTAINERIZATION DISCOVERY COMPLETE"
+echo "Audit reports: ./migration-csv/UnknownCustomer-audit/"
+echo "================================================================"

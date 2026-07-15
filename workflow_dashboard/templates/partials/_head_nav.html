@@ -4,7 +4,45 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>OSPC to FLEX Migration Dashboard</title>
+  <script>
+    /* Focus mode: flag this as early as possible (before <header>/#stageBar are
+       parsed) so embedded customer pages never paint the full dashboard first.
+       Replaces relying solely on applyOnlyFocus()'s runtime DOM-walk, which hides most of
+       the page but was leaving #stageBar visible when this page is embedded in an iframe. */
+    (function() {
+      var only = (new URLSearchParams(window.location.search || '').get('only') || '').toLowerCase();
+      if (!only) return;
+      // Any focus-mode embed: hide chrome and keep the body invisible until
+      // applyOnlyFocus() adds only-focus-ready, so the destination page appears
+      // directly instead of the full dashboard painting first.
+      document.documentElement.classList.add('only-focus-mode');
+      if (only === 'migration_request') {
+        document.documentElement.classList.add('only-migration-request');
+      }
+      // Fail-safe: never leave the embed invisible if a later script is interrupted.
+      setTimeout(function(){ document.documentElement.classList.add('only-focus-ready'); }, 5000);
+    })();
+  </script>
   <style>
+    html.only-focus-mode header,
+    html.only-focus-mode #ledCounterBar,
+    html.only-focus-mode #stageBar,
+    html.only-focus-mode #subBar1,
+    html.only-focus-mode #subBar2 {
+      display: none !important;
+    }
+    html.only-migration-request,
+    html.only-migration-request body {
+      background: #fff !important;
+    }
+    html.only-focus-mode body {
+      visibility: hidden !important;
+      opacity: 0 !important;
+    }
+    html.only-focus-mode.only-focus-ready body {
+      visibility: visible !important;
+      opacity: 1 !important;
+    }
     :root {
       --bg: #233a6b; --card: #0f1e3e88; --text: #ffffff;
       --muted: #d4ddf5; --border: #8ea2cc66; --primary: #4b5f91;
@@ -2067,6 +2105,25 @@ body.flex-skyline-mode #stageBar > .stage-btn.ai-now-stage.active {
     grid-template-columns: repeat(8, minmax(150px, 1fr)) !important;
   }
 }
+
+/* Top execution banner readability: add breathing room between stage title and subtext. */
+#stageBar > .stage-btn small,
+#stageBar > .top-stage-dropdown > .top-stage-dropdown-trigger small,
+#stageBar > .stage-btn.ai-now-stage small,
+body.flex-skyline-mode #stageBar > .stage-btn small,
+body.flex-skyline-mode #stageBar > .top-stage-dropdown > .top-stage-dropdown-trigger small,
+body.flex-skyline-mode #stageBar > .stage-btn.ai-now-stage small {
+  display: block !important;
+  margin-top: 7px !important;
+  line-height: 1.18 !important;
+}
+#stageBar > .stage-btn,
+#stageBar > .top-stage-dropdown > .top-stage-dropdown-trigger,
+body.flex-skyline-mode #stageBar > .stage-btn,
+body.flex-skyline-mode #stageBar > .top-stage-dropdown > .top-stage-dropdown-trigger {
+  row-gap: 3px !important;
+}
+
 .uat-s1-wrap { padding:18px 0; }
 .uat-s1-topbar { display:flex;justify-content:space-between;gap:14px;align-items:flex-start;margin-bottom:16px;flex-wrap:wrap; }
 .uat-s1-title h2 { margin:0;font-size:22px;font-weight:800;color:#0f172a; }
@@ -2358,7 +2415,7 @@ body.flex-skyline-mode .uat-s1-template-tab.active {
 .uat-s1-table-wrap th { color:#475569;background:#f8fafc;font-size:10px;text-transform:uppercase;letter-spacing:.05em; }
 
 /* Modal (light-theme, body-level, CSS class toggle) */
-.uat-s1-modal-backdrop { position:fixed;inset:0;background:rgba(2,6,23,.55);display:none;align-items:center;justify-content:center;padding:24px;z-index:9999; }
+.uat-s1-modal-backdrop { position:fixed;inset:0;background:rgba(2,6,23,.55);display:none;align-items:center;justify-content:center;padding:24px;z-index:20000 !important; }
 .uat-s1-modal-backdrop.open { display:flex; }
 .uat-s1-modal { width:min(1520px,96vw);max-height:92vh;overflow:hidden;background:#fff;border-radius:20px;box-shadow:0 30px 80px rgba(0,0,0,.3);display:grid;grid-template-rows:auto 1fr auto; }
 .uat-s1-modal-head { padding:16px 20px;border-bottom:1px solid #dbe4f0;display:flex;align-items:center;justify-content:space-between;gap:12px; }
@@ -2561,7 +2618,18 @@ body.flex-skyline-mode .uat-s1-template-tab.active {
 })();
 </script>
 
-<header>
+{% if request.args.get('only') %}
+<style>
+  /* ?only= focus mode: stylesheet !important beats any runtime element.style
+     re-show (theme JS sets #stageBar display back to grid, overriding the
+     inline display:none the server renders below). */
+  header, #stageBar, #ledCounterBar, #subBar1, #subBar2 { display: none !important; }
+  /* body.flex-skyline-mode #stageBar.stage-bar { display:grid !important } (line ~2033)
+     out-specifies a bare #stageBar; match it so focus mode wins the tie by source order. */
+  body.flex-skyline-mode #stageBar.stage-bar { display: none !important; }
+</style>
+{% endif %}
+<header{% if request.args.get('only') %} style="display:none"{% endif %}>
   <div class="header-inner">
     <div class="neon-sign-outer">
       <div class="neon-sign">
@@ -2616,7 +2684,7 @@ body.flex-skyline-mode .uat-s1-template-tab.active {
 
 <!-- ══ LED Migration Counter Dashboard ══ -->
 <div id="ledCounterBar" style="
-  display:flex; gap:0; padding:6px 16px; background:#000;
+  {% if request.args.get('only') %}display:none;{% else %}display:flex;{% endif %} gap:0; padding:6px 16px; background:#000;
   border-bottom:1px solid rgba(0,255,65,0.15);
   justify-content:center; align-items:stretch; flex-shrink:0;
 ">
@@ -2649,7 +2717,7 @@ body.flex-skyline-mode .uat-s1-template-tab.active {
   </div>
 </div>
 <!-- ── Mission stage buttons ─────────────────────────── -->
-<div class="stage-bar" id="stageBar">
+<div class="stage-bar" id="stageBar"{% if request.args.get('only') %} style="display:none"{% endif %}>
   <button class="stage-btn stage-promo-btn sky-top-stage active" data-stage="s_why">Why Who What When to<br>Move to FLEX</button>
   <button class="stage-btn sky-top-stage" data-stage="s_fb">&#128172; Improvement<br>Feedbacks</button>
   <button class="stage-btn stage-tour-btn sky-top-stage" data-stage="s_tour">🎓 Quick Tour</button>
@@ -2674,7 +2742,7 @@ body.flex-skyline-mode .uat-s1-template-tab.active {
 </div>
 
 <!-- ── Sub-tabs for Stage 1 ─────────────────────────── -->
-<div class="sub-bar visible" id="subBar1">
+<div class="sub-bar visible" id="subBar1"{% if request.args.get('only') %} style="display:none"{% endif %}>
   <button class="sub-btn active" data-sub="s1info">📋 Discovery &amp; Assessment</button>
   <div class="ospc-dropdown">
     <button class="sub-btn-dropdown">🚀 OSPC Infrastructure Scanner ▼</button>
@@ -2715,7 +2783,7 @@ body.flex-skyline-mode .uat-s1-template-tab.active {
 </div>
 
 <!-- ── Sub-tabs for Stage 2 ─────────────────────────── -->
-<div class="sub-bar" id="subBar2">
+<div class="sub-bar" id="subBar2"{% if request.args.get('only') %} style="display:none"{% endif %}>
   <button class="sub-btn" data-sub="s2migstrategy">🗺 Migration Strategy</button>
   <div class="ospc-dropdown nav-stage-group">
     <button class="sub-btn-dropdown" type="button" aria-haspopup="true">What Does Not Migrate to FLEX &#9662;</button>
@@ -2739,7 +2807,7 @@ body.flex-skyline-mode .uat-s1-template-tab.active {
   </div>
   <!-- R5 Data Replatform / Full Manual Runbook removed — see Stage 2 migration tools -->
   <div class="ospc-dropdown nav-stage-group">
-    <button class="sub-btn-dropdown" type="button" aria-haspopup="true">What Apps We Transform to K8 Containers &#9662;</button>
+    <button class="sub-btn-dropdown" type="button" aria-haspopup="true">Move FLEX Apps to K8 Cluster &#9662;</button>
     <div class="ospc-dropdown-content">
       <button class="sub-btn" data-sub="s2rehost_p2_2">&#128640; APPS to Container Refactor Engine</button>
       <button class="sub-btn" data-sub="s2opencenter">🚀 OpenCenter K8s Cluster Migration</button>
