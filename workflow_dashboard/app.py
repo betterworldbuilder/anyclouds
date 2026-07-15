@@ -24263,6 +24263,15 @@ def patch_config_file():
                 ssh_match = re.match(r"^ssh://(?:git@)?([^/]+)/(.+)$", repo_url, re.IGNORECASE)
                 if ssh_match:
                     repo_url = f"https://{ssh_match.group(1)}/{ssh_match.group(2)}"
+                # The dashboard deliberately uses a permission-restricted token
+                # file. Remove cluster-init's inline CHANGEME (or any stale
+                # inline token) so the configuration has one authoritative
+                # credential source and never persists a PAT in YAML.
+                token_file = str(
+                    get_nested(data, "opencenter.gitops.auth.token.token_file") or ""
+                ).strip()
+                if token_file and delete_nested(data, "opencenter.gitops.auth.token.token"):
+                    patched += 1
             if not repo_url:
                 return jsonify({
                     "ok": False,
