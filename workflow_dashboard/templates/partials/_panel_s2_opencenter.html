@@ -129,18 +129,6 @@
     <div class="ocqs-body">
     <!-- LEFT COLUMN -->
     <div class="ocqs-left" style="display:flex;gap:14px;align-items:flex-start;"><style>.ocqs-stepnav{position:sticky;top:12px;align-self:stretch;display:flex;flex-direction:column;gap:3px;background:#ffffff;border:1px solid #e2e8f0;border-left:4px solid #dc2626;border-radius:10px;padding:12px 10px;min-width:188px;flex:none;min-height:calc(100vh - 24px);box-shadow:0 1px 4px rgba(15,23,42,.06);}.ocqs-stepnav-hd{font-size:9px;font-weight:900;letter-spacing:1.5px;color:#94a3b8;padding:2px 8px 8px;border-bottom:1px solid #f1f5f9;margin-bottom:4px;}.ocqs-navlink{display:flex;align-items:center;gap:8px;padding:8px 8px;border-radius:6px;text-decoration:none;font-size:11px;font-weight:700;color:#334155;transition:background .15s;}.ocqs-navlink:hover{background:#fef2f2;color:#991b1b;}.ocqs-navlink.active{background:#dc2626;color:#fff;}.ocqs-navdot{width:8px;height:8px;border-radius:50%;background:#cbd5e1;flex:none;border:1px solid #e2e8f0;}.ocqs-navdot.pass{background:#16a34a;border-color:#16a34a;}.ocqs-navdot.fail{background:#dc2626;border-color:#dc2626;}.ocqs-navdot.run{background:#f59e0b;border-color:#f59e0b;}@media (max-width:1100px){.ocqs-stepnav{position:static;flex-direction:row;flex-wrap:wrap;min-height:0;width:100%;border-left:1px solid #e2e8f0;border-top:4px solid #dc2626;}}</style><div class="ocqs-stepnav" id="ocqs-stepnav"><div class="ocqs-stepnav-hd">JUMP TO STAGE</div><a href="#ocqs-step-B" class="ocqs-navlink" data-step="B" onclick="ocqsNavJump(event,'ocqs-step-B')"><span class="ocqs-navdot" id="ocqs-navdot-B"></span><span class="ocqs-navlabel">B. Credentials &amp; Inputs</span></a><a href="#ocqs-step-1" class="ocqs-navlink" data-step="1" onclick="ocqsNavJump(event,'ocqs-step-1')"><span class="ocqs-navdot" id="ocqs-navdot-1"></span><span class="ocqs-navlabel">1. Install &amp; Verify CLI</span></a><a href="#ocqs-step-2" class="ocqs-navlink" data-step="2" onclick="ocqsNavJump(event,'ocqs-step-2')"><span class="ocqs-navdot" id="ocqs-navdot-2"></span><span class="ocqs-navlabel">2. Initialize Cluster</span></a><a href="#ocqs-step-3" class="ocqs-navlink" data-step="3" onclick="ocqsNavJump(event,'ocqs-step-3')"><span class="ocqs-navdot" id="ocqs-navdot-3"></span><span class="ocqs-navlabel">3. Configure Credentials</span></a><a href="#ocqs-step-4" class="ocqs-navlink" data-step="4" onclick="ocqsNavJump(event,'ocqs-step-4')"><span class="ocqs-navdot" id="ocqs-navdot-4"></span><span class="ocqs-navlabel">4. Select Active Cluster</span></a><a href="#ocqs-step-5" class="ocqs-navlink" data-step="5" onclick="ocqsNavJump(event,'ocqs-step-5')"><span class="ocqs-navdot" id="ocqs-navdot-5"></span><span class="ocqs-navlabel">5. Optional Services</span></a><a href="#ocqs-step-7" class="ocqs-navlink" data-step="7" onclick="ocqsNavJump(event,'ocqs-step-7')"><span class="ocqs-navdot" id="ocqs-navdot-7"></span><span class="ocqs-navlabel">7. Setup GitOps Repo</span></a><a href="#ocqs-step-6" class="ocqs-navlink" data-step="6" onclick="ocqsNavJump(event,'ocqs-step-6')"><span class="ocqs-navdot" id="ocqs-navdot-6"></span><span class="ocqs-navlabel">6. Validate Config</span></a><a href="#ocqs-step-8" class="ocqs-navlink" data-step="8" onclick="ocqsNavJump(event,'ocqs-step-8')"><span class="ocqs-navdot" id="ocqs-navdot-8"></span><span class="ocqs-navlabel">8. Commit &amp; Push GitOps</span></a><a href="#ocqs-step-9" class="ocqs-navlink" data-step="9" onclick="ocqsNavJump(event,'ocqs-step-9')"><span class="ocqs-navdot" id="ocqs-navdot-9"></span><span class="ocqs-navlabel">9. Deploy Cluster</span></a></div><div class="ocqs-left-inner" style="flex:1;min-width:0;">
-          <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px;margin-bottom:14px;">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:8px;">
-              <div style="font-size:11px;font-weight:800;color:#0369a1;text-transform:uppercase;letter-spacing:1px;">&#127970; Business System Scope Engine</div>
-              <div style="display:flex;gap:8px;flex-wrap:wrap;">
-                <button class="ocqs-btn" style="background:#1e3a5f;color:#c4b5fd;border:1px solid #7c3aed;padding:6px 12px;font-size:12px;" onclick="fsmLoadDemo()">&#127974; Load Banking Demo</button>
-                <button class="ocqs-btn" style="background:#15803d;color:#fff;border:none;padding:6px 12px;font-size:12px;" onclick="fsmRefresh();ocqsMountBusinessSystems();">&#8635; Refresh Migration Matrix</button>
-              </div>
-            </div>
-            <p style="color:#64748b;font-size:12px;margin:0 0 10px;">Same Add Business System engine used by Stage 1 and Full Business System Migration - same cards, templates, and localStorage model. Select a system here to carry it into the OpenCenter deploy.</p>
-            <div id="ocqs-fsm-uat-engine-host" style="background:#fff;border:1px solid #d6e3f3;border-radius:10px;padding:0;overflow:hidden;"></div>
-          </div>
-
       <!-- Intro -->
       <div class="ocqs-section">
         <div style="background:linear-gradient(135deg,#0f172a,#1e3a5f);border-radius:12px;padding:20px 24px;margin-bottom:20px;color:#fff;">
@@ -241,7 +229,12 @@
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
               <div>
                 <label class="ocqs-label">Organization Name</label>
-                <input class="ocqs-input" id="ocqs-org" value="my-org" oninput="ocqsUpdate()" onchange="ocqsSeedClusterHistory()">
+                <select class="ocqs-select" id="ocqs-org-select" onchange="ocqsChooseOrganization(this.value)">
+                  <option value="my-org">my-org</option>
+                  <option value="__new__">＋ Create a new organization…</option>
+                </select>
+                <input class="ocqs-input" id="ocqs-org" value="my-org" placeholder="new-organization-name" oninput="ocqsUpdate()" style="display:none;margin-top:6px;">
+                <div id="ocqs-org-lock-warning" role="alert" style="display:none;font-size:10px;font-weight:800;color:#b45309;margin-top:4px;">&#9888; New Org not allowed for existing clusters</div>
               </div>
               <div>
                 <label class="ocqs-label">Cluster Name</label>
@@ -251,6 +244,7 @@
                 </select>
                 <input class="ocqs-input" id="ocqs-cluster" value="my-cluster" placeholder="new-cluster-name" oninput="ocqsUpdate()" onchange="ocqsRecordClusterName(this.value)" style="display:none;margin-top:6px;">
                 <div id="ocqs-cluster-list-status" style="font-size:10px;color:#64748b;margin-top:4px;">Loading configured clusters…</div>
+                <div role="note" style="margin-top:7px;padding:8px 10px;border:1px solid #f59e0b;border-left:4px solid #d97706;border-radius:6px;background:#fffbeb;color:#92400e;font-size:10px;font-weight:700;line-height:1.45;">&#9888; Organization&ndash;cluster pairing rule: Once a cluster is created under an organization, it is permanently associated with that organization and cannot be reassigned to another organization.</div>
               </div>
               <div>
                 <label class="ocqs-label">Environment</label>
@@ -940,67 +934,113 @@
         setTimeout(function(){ if(typeof ocqsSave==='function') ocqsSave(); }, 600);
       };
 
-      // Configured-cluster dropdown, scoped to the selected organization.
-      window.ocqsClusterHistoryKey = function(){
-        var org = ((document.getElementById('ocqs-org')||{}).value || 'my-org').trim().toLowerCase();
-        return 'ocqs_cluster_history_' + org;
+      // Existing clusters are immutable organization/cluster pairs.
+      window._ocqsClusterPairs = [];
+      window.ocqsShowOrgWarning = function(show){
+        var warning=document.getElementById('ocqs-org-lock-warning');
+        if(warning) warning.style.display=show?'block':'none';
       };
-      window.ocqsClusterHistory = function(){
-        try { return JSON.parse(localStorage.getItem(ocqsClusterHistoryKey()) || '[]'); } catch(e){ return []; }
+      window.ocqsFindClusterPair = function(organization, cluster){
+        return (_ocqsClusterPairs||[]).filter(function(pair){
+          return pair.organization===organization && pair.cluster===cluster;
+        })[0] || null;
       };
-      window.ocqsFillClusterHistory = function(names, preferred){
-        names = Array.isArray(names) ? names : ocqsClusterHistory();
-        names = names.filter(function(n,i,a){ return /^[a-z0-9][a-z0-9-]*$/.test(n) && a.indexOf(n)===i; }).sort();
-        var input = document.getElementById('ocqs-cluster');
-        var current = preferred || (input ? input.value.trim() : '');
-        if (current && current !== 'my-cluster' && names.indexOf(current) === -1) names.unshift(current);
-        if (!names.length) names = [current || 'my-cluster'];
-        var sel = document.getElementById('ocqs-cluster-select');
-        if (sel){
-          sel.innerHTML = '';
-          names.forEach(function(n){ var o=document.createElement('option');o.value=n;o.textContent=n;sel.appendChild(o); });
-          var fresh=document.createElement('option');fresh.value='__new__';fresh.textContent='＋ Create a new cluster…';sel.appendChild(fresh);
-          sel.value = names.indexOf(current) !== -1 ? current : names[0];
-          if(input){ input.value=sel.value; input.style.display='none'; }
+      window.ocqsFillClustersForOrg = function(organization, preferredCluster){
+        var sel=document.getElementById('ocqs-cluster-select');
+        if(!sel) return;
+        var clusters=organization==='__new__' ? [] : (_ocqsClusterPairs||[]).filter(function(pair){
+          return pair.organization===organization;
+        }).map(function(pair){ return pair.cluster; });
+        sel.innerHTML='';
+        clusters.forEach(function(cluster){
+          var option=document.createElement('option'); option.value=cluster; option.textContent=cluster; sel.appendChild(option);
+        });
+        var fresh=document.createElement('option');
+        fresh.value='__new__'; fresh.textContent='＋ Create a new cluster…'; sel.appendChild(fresh);
+        sel.value=preferredCluster && clusters.indexOf(preferredCluster)!==-1 ? preferredCluster : (clusters[0]||'__new__');
+        ocqsChooseCluster(sel.value);
+      };
+      window.ocqsChooseOrganization = function(organization, preferredCluster){
+        var orgInput=document.getElementById('ocqs-org');
+        var orgSelect=document.getElementById('ocqs-org-select');
+        if(!orgInput||!orgSelect) return;
+        if(organization==='__new__'){
+          orgSelect.value='__new__'; orgInput.value=''; orgInput.style.display='block'; orgInput.readOnly=false;
+          ocqsFillClustersForOrg('__new__','__new__'); orgInput.focus();
+        }else{
+          orgSelect.value=organization; orgInput.value=organization; orgInput.style.display='none'; orgInput.readOnly=true;
+          ocqsFillClustersForOrg(organization,preferredCluster);
+        }
+        if(typeof ocqsUpdate==='function') ocqsUpdate();
+      };
+      window.ocqsFillClusterHistory = function(pairs, preferred){
+        pairs=Array.isArray(pairs)?pairs:[];
+        _ocqsClusterPairs=pairs.filter(function(pair){
+          return pair && /^[a-z0-9][a-z0-9-]*$/.test(pair.organization||'') && /^[a-z0-9][a-z0-9-]*$/.test(pair.cluster||'');
+        });
+        var organizations=_ocqsClusterPairs.map(function(pair){return pair.organization;}).filter(function(org,index,all){return all.indexOf(org)===index;});
+        var orgSelect=document.getElementById('ocqs-org-select');
+        if(!orgSelect) return;
+        orgSelect.innerHTML='';
+        organizations.forEach(function(org){
+          var option=document.createElement('option'); option.value=org; option.textContent=org; orgSelect.appendChild(option);
+        });
+        var fresh=document.createElement('option');
+        fresh.value='__new__'; fresh.textContent='＋ Create a new organization…'; orgSelect.appendChild(fresh);
+        if(preferred && ocqsFindClusterPair(preferred.organization,preferred.cluster)){
+          ocqsChooseOrganization(preferred.organization,preferred.cluster);
+        }else if(organizations.length){
+          ocqsChooseOrganization(organizations[0]);
+        }else{
+          ocqsChooseOrganization('__new__');
         }
       };
-      window.ocqsChooseCluster = function(name){
+      window.ocqsChooseCluster = function(cluster){
         var input=document.getElementById('ocqs-cluster');
         if(!input) return;
-        if(name==='__new__'){
-          input.value=''; input.style.display='block'; input.focus();
+        if(cluster==='__new__'){
+          input.value=''; input.style.display='block'; ocqsShowOrgWarning(false); input.focus();
         }else{
-          input.value=name; input.style.display='none'; ocqsRecordClusterName(name);
+          input.value=cluster; input.style.display='none'; ocqsShowOrgWarning(true);
         }
         if(typeof ocqsUpdate==='function') ocqsUpdate();
       };
       window.ocqsRecordClusterName = function(name){
-        name = (name || '').trim().toLowerCase().replace(/[^a-z0-9-]+/g,'-').replace(/^-+|-+$/g,'');
-        if (!name || name === 'my-cluster') return;
-        var h = ocqsClusterHistory();
-        if (h.indexOf(name) === -1){
-          h.unshift(name);
-          localStorage.setItem(ocqsClusterHistoryKey(), JSON.stringify(h.slice(0, 50)));
-        }
-        ocqsFillClusterHistory(h, name);
+        var input=document.getElementById('ocqs-cluster');
+        name=(name||'').trim().toLowerCase().replace(/[^a-z0-9-]+/g,'-').replace(/^-+|-+$/g,'');
+        if(input) input.value=name;
+        if(typeof ocqsUpdate==='function') ocqsUpdate();
       };
-      // Load the real blueprint directories from the server; no shell interpolation.
+      window.ocqsValidateClusterOrgPair = function(showWarning){
+        var org=((document.getElementById('ocqs-org')||{}).value||'').trim().toLowerCase();
+        var cluster=((document.getElementById('ocqs-cluster')||{}).value||'').trim().toLowerCase();
+        var orgSelect=document.getElementById('ocqs-org-select');
+        var clusterSelect=document.getElementById('ocqs-cluster-select');
+        var existingOrg=orgSelect && orgSelect.value!=='__new__';
+        var existingCluster=clusterSelect && clusterSelect.value!=='__new__';
+        var conflict=existingOrg && orgSelect.value!==org;
+        if(existingCluster) conflict=conflict || !ocqsFindClusterPair(org,cluster);
+        if(!existingCluster) conflict=conflict || (_ocqsClusterPairs||[]).some(function(pair){return pair.cluster===cluster;});
+        if(conflict && showWarning){
+          ocqsShowOrgWarning(true);
+          alert('New Org not allowed for existing clusters');
+        }
+        return !conflict;
+      };
+      // Load all real blueprint ownership pairs from the server.
       window.ocqsSeedClusterHistory = function(){
-        var org=((document.getElementById('ocqs-org')||{}).value||'my-org').trim().toLowerCase();
         var status=document.getElementById('ocqs-cluster-list-status');
-        if(status){status.textContent='Loading configured clusters…';status.style.color='#64748b';}
-        fetch('/api/opencenter/clusters?org='+encodeURIComponent(org)).then(function(r){return r.json().then(function(d){return{ok:r.ok,d:d};});}).then(function(res){
+        if(status){status.textContent='Loading configured cluster pairs…';status.style.color='#64748b';}
+        fetch('/api/opencenter/clusters').then(function(r){return r.json().then(function(d){return{ok:r.ok,d:d};});}).then(function(res){
           if(!res.ok||!res.d.ok) throw new Error(res.d.error||'cluster lookup failed');
-          var names=res.d.clusters||[];
-          localStorage.setItem(ocqsClusterHistoryKey(),JSON.stringify(names));
-          var input=document.getElementById('ocqs-cluster');
-          var current=input?input.value.trim():'';
-          var preferred=(current && current!=='my-cluster')?current:(res.d.active_cluster||names[0]||'my-cluster');
-          ocqsFillClusterHistory(names,preferred);
-          if(status){status.textContent=names.length+' configured cluster'+(names.length===1?'':'s')+' in '+org;status.style.color='#15803d';}
-          if(typeof ocqsUpdate==='function') ocqsUpdate();
+          var pairs=res.d.pairs||[];
+          var org=((document.getElementById('ocqs-org')||{}).value||'').trim().toLowerCase();
+          var cluster=((document.getElementById('ocqs-cluster')||{}).value||'').trim().toLowerCase();
+          var preferred=pairs.filter(function(pair){return pair.organization===org&&pair.cluster===cluster;})[0]||res.d.active_pair||pairs[0]||null;
+          ocqsFillClusterHistory(pairs,preferred);
+          if(status){status.textContent=pairs.length+' configured organization / cluster pair'+(pairs.length===1?'':'s');status.style.color='#15803d';}
         }).catch(function(err){
-          ocqsFillClusterHistory();
+          ocqsFillClusterHistory([],null);
           if(status){status.textContent='Could not load clusters: '+err.message;status.style.color='#dc2626';}
         });
       };
@@ -2596,6 +2636,10 @@ kubectl describe kustomization &lt;name&gt; -n flux-system</div>
         var provider = (s.provider || 'openstack').trim().toLowerCase();
         var st = document.getElementById('ocqs-update-identity-status');
         var out = document.getElementById('ocqs-out-2');
+        if(!ocqsValidateClusterOrgPair(true)){
+          if(st){ st.textContent='\u2717 New Org not allowed for existing clusters'; st.style.color='#dc2626'; }
+          return;
+        }
         if(btn){ btn.disabled=true; btn.textContent='Updating...'; }
         if(st){ st.textContent='Updating cluster config...'; st.style.color='#0369a1'; }
         var cmd = [
@@ -2625,6 +2669,7 @@ kubectl describe kustomization &lt;name&gt; -n flux-system</div>
             if(st){ st.textContent = ok ? '\u2713 Cluster settings updated' : '\u2717 Update failed'; st.style.color = ok ? '#15803d' : '#dc2626'; }
             if(btn){ btn.disabled=false; btn.innerHTML='&#128260; Update Cluster'; }
             if(ok && typeof ocqsUpdate==='function') ocqsUpdate();
+            if(ok && typeof ocqsSeedClusterHistory==='function') ocqsSeedClusterHistory();
           }
         };
         es.onerror = function(){
@@ -3152,18 +3197,6 @@ var c9b=g('ocqs-cmd-9b');
     <div class="ocqs-body">
     <!-- LEFT COLUMN -->
     <div class="ocqs-left" style="display:flex;gap:14px;align-items:flex-start;"><style>.ocqs-stepnav{position:sticky;top:12px;align-self:stretch;display:flex;flex-direction:column;gap:3px;background:#ffffff;border:1px solid #e2e8f0;border-left:4px solid #dc2626;border-radius:10px;padding:12px 10px;min-width:188px;flex:none;min-height:calc(100vh - 24px);box-shadow:0 1px 4px rgba(15,23,42,.06);}.ocqs-stepnav-hd{font-size:9px;font-weight:900;letter-spacing:1.5px;color:#94a3b8;padding:2px 8px 8px;border-bottom:1px solid #f1f5f9;margin-bottom:4px;}.ocqs-navlink{display:flex;align-items:center;gap:8px;padding:8px 8px;border-radius:6px;text-decoration:none;font-size:11px;font-weight:700;color:#334155;transition:background .15s;}.ocqs-navlink:hover{background:#fef2f2;color:#991b1b;}.ocqs-navlink.active{background:#dc2626;color:#fff;}.ocqs-navdot{width:8px;height:8px;border-radius:50%;background:#cbd5e1;flex:none;border:1px solid #e2e8f0;}.ocqs-navdot.pass{background:#16a34a;border-color:#16a34a;}.ocqs-navdot.fail{background:#dc2626;border-color:#dc2626;}.ocqs-navdot.run{background:#f59e0b;border-color:#f59e0b;}@media (max-width:1100px){.ocqs-stepnav{position:static;flex-direction:row;flex-wrap:wrap;min-height:0;width:100%;border-left:1px solid #e2e8f0;border-top:4px solid #dc2626;}}</style><div class="ocqs-stepnav" id="ocqp-stepnav"><div class="ocqs-stepnav-hd">JUMP TO STAGE</div><a href="#ocqp-step-B" class="ocqs-navlink" data-step="B" onclick="ocqpNavJump(event,'ocqp-step-B')"><span class="ocqs-navdot" id="ocqp-navdot-B"></span><span class="ocqs-navlabel">B. Credentials &amp; Inputs</span></a><a href="#ocqp-step-1" class="ocqs-navlink" data-step="1" onclick="ocqpNavJump(event,'ocqp-step-1')"><span class="ocqs-navdot" id="ocqp-navdot-1"></span><span class="ocqs-navlabel">1. Install &amp; Verify CLI</span></a><a href="#ocqp-step-2" class="ocqs-navlink" data-step="2" onclick="ocqpNavJump(event,'ocqp-step-2')"><span class="ocqs-navdot" id="ocqp-navdot-2"></span><span class="ocqs-navlabel">2. Initialize Cluster</span></a><a href="#ocqp-step-3" class="ocqs-navlink" data-step="3" onclick="ocqpNavJump(event,'ocqp-step-3')"><span class="ocqs-navdot" id="ocqp-navdot-3"></span><span class="ocqs-navlabel">3. Configure Credentials</span></a><a href="#ocqp-step-4" class="ocqs-navlink" data-step="4" onclick="ocqpNavJump(event,'ocqp-step-4')"><span class="ocqs-navdot" id="ocqp-navdot-4"></span><span class="ocqs-navlabel">4. Select Active Cluster</span></a><a href="#ocqp-step-5" class="ocqs-navlink" data-step="5" onclick="ocqpNavJump(event,'ocqp-step-5')"><span class="ocqs-navdot" id="ocqp-navdot-5"></span><span class="ocqs-navlabel">5. Optional Services</span></a><a href="#ocqp-step-7" class="ocqs-navlink" data-step="7" onclick="ocqpNavJump(event,'ocqp-step-7')"><span class="ocqs-navdot" id="ocqp-navdot-7"></span><span class="ocqs-navlabel">7. Setup GitOps Repo</span></a><a href="#ocqp-step-6" class="ocqs-navlink" data-step="6" onclick="ocqpNavJump(event,'ocqp-step-6')"><span class="ocqs-navdot" id="ocqp-navdot-6"></span><span class="ocqs-navlabel">6. Validate Config</span></a><a href="#ocqp-step-8" class="ocqs-navlink" data-step="8" onclick="ocqpNavJump(event,'ocqp-step-8')"><span class="ocqs-navdot" id="ocqp-navdot-8"></span><span class="ocqs-navlabel">8. Commit &amp; Push GitOps</span></a><a href="#ocqp-step-9" class="ocqs-navlink" data-step="9" onclick="ocqpNavJump(event,'ocqp-step-9')"><span class="ocqs-navdot" id="ocqp-navdot-9"></span><span class="ocqs-navlabel">9. Deploy Cluster</span></a></div><div class="ocqs-left-inner" style="flex:1;min-width:0;">
-          <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px;margin-bottom:14px;">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:8px;">
-              <div style="font-size:11px;font-weight:800;color:#0369a1;text-transform:uppercase;letter-spacing:1px;">&#127970; Business System Scope Engine</div>
-              <div style="display:flex;gap:8px;flex-wrap:wrap;">
-                <button class="ocqs-btn" style="background:#1e3a5f;color:#c4b5fd;border:1px solid #7c3aed;padding:6px 12px;font-size:12px;" onclick="fsmLoadDemo()">&#127974; Load Banking Demo</button>
-                <button class="ocqs-btn" style="background:#15803d;color:#fff;border:none;padding:6px 12px;font-size:12px;" onclick="fsmRefresh();ocqpMountBusinessSystems();">&#8635; Refresh Migration Matrix</button>
-              </div>
-            </div>
-            <p style="color:#64748b;font-size:12px;margin:0 0 10px;">Same Add Business System engine used by Stage 1 and Full Business System Migration - same cards, templates, and localStorage model. Select a system here to carry it into the OpenCenter deploy.</p>
-            <div id="ocqp-fsm-uat-engine-host" style="background:#fff;border:1px solid #d6e3f3;border-radius:10px;padding:0;overflow:hidden;"></div>
-          </div>
-
       <!-- Intro -->
       <div class="ocqs-section">
         <div style="background:linear-gradient(135deg,#0f172a,#1e3a5f);border-radius:12px;padding:20px 24px;margin-bottom:20px;color:#fff;">
@@ -3264,7 +3297,12 @@ var c9b=g('ocqs-cmd-9b');
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
               <div>
                 <label class="ocqs-label">Organization Name</label>
-                <input class="ocqs-input" id="ocqp-org" value="my-org" oninput="ocqpUpdate()" onchange="ocqpSeedClusterHistory()">
+                <select class="ocqs-select" id="ocqp-org-select" onchange="ocqpChooseOrganization(this.value)">
+                  <option value="my-org">my-org</option>
+                  <option value="__new__">＋ Create a new organization…</option>
+                </select>
+                <input class="ocqs-input" id="ocqp-org" value="my-org" placeholder="new-organization-name" oninput="ocqpUpdate()" style="display:none;margin-top:6px;">
+                <div id="ocqp-org-lock-warning" role="alert" style="display:none;font-size:10px;font-weight:800;color:#b45309;margin-top:4px;">&#9888; New Org not allowed for existing clusters</div>
               </div>
               <div>
                 <label class="ocqs-label">Cluster Name</label>
@@ -3274,6 +3312,7 @@ var c9b=g('ocqs-cmd-9b');
                 </select>
                 <input class="ocqs-input" id="ocqp-cluster" value="my-cluster" placeholder="new-cluster-name" oninput="ocqpUpdate()" onchange="ocqpRecordClusterName(this.value)" style="display:none;margin-top:6px;">
                 <div id="ocqp-cluster-list-status" style="font-size:10px;color:#64748b;margin-top:4px;">Loading configured clusters…</div>
+                <div role="note" style="margin-top:7px;padding:8px 10px;border:1px solid #f59e0b;border-left:4px solid #d97706;border-radius:6px;background:#fffbeb;color:#92400e;font-size:10px;font-weight:700;line-height:1.45;">&#9888; Organization&ndash;cluster pairing rule: Once a cluster is created under an organization, it is permanently associated with that organization and cannot be reassigned to another organization.</div>
               </div>
               <div>
                 <label class="ocqs-label">Environment</label>
@@ -3938,67 +3977,113 @@ var c9b=g('ocqs-cmd-9b');
         setTimeout(function(){ if(typeof ocqpSave==='function') ocqpSave(); }, 600);
       };
 
-      // Configured-cluster dropdown, scoped to the selected organization.
-      window.ocqpClusterHistoryKey = function(){
-        var org = ((document.getElementById('ocqp-org')||{}).value || 'my-org').trim().toLowerCase();
-        return 'ocqp_cluster_history_' + org;
+      // Existing clusters are immutable organization/cluster pairs.
+      window._ocqpClusterPairs = [];
+      window.ocqpShowOrgWarning = function(show){
+        var warning=document.getElementById('ocqp-org-lock-warning');
+        if(warning) warning.style.display=show?'block':'none';
       };
-      window.ocqpClusterHistory = function(){
-        try { return JSON.parse(localStorage.getItem(ocqpClusterHistoryKey()) || '[]'); } catch(e){ return []; }
+      window.ocqpFindClusterPair = function(organization, cluster){
+        return (_ocqpClusterPairs||[]).filter(function(pair){
+          return pair.organization===organization && pair.cluster===cluster;
+        })[0] || null;
       };
-      window.ocqpFillClusterHistory = function(names, preferred){
-        names = Array.isArray(names) ? names : ocqpClusterHistory();
-        names = names.filter(function(n,i,a){ return /^[a-z0-9][a-z0-9-]*$/.test(n) && a.indexOf(n)===i; }).sort();
-        var input = document.getElementById('ocqp-cluster');
-        var current = preferred || (input ? input.value.trim() : '');
-        if (current && current !== 'my-cluster' && names.indexOf(current) === -1) names.unshift(current);
-        if (!names.length) names = [current || 'my-cluster'];
-        var sel = document.getElementById('ocqp-cluster-select');
-        if (sel){
-          sel.innerHTML = '';
-          names.forEach(function(n){ var o=document.createElement('option');o.value=n;o.textContent=n;sel.appendChild(o); });
-          var fresh=document.createElement('option');fresh.value='__new__';fresh.textContent='＋ Create a new cluster…';sel.appendChild(fresh);
-          sel.value = names.indexOf(current) !== -1 ? current : names[0];
-          if(input){ input.value=sel.value; input.style.display='none'; }
+      window.ocqpFillClustersForOrg = function(organization, preferredCluster){
+        var sel=document.getElementById('ocqp-cluster-select');
+        if(!sel) return;
+        var clusters=organization==='__new__' ? [] : (_ocqpClusterPairs||[]).filter(function(pair){
+          return pair.organization===organization;
+        }).map(function(pair){ return pair.cluster; });
+        sel.innerHTML='';
+        clusters.forEach(function(cluster){
+          var option=document.createElement('option'); option.value=cluster; option.textContent=cluster; sel.appendChild(option);
+        });
+        var fresh=document.createElement('option');
+        fresh.value='__new__'; fresh.textContent='＋ Create a new cluster…'; sel.appendChild(fresh);
+        sel.value=preferredCluster && clusters.indexOf(preferredCluster)!==-1 ? preferredCluster : (clusters[0]||'__new__');
+        ocqpChooseCluster(sel.value);
+      };
+      window.ocqpChooseOrganization = function(organization, preferredCluster){
+        var orgInput=document.getElementById('ocqp-org');
+        var orgSelect=document.getElementById('ocqp-org-select');
+        if(!orgInput||!orgSelect) return;
+        if(organization==='__new__'){
+          orgSelect.value='__new__'; orgInput.value=''; orgInput.style.display='block'; orgInput.readOnly=false;
+          ocqpFillClustersForOrg('__new__','__new__'); orgInput.focus();
+        }else{
+          orgSelect.value=organization; orgInput.value=organization; orgInput.style.display='none'; orgInput.readOnly=true;
+          ocqpFillClustersForOrg(organization,preferredCluster);
+        }
+        if(typeof ocqpUpdate==='function') ocqpUpdate();
+      };
+      window.ocqpFillClusterHistory = function(pairs, preferred){
+        pairs=Array.isArray(pairs)?pairs:[];
+        _ocqpClusterPairs=pairs.filter(function(pair){
+          return pair && /^[a-z0-9][a-z0-9-]*$/.test(pair.organization||'') && /^[a-z0-9][a-z0-9-]*$/.test(pair.cluster||'');
+        });
+        var organizations=_ocqpClusterPairs.map(function(pair){return pair.organization;}).filter(function(org,index,all){return all.indexOf(org)===index;});
+        var orgSelect=document.getElementById('ocqp-org-select');
+        if(!orgSelect) return;
+        orgSelect.innerHTML='';
+        organizations.forEach(function(org){
+          var option=document.createElement('option'); option.value=org; option.textContent=org; orgSelect.appendChild(option);
+        });
+        var fresh=document.createElement('option');
+        fresh.value='__new__'; fresh.textContent='＋ Create a new organization…'; orgSelect.appendChild(fresh);
+        if(preferred && ocqpFindClusterPair(preferred.organization,preferred.cluster)){
+          ocqpChooseOrganization(preferred.organization,preferred.cluster);
+        }else if(organizations.length){
+          ocqpChooseOrganization(organizations[0]);
+        }else{
+          ocqpChooseOrganization('__new__');
         }
       };
-      window.ocqpChooseCluster = function(name){
+      window.ocqpChooseCluster = function(cluster){
         var input=document.getElementById('ocqp-cluster');
         if(!input) return;
-        if(name==='__new__'){
-          input.value=''; input.style.display='block'; input.focus();
+        if(cluster==='__new__'){
+          input.value=''; input.style.display='block'; ocqpShowOrgWarning(false); input.focus();
         }else{
-          input.value=name; input.style.display='none'; ocqpRecordClusterName(name);
+          input.value=cluster; input.style.display='none'; ocqpShowOrgWarning(true);
         }
         if(typeof ocqpUpdate==='function') ocqpUpdate();
       };
       window.ocqpRecordClusterName = function(name){
-        name = (name || '').trim().toLowerCase().replace(/[^a-z0-9-]+/g,'-').replace(/^-+|-+$/g,'');
-        if (!name || name === 'my-cluster') return;
-        var h = ocqpClusterHistory();
-        if (h.indexOf(name) === -1){
-          h.unshift(name);
-          localStorage.setItem(ocqpClusterHistoryKey(), JSON.stringify(h.slice(0, 50)));
-        }
-        ocqpFillClusterHistory(h, name);
+        var input=document.getElementById('ocqp-cluster');
+        name=(name||'').trim().toLowerCase().replace(/[^a-z0-9-]+/g,'-').replace(/^-+|-+$/g,'');
+        if(input) input.value=name;
+        if(typeof ocqpUpdate==='function') ocqpUpdate();
       };
-      // Load the real blueprint directories from the server; no shell interpolation.
+      window.ocqpValidateClusterOrgPair = function(showWarning){
+        var org=((document.getElementById('ocqp-org')||{}).value||'').trim().toLowerCase();
+        var cluster=((document.getElementById('ocqp-cluster')||{}).value||'').trim().toLowerCase();
+        var orgSelect=document.getElementById('ocqp-org-select');
+        var clusterSelect=document.getElementById('ocqp-cluster-select');
+        var existingOrg=orgSelect && orgSelect.value!=='__new__';
+        var existingCluster=clusterSelect && clusterSelect.value!=='__new__';
+        var conflict=existingOrg && orgSelect.value!==org;
+        if(existingCluster) conflict=conflict || !ocqpFindClusterPair(org,cluster);
+        if(!existingCluster) conflict=conflict || (_ocqpClusterPairs||[]).some(function(pair){return pair.cluster===cluster;});
+        if(conflict && showWarning){
+          ocqpShowOrgWarning(true);
+          alert('New Org not allowed for existing clusters');
+        }
+        return !conflict;
+      };
+      // Load all real blueprint ownership pairs from the server.
       window.ocqpSeedClusterHistory = function(){
-        var org=((document.getElementById('ocqp-org')||{}).value||'my-org').trim().toLowerCase();
         var status=document.getElementById('ocqp-cluster-list-status');
-        if(status){status.textContent='Loading configured clusters…';status.style.color='#64748b';}
-        fetch('/api/opencenter/clusters?org='+encodeURIComponent(org)).then(function(r){return r.json().then(function(d){return{ok:r.ok,d:d};});}).then(function(res){
+        if(status){status.textContent='Loading configured cluster pairs…';status.style.color='#64748b';}
+        fetch('/api/opencenter/clusters').then(function(r){return r.json().then(function(d){return{ok:r.ok,d:d};});}).then(function(res){
           if(!res.ok||!res.d.ok) throw new Error(res.d.error||'cluster lookup failed');
-          var names=res.d.clusters||[];
-          localStorage.setItem(ocqpClusterHistoryKey(),JSON.stringify(names));
-          var input=document.getElementById('ocqp-cluster');
-          var current=input?input.value.trim():'';
-          var preferred=(current && current!=='my-cluster')?current:(res.d.active_cluster||names[0]||'my-cluster');
-          ocqpFillClusterHistory(names,preferred);
-          if(status){status.textContent=names.length+' configured cluster'+(names.length===1?'':'s')+' in '+org;status.style.color='#15803d';}
-          if(typeof ocqpUpdate==='function') ocqpUpdate();
+          var pairs=res.d.pairs||[];
+          var org=((document.getElementById('ocqp-org')||{}).value||'').trim().toLowerCase();
+          var cluster=((document.getElementById('ocqp-cluster')||{}).value||'').trim().toLowerCase();
+          var preferred=pairs.filter(function(pair){return pair.organization===org&&pair.cluster===cluster;})[0]||res.d.active_pair||pairs[0]||null;
+          ocqpFillClusterHistory(pairs,preferred);
+          if(status){status.textContent=pairs.length+' configured organization / cluster pair'+(pairs.length===1?'':'s');status.style.color='#15803d';}
         }).catch(function(err){
-          ocqpFillClusterHistory();
+          ocqpFillClusterHistory([],null);
           if(status){status.textContent='Could not load clusters: '+err.message;status.style.color='#dc2626';}
         });
       };
@@ -5551,6 +5636,10 @@ kubectl describe kustomization &lt;name&gt; -n flux-system</div>
         var provider = (s.provider || 'openstack').trim().toLowerCase();
         var st = document.getElementById('ocqp-update-identity-status');
         var out = document.getElementById('ocqp-out-2');
+        if(!ocqpValidateClusterOrgPair(true)){
+          if(st){ st.textContent='\u2717 New Org not allowed for existing clusters'; st.style.color='#dc2626'; }
+          return;
+        }
         if(btn){ btn.disabled=true; btn.textContent='Updating...'; }
         if(st){ st.textContent='Updating cluster config...'; st.style.color='#0369a1'; }
         var cmd = [
@@ -5580,6 +5669,7 @@ kubectl describe kustomization &lt;name&gt; -n flux-system</div>
             if(st){ st.textContent = ok ? '\u2713 Cluster settings updated' : '\u2717 Update failed'; st.style.color = ok ? '#15803d' : '#dc2626'; }
             if(btn){ btn.disabled=false; btn.innerHTML='&#128260; Update Cluster'; }
             if(ok && typeof ocqpUpdate==='function') ocqpUpdate();
+            if(ok && typeof ocqpSeedClusterHistory==='function') ocqpSeedClusterHistory();
           }
         };
         es.onerror = function(){

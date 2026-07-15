@@ -24008,22 +24008,27 @@ def r6_load_creds():
 
 @app.get("/api/opencenter/clusters")
 def list_opencenter_clusters():
-    """List configured blueprint clusters for one validated organization."""
-    organization = str(request.args.get("org") or "my-org").strip().lower()
-    if not re.fullmatch(r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?", organization):
+    """List immutable organization/cluster pairs from configured blueprints.
+
+    Supplying ``org`` keeps the original filtered response for API consumers,
+    while ``pairs`` always exposes the authoritative ownership relationship.
+    """
+    requested_org = str(request.args.get("org") or "").strip().lower()
+    name_pattern = r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?"
+    if requested_org and not re.fullmatch(name_pattern, requested_org):
         return jsonify({"ok": False, "error": "Invalid organization name"}), 400
 
-    blueprint_root = (
-        Path.home() / ".config" / "opencenter" / "clusters" / "blueprints" / organization
-    )
-    clusters: List[str] = []
+    blueprint_root = Path.home() / ".config" / "opencenter" / "clusters" / "blueprints"
+    pairs = []
     if blueprint_root.is_dir():
-        clusters = sorted(
-            entry.name
-            for entry in blueprint_root.iterdir()
-            if entry.is_dir()
-            and re.fullmatch(r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?", entry.name)
-        )
+        for org_entry in sorted(blueprint_root.iterdir(), key=lambda entry: entry.name):
+            if not org_entry.is_dir() or not re.fullmatch(name_pattern, org_entry.name):
+                continue
+            for cluster_entry in sorted(org_entry.iterdir(), key=lambda entry: entry.name):
+                if cluster_entry.is_dir() and re.fullmatch(name_pattern, cluster_entry.name):
+                    pairs.append(
+                        {"organization": org_entry.name, "cluster": cluster_entry.name}
+                    )
 
     active_org = ""
     active_cluster = ""
@@ -24035,12 +24040,26 @@ def list_opencenter_clusters():
     except (OSError, IndexError):
         pass
 
+    response_org = requested_org or active_org or "my-org"
+    clusters = [
+        pair["cluster"] for pair in pairs if pair["organization"] == response_org
+    ]
+    active_pair = (
+        {"organization": active_org, "cluster": active_cluster}
+        if any(
+            pair["organization"] == active_org and pair["cluster"] == active_cluster
+            for pair in pairs
+        )
+        else None
+    )
     return jsonify(
         {
             "ok": True,
-            "organization": organization,
+            "organization": response_org,
             "clusters": clusters,
-            "active_cluster": active_cluster if active_org == organization else "",
+            "pairs": pairs,
+            "active_cluster": active_cluster if active_org == response_org else "",
+            "active_pair": active_pair,
         }
     )
 
