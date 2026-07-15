@@ -1003,8 +1003,6 @@
         if(!guard || guard.value!=='yes'){
           alert('Guardrail stopped the action. Select Yes before decommissioning this cluster.'); return;
         }
-        var typed=prompt('This destroys the cloud infrastructure for '+target+'. Local configuration files will be preserved.\n\nType '+target+' to confirm:','');
-        if(typed!==target){ if(typed!==null) alert('Cluster name did not match. Decommission cancelled.'); return; }
         guard.value='no';
         var cmd=document.getElementById('ocqs-cmd-10');
         if(cmd) cmd.textContent='opencenter cluster destroy '+target+' --force --break-lock';
@@ -1531,11 +1529,11 @@ git push -u origin main</div>
           <div class="ocqs-checklist-item"><input type="checkbox" id="chk-10" onchange="ocqsChecklistUpdate()"><label for="chk-10"><code>opencenter cluster validate</code> passes with no blockers</label><span class="chk-st" id="chk-10-st">not installed</span></div>
           <div class="ocqs-checklist-item"><input type="checkbox" id="chk-11" onchange="ocqsChecklistUpdate()"><label for="chk-11">No critical CHANGEME placeholders in GitOps manifests</label><span class="chk-st" id="chk-11-st">not installed</span></div>
           <div class="ocqs-checklist-item"><input type="checkbox" id="chk-12" onchange="ocqsChecklistUpdate()"><label for="chk-12">GitOps repo committed and pushed</label><span class="chk-st" id="chk-12-st">not installed</span></div>
-          <div class="ocqs-checklist-item"><input type="checkbox" id="chk-14" onchange="ocqsChecklistUpdate()"><label for="chk-14">Target FLEX region has the resources OpenCenter needs (&ge;3 floating IPs free, &ge;22 vCPU, &ge;60 GB RAM, flavors/images available)</label><span class="chk-st" id="chk-14-st" style="cursor:pointer;" onclick="var c=document.getElementById('chk-14');c.checked=!c.checked;ocqsChecklistUpdate();">click to confirm</span></div>
+          <div class="ocqs-checklist-item"><input type="checkbox" id="chk-14" onchange="ocqsChecklistUpdate()"><label for="chk-14">Target FLEX region has the resources OpenCenter needs (&ge;3 floating IPs, up to 4 security groups, &ge;22 vCPU, &ge;60 GB RAM, flavors/images available)</label><span class="chk-st" id="chk-14-st" style="cursor:pointer;" onclick="var c=document.getElementById('chk-14');c.checked=!c.checked;ocqsChecklistUpdate();">click to confirm</span></div>
           <div class="ocqs-checklist-item"><input type="checkbox" id="chk-13" onchange="ocqsChecklistUpdate()"><label for="chk-13">I understand deployment will create cloud resources that may incur costs</label><span class="chk-st" id="chk-13-st" style="cursor:pointer;" onclick="var c=document.getElementById('chk-13');c.checked=!c.checked;ocqsChecklistUpdate();">click to acknowledge</span></div>
           <div style="margin-top:14px;text-align:center;">
             <div style="text-align:center;margin:6px 0;"><button onclick="ocqsVerifyReadiness(this)" style="background:#0369a1;color:#fff;border:none;border-radius:6px;padding:7px 16px;font-size:11.5px;font-weight:800;cursor:pointer;">&#8635; Verify readiness</button> <span style="font-size:10.5px;color:#64748b;">checks validate / CHANGEME / git push server-side</span></div>
-            <div style="text-align:center;margin:6px 0;"><button onclick="ocqsQuotaCheck(this)" style="background:#15803d;color:#fff;border:none;border-radius:6px;padding:7px 16px;font-size:11.5px;font-weight:800;cursor:pointer;">&#128269; Check FLEX region quotas</button> <button id="ocqs-freefip-btn" onclick="ocqsFreeFips(this)" style="display:none;background:#b45309;color:#fff;border:none;border-radius:6px;padding:7px 16px;font-size:11.5px;font-weight:800;cursor:pointer;margin-left:6px;">&#129529; Free orphaned floating IPs</button></div>
+            <div style="text-align:center;margin:6px 0;"><button onclick="ocqsQuotaCheck(this)" style="background:#15803d;color:#fff;border:none;border-radius:6px;padding:7px 16px;font-size:11.5px;font-weight:800;cursor:pointer;">&#128269; Check FLEX region quotas</button> <button id="ocqs-freefip-btn" onclick="ocqsFreeFips(this)" style="display:none;background:#b45309;color:#fff;border:none;border-radius:6px;padding:7px 16px;font-size:11.5px;font-weight:800;cursor:pointer;margin-left:6px;">&#129529; Free orphaned floating IPs</button> <select id="ocqs-sg-delete-select" onchange="document.getElementById('ocqs-forcesg-btn').disabled=!this.value" style="display:none;margin-left:6px;padding:7px 9px;border:1px solid #dc2626;border-radius:6px;font-size:11px;"><option value="">Select security group…</option></select> <button id="ocqs-forcesg-btn" disabled onclick="ocqsForceDeleteSg(this)" style="display:none;background:#b91c1c;color:#fff;border:none;border-radius:6px;padding:7px 16px;font-size:11.5px;font-weight:800;cursor:pointer;margin-left:4px;">&#9888; Force delete selected SG</button></div>
             <div id="ocqs-quota-result" style="display:none;margin:8px auto;max-width:640px;"></div>
             <div id="ocqs-checklist-status" style="font-size:13px;color:#f87171;margin-bottom:10px;">0 / 13 items checked — deploy blocked</div>
             <button class="ocqs-btn ocqs-btn-danger" id="ocqs-deploy-btn2" disabled onclick="ocqsDeploy()" style="padding:10px 28px;font-size:14px;opacity:.5;cursor:not-allowed;">🚀 Deploy Cluster (Blocked)</button>
@@ -1552,10 +1550,10 @@ git push -u origin main</div>
           <div class="ocqs-warn-box" style="margin-bottom:10px;">⚠️ <strong>NEVER run deploy until validation passes and no critical CHANGEME values remain.</strong></div>
           <p>Provisions infrastructure, deploys Kubernetes, bootstraps GitOps/Flux, and applies platform services.</p>
           <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px;font-size:12px;line-height:1.9;margin-bottom:10px;">
-            <div><strong style="color:#0369a1;">Phase 1</strong> — Infrastructure (5-10 min): VMs, networks, load balancers, storage</div>
-            <div><strong style="color:#0369a1;">Phase 2</strong> — Kubernetes (10-15 min): ContainerD, control plane, worker nodes, Calico CNI</div>
-            <div><strong style="color:#0369a1;">Phase 3</strong> — GitOps (2-5 min): FluxCD controllers, GitRepository sources, Kustomizations</div>
-            <div><strong style="color:#0369a1;">Phase 4</strong> — Services (10-20 min): cert-manager, Keycloak, Prometheus, ingress, TLS</div>
+            <div><strong style="color:#0369a1;">Phase 1</strong> <span style="background:#dbeafe;color:#1d4ed8;border-radius:10px;padding:2px 7px;font-size:10px;font-weight:800;">OpenTofu + OpenStack Provider</span> — Infrastructure (5-10 min): VMs, networks, load balancers, storage</div>
+            <div><strong style="color:#0369a1;">Phase 2</strong> <span style="background:#fef3c7;color:#92400e;border-radius:10px;padding:2px 7px;font-size:10px;font-weight:800;">Kubespray + Ansible</span> — Kubernetes (10-15 min): ContainerD, control plane, worker nodes, Calico CNI</div>
+            <div><strong style="color:#0369a1;">Phase 3</strong> <span style="background:#ede9fe;color:#6d28d9;border-radius:10px;padding:2px 7px;font-size:10px;font-weight:800;">Flux CLI + Git</span> — GitOps (2-5 min): FluxCD controllers, GitRepository sources, Kustomizations</div>
+            <div><strong style="color:#0369a1;">Phase 4</strong> <span style="background:#dcfce7;color:#166534;border-radius:10px;padding:2px 7px;font-size:10px;font-weight:800;">FluxCD + Helm/Kustomize</span> — Services (10-20 min): cert-manager, Keycloak, Prometheus, ingress, TLS</div>
             <div style="margin-top:6px;color:#64748b;"><strong>Total: 30–50 minutes</strong> depending on provider and service count</div>
           </div>
           <div class="ocqs-cmd" id="ocqs-cmd-9">opencenter cluster validate my-cluster
@@ -1618,15 +1616,15 @@ tail -f /home/dzoan/.local/state/opencenter/logs/bootstrap/my-org/my-cluster/*.l
               <label style="min-width:300px;max-width:520px;flex:1;text-align:left;font-size:10px;font-weight:900;color:#334155;text-transform:uppercase;letter-spacing:.7px;">Existing cluster
                 <select id="ocqs-decommission-cluster" style="display:block;width:100%;margin-top:5px;padding:10px 12px;border:1px solid #94a3b8;border-radius:5px;background:#fff;color:#111827;font-size:12px;"><option value="">Loading existing clusters…</option></select>
               </label>
-              <label style="min-width:230px;text-align:left;font-size:10px;font-weight:900;color:#991b1b;text-transform:uppercase;letter-spacing:.7px;">Guardrail confirmation
-                <select id="ocqs-decommission-confirm" style="display:block;width:100%;margin-top:5px;padding:10px 12px;border:2px solid #dc2626;border-radius:5px;background:#fff;color:#111827;font-size:12px;font-weight:800;"><option value="no">No — keep the cluster</option><option value="yes">Yes — decommission it</option></select>
+              <label style="min-width:230px;text-align:left;font-size:10px;font-weight:900;color:#991b1b;text-transform:uppercase;letter-spacing:.7px;">Are you sure?
+                <select id="ocqs-decommission-confirm" style="display:block;width:100%;margin-top:5px;padding:10px 12px;border:2px solid #dc2626;border-radius:5px;background:#fff;color:#111827;font-size:12px;font-weight:800;"><option value="no">No</option><option value="yes">Yes</option></select>
               </label>
               <button id="ocqs-decommission-button" onclick="ocqsDecommissionCluster()" style="min-height:39px;background:#111827;color:#ffef00;border:3px solid #ffef00;outline:2px solid #111827;border-radius:5px;padding:8px 20px;font-size:12px;font-weight:900;cursor:pointer;text-transform:uppercase;letter-spacing:.4px;">&#9211; Decommission Cluster</button>
             </div>
             <div class="ocqs-cmd" id="ocqs-cmd-10" style="margin-top:14px;text-align:left;">Select a cluster to prepare the destroy command.</div>
             <button onclick="ocqsCopyOut('ocqs-out-10',this)" style="margin-top:7px;background:#334155;color:#fff;border:0;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;">&#128203; Copy Output</button>
             <div id="ocqs-out-10" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#94a3b8;white-space:pre-wrap;word-break:break-all;max-height:240px;overflow-y:auto;margin-top:7px;text-align:left;">$ waiting...</div>
-            <div style="margin-top:10px;color:#991b1b;font-size:11px;font-weight:800;">This stage is intentionally excluded from AutoRun and requires exact-name confirmation.</div>
+            <div style="margin-top:10px;color:#991b1b;font-size:11px;font-weight:800;">This destructive stage is intentionally excluded from AutoRun and requires Yes confirmation.</div>
           </div>
         </div>
       </div>
@@ -2298,6 +2296,20 @@ kubectl describe kustomization &lt;name&gt; -n flux-system</div>
             box.innerHTML = h;
             var fb = document.getElementById('ocqs-freefip-btn');
             if (fb) fb.style.display = (d.orphaned_fips > 0) ? 'inline-block' : 'none';
+            var sgSelect = document.getElementById('ocqs-sg-delete-select');
+            var sgButton = document.getElementById('ocqs-forcesg-btn');
+            if (sgSelect && sgButton){
+              sgSelect.innerHTML = '<option value="">Select security group…</option>';
+              (d.security_groups || []).forEach(function(sg){
+                var option = document.createElement('option');
+                option.value = sg.id; option.dataset.name = sg.name;
+                option.textContent = sg.name + ' (' + sg.attached_ports + ' attached port' + (sg.attached_ports === 1 ? '' : 's') + ')';
+                sgSelect.appendChild(option);
+              });
+              sgSelect.style.display = (d.security_groups || []).length ? 'inline-block' : 'none';
+              sgButton.style.display = (d.security_groups || []).length ? 'inline-block' : 'none';
+              sgButton.disabled = true;
+            }
             var cb = document.getElementById('chk-14');
             if (cb){ cb.checked = !!d.ok; if (typeof ocqsChecklistUpdate === 'function') ocqsChecklistUpdate(); }
           }).catch(function(e){ if (btn){ btn.disabled = false; btn.innerHTML = '&#128269; Check FLEX region quotas'; }
@@ -2313,6 +2325,27 @@ kubectl describe kustomization &lt;name&gt; -n flux-system</div>
             if (btn){ btn.disabled = false; btn.innerHTML = '&#129529; Free orphaned floating IPs'; }
             if (d.ok) ocqsQuotaCheck(null); // re-check with freed quota
           }).catch(function(){ if (btn){ btn.disabled = false; btn.innerHTML = '&#129529; Free orphaned floating IPs'; } });
+      };
+      window.ocqsForceDeleteSg = function(btn){
+        var st = ocqsGetState();
+        var select = document.getElementById('ocqs-sg-delete-select');
+        var option = select && select.options[select.selectedIndex];
+        var sgId = (select && select.value) || '';
+        var sgName = (option && option.dataset.name) || '';
+        if (!sgId || !sgName){ alert('Select a security group first.'); return; }
+        if (sgName.toLowerCase() === 'default'){ alert('The default security group is protected.'); return; }
+        var typed = prompt('FORCE DELETE SECURITY GROUP\n\nThis will detach '+sgName+' from every attached port, then permanently delete it.\n\nType '+sgName+' to confirm:','');
+        if (typed !== sgName){ if (typed !== null) alert('Name did not match. Delete cancelled.'); return; }
+        if (btn){ btn.disabled = true; btn.textContent = '\u23f3 deleting SG...'; }
+        fetch('/api/openstack/force-delete-security-group', {method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({org: st.org, cluster: st.cluster, security_group_id: sgId})})
+          .then(function(r){ return r.json().then(function(d){ return {ok:r.ok,d:d}; }); })
+          .then(function(res){
+            if (!res.ok || !res.d.ok) throw new Error(res.d.error || 'security group deletion failed');
+            alert('Deleted '+res.d.deleted+' after detaching it from '+res.d.detached_ports+' port(s).');
+            ocqsQuotaCheck(null);
+          }).catch(function(e){ alert('Force delete failed: '+e.message); })
+          .finally(function(){ if (btn){ btn.disabled = false; btn.innerHTML = '&#9888; Force delete selected SG'; } });
       };
       window.ocqsVerifyReadiness = function(btn){
         var s = ocqsGetState();
@@ -4104,8 +4137,6 @@ var c9b=g('ocqs-cmd-9b');
         if(!guard || guard.value!=='yes'){
           alert('Guardrail stopped the action. Select Yes before decommissioning this cluster.'); return;
         }
-        var typed=prompt('This destroys the cloud infrastructure for '+target+'. Local configuration files will be preserved.\n\nType '+target+' to confirm:','');
-        if(typed!==target){ if(typed!==null) alert('Cluster name did not match. Decommission cancelled.'); return; }
         guard.value='no';
         var cmd=document.getElementById('ocqp-cmd-10');
         if(cmd) cmd.textContent='opencenter cluster destroy '+target+' --force --break-lock';
@@ -4632,11 +4663,11 @@ git push -u origin main</div>
           <div class="ocqs-checklist-item"><input type="checkbox" id="chk-10" onchange="ocqpChecklistUpdate()"><label for="chk-10"><code>opencenter cluster validate</code> passes with no blockers</label><span class="chk-st" id="chk-10-st">not installed</span></div>
           <div class="ocqs-checklist-item"><input type="checkbox" id="chk-11" onchange="ocqpChecklistUpdate()"><label for="chk-11">No critical CHANGEME placeholders in GitOps manifests</label><span class="chk-st" id="chk-11-st">not installed</span></div>
           <div class="ocqs-checklist-item"><input type="checkbox" id="chk-12" onchange="ocqpChecklistUpdate()"><label for="chk-12">GitOps repo committed and pushed</label><span class="chk-st" id="chk-12-st">not installed</span></div>
-          <div class="ocqs-checklist-item"><input type="checkbox" id="chk-14" onchange="ocqpChecklistUpdate()"><label for="chk-14">Target FLEX region has the resources OpenCenter needs (&ge;3 floating IPs free, &ge;22 vCPU, &ge;60 GB RAM, flavors/images available)</label><span class="chk-st" id="chk-14-st" style="cursor:pointer;" onclick="var c=document.getElementById('chk-14');c.checked=!c.checked;ocqpChecklistUpdate();">click to confirm</span></div>
+          <div class="ocqs-checklist-item"><input type="checkbox" id="chk-14" onchange="ocqpChecklistUpdate()"><label for="chk-14">Target FLEX region has the resources OpenCenter needs (&ge;3 floating IPs, up to 4 security groups, &ge;22 vCPU, &ge;60 GB RAM, flavors/images available)</label><span class="chk-st" id="chk-14-st" style="cursor:pointer;" onclick="var c=document.getElementById('chk-14');c.checked=!c.checked;ocqpChecklistUpdate();">click to confirm</span></div>
           <div class="ocqs-checklist-item"><input type="checkbox" id="chk-13" onchange="ocqpChecklistUpdate()"><label for="chk-13">I understand deployment will create cloud resources that may incur costs</label><span class="chk-st" id="chk-13-st" style="cursor:pointer;" onclick="var c=document.getElementById('chk-13');c.checked=!c.checked;ocqpChecklistUpdate();">click to acknowledge</span></div>
           <div style="margin-top:14px;text-align:center;">
             <div style="text-align:center;margin:6px 0;"><button onclick="ocqpVerifyReadiness(this)" style="background:#0369a1;color:#fff;border:none;border-radius:6px;padding:7px 16px;font-size:11.5px;font-weight:800;cursor:pointer;">&#8635; Verify readiness</button> <span style="font-size:10.5px;color:#64748b;">checks validate / CHANGEME / git push server-side</span></div>
-            <div style="text-align:center;margin:6px 0;"><button onclick="ocqpQuotaCheck(this)" style="background:#15803d;color:#fff;border:none;border-radius:6px;padding:7px 16px;font-size:11.5px;font-weight:800;cursor:pointer;">&#128269; Check FLEX region quotas</button> <button id="ocqp-freefip-btn" onclick="ocqpFreeFips(this)" style="display:none;background:#b45309;color:#fff;border:none;border-radius:6px;padding:7px 16px;font-size:11.5px;font-weight:800;cursor:pointer;margin-left:6px;">&#129529; Free orphaned floating IPs</button></div>
+            <div style="text-align:center;margin:6px 0;"><button onclick="ocqpQuotaCheck(this)" style="background:#15803d;color:#fff;border:none;border-radius:6px;padding:7px 16px;font-size:11.5px;font-weight:800;cursor:pointer;">&#128269; Check FLEX region quotas</button> <button id="ocqp-freefip-btn" onclick="ocqpFreeFips(this)" style="display:none;background:#b45309;color:#fff;border:none;border-radius:6px;padding:7px 16px;font-size:11.5px;font-weight:800;cursor:pointer;margin-left:6px;">&#129529; Free orphaned floating IPs</button> <select id="ocqp-sg-delete-select" onchange="document.getElementById('ocqp-forcesg-btn').disabled=!this.value" style="display:none;margin-left:6px;padding:7px 9px;border:1px solid #dc2626;border-radius:6px;font-size:11px;"><option value="">Select security group…</option></select> <button id="ocqp-forcesg-btn" disabled onclick="ocqpForceDeleteSg(this)" style="display:none;background:#b91c1c;color:#fff;border:none;border-radius:6px;padding:7px 16px;font-size:11.5px;font-weight:800;cursor:pointer;margin-left:4px;">&#9888; Force delete selected SG</button></div>
             <div id="ocqp-quota-result" style="display:none;margin:8px auto;max-width:640px;"></div>
             <div id="ocqp-checklist-status" style="font-size:13px;color:#f87171;margin-bottom:10px;">0 / 13 items checked — deploy blocked</div>
             <button class="ocqs-btn ocqs-btn-danger" id="ocqp-deploy-btn2" disabled onclick="ocqpDeploy()" style="padding:10px 28px;font-size:14px;opacity:.5;cursor:not-allowed;">🚀 Deploy Cluster (Blocked)</button>
@@ -4653,10 +4684,10 @@ git push -u origin main</div>
           <div class="ocqs-warn-box" style="margin-bottom:10px;">⚠️ <strong>NEVER run deploy until validation passes and no critical CHANGEME values remain.</strong></div>
           <p>Provisions infrastructure, deploys Kubernetes, bootstraps GitOps/Flux, and applies platform services.</p>
           <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px;font-size:12px;line-height:1.9;margin-bottom:10px;">
-            <div><strong style="color:#0369a1;">Phase 1</strong> — Infrastructure (5-10 min): VMs, networks, load balancers, storage</div>
-            <div><strong style="color:#0369a1;">Phase 2</strong> — Kubernetes (10-15 min): ContainerD, control plane, worker nodes, Calico CNI</div>
-            <div><strong style="color:#0369a1;">Phase 3</strong> — GitOps (2-5 min): FluxCD controllers, GitRepository sources, Kustomizations</div>
-            <div><strong style="color:#0369a1;">Phase 4</strong> — Services (10-20 min): cert-manager, Keycloak, Prometheus, ingress, TLS</div>
+            <div><strong style="color:#0369a1;">Phase 1</strong> <span style="background:#dbeafe;color:#1d4ed8;border-radius:10px;padding:2px 7px;font-size:10px;font-weight:800;">OpenTofu + OpenStack Provider</span> — Infrastructure (5-10 min): VMs, networks, load balancers, storage</div>
+            <div><strong style="color:#0369a1;">Phase 2</strong> <span style="background:#fef3c7;color:#92400e;border-radius:10px;padding:2px 7px;font-size:10px;font-weight:800;">Kubespray + Ansible</span> — Kubernetes (10-15 min): ContainerD, control plane, worker nodes, Calico CNI</div>
+            <div><strong style="color:#0369a1;">Phase 3</strong> <span style="background:#ede9fe;color:#6d28d9;border-radius:10px;padding:2px 7px;font-size:10px;font-weight:800;">Flux CLI + Git</span> — GitOps (2-5 min): FluxCD controllers, GitRepository sources, Kustomizations</div>
+            <div><strong style="color:#0369a1;">Phase 4</strong> <span style="background:#dcfce7;color:#166534;border-radius:10px;padding:2px 7px;font-size:10px;font-weight:800;">FluxCD + Helm/Kustomize</span> — Services (10-20 min): cert-manager, Keycloak, Prometheus, ingress, TLS</div>
             <div style="margin-top:6px;color:#64748b;"><strong>Total: 30–50 minutes</strong> depending on provider and service count</div>
           </div>
           <div class="ocqs-cmd" id="ocqp-cmd-9">opencenter cluster validate my-cluster
@@ -4719,15 +4750,15 @@ tail -f /home/dzoan/.local/state/opencenter/logs/bootstrap/my-org/my-cluster/*.l
               <label style="min-width:300px;max-width:520px;flex:1;text-align:left;font-size:10px;font-weight:900;color:#334155;text-transform:uppercase;letter-spacing:.7px;">Existing cluster
                 <select id="ocqp-decommission-cluster" style="display:block;width:100%;margin-top:5px;padding:10px 12px;border:1px solid #94a3b8;border-radius:5px;background:#fff;color:#111827;font-size:12px;"><option value="">Loading existing clusters…</option></select>
               </label>
-              <label style="min-width:230px;text-align:left;font-size:10px;font-weight:900;color:#991b1b;text-transform:uppercase;letter-spacing:.7px;">Guardrail confirmation
-                <select id="ocqp-decommission-confirm" style="display:block;width:100%;margin-top:5px;padding:10px 12px;border:2px solid #dc2626;border-radius:5px;background:#fff;color:#111827;font-size:12px;font-weight:800;"><option value="no">No — keep the cluster</option><option value="yes">Yes — decommission it</option></select>
+              <label style="min-width:230px;text-align:left;font-size:10px;font-weight:900;color:#991b1b;text-transform:uppercase;letter-spacing:.7px;">Are you sure?
+                <select id="ocqp-decommission-confirm" style="display:block;width:100%;margin-top:5px;padding:10px 12px;border:2px solid #dc2626;border-radius:5px;background:#fff;color:#111827;font-size:12px;font-weight:800;"><option value="no">No</option><option value="yes">Yes</option></select>
               </label>
               <button id="ocqp-decommission-button" onclick="ocqpDecommissionCluster()" style="min-height:39px;background:#111827;color:#ffef00;border:3px solid #ffef00;outline:2px solid #111827;border-radius:5px;padding:8px 20px;font-size:12px;font-weight:900;cursor:pointer;text-transform:uppercase;letter-spacing:.4px;">&#9211; Decommission Cluster</button>
             </div>
             <div class="ocqs-cmd" id="ocqp-cmd-10" style="margin-top:14px;text-align:left;">Select a cluster to prepare the destroy command.</div>
             <button onclick="ocqpCopyOut('ocqp-out-10',this)" style="margin-top:7px;background:#334155;color:#fff;border:0;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;">&#128203; Copy Output</button>
             <div id="ocqp-out-10" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#94a3b8;white-space:pre-wrap;word-break:break-all;max-height:240px;overflow-y:auto;margin-top:7px;text-align:left;">$ waiting...</div>
-            <div style="margin-top:10px;color:#991b1b;font-size:11px;font-weight:800;">This stage is intentionally excluded from AutoRun and requires exact-name confirmation.</div>
+            <div style="margin-top:10px;color:#991b1b;font-size:11px;font-weight:800;">This destructive stage is intentionally excluded from AutoRun and requires Yes confirmation.</div>
           </div>
         </div>
       </div>
@@ -5356,6 +5387,20 @@ kubectl describe kustomization &lt;name&gt; -n flux-system</div>
             box.innerHTML = h;
             var fb = document.getElementById('ocqp-freefip-btn');
             if (fb) fb.style.display = (d.orphaned_fips > 0) ? 'inline-block' : 'none';
+            var sgSelect = document.getElementById('ocqp-sg-delete-select');
+            var sgButton = document.getElementById('ocqp-forcesg-btn');
+            if (sgSelect && sgButton){
+              sgSelect.innerHTML = '<option value="">Select security group…</option>';
+              (d.security_groups || []).forEach(function(sg){
+                var option = document.createElement('option');
+                option.value = sg.id; option.dataset.name = sg.name;
+                option.textContent = sg.name + ' (' + sg.attached_ports + ' attached port' + (sg.attached_ports === 1 ? '' : 's') + ')';
+                sgSelect.appendChild(option);
+              });
+              sgSelect.style.display = (d.security_groups || []).length ? 'inline-block' : 'none';
+              sgButton.style.display = (d.security_groups || []).length ? 'inline-block' : 'none';
+              sgButton.disabled = true;
+            }
             var cb = document.getElementById('chk-14');
             if (cb){ cb.checked = !!d.ok; if (typeof ocqpChecklistUpdate === 'function') ocqpChecklistUpdate(); }
           }).catch(function(e){ if (btn){ btn.disabled = false; btn.innerHTML = '&#128269; Check FLEX region quotas'; }
@@ -5371,6 +5416,27 @@ kubectl describe kustomization &lt;name&gt; -n flux-system</div>
             if (btn){ btn.disabled = false; btn.innerHTML = '&#129529; Free orphaned floating IPs'; }
             if (d.ok) ocqpQuotaCheck(null); // re-check with freed quota
           }).catch(function(){ if (btn){ btn.disabled = false; btn.innerHTML = '&#129529; Free orphaned floating IPs'; } });
+      };
+      window.ocqpForceDeleteSg = function(btn){
+        var st = ocqpGetState();
+        var select = document.getElementById('ocqp-sg-delete-select');
+        var option = select && select.options[select.selectedIndex];
+        var sgId = (select && select.value) || '';
+        var sgName = (option && option.dataset.name) || '';
+        if (!sgId || !sgName){ alert('Select a security group first.'); return; }
+        if (sgName.toLowerCase() === 'default'){ alert('The default security group is protected.'); return; }
+        var typed = prompt('FORCE DELETE SECURITY GROUP\n\nThis will detach '+sgName+' from every attached port, then permanently delete it.\n\nType '+sgName+' to confirm:','');
+        if (typed !== sgName){ if (typed !== null) alert('Name did not match. Delete cancelled.'); return; }
+        if (btn){ btn.disabled = true; btn.textContent = '\u23f3 deleting SG...'; }
+        fetch('/api/openstack/force-delete-security-group', {method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({org: st.org, cluster: st.cluster, security_group_id: sgId})})
+          .then(function(r){ return r.json().then(function(d){ return {ok:r.ok,d:d}; }); })
+          .then(function(res){
+            if (!res.ok || !res.d.ok) throw new Error(res.d.error || 'security group deletion failed');
+            alert('Deleted '+res.d.deleted+' after detaching it from '+res.d.detached_ports+' port(s).');
+            ocqpQuotaCheck(null);
+          }).catch(function(e){ alert('Force delete failed: '+e.message); })
+          .finally(function(){ if (btn){ btn.disabled = false; btn.innerHTML = '&#9888; Force delete selected SG'; } });
       };
       window.ocqpVerifyReadiness = function(btn){
         var s = ocqpGetState();

@@ -20799,15 +20799,34 @@ def openstack_quota_check():
         inst_free = lim.get("maxTotalInstances", 0) - lim.get("totalInstancesUsed", 0)
 
         fips = _rq.get(eps["network"] + "/v2.0/floatingips", headers=hh, timeout=20).json()["floatingips"]
+        security_groups = _rq.get(eps["network"] + "/v2.0/security-groups",
+                                  headers=hh, timeout=20).json().get("security_groups", [])
+        ports = _rq.get(eps["network"] + "/v2.0/ports",
+                        headers=hh, timeout=20).json().get("ports", [])
         q = _rq.get(eps["network"] + "/v2.0/quotas/" + (osc.get("project_id") or ""),
                     headers=hh, timeout=20).json()
         fip_quota = q.get("quota", {}).get("floatingip", 0)
         fip_free = fip_quota - len(fips)
         orphans = sum(1 for f in fips if f.get("port_id") is None and f.get("status") == "DOWN")
 
+        # OpenCenter creates four role-scoped groups. Count only groups still missing for
+        # this cluster so a resumed deployment reports its true additional quota need.
+        required_sg_names = {f"{cluster}-{role}" for role in
+                             ("bastion", "controlplane", "master", "worker")}
+        existing_sg_names = {sg.get("name") for sg in security_groups}
+        need_sg = len(required_sg_names - existing_sg_names)
+        sg_quota = q.get("quota", {}).get("security_group", 0)
+        sg_unlimited = sg_quota == -1
+        sg_free = "unlimited" if sg_unlimited else sg_quota - len(security_groups)
+        sg_ok = sg_unlimited or sg_free >= need_sg
+        sg_note = (f"{len(security_groups)}/unlimited used" if sg_unlimited else
+                   f"{len(security_groups)}/{sg_quota} used")
+
         rows = [
             {"resource": "Floating IPs", "free": fip_free, "need": need_fip,
              "ok": fip_free >= need_fip, "note": f"{orphans} orphaned (reclaimable)" if orphans else ""},
+            {"resource": "Security Groups", "free": sg_free, "need": need_sg,
+             "ok": sg_ok, "note": sg_note},
             {"resource": "vCPU cores", "free": cores_free, "need": need_cores, "ok": cores_free >= need_cores,
              "note": f"{lim.get('totalCoresUsed')}/{lim.get('maxTotalCores')} used"},
             {"resource": "RAM (GB)", "free": ram_free_gb, "need": need_ram_gb, "ok": ram_free_gb >= need_ram_gb,
@@ -20815,8 +20834,74 @@ def openstack_quota_check():
             {"resource": "Instances", "free": inst_free, "need": need_inst, "ok": inst_free >= need_inst,
              "note": f"{lim.get('totalInstancesUsed')}/{lim.get('maxTotalInstances')} used"},
         ]
+        deletable_security_groups = []
+        for sg in security_groups:
+            if sg.get("name", "").strip().lower() == "default":
+                continue
+            sg_id = sg.get("id")
+            deletable_security_groups.append({
+                "id": sg_id,
+                "name": sg.get("name") or sg_id,
+                "attached_ports": sum(sg_id in (port.get("security_groups") or []) for port in ports),
+            })
+        deletable_security_groups.sort(key=lambda item: item["name"].lower())
         return jsonify({"ok": all(r["ok"] for r in rows), "rows": rows, "orphaned_fips": orphans,
+                        "security_groups": deletable_security_groups,
                         "region": (osc.get("region") or "").upper()})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@app.post("/api/openstack/force-delete-security-group")
+def openstack_force_delete_security_group():
+    """Detach one explicitly selected non-default security group from all ports, then delete it."""
+    import re as _re
+    import requests as _rq
+    body = request.get_json(force=True, silent=True) or {}
+    org = (body.get("org") or "").strip()
+    cluster = (body.get("cluster") or "").strip()
+    sg_id = (body.get("security_group_id") or "").strip().lower()
+    if not _re.fullmatch(r"[a-z0-9][a-z0-9-]*", org) or not _re.fullmatch(r"[a-z0-9][a-z0-9-]*", cluster):
+        return jsonify({"ok": False, "error": "invalid org/cluster"}), 400
+    if not _re.fullmatch(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", sg_id):
+        return jsonify({"ok": False, "error": "invalid security group ID"}), 400
+    try:
+        tok, eps, _osc = _flex_project_session(org, cluster)
+        hh = {"X-Auth-Token": tok}
+        network = eps["network"] + "/v2.0"
+        sg_response = _rq.get(f"{network}/security-groups/{sg_id}", headers=hh, timeout=20)
+        if sg_response.status_code == 404:
+            return jsonify({"ok": False, "error": "security group no longer exists"}), 404
+        sg_response.raise_for_status()
+        sg = sg_response.json().get("security_group") or {}
+        sg_name = (sg.get("name") or "").strip()
+        if sg_name.lower() == "default":
+            return jsonify({"ok": False, "error": "the default security group is protected and cannot be deleted"}), 400
+
+        ports_response = _rq.get(f"{network}/ports", headers=hh, timeout=20)
+        ports_response.raise_for_status()
+        attached_ports = [port for port in ports_response.json().get("ports", [])
+                          if sg_id in (port.get("security_groups") or [])]
+        detached = 0
+        for port in attached_ports:
+            remaining = [group_id for group_id in (port.get("security_groups") or []) if group_id != sg_id]
+            update = _rq.put(f"{network}/ports/{port['id']}", headers=hh,
+                             json={"port": {"security_groups": remaining}}, timeout=20)
+            update.raise_for_status()
+            detached += 1
+
+        deleted = _rq.delete(f"{network}/security-groups/{sg_id}", headers=hh, timeout=20)
+        deleted.raise_for_status()
+        return jsonify({"ok": True, "deleted": sg_name or sg_id, "detached_ports": detached})
+    except _rq.HTTPError as e:
+        response = e.response
+        detail = ""
+        if response is not None:
+            try:
+                detail = response.json().get("NeutronError", {}).get("message", "")
+            except Exception:
+                detail = ""
+        return jsonify({"ok": False, "error": detail or str(e)}), 409
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500
 
