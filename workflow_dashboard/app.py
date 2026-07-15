@@ -24006,6 +24006,45 @@ def r6_load_creds():
         return jsonify({"ok": False, "error": str(exc)}), 500
 
 
+@app.get("/api/opencenter/clusters")
+def list_opencenter_clusters():
+    """List configured blueprint clusters for one validated organization."""
+    organization = str(request.args.get("org") or "my-org").strip().lower()
+    if not re.fullmatch(r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?", organization):
+        return jsonify({"ok": False, "error": "Invalid organization name"}), 400
+
+    blueprint_root = (
+        Path.home() / ".config" / "opencenter" / "clusters" / "blueprints" / organization
+    )
+    clusters: List[str] = []
+    if blueprint_root.is_dir():
+        clusters = sorted(
+            entry.name
+            for entry in blueprint_root.iterdir()
+            if entry.is_dir()
+            and re.fullmatch(r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?", entry.name)
+        )
+
+    active_org = ""
+    active_cluster = ""
+    active_path = Path.home() / ".config" / "opencenter" / "clusters" / ".active"
+    try:
+        active_value = active_path.read_text(encoding="utf-8").strip().splitlines()[0]
+        if "/" in active_value:
+            active_org, active_cluster = active_value.split("/", 1)
+    except (OSError, IndexError):
+        pass
+
+    return jsonify(
+        {
+            "ok": True,
+            "organization": organization,
+            "clusters": clusters,
+            "active_cluster": active_cluster if active_org == organization else "",
+        }
+    )
+
+
 @app.get("/api/opencenter/export-bundle")
 def opencenter_export_bundle():
     """Zip all deployment input files (config blueprint, secrets, tokens, .sops.yaml) for org/cluster."""
