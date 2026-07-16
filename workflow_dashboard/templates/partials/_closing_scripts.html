@@ -5948,12 +5948,13 @@ ${certContent}
           customer_name: company + (sys.name ? ' — '+sys.name : ''),
           company_name: company,
           contact_name: contact,
-          email: email,
+          email: sys.customerEmail||email,
+          rax_sales_email: sys.raxSalesEmail||'',
           phone: item.phone,
           industry: sys.archetype||'',
-          customer_id: item.tenant||('MIG-'+(i+1)),
+          customer_id: sys.accountNo||item.tenant||('MIG-'+(i+1)),
           request_id: item.id,
-          ospc_account_tenant_id: item.tenant||'',
+          ospc_account_tenant_id: sys.accountNo||item.tenant||'',
           target_flex_region: item.region||'',
           region: item.region||'',
           flex_readiness: 'FLEX Ready',
@@ -5963,7 +5964,7 @@ ${certContent}
           business_system_name: sys.name||company,
           business_system_type: sys.archetype||'',
           source_of_request: 'Operator',
-          migration_operator_name: (document.getElementById('mfr-operator')||{}).value||'',
+          migration_operator_name: sys.towner||(document.getElementById('mfr-operator')||{}).value||'',
           migration_method: 'Rehost',
           ospc_vm_count: String(comps.length||1),
           size_rank: comps.length<=3?'1':comps.length<=6?'2':'3',
@@ -8344,39 +8345,41 @@ ${certContent}
         }
 
         allKeys = allKeys.filter(function(k, i){ return allKeys.indexOf(k) === i; });
+        const thStyle = 'padding:13px 15px; background:linear-gradient(135deg,#0c4a6e,#1e40af); color:#fff; font-weight:800; text-transform:uppercase; font-size:12px; letter-spacing:.06em; border-bottom:3px solid #38bdf8; border-right:1px solid rgba(255,255,255,.14); position:sticky; top:0; z-index:2; white-space:nowrap;';
         let theadHtml = `<tr>
-            <th style="padding:15px 15px; text-align:center; border-bottom:2px solid #00f3ff; background:rgba(0,24,70,0.8); color:#00f3ff; font-weight:700; text-transform:uppercase; font-size:18px; text-shadow:0 0 8px rgba(0,243,255,0.6);">Action</th>`;
+            <th style="${thStyle} text-align:center;">Action</th>`;
         allKeys.forEach((col, idx) => {
             let colName = col === 'stage_failed' || col === 'fail_cause' ? 'Stage Failed' : col.replace(/_/g, ' ');
-            theadHtml += `<th style="padding:15px 15px; text-align:left; border-bottom:2px solid #00f3ff; background:rgba(0,24,70,0.8); color:#00f3ff; font-weight:700; text-transform:uppercase; font-size:18px; cursor:pointer; text-shadow:0 0 8px rgba(0,243,255,0.6);" onclick="sortTracker(${idx + 1})">${colName} <span style="font-size:14px; opacity:0.8">⇕</span></th>`;
+            theadHtml += `<th style="${thStyle} text-align:left; cursor:pointer;" onclick="sortTracker(${idx + 1})" onmouseover="this.style.filter='brightness(1.25)'" onmouseout="this.style.filter='none'">${colName} <span style="font-size:11px; opacity:0.75">⇕</span></th>`;
         });
-        theadHtml += `<th style="padding:15px 15px; text-align:center; border-bottom:2px solid #00f3ff; background:rgba(0,24,70,0.8); color:#00f3ff; font-weight:700; text-transform:uppercase; font-size:18px; text-shadow:0 0 8px rgba(0,243,255,0.6);">Del</th></tr>`;
+        theadHtml += `<th style="${thStyle} text-align:center;">Del</th></tr>`;
 
         let theadEl = document.querySelector("#trackerTable thead");
         if(theadEl) theadEl.innerHTML = theadHtml;
 
         let html = '';
-        data.customers.forEach((c) => {
+        data.customers.forEach((c, rowIdx) => {
           let displayStatus = c.status || 'Not Started';
           let sRaw = displayStatus.toLowerCase();
 
-          let neonColor = '#00d2ff'; // default cyan
-          let textGlow = '0 0 5px #00d2ff';
+          // status palette: solid, readable colors on the light table
+          let neonColor = '#0284c7'; // default blue
+          let textGlow = 'none';
           let btnText = 'Start';
-          let btnBg = 'rgba(0, 210, 255, 0.15)';
-          let btnBorder = '#00d2ff';
+          let btnBg = '#e0f2fe';
+          let btnBorder = '#0284c7';
 
           if (sRaw.includes('in progress') || sRaw === 'queue') {
-              neonColor = '#f39c12'; textGlow = '0 0 5px #f39c12'; btnText = 'Continue'; btnBg = 'rgba(243, 156, 18, 0.15)'; btnBorder = '#f39c12';
+              neonColor = '#d97706'; btnText = 'Continue'; btnBg = '#fef3c7'; btnBorder = '#d97706';
           }
           else if (sRaw.includes('finish') || sRaw.includes('success')) {
-              neonColor = '#00ff88'; textGlow = '0 0 8px #00ff88'; btnText = 'Monitor'; btnBg = 'rgba(0, 255, 136, 0.15)'; btnBorder = '#00ff88';
+              neonColor = '#15803d'; btnText = 'Monitor'; btnBg = '#dcfce7'; btnBorder = '#15803d';
           }
           else if (sRaw.includes('fail')) {
-              neonColor = '#ff2a5f'; textGlow = '0 0 8px #ff2a5f'; btnText = 'Review'; btnBg = 'rgba(255, 42, 95, 0.15)'; btnBorder = '#ff2a5f';
+              neonColor = '#dc2626'; btnText = 'Review'; btnBg = '#fee2e2'; btnBorder = '#dc2626';
           }
           else if (sRaw.includes('roll')) {
-              neonColor = '#ff00ff'; textGlow = '0 0 8px #ff00ff'; btnText = 'Start'; btnBg = 'rgba(255, 0, 255, 0.15)'; btnBorder = '#ff00ff';
+              neonColor = '#9333ea'; btnText = 'Start'; btnBg = '#f3e8ff'; btnBorder = '#9333ea';
           }
 
           const cDataB64 = btoa(unescape(encodeURIComponent(JSON.stringify(c))));
@@ -8388,18 +8391,19 @@ ${certContent}
               actionBtn = `<button style="background:${btnBg}; border:1px solid ${btnBorder}; color:${neonColor}; box-shadow:0 0 10px ${btnBg}; padding:6px 14px; border-radius:6px; cursor:pointer; font-weight:800; font-size:12px; transition:all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1); letter-spacing: 0.5px;" onmouseover="this.style.boxShadow='0 0 20px ${btnBorder}'; this.style.transform='scale(1.05)';" onmouseout="this.style.boxShadow='0 0 10px ${btnBg}'; this.style.transform='scale(1)';" onclick="setActiveCustomer('${c.customer_id}', '${cDataB64}')">${btnText}</button>`;
           }
 
-          html += `<tr class="tracker-row" style="background-color: rgba(15, 20, 35, 0.8); backdrop-filter: blur(8px); transition: background 0.2s;" onmouseover="this.style.backgroundColor='rgba(30, 40, 60, 0.95)'" onmouseout="this.style.backgroundColor='rgba(15, 20, 35, 0.8)'">
-            <td style="padding:14px 15px; border-bottom:1px solid rgba(255,255,255,0.05); text-align:center;">${actionBtn}</td>`;
+          const zebraBg = rowIdx % 2 ? '#f8fafc' : '#ffffff';
+          html += `<tr class="tracker-row" style="background-color:${zebraBg}; border-left:4px solid ${neonColor}; transition: background 0.15s;" onmouseover="this.style.backgroundColor='#e0f2fe'" onmouseout="this.style.backgroundColor='${zebraBg}'">
+            <td style="padding:12px 15px; border-bottom:1px solid #dbeafe; border-right:1px solid #f1f5f9; text-align:center;">${actionBtn}</td>`;
 
           allKeys.forEach(col => {
               let val = c[col] || '';
               if(col === 'status') {
-                  html += `<td style="padding:14px 15px; border-bottom:1px solid rgba(255,255,255,0.05); color:${neonColor}; text-shadow: ${textGlow}; font-weight:800; font-size:13px; text-transform:uppercase; letter-spacing:1px; border:1px dashed transparent;" contenteditable="true" oninput="markEdits()" data-key="${col}">${val}</td>`;
+                  html += `<td style="padding:12px 15px; border-bottom:1px solid #dbeafe; border-right:1px solid #f1f5f9; color:${neonColor}; font-weight:800; font-size:12px; text-transform:uppercase; letter-spacing:1px;" contenteditable="true" oninput="markEdits()" data-key="${col}">${val}</td>`;
               } else {
-                  html += `<td style="padding:14px 15px; border-bottom:1px solid rgba(255,255,255,0.05); color:#e2e8f0; font-size:13px; border:1px dashed transparent; font-weight:500;" contenteditable="true" oninput="markEdits()" data-key="${col}">${val}</td>`;
+                  html += `<td style="padding:12px 15px; border-bottom:1px solid #dbeafe; border-right:1px solid #f1f5f9; color:#0f172a; font-size:13px; font-weight:500;" contenteditable="true" oninput="markEdits()" data-key="${col}">${val}</td>`;
               }
           });
-          html += `<td style="padding:14px 15px; border-bottom:1px solid rgba(255,255,255,0.05); text-align:center;"><button onclick="deleteRow(this)" style="background:transparent; border:none; cursor:pointer; font-size:16px; filter: grayscale(100%) opacity(50%); transition: all 0.2s;" onmouseover="this.style.filter='grayscale(0%) opacity(100%)'" onmouseout="this.style.filter='grayscale(100%) opacity(50%)'" title="Delete Row">❌</button></td></tr>`;
+          html += `<td style="padding:12px 15px; border-bottom:1px solid #dbeafe; text-align:center;"><button onclick="deleteRow(this)" style="background:transparent; border:none; cursor:pointer; font-size:16px; filter: grayscale(100%) opacity(50%); transition: all 0.2s;" onmouseover="this.style.filter='grayscale(0%) opacity(100%)'" onmouseout="this.style.filter='grayscale(100%) opacity(50%)'" title="Delete Row">❌</button></td></tr>`;
         });
         trackerTbody.innerHTML = html;
         if(typeof window.markEdits === 'function') {
@@ -9645,6 +9649,12 @@ ${certContent}
         <div class="uat-s1-field"><label>Business Owner</label><input id="uatS1BOwner" value="" placeholder="Business Owner" /></div>
         <div style="height:8px"></div>
         <div class="uat-s1-field"><label>Technical Owner</label><input id="uatS1TOwner" value="" placeholder="dzoan" /></div>
+        <div style="height:8px"></div>
+        <div class="uat-s1-field"><label>Account Number</label><input id="uatS1AccountNo" value="" placeholder="e.g. 1112223" /></div>
+        <div style="height:8px"></div>
+        <div class="uat-s1-field"><label>Customer Email</label><input id="uatS1CustEmail" type="email" value="" placeholder="customer@company.com" /></div>
+        <div style="height:8px"></div>
+        <div class="uat-s1-field"><label>Rax Sales Email</label><input id="uatS1RaxEmail" type="email" value="" placeholder="sales@rackspace.com" /></div>
       </div>
       <div class="uat-s1-modal-panel">
         <h4>Component Configuration</h4>
@@ -9955,7 +9965,8 @@ ${certContent}
       if (sys) {
         _sv('uatS1ArchSel', sys.archetype||'banking');
         _sv('uatS1Name', sys.name); _sv('uatS1Crit', sys.criticality||'Critical');
-        _sv('uatS1BOwner', sys.bowner||''); _sv('uatS1TOwner', sys.towner||'');
+        _sv('uatS1BOwner', sys.bowner||''); _sv('uatS1TOwner', sys.towner||''); _sv('uatS1AccountNo', sys.accountNo||'');
+        _sv('uatS1CustEmail', sys.customerEmail||''); _sv('uatS1RaxEmail', sys.raxSalesEmail||'');
         _sv('uatS1Wave', sys.wave||'Wave 1'); _sv('uatS1Risk', sys.risk||'Medium');
         _sv('uatS1Region', sys.region||'');
         _sv('uatS1Desc', sys.desc||'');
@@ -9965,7 +9976,7 @@ ${certContent}
         return;
       }
     }
-    _sv('uatS1Name',''); _sv('uatS1BOwner',''); _sv('uatS1TOwner',''); _sv('uatS1Desc','');
+    _sv('uatS1Name',''); _sv('uatS1BOwner',''); _sv('uatS1TOwner',''); _sv('uatS1AccountNo',''); _sv('uatS1CustEmail',''); _sv('uatS1RaxEmail',''); _sv('uatS1Desc','');
     if (typeof window.uatS1SelectArchetype === 'function') {
       window.uatS1SelectArchetype(presetArch || 'banking');
     } else {
@@ -10549,6 +10560,9 @@ ${certContent}
       _sv('uatS1Crit', tpl.criticality || 'Critical');
       _sv('uatS1BOwner', tpl.bowner || '');
       _sv('uatS1TOwner', tpl.towner || '');
+      _sv('uatS1AccountNo', tpl.accountNo || '');
+      _sv('uatS1CustEmail', tpl.customerEmail || '');
+      _sv('uatS1RaxEmail', tpl.raxSalesEmail || '');
       _sv('uatS1Wave', tpl.wave || 'Wave 1');
       _sv('uatS1Risk', tpl.risk || 'Medium');
       _sv('uatS1Desc', tpl.desc || 'custom business system');
@@ -10569,6 +10583,9 @@ ${certContent}
       criticality: _gv('uatS1Crit')||'Critical',
       bowner: _gv('uatS1BOwner')||'',
       towner: _gv('uatS1TOwner')||'',
+      accountNo: _gv('uatS1AccountNo')||'',
+      customerEmail: _gv('uatS1CustEmail')||'',
+      raxSalesEmail: _gv('uatS1RaxEmail')||'',
       wave: _gv('uatS1Wave')||'Wave 1',
       risk: _gv('uatS1Risk')||'Medium',
       desc: _gv('uatS1Desc')||'custom business system',
@@ -10606,6 +10623,9 @@ ${certContent}
       criticality: _gv('uatS1Crit')||'Critical',
       bowner:      _gv('uatS1BOwner')||'',
       towner:      _gv('uatS1TOwner')||'',
+      accountNo:   _gv('uatS1AccountNo')||'',
+      customerEmail: _gv('uatS1CustEmail')||'',
+      raxSalesEmail: _gv('uatS1RaxEmail')||'',
       wave:        _gv('uatS1Wave')||'Wave 1',
       risk:        _gv('uatS1Risk')||'Medium',
       desc:        _gv('uatS1Desc')||'',
