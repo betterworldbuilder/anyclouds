@@ -116,6 +116,12 @@ except ImportError:
     from r6_scan_appraisal import create_r6_scan_blueprint
 app.register_blueprint(create_r6_scan_blueprint(BASE_DIR))
 
+try:
+    from workflow_dashboard.routes.monitoring_api import create_monitoring_blueprint
+except ImportError:
+    from routes.monitoring_api import create_monitoring_blueprint
+app.register_blueprint(create_monitoring_blueprint(BASE_DIR))
+
 # ── Template caching: reload once at startup, then serve from cache ──────────
 # TEMPLATES_AUTO_RELOAD=False stops Jinja2 re-parsing combined.html (1.35 MB)
 # mid-traffic whenever its mtime changes — that re-parse blocks Flask for
@@ -21377,6 +21383,53 @@ def _r6_saved_cloud_credentials() -> Dict[str, Any]:
     return cloud if isinstance(cloud, dict) else {}
 
 
+def _r6_cluster_blueprint_cloud_env() -> Dict[str, str]:
+    """Fallback OS_* auth from OpenCenter cluster blueprint configs, used when the
+    R6 credential cache is empty and the Flask process has no OS_* variables
+    (e.g. after a service restart). Prefers the active cluster, then the most
+    recently modified blueprint that carries complete application credentials."""
+    config_root = Path(os.path.expanduser("~")) / ".config" / "opencenter"
+    candidates: List[Path] = []
+    try:
+        target = (config_root / "active").read_text(encoding="utf-8").strip()
+        if "/" in target:
+            org, cluster = target.split("/", 1)
+            candidates.append(config_root / "clusters" / "blueprints" / org / cluster / ("%s-config.yaml" % cluster))
+    except Exception:
+        pass
+    try:
+        candidates.extend(sorted(config_root.glob("clusters/blueprints/*/*/*-config.yaml"),
+                                 key=lambda f: f.stat().st_mtime, reverse=True))
+    except Exception:
+        pass
+    for path in candidates:
+        try:
+            if not path.is_file():
+                continue
+            doc = _yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+            cloud = ((((doc.get("opencenter") or {}).get("infrastructure") or {}).get("cloud") or {}).get("openstack") or {})
+            auth_url = str(cloud.get("auth_url") or "").strip()
+            cred_id = str(cloud.get("application_credential_id") or "").strip()
+            secret = str(cloud.get("application_credential_secret") or "").strip()
+            if not (auth_url and cred_id and secret):
+                continue
+            env = {
+                "OS_AUTH_URL": auth_url.rstrip("/"),
+                "OS_AUTH_TYPE": "v3applicationcredential",
+                "OS_APPLICATION_CREDENTIAL_ID": cred_id,
+                "OS_APPLICATION_CREDENTIAL_SECRET": secret,
+                "OS_IDENTITY_API_VERSION": "3",
+                "OS_INTERFACE": "public",
+            }
+            region = str(cloud.get("region") or "").strip()
+            if region:
+                env["OS_REGION_NAME"] = region
+            return env
+        except Exception:
+            continue
+    return {}
+
+
 def _r6_openstack_auth_env() -> Dict[str, str]:
     """Return OpenStack auth variables for Stage 9A CLI calls.
 
@@ -21428,6 +21481,9 @@ def _r6_openstack_auth_env() -> Dict[str, str]:
     else:
         missing += [key for key in ("OS_USERNAME", "OS_PASSWORD") if not env.get(key)]
     if missing:
+        fallback = _r6_cluster_blueprint_cloud_env()
+        if fallback:
+            return fallback
         raise RuntimeError("OpenStack auth is not configured for Stage 9A (%s missing). Run Preflight > Test Cloud Login or import an OpenRC file, save credentials, then retry Build VM Snapshots." % ", ".join(missing))
     return env
 
@@ -22068,7 +22124,8 @@ def r6_generate_bundle():
     slug = re.sub(r"[^a-z0-9-]+", "-", str(bundle.get("businessSystemName") or "flex-app").lower()).strip("-") or "flex-app"
     home = Path(os.path.expanduser("~"))
     stamp = _time.strftime("%Y%m%d_%H%M%S")
-    out_dir = home / ".config" / "opencenter" / "bundles" / "r6" / ("%s-%s" % (slug, stamp))
+    bundle_root = Path(os.environ.get("R6_BUNDLE_ROOT") or (home / ".config" / "opencenter" / "bundles" / "r6"))
+    out_dir = bundle_root / ("%s-%s" % (slug, stamp))
     (out_dir / "dockerfiles").mkdir(parents=True, exist_ok=True)
     (out_dir / "kustomize_bundle").mkdir(parents=True, exist_ok=True)
 
@@ -22389,7 +22446,6 @@ def r6_generate_bundle():
             "COPY ./app /app",
             "RUN set -eux; if [ -f package-lock.json ]; then npm ci --omit=dev; elif [ -f requirements.txt ]; then pip install --no-cache-dir -r requirements.txt; elif [ -f composer.lock ]; then composer install --no-dev --no-interaction || true; fi",
             "EXPOSE %s" % container_port,
-            "HEALTHCHECK --interval=30s --timeout=5s CMD curl -fsS http://localhost:%s%s || exit 1" % (container_port, health_path),
             cmd_line,
         ]
         _w("dockerfiles/%s/Dockerfile" % comp, "\n".join(df_lines) + "\n")
@@ -22400,13 +22456,6 @@ def r6_generate_bundle():
         (out_dir / "dockerfiles" / comp / "app" / ".gitkeep").write_text("", encoding="utf-8")
         app_paths = scan_app_paths or w.get("applicationPaths") or [w.get("sourcePath") or layer_paths.get(str(w.get("layer")), "/opt/app/")]
         app_paths = [str(p) for p in app_paths if str(p).startswith("/")]
-        exclude_args = " ".join(
-            "--exclude=%s" % shlex.quote(pattern) for pattern in (
-                "var/log/***", "tmp/***", "etc/ssh/***", ".ssh/***", "*.pem", "*.key",
-                "*.p12", "*.pfx", "*.bak", "*.backup", "*~", "var/lib/postgresql/***",
-                "var/lib/mysql/***", "var/lib/mongodb/***", "var/lib/redis/***",
-            )
-        )
         extract_lines += ['echo "== extract approved application paths for %s =="' % comp,
                           'rm -rf "dockerfiles/%s/app" && mkdir -p "dockerfiles/%s/app"' % (comp, comp)]
         component_vm_host = _r6_source_host_from_ref(str((w.get("sourceLineage") or {}).get("sourceVm") or w.get("sourceVmId") or w.get("targetIp") or vm_host or ""))
@@ -22440,11 +22489,20 @@ def r6_generate_bundle():
             'echo "== build %s =="' % comp,
             'test -s "dockerfiles/%s/source.sha256" || { echo "[BLOCKED] sanitized source checksum is missing" >&2; exit 43; }' % comp,
             "docker build -t %s dockerfiles/%s" % (image, comp),
-            'echo "== startup/health test %s =="' % comp,
-            # Foreground run with the health check as the container's own command - avoids
-            # racing a detached container that may exit before docker exec/stop reach it.
-            'docker run --rm %s sh -c "command -v curl >/dev/null 2>&1 && curl -fsS -m 3 http://localhost:8080/healthz 2>/dev/null || echo \'no local health server to test in a plain run - verify after Kubernetes deploy\'" || echo "[WARN] startup test container exited non-zero for %s - review manually"'
-            % (image, comp),
+            'echo "== startup test %s =="' % comp,
+            # Boot the image with its real start command and require it to still be
+            # running a few seconds later - catches instant-crash images without
+            # depending on curl existing inside the container. Kubernetes probes
+            # cover HTTP health after deploy.
+            '_cid=$(docker run -d %s)' % image,
+            "sleep 5",
+            "if [ \"$(docker inspect -f '{{.State.Running}}' \"$_cid\" 2>/dev/null)\" = \"true\" ]; then\n"
+            '  echo "startup test PASSED - %s stayed up with its real start command"\n'
+            "else\n"
+            '  echo "[WARN] startup test FAILED for %s - container exited early; last logs:"\n'
+            '  docker logs --tail 20 "$_cid" 2>&1 || true\n'
+            "fi" % (comp, comp),
+            'docker rm -f "$_cid" >/dev/null 2>&1 || true',
             'echo "== SBOM %s =="' % comp,
             "mkdir -p evidence/images",
             'if command -v syft >/dev/null 2>&1; then syft %s -o spdx-json > %s; else echo "syft not installed - skipping SBOM" > %s; fi' % (image, sbom_path, sbom_path),
@@ -23819,12 +23877,15 @@ def r6_generate_bundle():
         "generated_at": stamp,
         "bundle_validation": bundle_validation,
     }
-    # Single source of truth: persist latest pipeline state server-side (no secrets)
-    try:
-        (home / ".config" / "opencenter" / "bundles" / "r6" / "latest.json").write_text(
-            _json.dumps(resp, indent=2), encoding="utf-8")
-    except Exception:
-        pass
+    # Single source of truth: persist latest pipeline state server-side (no secrets).
+    # Callers that generate throwaway bundles (fixtures/tests) send update_state=false
+    # so they never repoint the live pipeline state at a bundle they will delete.
+    if data.get("update_state") is not False:
+        try:
+            (bundle_root / "latest.json").write_text(
+                _json.dumps(resp, indent=2), encoding="utf-8")
+        except Exception as exc:
+            resp["state_persist_error"] = str(exc)
     return jsonify(resp)
 
 
@@ -24050,15 +24111,41 @@ def r6_handover_export(run_id):
 
 @app.get("/api/r6/state")
 def r6_state():
-    """Latest R6 pipeline state (server-side single source of truth)."""
+    """Latest R6 pipeline state (server-side single source of truth). Self-heals
+    when the recorded bundle directory no longer exists (e.g. it was deleted by a
+    cleanup) by repointing at the newest bundle still on disk, so the UI's
+    extract/build commands never reference a missing directory."""
     import json as _json
-    p = Path(os.path.expanduser("~")) / ".config" / "opencenter" / "bundles" / "r6" / "latest.json"
+    root = Path(os.environ.get("R6_BUNDLE_ROOT") or (Path(os.path.expanduser("~")) / ".config" / "opencenter" / "bundles" / "r6"))
+    p = root / "latest.json"
     if not p.is_file():
         return jsonify({"ok": False, "error": "no bundle generated yet"}), 404
     try:
-        return jsonify(_json.loads(p.read_text(encoding="utf-8")))
+        state = _json.loads(p.read_text(encoding="utf-8"))
     except Exception as exc:
         return jsonify({"ok": False, "error": str(exc)}), 500
+    bundle_dir = str(state.get("bundle_dir") or "")
+    if bundle_dir and not Path(bundle_dir).is_dir():
+        replacement = None
+        try:
+            for candidate in sorted((d for d in root.iterdir() if d.is_dir()),
+                                    key=lambda d: d.stat().st_mtime, reverse=True):
+                if (candidate / "build_and_push.sh").is_file():
+                    replacement = candidate
+                    break
+        except Exception:
+            replacement = None
+        if replacement is None:
+            return jsonify({"ok": False, "error": "recorded bundle %s no longer exists and no other bundle remains - regenerate the bundle in Stage 9/10" % bundle_dir}), 404
+        state["bundle_dir"] = str(replacement)
+        state["build_cmd"] = "cd %s && bash build_and_push.sh" % replacement
+        state["extract_cmd"] = "cd %s && bash extract_assets.sh" % replacement
+        state["state_healed"] = "recorded bundle %s was missing; switched to newest existing bundle %s" % (bundle_dir, replacement)
+        try:
+            p.write_text(_json.dumps(state, indent=2), encoding="utf-8")
+        except Exception as exc:
+            state["state_persist_error"] = str(exc)
+    return jsonify(state)
 
 
 @app.post("/api/r6/save-creds")
@@ -24230,7 +24317,8 @@ def stream_run_cmd():
             home = os.path.expanduser("~")
             env = {**os.environ}
             local_bin = os.path.join(home, ".local", "bin")
-            env["PATH"] = local_bin + os.pathsep + env.get("PATH", "")
+            project_scripts = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "scripts")
+            env["PATH"] = local_bin + os.pathsep + project_scripts + os.pathsep + env.get("PATH", "")
             # Ensure terraform symlink exists pointing to tofu (OpenTofu)
             tofu_path = os.path.join(home, ".local", "share", "mise", "shims", "tofu")
             if not os.path.exists(tofu_path):
@@ -24256,7 +24344,7 @@ def stream_run_cmd():
                 'export SOPS_AGE_KEY_FILE="$HOME/.config/opencenter/.all-age-keys.txt"; fi; '
             )
             wrapped = (
-                f'export PATH="{local_bin}:$PATH"; '
+                f'export PATH="{local_bin}:{project_scripts}:$PATH"; '
                 f'[ -f "$HOME/.bashrc" ] && source "$HOME/.bashrc" 2>/dev/null; '
                 f'command -v mise >/dev/null 2>&1 && eval "$(mise activate bash 2>/dev/null)"; '
                 f'{sops_setup}'
