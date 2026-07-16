@@ -349,11 +349,17 @@ window.r6pInputConnectionFor=function(c){
 };
 window.r6pResolveComponentVm=function(c){
   c=c||{};var direct=c.sourceVmId||c.source_vm_id||c.vmId||c.vm_id||c.openstackServerId||c.serverId||c.flexVmId;
-  if(direct)return{id:direct,name:c.sourceVmName||c.source_vm_name||c.vmName||c.vm_name||'',ip:c.sourceIp||c.source_ip||'',region:c.cloudRegion||c.cloud_region||''};
+  if(direct)return{id:direct,name:c.sourceVmName||c.source_vm_name||c.vmName||c.vm_name||'',ip:c.sourceIp||c.source_ip||r6pComponentTarget(c)||'',region:c.cloudRegion||c.cloud_region||''};
   var target=r6pComponentTarget(c),host='';try{host=new URL(target.indexOf('://')>=0?target:'ssh://'+target).hostname;}catch(e){host=target.replace(/^[a-z][a-z0-9+.-]*:\/\//i,'').split('/')[0].split(':')[0];}
-  var rows=window._uatS1FlexVmRows||[],matches=rows.filter(function(row){return [row.public_ip,row.private_ip,row.ip].filter(Boolean).map(String).indexOf(String(host))>=0;});
+  var rows=window._uatS1FlexVmRows||[];
+  if(!rows.length)try{var saved=JSON.parse(localStorage.getItem('uatS1_flex_vm_rows')||'{}');rows=saved.rows||[];}catch(e2){rows=[];}
+  var ips=function(row){return [row.public_ip,row.private_ip,row.ip,row.access_ip,row.accessIPv4].filter(Boolean).map(String);};
+  var matches=rows.filter(function(row){return host&&ips(row).indexOf(String(host))>=0;});
+  if(!matches.length){var wanted=String(c.sourceVmName||c.source_vm_name||c.vmName||c.vm_name||'').toLowerCase();if(wanted)matches=rows.filter(function(row){return String(row.name||'').toLowerCase()===wanted;});}
+  if(!matches.length&&rows.length===1)matches=[rows[0]];
   if(matches.length!==1)return{id:null,name:'',ip:host,region:'',mappingAmbiguous:matches.length>1};
-  var row=matches[0];return{id:row.id||row.vm_id||row.server_id||row.uuid||null,name:row.name||'',ip:host,region:row.region||row.cloud_region||''};
+  var row=matches[0],resolvedIp=host&&ips(row).indexOf(String(host))>=0?host:(row.public_ip||row.private_ip||row.ip||row.access_ip||row.accessIPv4||'');
+  return{id:row.id||row.vm_id||row.server_id||row.uuid||null,name:row.name||'',ip:resolvedIp,region:row.region||row.cloud_region||''};
 };
 window.r6pBusinessSystemsChanged=function(){
   R6P_BS_STORAGE_SIG='';
@@ -3310,18 +3316,18 @@ window.r6pAppraisalAllowsStage8=function(c){
     (a.componentVerdict==='READY_FOR_STAGE_8_WITH_WARNINGS'&&R6P.appraisalReviewed===true);
 };
 window.r6pProductionScanPayloadLegacy=function(){
-  var user=((document.getElementById('r6p-scan-user')||{}).value||'').trim();
-  var key=((document.getElementById('r6p-scan-key')||{}).value||'').trim();
-  var known=((document.getElementById('r6p-scan-known-hosts')||{}).value||'./data/ssh/known_hosts').trim();
+  var user=((document.getElementById('r6p-scan-user')||{}).value||(document.getElementById('r6p-extract-user')||{}).value||'').trim();
+  var key=((document.getElementById('r6p-scan-key')||{}).value||(document.getElementById('r6p-extract-key')||{}).value||'').trim();
+  var known=((document.getElementById('r6p-scan-known-hosts')||{}).value||(document.getElementById('r6p-extract-known-hosts')||{}).value||'./data/ssh/known_hosts').trim();
   var all=(R6P.components||[]);
   var scope=(document.getElementById('r6p-scan-comp')||{}).value||'__all__';
   var selected=scope==='__all__'?all:(all[parseInt(scope,10)]?[all[parseInt(scope,10)]]:[]);
   return {businessSystem:{id:R6P.bs&&R6P.bs.id,name:R6P.bs&&R6P.bs.name,totalComponentCount:all.length,scanScope:scope==='__all__'?'ALL_COMPONENTS':'SINGLE_COMPONENT',components:selected.map(function(c){var ep=r6pParseSshTarget(r6pComponentTarget(c),c),mapped=r6pResolveComponentVm(c),vmId=mapped.id,dbMode=c.databaseAccessMode||c.database_access_mode||c.databaseTargetType||((/database|db/i.test(c.type||c.role||c.name||'')&&!vmId)?'UNKNOWN':null);return{id:c.id||c.name,name:c.name,sourceVmId:vmId,source_vm_id:vmId,sourceVmName:c.sourceVmName||c.source_vm_name||c.vmName||c.vm_name||mapped.name||null,sourceIp:(ep&&ep.host)||c.sourceIp||c.source_ip||mapped.ip||null,sshHost:ep&&ep.host,sshPort:ep&&ep.port,sshUser:c.sshUser||c.ssh_user||user,cloudRegion:c.cloudRegion||c.cloud_region||mapped.region||R6P.bs&&R6P.bs.region||null,scanTargetId:c.scanTargetId||c.scan_target_id||vmId,expectedFingerprint:c.expectedFingerprint||c.sshFingerprint||null,type:c.type||c.role||'',databaseAccessMode:dbMode,databaseEndpoint:c.databaseEndpoint||r6pComponentTarget(c),cloudInventory:c.cloudInventory||c.cloud_inventory||null,volumeIds:c.volumeIds||c.volume_ids||[]};})},ssh:{user:user,keyPath:key,knownHostsFile:known}};
 };
 window.r6pProductionScanPayload=function(){
-  var user=((document.getElementById('r6p-scan-user')||{}).value||'').trim();
-  var key=((document.getElementById('r6p-scan-key')||{}).value||'').trim();
-  var known=((document.getElementById('r6p-scan-known-hosts')||{}).value||'./data/ssh/known_hosts').trim();
+  var user=((document.getElementById('r6p-scan-user')||{}).value||(document.getElementById('r6p-extract-user')||{}).value||'').trim();
+  var key=((document.getElementById('r6p-scan-key')||{}).value||(document.getElementById('r6p-extract-key')||{}).value||'').trim();
+  var known=((document.getElementById('r6p-scan-known-hosts')||{}).value||(document.getElementById('r6p-extract-known-hosts')||{}).value||'./data/ssh/known_hosts').trim();
   var all=(R6P.components||[]),scope=(document.getElementById('r6p-scan-comp')||{}).value||'__all__';
   var selected=scope==='__all__'?all:(all[parseInt(scope,10)]?[all[parseInt(scope,10)]]:[]);
   var components=selected.map(function(c){
@@ -3496,7 +3502,7 @@ window.r6pRetryAppraisal=function(id){
   var input=r6pInputConnectionFor(source||{});
   if(input.sshUser)payload.ssh.user=input.sshUser;
   if(input.sshKeyPath)payload.ssh.keyPath=input.sshKeyPath;
-  payload.ssh.knownHostsFile=((document.getElementById('r6p-scan-known-hosts')||{}).value||payload.ssh.knownHostsFile||'').trim();
+  payload.ssh.knownHostsFile=((document.getElementById('r6p-scan-known-hosts')||{}).value||(document.getElementById('r6p-extract-known-hosts')||{}).value||payload.ssh.knownHostsFile||'').trim();
   fetch('/api/r6/scans/runs/'+encodeURIComponent(R6P.scanRunId)+'/components/'+encodeURIComponent(id)+'/retry',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ssh:payload.ssh})}).then(function(r){return r.json();}).then(function(d){if(!d.ok)throw new Error(d.error);r6pRefreshAppraisal();}).catch(function(e){alert('Retry failed: '+e.message);});
 };
 window.r6pRetryVm=function(vmId){
@@ -3512,10 +3518,10 @@ window.r6pVerifyReplaceHostKey=function(componentId){
   var probe=component&&(component.probes||[]).find(function(p){return p.errorCode==='SSH_HOST_KEY_CHANGED';});
   if(!component||!probe){alert('Host-key evidence is unavailable.');return;}
   var fingerprint=probe.newFingerprint||probe.hostFingerprint;if(!fingerprint){alert('A verified replacement fingerprint is required before this key can be changed.');return;}
-  var known=((document.getElementById('r6p-scan-known-hosts')||{}).value||'').trim();
+  var known=((document.getElementById('r6p-scan-known-hosts')||{}).value||(document.getElementById('r6p-extract-known-hosts')||{}).value||'').trim();
   r6pOpenHostIdentityPanel(component.sourceHost,component.sshPort||22,{componentId:componentId,vmId:component.sourceVmId,
-    sshUser:((document.getElementById('r6p-scan-user')||{}).value||'').trim(),
-    sshKeyPath:((document.getElementById('r6p-scan-key')||{}).value||'').trim(),knownHostsFile:known,
+    sshUser:((document.getElementById('r6p-scan-user')||{}).value||(document.getElementById('r6p-extract-user')||{}).value||'').trim(),
+    sshKeyPath:((document.getElementById('r6p-scan-key')||{}).value||(document.getElementById('r6p-extract-key')||{}).value||'').trim(),knownHostsFile:known,
     onConnected:function(){r6pRetryVm(component.sourceVmId);}});
 };
 
@@ -3695,9 +3701,9 @@ window.r6pCheckSelectedComponentHostIdentity=function(){
   if(!target){alert('Select a mapped component first.');return;}
   var host='';try{host=new URL(target.indexOf('://')>=0?target:'ssh://'+target).hostname;}catch(e){host=target.replace(/^[a-z][a-z0-9+.-]*:\/\//i,'').split('/')[0].split(':')[0];}
   r6pOpenHostIdentityPanel(host,22,{
-    sshUser:((document.getElementById('r6p-scan-user')||{}).value||'').trim(),
-    sshKeyPath:((document.getElementById('r6p-scan-key')||{}).value||'').trim(),
-    knownHostsFile:((document.getElementById('r6p-scan-known-hosts')||{}).value||'').trim()});
+    sshUser:((document.getElementById('r6p-scan-user')||{}).value||(document.getElementById('r6p-extract-user')||{}).value||'').trim(),
+    sshKeyPath:((document.getElementById('r6p-scan-key')||{}).value||(document.getElementById('r6p-extract-key')||{}).value||'').trim(),
+    knownHostsFile:((document.getElementById('r6p-scan-known-hosts')||{}).value||(document.getElementById('r6p-extract-known-hosts')||{}).value||'').trim()});
 };
 /* === END SSH HOST IDENTITY WORKFLOW === */
 window.r6pRunAllLiveScans=function(){
@@ -3708,8 +3714,8 @@ window.r6pRunAllLiveScans=function(){
   /* Capture credentials once. Stage bodies can be refreshed while a batch is
      running; rereading a replaced input used to silently fall back to root. */
   var batchCredentials={
-    user:String(((document.getElementById('r6p-scan-user')||{}).value)||'').trim(),
-    key:String(((document.getElementById('r6p-scan-key')||{}).value)||'').trim()
+    user:String(((document.getElementById('r6p-scan-user')||{}).value||(document.getElementById('r6p-extract-user')||{}).value)||'').trim(),
+    key:String(((document.getElementById('r6p-scan-key')||{}).value||(document.getElementById('r6p-extract-key')||{}).value)||'').trim()
   };
   if(!/^[a-z_][a-z0-9_.-]*$/i.test(batchCredentials.user)){
     if(out){out.style.display='block';out.textContent='Enter a valid SSH username before scanning all components.';}
@@ -3750,8 +3756,8 @@ window.r6pRunLiveScan=function(done,appendMode,credentials){
   var comp=comps6[idx];
   var out=document.getElementById('r6p-scan-out');
   if(!comp){if(out){out.style.display='block';out.textContent='Select a component with a FLEX target IP first (choose a Business System in Step 1).';}if(typeof done==='function')done(false);return;}
-  var user=String((credentials&&credentials.user)||((document.getElementById('r6p-scan-user')||{}).value)||'').trim();
-  var key=String((credentials&&credentials.key)||((document.getElementById('r6p-scan-key')||{}).value)||'').trim();
+  var user=String((credentials&&credentials.user)||((document.getElementById('r6p-scan-user')||{}).value||(document.getElementById('r6p-extract-user')||{}).value)||'').trim();
+  var key=String((credentials&&credentials.key)||((document.getElementById('r6p-scan-key')||{}).value||(document.getElementById('r6p-extract-key')||{}).value)||'').trim();
   var endpoint=r6pParseSshTarget(r6pComponentTarget(comp),comp);
   if(!endpoint){if(out){out.style.display='block';out.textContent='Invalid SSH target for '+comp.name+'. Set a valid FLEX hostname or IP in Step 1.';}if(typeof done==='function')done(false);return;}
   if(!/^[a-z_][a-z0-9_.-]*$/i.test(user)){if(out){out.style.display='block';out.textContent='Invalid SSH username.';}if(typeof done==='function')done(false);return;}
