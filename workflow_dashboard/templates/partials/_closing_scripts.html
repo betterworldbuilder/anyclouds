@@ -5933,6 +5933,16 @@ ${certContent}
     var systems = Array.isArray(item.systems) ? item.systems : [];
     var tbody = document.getElementById('trackerBody');
     if (tbody) {
+      // Re-adding a request replaces the rows it previously created, so the
+      // Migration Log never accumulates stale duplicates of the same request.
+      if (item.id) {
+        Array.prototype.slice.call(tbody.querySelectorAll('td[data-key="request_id"]')).forEach(function(td) {
+          if ((td.textContent || '').trim() === String(item.id)) {
+            var tr = td.closest('tr');
+            if (tr) tr.parentNode.removeChild(tr);
+          }
+        });
+      }
       var sysList = systems.length ? systems : [{name:company,archetype:'',criticality:'',wave:'',status:'Active',components:[]}];
       sysList.forEach(function(sys, i) {
         var comps = sys.components || [];
@@ -6074,19 +6084,19 @@ ${certContent}
       });
     }
     if (!allKeys.length) allKeys = ['customer_name','status','region','migration_method','flex_readiness','reference_architecture'];
-    var color = accentColor || '#00d2ff';
-    var html = '<tr class="tracker-row" style="background-color:rgba(2,132,199,0.10);transition:background 0.2s;" onmouseover="this.style.backgroundColor=\'rgba(30,40,60,0.95)\'" onmouseout="this.style.backgroundColor=\'rgba(2,132,199,0.06)\'">'
-      + '<td style="padding:14px 15px;border-bottom:1px solid rgba(255,255,255,0.05);text-align:center;">'
-      + '<button style="background:rgba(0,210,255,0.15);border:1px solid ' + color + ';color:' + color + ';padding:6px 14px;border-radius:6px;font-weight:800;font-size:12px;cursor:pointer;">Start</button>'
+    var color = accentColor || '#0284c7';
+    var html = '<tr class="tracker-row" style="background-color:#f0f9ff;border-left:4px solid ' + color + ';transition:background 0.15s;" onmouseover="this.style.backgroundColor=\'#e0f2fe\'" onmouseout="this.style.backgroundColor=\'#f0f9ff\'">'
+      + '<td style="padding:12px 15px;border-bottom:1px solid #dbeafe;border-right:1px solid #f1f5f9;text-align:center;">'
+      + '<button style="background:#e0f2fe;border:1px solid ' + color + ';color:' + color + ';padding:6px 14px;border-radius:6px;font-weight:800;font-size:12px;cursor:pointer;">Start</button>'
       + '</td>';
     allKeys.forEach(function(col) {
       var val = fieldMap[col] !== undefined ? fieldMap[col] : '';
       var isStatus = col === 'status';
-      html += '<td style="padding:14px 15px;border-bottom:1px solid rgba(255,255,255,0.05);'
-        + (isStatus ? 'color:' + color + ';text-shadow:0 0 5px ' + color + ';font-weight:800;font-size:13px;text-transform:uppercase;letter-spacing:1px;' : 'color:#e2e8f0;font-size:13px;font-weight:500;')
-        + 'border:1px dashed rgba(126,207,255,0.25);" contenteditable="true" oninput="markEdits()" data-key="' + col + '">' + val + '</td>';
+      html += '<td style="padding:12px 15px;border-bottom:1px solid #dbeafe;border-right:1px solid #f1f5f9;'
+        + (isStatus ? 'color:' + color + ';font-weight:800;font-size:12px;text-transform:uppercase;letter-spacing:1px;' : 'color:#0f172a;font-size:13px;font-weight:500;')
+        + '" contenteditable="true" oninput="markEdits()" data-key="' + col + '">' + val + '</td>';
     });
-    html += '<td style="padding:14px 15px;border-bottom:1px solid rgba(255,255,255,0.05);text-align:center;">'
+    html += '<td style="padding:12px 15px;border-bottom:1px solid #dbeafe;text-align:center;">'
       + '<button onclick="deleteRow(this)" style="background:transparent;border:none;cursor:pointer;font-size:16px;filter:grayscale(100%) opacity(50%);" onmouseover="this.style.filter=\'grayscale(0%) opacity(100%)\'" onmouseout="this.style.filter=\'grayscale(100%) opacity(50%)\'">❌</button>'
       + '</td></tr>';
     return html;
