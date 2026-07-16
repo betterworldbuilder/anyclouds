@@ -34,6 +34,7 @@ def _generate(workloads, **overrides):
         "org": "r6-dryrun-test",
         "cluster": "r6-dryrun-cluster",
         "import_to_gitops": False,
+        "update_state": False,
         "registry": {"type": "harbor", "project": "flex-apps"},
         "source_vm": {"host": "10.0.0.10", "user": "root"},
         "bundle": {
