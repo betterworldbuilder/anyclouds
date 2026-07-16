@@ -1695,7 +1695,11 @@ window.r6pGenFlux=function(){
       dependencies:siblingDeps,targetIp:endpoint.ip,targetPort:endpoint.port,
       persistentPath:r6pPersistentPathFor(c)};
   });
-  var payload={org:org,cluster:cluster,region:stage9Region,cloud:cloudCreds,
+  var cloudCreds=Object.assign({},(R6P.creds&&R6P.creds.cloud)||{});
+  cloudCreds.proj=cloudCreds.proj||cloudCreds.projectId||'';
+  var fluxRegionText=String((R6P.bs&&(R6P.bs.region||R6P.bs.flexRegion||R6P.bs.sourceRegion))||cloudCreds.region||'IAD3');
+  var fluxRegionMatch=fluxRegionText.match(/\b([A-Z]{3}\d*)\b/i);
+  var stage9Region=(fluxRegionMatch?fluxRegionMatch[1]:fluxRegionText||'IAD3').toUpperCase();  var payload={org:org,cluster:cluster,region:stage9Region,cloud:cloudCreds,
     registry:{type:'harbor',project:'flex-apps'},
     source_vm:{host:(srcComp&&srcComp.tgt)||'',user:((document.getElementById('r6p-extract-user')||{}).value||'ubuntu')},
     auto_commit:false,import_to_gitops:false,
