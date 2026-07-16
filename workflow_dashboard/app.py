@@ -24300,6 +24300,37 @@ def r6_state():
     return jsonify(state)
 
 
+@app.post("/api/r6/test-registry")
+def r6_test_registry():
+    """Validate container registry credentials without exposing the secret."""
+    import subprocess as _subprocess
+    data = request.get_json(silent=True) or {}
+    registry_type = str(data.get("type") or "dockerhub").strip().lower()
+    registry = str(data.get("url") or "").strip().rstrip("/")
+    registry = re.sub(r"^https?://", "", registry)
+    if registry_type == "dockerhub":
+        registry = "docker.io"
+    if not registry or not re.fullmatch(r"[A-Za-z0-9._:/-]+", registry):
+        return jsonify({"ok": False, "error": "Invalid registry URL"}), 400
+    username = str(data.get("user") or "").strip()
+    password = str(data.get("password") or "")
+    if not username or not password:
+        return jsonify({"ok": False, "error": "Registry user and access token are required"}), 400
+    try:
+        result = _subprocess.run(
+            ["docker", "login", registry, "-u", username, "--password-stdin"],
+            input=password, text=True, capture_output=True, timeout=30, check=False,
+        )
+    except FileNotFoundError:
+        return jsonify({"ok": False, "error": "Docker CLI is not installed on the dashboard host"}), 503
+    except _subprocess.TimeoutExpired:
+        return jsonify({"ok": False, "error": "Registry login timed out"}), 504
+    if result.returncode != 0:
+        detail = (result.stderr or result.stdout or "Registry rejected the credentials").strip()
+        return jsonify({"ok": False, "error": detail[-500:]}), 401
+    return jsonify({"ok": True, "registry": registry, "user": username})
+
+
 @app.post("/api/r6/save-creds")
 def r6_save_creds():
     """Persist R6 cloud + gitops credentials server-side so they survive browser

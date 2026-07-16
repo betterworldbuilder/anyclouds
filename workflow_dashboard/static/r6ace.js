@@ -1,5 +1,5 @@
 /* APPS to Container Refactor Engine v4 */
-var R6P={current:0,status:{},bs:null,components:[],captureMethod:'smart',compatConfirmed:false,yaml:'',bundle:null,artifacts:{},preflight:{},continueBlocked:true,captureRun:null,creds:{cloud:{status:'not_configured',authUrl:'',region:'',credId:'',projectId:''},opencenter:{status:'not_configured',clusterRef:'rackspace-flex/flex-prod-k8s',gitDir:''},gitops:{status:'not_configured',localPath:'',branch:'main',method:'existing'}}};
+var R6P={current:0,status:{},bs:null,components:[],captureMethod:'smart',compatConfirmed:false,yaml:'',bundle:null,artifacts:{},preflight:{},continueBlocked:true,captureRun:null,creds:{cloud:{status:'not_configured',authUrl:'',region:'',credId:'',projectId:''},registry:{type:'dockerhub',url:'docker.io',project:'dzoan/flex-apps',user:'dzoan',password:''},opencenter:{status:'not_configured',clusterRef:'rackspace-flex/flex-prod-k8s',gitDir:''},gitops:{status:'not_configured',localPath:'',branch:'main',method:'existing'}}};
 var R6_SCAN_UI_VERSIONS=[{id:'scan-ui-v1',label:'Scan UI v1'}];
 R6P.scanUiVersion='scan-ui-v1';try{localStorage.setItem('r6p_scan_ui_version','scan-ui-v1');}catch(e){}
 /* Device-type badges for Stage 13 UAT rows - mirrors Stage 4's Component Test Lab
@@ -394,21 +394,46 @@ window.r6pSaveCredsServer=function(){
     cloud:{authUrl:v('r6p-c-authurl'),authType:v('r6p-c-authtype'),username:v('r6p-c-username'),
       password:v('r6p-c-password'),credId:v('r6p-c-credid'),secret:v('r6p-c-secret'),
       proj:v('r6p-c-proj'),domain:v('r6p-c-domain'),region:v('r6p-c-region')},
+    registry:{type:v('r6p-build-regtype'),url:v('r6p-build-regurl'),project:v('r6p-build-project'),
+      user:v('r6p-build-reguser'),password:v('r6p-build-regpass')},
     gitops:{repo:v('r6p-git-repo'),branch:v('r6p-git-branch'),auth:v('r6p-git-auth'),
       sshkey:v('r6p-git-sshkey'),localdir:v('r6p-git-localdir'),token:v('r6p-git-token')}
   };
   fetch('/api/r6/save-creds',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}).catch(function(){});
 };
+window.r6pRegistryTest=function(){
+  var v=function(id){var el=document.getElementById(id);return el?el.value.trim():'';};
+  var st=document.getElementById('r6p-registry-test-status');
+  if(st){st.textContent='Testing registry login...';st.style.color='#0369a1';}
+  fetch('/api/r6/test-registry',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+    type:v('r6p-build-regtype'),url:v('r6p-build-regurl'),project:v('r6p-build-project'),
+    user:v('r6p-build-reguser'),password:(document.getElementById('r6p-build-regpass')||{}).value||''
+  })}).then(function(r){return r.json().then(function(d){if(!r.ok||!d.ok)throw new Error(d.error||'Registry login failed');return d;});})
+  .then(function(d){if(st){st.textContent='✓ Connected to '+d.registry;st.style.color='#15803d';}})
+  .catch(function(e){if(st){st.textContent='✗ '+e.message;st.style.color='#dc2626';}});
+};
+window.r6pRegistrySave=function(){
+  var v=function(id){var el=document.getElementById(id);return el?el.value.trim():'';};
+  R6P.creds.registry={type:v('r6p-build-regtype')||'dockerhub',url:v('r6p-build-regurl')||'docker.io',
+    project:v('r6p-build-project')||'dzoan/flex-apps',user:v('r6p-build-reguser')||'dzoan',
+    password:(document.getElementById('r6p-build-regpass')||{}).value||''};
+  if(typeof r6pSaveCredsServer==='function')r6pSaveCredsServer();
+  var st=document.getElementById('r6p-registry-save-status');
+  if(st){st.textContent='✓ saved';st.style.color='#15803d';}
+};
 window.r6pLoadCredsServer=function(){
   return fetch('/api/r6/load-creds').then(function(r){return r.json();}).then(function(d){
     if(!d||!d.ok||!d.data)return;
-    var c=d.data.cloud||{},g=d.data.gitops||{};
+    var c=d.data.cloud||{},reg=d.data.registry||{},g=d.data.gitops||{};
     var set=function(id,val){if(!val)return;var el=document.getElementById(id);if(el&&!el.value)el.value=val;};
     set('r6p-c-authurl',c.authUrl);set('r6p-c-username',c.username);set('r6p-c-password',c.password);
     set('r6p-c-credid',c.credId);set('r6p-c-secret',c.secret);set('r6p-c-proj',c.proj);
     set('r6p-c-domain',c.domain);
     if(c.authType){var dt=document.getElementById('r6p-c-authtype');if(dt){dt.value=c.authType;r6pAuthTypeChange(c.authType);}}
     if(c.region){var rs=document.getElementById('r6p-c-region');if(rs)rs.value=c.region;}
+    set('r6p-build-regurl',reg.url);set('r6p-build-project',reg.project);set('r6p-build-reguser',reg.user);set('r6p-build-regpass',reg.password);
+    if(reg.type){var rt=document.getElementById('r6p-build-regtype');if(rt)rt.value=reg.type;}
+    R6P.creds.registry=Object.assign(R6P.creds.registry||{},reg);
     set('r6p-git-repo',g.repo);set('r6p-git-branch',g.branch);set('r6p-git-sshkey',g.sshkey);
     set('r6p-git-token',g.token);
     if(g.auth){var ga=document.getElementById('r6p-git-auth');if(ga){ga.value=g.auth;if(typeof r6pGitAuthToggle==='function')r6pGitAuthToggle();}}
@@ -1350,9 +1375,6 @@ window.r6pContent=function(n){
     +'<div style="background:#ffffff;border:1px solid #e5e7eb;border-radius:12px;padding:12px;box-shadow:0 8px 22px rgba(15,23,42,.06);margin-bottom:14px;">'
     +'<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;">'
     +'<div style="min-width:260px;flex:1;"><label style="display:block;font-size:11px;font-weight:800;color:#555;margin-bottom:5px;">Component extraction scope</label><select id="r6p-extract-comp" style="width:100%;padding:9px;border:1px solid #cbd5e1;border-radius:8px;">'+extractOptions+'</select></div>'
-    +'<div style="width:120px;"><label style="display:block;font-size:11px;font-weight:800;color:#555;margin-bottom:5px;">SSH User</label><input id="r6p-extract-user" value="ubuntu" style="width:100%;padding:9px;border:1px solid #cbd5e1;border-radius:8px;"></div>'
-    +'<div style="min-width:240px;flex:1;"><label style="display:block;font-size:11px;font-weight:800;color:#555;margin-bottom:5px;">SSH Private Key Path / Secret Ref</label><input id="r6p-extract-key" value="~/.ssh/id_rsa" style="width:100%;padding:9px;border:1px solid #cbd5e1;border-radius:8px;"></div>'
-    +'<div style="min-width:230px;flex:1;"><label style="display:block;font-size:11px;font-weight:800;color:#555;margin-bottom:5px;">Managed known_hosts</label><input id="r6p-extract-known-hosts" value="./data/ssh/known_hosts" style="width:100%;padding:9px;border:1px solid #cbd5e1;border-radius:8px;"></div>'
     +'<button class="r6p-btn primary" onclick="r6pGenRealDockerfiles(false,false)">▶ Extract VM Data</button><button class="r6p-btn secondary" disabled>Stop Extraction</button><button class="r6p-btn secondary" onclick="r6pCopyStage9ExtractLog()">Copy Log</button>'
     +'</div></div>'
     +'<div style="font-size:11px;font-weight:900;color:#555;margin:10px 0 6px;text-transform:uppercase;letter-spacing:.04em;">Verbose VM extraction output</div>'
@@ -1366,6 +1388,7 @@ window.r6pContent=function(n){
     +'<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px;">'
     +'<div><label>Registry</label><select id="r6p-build-regtype"><option value="harbor" selected>Harbor</option><option value="dockerhub">Docker Hub</option><option value="ghcr">GitHub Container Registry</option><option value="ecr">AWS ECR</option><option value="gcp">GCP Artifact Registry</option><option value="custom">Custom OCI URL</option></select></div>'
     +'<div><label>Registry URL optional</label><input id="r6p-build-regurl" placeholder="registry.example.com"></div><div><label>Project</label><input id="r6p-build-project" value="flex-apps"></div><div><label>Registry User</label><input id="r6p-build-reguser" placeholder="admin"></div><div><label>Registry Password</label><input id="r6p-build-regpass" type="password"></div></div>'
+    +'<div style="display:flex;align-items:center;gap:10px;margin:-4px 0 14px;"><button class="r6p-btn primary" type="button" onclick="r6pRegistrySave()">Save Registry Credentials</button><button class="r6p-btn secondary" type="button" onclick="r6pRegistryTest()">Test Container Registry</button><span id="r6p-registry-save-status" style="font-size:12px;color:#64748b;"></span><span id="r6p-registry-test-status" style="font-size:12px;color:#64748b;"></span></div>'
     +'<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px;margin-bottom:14px;"><div style="font-size:11px;font-weight:700;color:#334155;margin-bottom:6px;">Stage 9C Execution Mode</div><label style="margin-right:16px;"><input type="radio" name="r6p-build-mode" value="manual" checked style="margin-right:6px;">Manual - review and run commands</label><label><input type="radio" name="r6p-build-mode" value="auto" style="margin-right:6px;">Automatic - build, scan and push after generation</label><div style="font-size:10px;color:#94a3b8;margin-top:4px;">Automatic mode pushes images to the selected registry. Use Manual for first registry run.</div></div>'
     +'<button class="r6p-btn primary" onclick="r6pGenRealDockerfiles(false,true)">▶ Build Containers</button>'
     +'<div style="font-size:11px;font-weight:900;color:#555;margin:12px 0 6px;text-transform:uppercase;letter-spacing:.04em;">Stage 9C build output</div>'
@@ -2681,10 +2704,20 @@ window.r6pStage0=function(){
     +'</div></div>'
 
 
-    /* 2. GitOps credentials (synced with OpenCenter Production panel state - ocqp, never Quickstart/ocqs) */
+    /* 2. Source VM SSH credentials */
+    +'<div style="border:1px solid #e2e8f0;border-radius:8px;padding:14px 16px;margin:12px 16px 16px;">'
+    +'<div style="font-weight:700;font-size:13px;margin-bottom:2px;">2. Source VM SSH Credentials</div>'
+    +'<div style="font-size:11px;color:#64748b;margin-bottom:10px;">Used by live scan and Stage 9B sanitized VM extraction</div>'
+    +'<div style="display:grid;grid-template-columns:1fr 2fr 2fr;gap:10px;">'
+    +'<div><label style="font-size:11px;font-weight:700;color:#334155;display:block;">SSH User</label><input id="r6p-extract-user" value="ubuntu" style="width:100%;padding:6px;border:1px solid #cbd5e1;border-radius:5px;font-size:12px;"></div>'
+    +'<div><label style="font-size:11px;font-weight:700;color:#334155;display:block;">SSH Private Key Path / Secret Ref</label><input id="r6p-extract-key" value="~/.ssh/id_rsa" style="width:100%;padding:6px;border:1px solid #cbd5e1;border-radius:5px;font-size:12px;"></div>'
+    +'<div><label style="font-size:11px;font-weight:700;color:#334155;display:block;">Managed known_hosts</label><input id="r6p-extract-known-hosts" value="./data/ssh/known_hosts" style="width:100%;padding:6px;border:1px solid #cbd5e1;border-radius:5px;font-size:12px;"></div>'
+    +'</div></div>'
+
+    /* 3. GitOps credentials (synced with OpenCenter Production panel state - ocqp, never Quickstart/ocqs) */
     +'<div style="border:1px solid #e2e8f0;border-radius:8px;padding:14px 16px;margin:12px 16px 16px;">'
     +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">'
-    +'<div><div style="font-weight:700;font-size:13px;">2. GitOps Credentials</div>'
+    +'<div><div style="font-weight:700;font-size:13px;">3. GitOps Credentials</div>'
     +'<div style="font-size:11px;color:#64748b;">Repo + auth used to push refactored app manifests into the OpenCenter pipeline</div></div>'
     +'<span id="r6p-git-badge" style="font-size:10px;font-weight:800;color:#94a3b8;">Not Configured</span></div>'
     +'<div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:10px;">'
