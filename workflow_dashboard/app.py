@@ -8685,6 +8685,158 @@ def tracker_export():
         }
     )
 
+@app.post("/api/migration-requests/export-xlsx")
+def migration_requests_export_xlsx():
+    """Export browser migration requests as a normalized multi-tab workbook."""
+    try:
+        from openpyxl import Workbook
+        from openpyxl.styles import PatternFill, Font, Alignment
+        from openpyxl.worksheet.table import Table, TableStyleInfo
+        from openpyxl.utils import get_column_letter
+    except ImportError:
+        return jsonify({"ok": False, "error": "openpyxl not installed"}), 500
+
+    payload = request.get_json(silent=True) or {}
+    requests_data = payload.get("requests")
+    if not isinstance(requests_data, list) or not requests_data:
+        return jsonify({"ok": False, "error": "No migration requests to export"}), 400
+
+    def value(v):
+        if v is None:
+            return ""
+        if isinstance(v, (dict, list)):
+            return json.dumps(v, ensure_ascii=False)
+        return v
+
+    def ordered_keys(records, excluded, preferred):
+        keys = [key for key in preferred if any(key in row for row in records)]
+        for row in records:
+            for key in row:
+                if key not in excluded and key not in keys:
+                    keys.append(key)
+        return keys
+
+    customers = []
+    systems = []
+    components = []
+    dependencies = []
+    customer_source = []
+    system_source = []
+    component_source = []
+    for ci, customer in enumerate(requests_data, 1):
+        if not isinstance(customer, dict):
+            continue
+        customer_id = str(customer.get("id") or "CUST-%04d" % ci)
+        customer_name = str(customer.get("company") or customer.get("customerName") or "")
+        customer_source.append(customer)
+        cust_row = {"Customer ID": customer_id, "Customer Name": customer_name}
+        cust_row.update({k: value(v) for k, v in customer.items() if k != "systems" and k not in ("id", "company", "customerName")})
+        customers.append(cust_row)
+        child_systems = customer.get("systems") if isinstance(customer.get("systems"), list) else []
+        for si, system in enumerate(child_systems, 1):
+            if not isinstance(system, dict):
+                continue
+            system_id = str(system.get("id") or "%s-SYS-%03d" % (customer_id, si))
+            system_name = str(system.get("name") or system.get("businessSystemName") or "")
+            system_source.append(system)
+            sys_row = {"Customer ID": customer_id, "Customer Name": customer_name,
+                       "Business System ID": system_id, "Business System Name": system_name}
+            sys_row.update({k: value(v) for k, v in system.items() if k != "components" and k not in ("id", "name", "businessSystemName")})
+            systems.append(sys_row)
+            child_components = system.get("components") if isinstance(system.get("components"), list) else []
+            for pi, component in enumerate(child_components, 1):
+                if not isinstance(component, dict):
+                    continue
+                component_id = str(component.get("id") or "%s-COMP-%03d" % (system_id, pi))
+                component_name = str(component.get("name") or component.get("componentName") or "")
+                component_source.append(component)
+                comp_row = {"Customer ID": customer_id, "Customer Name": customer_name,
+                            "Business System ID": system_id, "Business System Name": system_name,
+                            "Component ID": component_id, "Component Name": component_name}
+                comp_row.update({k: value(v) for k, v in component.items() if k not in ("id", "name", "componentName")})
+                components.append(comp_row)
+                if component.get("dependencies"):
+                    dependencies.append({"Customer ID": customer_id, "Customer Name": customer_name,
+                        "Business System ID": system_id, "Business System Name": system_name,
+                        "Component ID": component_id, "Component Name": component_name,
+                        "Dependencies": value(component.get("dependencies"))})
+
+    customer_keys = ordered_keys(customer_source, {"systems", "id", "company", "customerName"},
+        ["contact", "email", "phone", "tenant", "region", "startDate", "completionDate", "submittedAt", "status", "strategy", "notes", "addedToLog", "addedToLogAt"])
+    system_keys = ordered_keys(system_source, {"components", "id", "name", "businessSystemName"},
+        ["archetype", "criticality", "environment", "bowner", "towner", "wave", "region", "status", "description"])
+    component_keys = ordered_keys(component_source, {"id", "name", "componentName"},
+        ["type", "inScope", "src", "tgt", "path", "runtime", "state", "containerDecision", "targetResource", "persistentPath", "dependencies"])
+    customer_headers = ["Customer ID", "Customer Name"] + customer_keys
+    system_headers = ["Customer ID", "Customer Name", "Business System ID", "Business System Name"] + system_keys
+    component_headers = ["Customer ID", "Customer Name", "Business System ID", "Business System Name", "Component ID", "Component Name"] + component_keys
+    dependency_headers = ["Customer ID", "Customer Name", "Business System ID", "Business System Name", "Component ID", "Component Name", "Dependencies"]
+
+    wb = Workbook()
+    wb.remove(wb.active)
+    navy, blue, white, light = "17365D", "1F4E78", "FFFFFF", "D9EAF7"
+
+    def add_title(ws, title, subtitle, width):
+        ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=width)
+        ws.cell(1, 1, title).fill = PatternFill("solid", fgColor=navy)
+        ws.cell(1, 1).font = Font(color=white, bold=True, size=18)
+        ws.cell(1, 1).alignment = Alignment(vertical="center")
+        ws.row_dimensions[1].height = 30
+        ws.merge_cells(start_row=2, start_column=1, end_row=2, end_column=width)
+        ws.cell(2, 1, subtitle).font = Font(color="667085", italic=True, size=10)
+        ws.row_dimensions[2].height = 24
+        ws.sheet_view.showGridLines = False
+
+    def add_data_sheet(name, title_text, subtitle, headers, rows, table_name):
+        ws = wb.create_sheet(name)
+        add_title(ws, title_text, subtitle, max(1, len(headers)))
+        for col, header in enumerate(headers, 1):
+            cell = ws.cell(4, col, header)
+            cell.fill = PatternFill("solid", fgColor=blue)
+            cell.font = Font(color=white, bold=True)
+            cell.alignment = Alignment(wrap_text=True, vertical="center")
+        for row_num, row in enumerate(rows, 5):
+            for col, header in enumerate(headers, 1):
+                ws.cell(row_num, col, value(row.get(header, ""))).alignment = Alignment(vertical="top", wrap_text=True)
+        last_row = max(5, 4 + len(rows))
+        table = Table(displayName=table_name, ref="A4:%s%d" % (get_column_letter(len(headers)), last_row))
+        table.tableStyleInfo = TableStyleInfo(name="TableStyleMedium2", showRowStripes=True)
+        ws.add_table(table)
+        ws.freeze_panes = "A5"
+        for col, header in enumerate(headers, 1):
+            ws.column_dimensions[get_column_letter(col)].width = min(max(len(str(header)) + 3, 14), 32)
+        return ws
+
+    overview = wb.create_sheet("Overview")
+    add_title(overview, "FLEX Customer Migration Portfolio", "Customer → Business System → Component hierarchy", 8)
+    cards = [("Customers", "=COUNTA(Customers!A5:A10000)"),
+             ("Business Systems", "=COUNTA('Business Systems'!C5:C10000)"),
+             ("Components", "=COUNTA(Components!E5:E50000)"),
+             ("Dependencies", "=COUNTA(Dependencies!A5:A50000)")]
+    for index, (label, formula) in enumerate(cards):
+        col = 1 + index * 2
+        overview.merge_cells(start_row=4, start_column=col, end_row=4, end_column=col + 1)
+        overview.merge_cells(start_row=5, start_column=col, end_row=6, end_column=col + 1)
+        overview.cell(4, col, label).fill = PatternFill("solid", fgColor=blue)
+        overview.cell(4, col).font = Font(color=white, bold=True)
+        overview.cell(4, col).alignment = Alignment(horizontal="center")
+        overview.cell(5, col, formula).fill = PatternFill("solid", fgColor=light)
+        overview.cell(5, col).font = Font(color=navy, bold=True, size=24)
+        overview.cell(5, col).alignment = Alignment(horizontal="center", vertical="center")
+    add_data_sheet("Customers", "Customer Portfolio", "One row per customer.", customer_headers, customers, "CustomersTable")
+    add_data_sheet("Business Systems", "Business Systems by Customer", "One row per business system linked by Customer ID.", system_headers, systems, "BusinessSystemsTable")
+    add_data_sheet("Components", "Components by Customer and Business System", "One row per component linked by Customer ID and Business System ID.", component_headers, components, "ComponentsTable")
+    add_data_sheet("Dependencies", "Component Dependencies", "Dependency details extracted from each component.", dependency_headers, dependencies, "DependenciesTable")
+    wb.calculation.fullCalcOnLoad = True
+    output = io.BytesIO()
+    wb.save(output)
+    output.seek(0)
+    filename = "FLEX_Customer_Migration_Hierarchy_%s.xlsx" % datetime.utcnow().strftime("%Y-%m-%d")
+    return Response(output.read(), 200, {
+        "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "Content-Disposition": "attachment; filename=%s" % filename,
+    })
+
 @app.get("/api/tracker/export_xlsx")
 def tracker_export_xlsx():
     import re as _re

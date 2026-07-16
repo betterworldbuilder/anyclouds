@@ -5911,67 +5911,31 @@ ${certContent}
     } catch(e) { alert('Could not delete the migration request: ' + e); }
   };
 
-  // Export every customer request as one CSV row per component. Parent customer
-  // and business-system fields repeat on each row to preserve the hierarchy.
+  // Send all live request data to the server and download the normalized,
+  // multi-tab Customer -> Business System -> Component Excel workbook.
   window.wlExportAllMigrationDetails = function() {
     var items = [];
     try { items = JSON.parse(localStorage.getItem('flex_migration_waiting_list') || '[]'); }
     catch(e) { alert('Could not read migration requests: ' + e); return; }
     if (!Array.isArray(items) || !items.length) { alert('No migration requests to export.'); return; }
-
-    function scalarFields(source, prefix, excluded) {
-      var out = {};
-      Object.keys(source || {}).forEach(function(key) {
-        if (excluded.indexOf(key) !== -1) return;
-        var value = source[key];
-        if (value == null) value = '';
-        else if (typeof value === 'object') value = JSON.stringify(value);
-        out[prefix + key] = value;
-      });
-      return out;
-    }
-    function merge(target, source) {
-      Object.keys(source).forEach(function(key) { target[key] = source[key]; });
-      return target;
-    }
-    var rows = [];
-    items.forEach(function(customer) {
-      var customerFields = scalarFields(customer, 'customer_', ['systems']);
-      var systems = Array.isArray(customer.systems) ? customer.systems : [];
-      if (!systems.length) systems = [{}];
-      systems.forEach(function(system) {
-        var systemFields = scalarFields(system, 'business_system_', ['components']);
-        var components = Array.isArray(system.components) ? system.components : [];
-        if (!components.length) components = [{}];
-        components.forEach(function(component) {
-          var row = {};
-          merge(row, customerFields);
-          merge(row, systemFields);
-          merge(row, scalarFields(component, 'component_', []));
-          rows.push(row);
-        });
-      });
+    fetch('/api/migration-requests/export-xlsx', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({requests: items})
+    }).then(function(response) {
+      if (!response.ok) return response.json().then(function(body) { throw new Error(body.error || 'Export failed'); });
+      return response.blob();
+    }).then(function(blob) {
+      var link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = 'FLEX_Customer_Migration_Hierarchy_' + new Date().toISOString().slice(0,10) + '.xlsx';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      setTimeout(function() { URL.revokeObjectURL(link.href); }, 0);
+    }).catch(function(error) {
+      alert('Could not export Excel workbook: ' + error.message);
     });
-
-    var headers = [];
-    rows.forEach(function(row) {
-      Object.keys(row).forEach(function(key) { if (headers.indexOf(key) === -1) headers.push(key); });
-    });
-    function csvCell(value) {
-      var text = String(value == null ? '' : value);
-      return '"' + text.replace(/"/g, '""') + '"';
-    }
-    var csv = [headers.map(csvCell).join(',')].concat(rows.map(function(row) {
-      return headers.map(function(header) { return csvCell(row[header]); }).join(',');
-    })).join('\r\n');
-    var blob = new Blob(['\ufeff' + csv], {type:'text/csv;charset=utf-8'});
-    var link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = 'all-customer-migration-details-' + new Date().toISOString().slice(0,10) + '.csv';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    setTimeout(function() { URL.revokeObjectURL(link.href); }, 0);
   };
   // Waiting-list header action: push every request into the Migration Log in
   // one pass (single save, single summary popup), then clear the waiting list.
