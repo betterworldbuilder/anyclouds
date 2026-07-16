@@ -3,8 +3,11 @@
       <!-- Shared migration-request workspace. The OSPC customer mockup embeds this
            exact live DOM via ?stage=s0&only=migration_request, so both pages use one engine. -->
       <div id="migration-request-workspace">
-      <!-- Migration to FLEX Request Panel -->
-      <div id="mig-flex-req-panel" style="background:#fff;border:1px solid #c7d2fe;border-radius:12px;margin-bottom:18px;overflow:hidden;box-shadow:0 4px 20px rgba(79,70,229,.12);">
+      <!-- Migration to FLEX Request Panel (operator "New Migration Project" bar)
+           removed 2026-07-16 on request — requests are created via the Customer
+           Migration Request board below; hidden so mfr-* element ids and the
+           embed logic keep working unchanged. -->
+      <div id="mig-flex-req-panel" style="display:none;background:#fff;border:1px solid #c7d2fe;border-radius:12px;margin-bottom:18px;overflow:hidden;box-shadow:0 4px 20px rgba(79,70,229,.12);">
         <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 20px;background:linear-gradient(135deg,#1e1b4b,#4f46e5);">
           <div style="font-size:14px;font-weight:900;color:#fff;letter-spacing:.06em;">🚀 New Migration Project</div>
           <div style="display:flex;gap:8px;align-items:center;">
