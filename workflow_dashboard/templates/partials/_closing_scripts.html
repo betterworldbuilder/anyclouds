@@ -5890,7 +5890,12 @@ ${certContent}
   window.wlAddToLog = function(i) {
     try {
       var items = JSON.parse(localStorage.getItem('flex_migration_waiting_list') || '[]');
-      if (items[i]) addRequestToMigrationLog(items[i]);
+      if (items[i] && addRequestToMigrationLog(items[i])) {
+        items[i].addedToLog = true;
+        items[i].addedToLogAt = new Date().toISOString();
+        localStorage.setItem('flex_migration_waiting_list', JSON.stringify(items));
+        loadMigWaitingList();
+      }
     } catch(e) { alert('Could not read the migration request: ' + e); }
   };
 
@@ -6021,6 +6026,9 @@ ${certContent}
           + (r.startDate ? '<span style="background:#f0fdf4;color:#15803d;border-radius:4px;padding:2px 7px;font-size:10px;font-weight:700;">▶ ' + r.startDate + '</span>' : '')
           + (r.completionDate ? '<span style="background:#fef2f2;color:#dc2626;border-radius:4px;padding:2px 7px;font-size:10px;font-weight:700;">🏁 ' + r.completionDate + '</span>' : '')
           + (sysCnt ? '<span style="background:#dcfce7;color:#15803d;border-radius:4px;padding:2px 7px;font-size:10px;font-weight:800;">' + sysCnt + ' systems</span>' : '')
+          + (r.addedToLog
+              ? '<span title="' + (r.addedToLogAt ? 'added ' + new Date(r.addedToLogAt).toLocaleString() : '') + '" style="background:#dcfce7;color:#15803d;border:1px solid #86efac;border-radius:999px;padding:2px 10px;font-size:10px;font-weight:800;">✓ Added to Migration Queue</span>'
+              : '<span style="background:#f8fafc;color:#94a3b8;border:1px solid #e2e8f0;border-radius:999px;padding:2px 10px;font-size:10px;font-weight:800;">Not Added to Migration Queue</span>')
           + '<div style="margin-left:auto;display:flex;gap:8px;">'
           + '<button onclick="showWLDetails(' + i + ')" style="background:#f0f9ff;color:#0284c7;border:1px solid #bae6fd;border-radius:6px;padding:5px 12px;font-size:11px;font-weight:900;cursor:pointer;white-space:nowrap;">🔍 Show Details</button>'
           + '<button onclick="wlAddToLog(' + i + ')" style="background:linear-gradient(135deg,#4f46e5,#0284c7);color:#fff;border:none;border-radius:6px;padding:5px 12px;font-size:11px;font-weight:900;cursor:pointer;white-space:nowrap;">➕ Add to Migration Log</button>'
