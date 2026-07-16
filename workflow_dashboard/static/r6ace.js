@@ -309,9 +309,16 @@ window.r6pRefreshComponentDrivenStages=function(){
 window.r6pComponentTarget=function(c){
   c=c||{};
   var nested=c.target||c.flex||c.vm||{};
-  return String(c.tgt||c.targetIp||c.targetIP||c.target_ip||c.targetUrl||c.target_url||c.flexIp||c.flexIP||
-    c.flex_ip||c.flexUrl||c.flex_url||c.vmIp||c.vm_ip||c.ip||c.endpoint||c.host||
-    nested.ip||nested.address||nested.endpoint||nested.url||'').trim();
+  var values=[c.sourceIp,c.source_ip,c.targetIp,c.targetIP,c.target_ip,c.targetUrl,c.target_url,
+    c.flexIp,c.flexIP,c.flex_ip,c.flexUrl,c.flex_url,c.vmIp,c.vm_ip,c.ip,c.endpoint,c.host,c.tgt,
+    nested.ip,nested.address,nested.endpoint,nested.url];
+  for(var i=0;i<values.length;i++){
+    var value=String(values[i]||'').trim();
+    if(!value||/^(not required|n\/?a|none|null|undefined|tbd|unknown)$/i.test(value))continue;
+    if(/<(source|target|flex|ospc)[-_ ]?(ip|url|host)>/i.test(value))continue;
+    return value;
+  }
+  return '';
 };
 window.r6pInputConnectionFor=function(c){
   c=c||{};
