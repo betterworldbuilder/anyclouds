@@ -46,18 +46,66 @@ sleep 1
 # ── FRESH-SERVER BOOTSTRAP ────────────────────────────────────────────────────
 # A brand-new Ubuntu host has no pip3/nginx and the ubuntu user has no password,
 # so plain `systemctl restart nginx` hangs on an interactive polkit prompt.
-# Everything below is non-interactive; nginx is optional (dashboard falls back
-# to plain HTTP on :5001 when it is unavailable).
-if ! command -v pip3 >/dev/null 2>&1; then
-    echo "-> Fresh host detected: installing python3-pip/python3-venv (sudo apt)..."
-    sudo apt-get update -qq && sudo apt-get install -y -qq python3-pip python3-venv || {
-        echo "ERROR: could not install python3-pip. Run manually: sudo apt-get install -y python3-pip"
-        exit 1
-    }
+# Everything below is non-interactive and idempotent; nginx is optional (the
+# dashboard falls back to plain HTTP on :5001 when it is unavailable).
+export DEBIAN_FRONTEND=noninteractive
+
+# System packages the dashboard and its panels need. This is the union of the
+# core runtime and the jumphost tool list documented in
+# requirements/requirements.txt (VM offline repair, DBaaS migration, audio).
+APT_PACKAGES=(
+    # core runtime
+    python3-pip python3-venv nginx git curl wget jq unzip zip openssl
+    ca-certificates psmisc procps openssh-client rsync sshpass
+    # DBaaS migration (mysqldump/mysql via Cloud LB)
+    mysql-client
+    # Linux VM offline repair
+    qemu-utils gdisk e2fsprogs xfsprogs parted
+    # Windows VM offline repair
+    ntfs-3g chntpw libhivex-bin
+    # announce.py audio playback
+    pulseaudio-utils mpg123 ffmpeg
+)
+MISSING_PKGS=()
+for pkg in "${APT_PACKAGES[@]}"; do
+    dpkg -s "$pkg" >/dev/null 2>&1 || MISSING_PKGS+=("$pkg")
+done
+if ((${#MISSING_PKGS[@]})); then
+    echo "-> Fresh host: installing ${#MISSING_PKGS[@]} system package(s): ${MISSING_PKGS[*]}"
+    sudo apt-get update -qq || true
+    if ! sudo apt-get install -y -qq "${MISSING_PKGS[@]}"; then
+        # mysql-client is a meta package that is absent on some Ubuntu variants;
+        # retry without it (mariadb-client is the drop-in) before giving up.
+        RETRY_PKGS=()
+        for pkg in "${MISSING_PKGS[@]}"; do [[ "$pkg" == "mysql-client" ]] || RETRY_PKGS+=("$pkg"); done
+        sudo apt-get install -y -qq "${RETRY_PKGS[@]}" mariadb-client || {
+            echo "ERROR: apt package installation failed. Run manually:"
+            echo "       sudo apt-get install -y ${MISSING_PKGS[*]}"
+            exit 1
+        }
+    fi
 fi
-if ! command -v nginx >/dev/null 2>&1; then
-    echo "-> Fresh host: installing nginx (HTTPS proxy on :5002)..."
-    sudo apt-get install -y -qq nginx || echo "WARN: nginx install failed — dashboard will be HTTP-only on :5001"
+
+# Kubernetes/GitOps CLIs used by the OpenCenter panels and live monitors.
+# Best-effort: the dashboard runs without them; cluster panels need them.
+if ! command -v kubectl >/dev/null 2>&1; then
+    echo "-> Fresh host: installing kubectl..."
+    KVER=$(curl -fsSL --max-time 15 https://dl.k8s.io/release/stable.txt 2>/dev/null)
+    if [[ -n "$KVER" ]] && curl -fsSL --max-time 120 -o /tmp/kubectl "https://dl.k8s.io/release/${KVER}/bin/linux/amd64/kubectl"; then
+        sudo install -m 0755 /tmp/kubectl /usr/local/bin/kubectl && rm -f /tmp/kubectl
+    else
+        echo "WARN: kubectl install failed — cluster panels will show 'not available'"
+    fi
+fi
+if ! command -v helm >/dev/null 2>&1; then
+    echo "-> Fresh host: installing helm..."
+    curl -fsSL --max-time 120 https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 2>/dev/null | bash >/dev/null 2>&1 \
+        || echo "WARN: helm install failed — OpenCenter network-plugin step needs it on deployer hosts"
+fi
+if ! command -v flux >/dev/null 2>&1; then
+    echo "-> Fresh host: installing flux CLI..."
+    curl -fsSL --max-time 120 https://fluxcd.io/install.sh 2>/dev/null | sudo bash >/dev/null 2>&1 \
+        || echo "WARN: flux CLI install failed — OpenCenter flux bootstrap needs it on deployer hosts"
 fi
 if command -v nginx >/dev/null 2>&1 && [[ ! -f /etc/nginx/conf.d/osflex.conf ]] \
         && [[ -f "$SCRIPT_DIR/workflow_dashboard/osflex_nginx.conf" ]]; then
