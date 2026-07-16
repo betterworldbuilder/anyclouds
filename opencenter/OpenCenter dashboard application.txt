@@ -1,0 +1,1026 @@
+OpenCenter dashboard application
+ ├── /metrics             → OpenCenter custom exporter
+ ├── bootstrap logs       → dashboard live stream
+ └── Kubernetes/OpenStack collectors
+             │
+             ▼
+Prometheus :9090
+ ├── OpenCenter exporter
+ ├── Node Exporter :9100
+ └── optional Kubernetes targets
+             │
+             ▼
+Grafana :3000
+ ├── OpenCenter Deployment dashboard
+ ├── OpenCenter Cluster Overview
+ ├── OpenCenter GitOps dashboard
+ └── OpenCenter Infrastructure dashboard
+
+
+cd /home/dzoan/OSPC2FLEX/osflex-deployer-fullmig-5.0.0420current
+
+mkdir -p scripts/monitoring
+nano scripts/monitoring/install_opencenter_monitoring.sh
+
+Below is a deployment plan for installing Prometheus + Node Exporter + Grafana on the Ubuntu 24.04 OpenCenter server, exposing the OpenCenter /metrics exporter, and provisioning the OpenCenter dashboards.
+
+This assumes Prometheus and Grafana run on the same server as:
+
+/home/dzoan/OSPC2FLEX/osflex-deployer-fullmig-5.0.0420current
+
+Prometheus supports precompiled binaries and persistent storage, while Grafana’s official Ubuntu method uses its APT repository. Grafana can provision datasources and dashboards from version-controlled files.
+
+1. Target architecture
+OpenCenter dashboard application
+ ├── /metrics             → OpenCenter custom exporter
+ ├── bootstrap logs       → dashboard live stream
+ └── Kubernetes/OpenStack collectors
+             │
+             ▼
+Prometheus :9090
+ ├── OpenCenter exporter
+ ├── Node Exporter :9100
+ └── optional Kubernetes targets
+             │
+             ▼
+Grafana :3000
+ ├── OpenCenter Deployment dashboard
+ ├── OpenCenter Cluster Overview
+ ├── OpenCenter GitOps dashboard
+ └── OpenCenter Infrastructure dashboard
+2. Create the installation script
+
+On the OpenCenter Ubuntu 24.04 server:
+
+cd /home/dzoan/OSPC2FLEX/osflex-deployer-fullmig-5.0.0420current
+
+mkdir -p scripts/monitoring
+nano scripts/monitoring/install_opencenter_monitoring.sh
+
+Paste:
+
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+PROMETHEUS_VERSION="${PROMETHEUS_VERSION:-3.5.0}"
+NODE_EXPORTER_VERSION="${NODE_EXPORTER_VERSION:-1.9.1}"
+
+PROJECT_ROOT="${PROJECT_ROOT:-/home/dzoan/OSPC2FLEX/osflex-deployer-fullmig-5.0.0420current}"
+ARCH="$(dpkg --print-architecture)"
+
+case "$ARCH" in
+  amd64)
+    PROM_ARCH="amd64"
+    ;;
+  arm64)
+    PROM_ARCH="arm64"
+    ;;
+  *)
+    echo "[ERROR] Unsupported architecture: $ARCH" >&2
+    exit 1
+    ;;
+esac
+
+echo "============================================================"
+echo " Installing OpenCenter monitoring"
+echo " Project: $PROJECT_ROOT"
+echo " Architecture: $PROM_ARCH"
+echo "============================================================"
+
+sudo apt-get update
+sudo apt-get install -y \
+  ca-certificates \
+  curl \
+  wget \
+  gnupg \
+  jq \
+  tar \
+  gzip \
+  apache2-utils \
+  python3 \
+  python3-venv \
+  python3-pip
+
+# -------------------------------------------------------------------
+# Prometheus users and directories
+# -------------------------------------------------------------------
+
+if ! getent group prometheus >/dev/null; then
+  sudo groupadd --system prometheus
+fi
+
+if ! id prometheus >/dev/null 2>&1; then
+  sudo useradd \
+    --system \
+    --no-create-home \
+    --shell /usr/sbin/nologin \
+    --gid prometheus \
+    prometheus
+fi
+
+sudo install -d -o prometheus -g prometheus -m 0750 /etc/prometheus
+sudo install -d -o prometheus -g prometheus -m 0750 /etc/prometheus/rules
+sudo install -d -o prometheus -g prometheus -m 0750 /etc/prometheus/file_sd
+sudo install -d -o prometheus -g prometheus -m 0750 /var/lib/prometheus
+
+# -------------------------------------------------------------------
+# Prometheus
+# -------------------------------------------------------------------
+
+TMP_DIR="$(mktemp -d)"
+trap 'rm -rf "$TMP_DIR"' EXIT
+
+PROM_ARCHIVE="prometheus-${PROMETHEUS_VERSION}.linux-${PROM_ARCH}.tar.gz"
+PROM_URL="https://github.com/prometheus/prometheus/releases/download/v${PROMETHEUS_VERSION}/${PROM_ARCHIVE}"
+
+echo "[INFO] Downloading Prometheus ${PROMETHEUS_VERSION}"
+curl --fail --location --retry 3 \
+  "$PROM_URL" \
+  --output "$TMP_DIR/$PROM_ARCHIVE"
+
+tar -xzf "$TMP_DIR/$PROM_ARCHIVE" -C "$TMP_DIR"
+
+PROM_DIR="$TMP_DIR/prometheus-${PROMETHEUS_VERSION}.linux-${PROM_ARCH}"
+
+sudo install -m 0755 "$PROM_DIR/prometheus" /usr/local/bin/prometheus
+sudo install -m 0755 "$PROM_DIR/promtool" /usr/local/bin/promtool
+
+sudo rm -rf /etc/prometheus/consoles /etc/prometheus/console_libraries
+sudo cp -a "$PROM_DIR/consoles" /etc/prometheus/
+sudo cp -a "$PROM_DIR/console_libraries" /etc/prometheus/
+
+sudo chown -R prometheus:prometheus /etc/prometheus
+
+# -------------------------------------------------------------------
+# Node Exporter
+# -------------------------------------------------------------------
+
+if ! getent group node_exporter >/dev/null; then
+  sudo groupadd --system node_exporter
+fi
+
+if ! id node_exporter >/dev/null 2>&1; then
+  sudo useradd \
+    --system \
+    --no-create-home \
+    --shell /usr/sbin/nologin \
+    --gid node_exporter \
+    node_exporter
+fi
+
+NODE_ARCHIVE="node_exporter-${NODE_EXPORTER_VERSION}.linux-${PROM_ARCH}.tar.gz"
+NODE_URL="https://github.com/prometheus/node_exporter/releases/download/v${NODE_EXPORTER_VERSION}/${NODE_ARCHIVE}"
+
+echo "[INFO] Downloading Node Exporter ${NODE_EXPORTER_VERSION}"
+curl --fail --location --retry 3 \
+  "$NODE_URL" \
+  --output "$TMP_DIR/$NODE_ARCHIVE"
+
+tar -xzf "$TMP_DIR/$NODE_ARCHIVE" -C "$TMP_DIR"
+
+NODE_DIR="$TMP_DIR/node_exporter-${NODE_EXPORTER_VERSION}.linux-${PROM_ARCH}"
+
+sudo install -m 0755 "$NODE_DIR/node_exporter" /usr/local/bin/node_exporter
+
+# -------------------------------------------------------------------
+# Grafana APT repository
+# -------------------------------------------------------------------
+
+sudo install -d -m 0755 /etc/apt/keyrings
+
+curl --fail --location https://apt.grafana.com/gpg-full.key |
+  sudo tee /etc/apt/keyrings/grafana.asc >/dev/null
+
+sudo chmod 0644 /etc/apt/keyrings/grafana.asc
+
+echo \
+  "deb [signed-by=/etc/apt/keyrings/grafana.asc] https://apt.grafana.com stable main" |
+  sudo tee /etc/apt/sources.list.d/grafana.list >/dev/null
+
+sudo apt-get update
+sudo apt-get install -y grafana
+
+# -------------------------------------------------------------------
+# Systemd services
+# -------------------------------------------------------------------
+
+sudo tee /etc/systemd/system/prometheus.service >/dev/null <<'EOF'
+[Unit]
+Description=Prometheus Monitoring Server
+Documentation=https://prometheus.io/docs/
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+User=prometheus
+Group=prometheus
+Type=simple
+ExecStart=/usr/local/bin/prometheus \
+  --config.file=/etc/prometheus/prometheus.yml \
+  --storage.tsdb.path=/var/lib/prometheus \
+  --storage.tsdb.retention.time=30d \
+  --storage.tsdb.retention.size=20GB \
+  --web.console.templates=/etc/prometheus/consoles \
+  --web.console.libraries=/etc/prometheus/console_libraries \
+  --web.enable-lifecycle \
+  --web.listen-address=127.0.0.1:9090
+
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=on-failure
+RestartSec=5s
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/prometheus
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+sudo tee /etc/systemd/system/node_exporter.service >/dev/null <<'EOF'
+[Unit]
+Description=Prometheus Node Exporter
+Documentation=https://prometheus.io/docs/guides/node-exporter/
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+User=node_exporter
+Group=node_exporter
+Type=simple
+ExecStart=/usr/local/bin/node_exporter \
+  --web.listen-address=127.0.0.1:9100 \
+  --collector.systemd \
+  --collector.processes
+Restart=on-failure
+RestartSec=5s
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+# -------------------------------------------------------------------
+# Base Prometheus configuration
+# -------------------------------------------------------------------
+
+sudo tee /etc/prometheus/prometheus.yml >/dev/null <<'EOF'
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  scrape_timeout: 10s
+
+  external_labels:
+    environment: "opencenter"
+    platform: "flex"
+
+rule_files:
+  - "/etc/prometheus/rules/*.yml"
+
+scrape_configs:
+  - job_name: "prometheus"
+    static_configs:
+      - targets:
+          - "127.0.0.1:9090"
+
+  - job_name: "opencenter-host"
+    static_configs:
+      - targets:
+          - "127.0.0.1:9100"
+        labels:
+          service: "opencenter-server"
+
+  - job_name: "opencenter-exporter"
+    metrics_path: "/metrics"
+    static_configs:
+      - targets:
+          - "127.0.0.1:9187"
+        labels:
+          service: "opencenter"
+
+  - job_name: "opencenter-file-discovery"
+    file_sd_configs:
+      - files:
+          - "/etc/prometheus/file_sd/*.json"
+        refresh_interval: 30s
+EOF
+
+sudo chown prometheus:prometheus /etc/prometheus/prometheus.yml
+sudo chmod 0640 /etc/prometheus/prometheus.yml
+
+sudo tee /etc/prometheus/file_sd/opencenter-targets.json >/dev/null <<'EOF'
+[]
+EOF
+
+sudo chown prometheus:prometheus \
+  /etc/prometheus/file_sd/opencenter-targets.json
+
+# -------------------------------------------------------------------
+# Prometheus alert rules
+# -------------------------------------------------------------------
+
+sudo tee /etc/prometheus/rules/opencenter-alerts.yml >/dev/null <<'EOF'
+groups:
+  - name: opencenter
+    rules:
+      - alert: OpenCenterExporterDown
+        expr: up{job="opencenter-exporter"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "OpenCenter exporter is unavailable"
+          description: "Prometheus has not scraped the OpenCenter exporter for more than two minutes."
+
+      - alert: OpenCenterDeploymentFailed
+        expr: opencenter_deployment_status{status="failed"} == 1
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "OpenCenter deployment failed"
+          description: "Cluster {{ $labels.org }}/{{ $labels.cluster }} has a failed deployment."
+
+      - alert: OpenCenterDuplicateDeployment
+        expr: opencenter_deployment_processes > 1
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: "Duplicate OpenCenter deployments detected"
+          description: "More than one deployment process is active for {{ $labels.org }}/{{ $labels.cluster }}."
+
+      - alert: OpenCenterNodeNotReady
+        expr: opencenter_cluster_node_ready == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "OpenCenter Kubernetes node is not ready"
+          description: "Node {{ $labels.node }} is not Ready."
+
+      - alert: OpenCenterQuotaPressure
+        expr: opencenter_openstack_quota_usage_ratio > 0.85
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "OpenStack quota pressure"
+          description: "{{ $labels.resource }} quota is above 85% for {{ $labels.cluster }}."
+EOF
+
+sudo chown prometheus:prometheus \
+  /etc/prometheus/rules/opencenter-alerts.yml
+
+# -------------------------------------------------------------------
+# Grafana provisioning directories
+# -------------------------------------------------------------------
+
+sudo install -d -o root -g grafana -m 0750 \
+  /etc/grafana/provisioning/datasources
+
+sudo install -d -o root -g grafana -m 0750 \
+  /etc/grafana/provisioning/dashboards
+
+sudo install -d -o root -g grafana -m 0750 \
+  /var/lib/grafana/dashboards/opencenter
+
+sudo tee /etc/grafana/provisioning/datasources/opencenter.yml >/dev/null <<'EOF'
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    uid: prometheus
+    type: prometheus
+    access: proxy
+    url: http://127.0.0.1:9090
+    isDefault: true
+    editable: false
+    jsonData:
+      timeInterval: 15s
+EOF
+
+sudo tee /etc/grafana/provisioning/dashboards/opencenter.yml >/dev/null <<'EOF'
+apiVersion: 1
+
+providers:
+  - name: OpenCenter
+    orgId: 1
+    folder: OpenCenter
+    type: file
+    disableDeletion: false
+    allowUiUpdates: false
+    updateIntervalSeconds: 30
+    options:
+      path: /var/lib/grafana/dashboards/opencenter
+      foldersFromFilesStructure: false
+EOF
+
+sudo chown root:grafana \
+  /etc/grafana/provisioning/datasources/opencenter.yml \
+  /etc/grafana/provisioning/dashboards/opencenter.yml
+
+sudo chmod 0640 \
+  /etc/grafana/provisioning/datasources/opencenter.yml \
+  /etc/grafana/provisioning/dashboards/opencenter.yml
+
+# -------------------------------------------------------------------
+# Grafana local binding
+# -------------------------------------------------------------------
+
+sudo sed -i \
+  's|^;http_addr =.*|http_addr = 127.0.0.1|' \
+  /etc/grafana/grafana.ini
+
+sudo sed -i \
+  's|^;http_port =.*|http_port = 3000|' \
+  /etc/grafana/grafana.ini
+
+# -------------------------------------------------------------------
+# Validate and start
+# -------------------------------------------------------------------
+
+sudo /usr/local/bin/promtool check config \
+  /etc/prometheus/prometheus.yml
+
+sudo /usr/local/bin/promtool check rules \
+  /etc/prometheus/rules/opencenter-alerts.yml
+
+sudo systemctl daemon-reload
+
+sudo systemctl enable --now node_exporter
+sudo systemctl enable --now prometheus
+sudo systemctl enable --now grafana-server
+
+echo
+echo "Installation completed."
+echo
+echo "Prometheus: http://127.0.0.1:9090"
+echo "Node Exporter: http://127.0.0.1:9100/metrics"
+echo "Grafana: http://127.0.0.1:3000"
+echo
+echo "The OpenCenter exporter must now be installed on port 9187."
+
+Make it executable and run it:
+
+chmod +x scripts/monitoring/install_opencenter_monitoring.sh
+
+sudo \
+  PROJECT_ROOT="$PWD" \
+  scripts/monitoring/install_opencenter_monitoring.sh
+
+Prometheus file-based service discovery can update target files without restarting Prometheus, which is useful later when OpenCenter generates dynamic cluster targets.
+
+3. Install the OpenCenter metrics exporter
+
+The monitoring package described earlier must contain:
+
+workflow_dashboard/monitoring/opencenter_exporter.py
+
+The exporter should expose:
+
+http://127.0.0.1:9187/metrics
+http://127.0.0.1:9187/healthz
+
+Create the Python environment:
+
+cd /home/dzoan/OSPC2FLEX/osflex-deployer-fullmig-5.0.0420current
+
+python3 -m venv .venv-monitoring
+source .venv-monitoring/bin/activate
+
+pip install --upgrade pip wheel
+pip install \
+  prometheus-client \
+  flask \
+  psutil \
+  pyyaml
+
+Create the exporter systemd service:
+
+sudo tee /etc/systemd/system/opencenter-exporter.service >/dev/null <<EOF
+[Unit]
+Description=OpenCenter Prometheus Metrics Exporter
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=dzoan
+Group=dzoan
+WorkingDirectory=/home/dzoan/OSPC2FLEX/osflex-deployer-fullmig-5.0.0420current
+
+Environment=PYTHONUNBUFFERED=1
+Environment=OPENCENTER_CONFIG_DIR=/home/dzoan/.config/opencenter
+Environment=OPENCENTER_STATE_DIR=/home/dzoan/.local/state/opencenter
+Environment=OPENCENTER_EXPORTER_HOST=127.0.0.1
+Environment=OPENCENTER_EXPORTER_PORT=9187
+
+ExecStart=/home/dzoan/OSPC2FLEX/osflex-deployer-fullmig-5.0.0420current/.venv-monitoring/bin/python \
+  -m workflow_dashboard.monitoring.opencenter_exporter
+
+Restart=always
+RestartSec=5
+TimeoutStopSec=20
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=false
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+sudo systemctl daemon-reload
+sudo systemctl enable --now opencenter-exporter
+
+Validate:
+
+systemctl status opencenter-exporter --no-pager
+curl --fail http://127.0.0.1:9187/healthz
+curl --fail http://127.0.0.1:9187/metrics | head -50
+
+Confirm Prometheus can scrape it:
+
+curl -s http://127.0.0.1:9090/api/v1/targets |
+  jq '.data.activeTargets[] |
+      {
+        job: .labels.job,
+        health: .health,
+        lastError: .lastError
+      }'
+
+Expected:
+
+{
+  "job": "opencenter-exporter",
+  "health": "up",
+  "lastError": ""
+}
+4. Install the OpenCenter Grafana dashboard package
+
+The package from the previous design should produce:
+
+infrastructure/monitoring/grafana/
+├── dashboards/
+│   ├── opencenter-cluster-overview.json
+│   ├── opencenter-deployment.json
+│   ├── opencenter-gitops.json
+│   └── opencenter-infrastructure.json
+├── provisioning/
+│   ├── dashboards/
+│   │   └── opencenter.yaml
+│   └── datasources/
+│       └── datasources.yaml
+└── alerts/
+    └── opencenter-alerts.yaml
+
+Create an installer:
+
+nano scripts/monitoring/install_opencenter_dashboards.sh
+
+Paste:
+
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+PROJECT_ROOT="${PROJECT_ROOT:-/home/dzoan/OSPC2FLEX/osflex-deployer-fullmig-5.0.0420current}"
+
+SOURCE_ROOT="$PROJECT_ROOT/infrastructure/monitoring/grafana"
+DASHBOARD_SOURCE="$SOURCE_ROOT/dashboards"
+DASHBOARD_DEST="/var/lib/grafana/dashboards/opencenter"
+
+if [[ ! -d "$DASHBOARD_SOURCE" ]]; then
+  echo "[ERROR] Dashboard package not found: $DASHBOARD_SOURCE" >&2
+  echo "[ERROR] Run the Codex monitoring implementation first." >&2
+  exit 1
+fi
+
+required_dashboards=(
+  "opencenter-cluster-overview.json"
+  "opencenter-deployment.json"
+  "opencenter-gitops.json"
+  "opencenter-infrastructure.json"
+)
+
+for dashboard in "${required_dashboards[@]}"; do
+  if [[ ! -s "$DASHBOARD_SOURCE/$dashboard" ]]; then
+    echo "[ERROR] Missing dashboard: $dashboard" >&2
+    exit 1
+  fi
+
+  jq empty "$DASHBOARD_SOURCE/$dashboard"
+done
+
+sudo install -d \
+  -o grafana \
+  -g grafana \
+  -m 0750 \
+  "$DASHBOARD_DEST"
+
+for dashboard in "${required_dashboards[@]}"; do
+  sudo install \
+    -o grafana \
+    -g grafana \
+    -m 0640 \
+    "$DASHBOARD_SOURCE/$dashboard" \
+    "$DASHBOARD_DEST/$dashboard"
+done
+
+if [[ -s "$SOURCE_ROOT/provisioning/datasources/datasources.yaml" ]]; then
+  sudo install \
+    -o root \
+    -g grafana \
+    -m 0640 \
+    "$SOURCE_ROOT/provisioning/datasources/datasources.yaml" \
+    /etc/grafana/provisioning/datasources/opencenter-package.yaml
+fi
+
+if [[ -s "$SOURCE_ROOT/provisioning/dashboards/opencenter.yaml" ]]; then
+  sudo install \
+    -o root \
+    -g grafana \
+    -m 0640 \
+    "$SOURCE_ROOT/provisioning/dashboards/opencenter.yaml" \
+    /etc/grafana/provisioning/dashboards/opencenter-package.yaml
+fi
+
+sudo systemctl restart grafana-server
+
+sleep 5
+
+if ! systemctl is-active --quiet grafana-server; then
+  echo "[ERROR] Grafana failed after dashboard installation." >&2
+  journalctl -u grafana-server -n 100 --no-pager
+  exit 1
+fi
+
+echo "[OK] OpenCenter Grafana dashboards installed."
+
+Run:
+
+chmod +x scripts/monitoring/install_opencenter_dashboards.sh
+
+sudo \
+  PROJECT_ROOT="$PWD" \
+  scripts/monitoring/install_opencenter_dashboards.sh
+
+Grafana reads datasource configuration from its provisioning datasource directory and dashboard providers from its dashboard provisioning directory, so these dashboards remain reproducible after restarts.
+
+5. Add monitoring routes to the OpenCenter application
+
+The OpenCenter dashboard application should expose:
+
+/opencenter/monitor/deployment/<org>/<cluster>
+/opencenter/monitor/cluster/<org>/<cluster>
+/api/monitoring/...
+/metrics
+/healthz
+
+Register the monitoring blueprint in the existing application factory, following the repository’s current Flask or FastAPI structure.
+
+Example Flask registration:
+
+from workflow_dashboard.routes.monitoring_api import monitoring_api
+
+app.register_blueprint(
+    monitoring_api,
+    url_prefix="/api/monitoring",
+)
+
+Keep the standalone exporter on port 9187 even when /metrics is also exposed through the main application. This isolates Prometheus scraping from UI restarts.
+
+6. Add Grafana links to the OpenCenter UI
+
+Add these environment settings to the dashboard service:
+
+OPENCENTER_GRAFANA_URL=/grafana
+OPENCENTER_PROMETHEUS_URL=/prometheus
+
+The two OpenCenter dashboards should include:
+
+Open in Grafana
+Open deployment dashboard
+Open cluster overview
+Open GitOps dashboard
+Open infrastructure dashboard
+
+Use Grafana dashboard UIDs rather than dashboard titles:
+
+opencenter-deployment
+opencenter-cluster-overview
+opencenter-gitops
+opencenter-infrastructure
+
+Example link:
+
+/grafana/d/opencenter-cluster-overview/opencenter-cluster-overview?var-organization=my-org&var-cluster=test8cluster
+7. Put Prometheus and Grafana behind Nginx
+
+Do not expose Prometheus directly to the Internet.
+
+Install Nginx:
+
+sudo apt-get install -y nginx
+
+Create an OpenCenter reverse proxy:
+
+sudo tee /etc/nginx/sites-available/opencenter-monitoring >/dev/null <<'EOF'
+map $http_upgrade $connection_upgrade {
+    default upgrade;
+    '' close;
+}
+
+server {
+    listen 80;
+    server_name _;
+
+    client_max_body_size 25m;
+
+    location /grafana/ {
+        proxy_pass http://127.0.0.1:3000/;
+        proxy_http_version 1.1;
+
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection $connection_upgrade;
+    }
+
+    location /prometheus/ {
+        auth_basic "OpenCenter Prometheus";
+        auth_basic_user_file /etc/nginx/.prometheus-htpasswd;
+
+        proxy_pass http://127.0.0.1:9090/;
+        proxy_http_version 1.1;
+
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location /opencenter-exporter-health {
+        proxy_pass http://127.0.0.1:9187/healthz;
+        proxy_set_header Host $host;
+    }
+
+    # Replace this port with the existing OpenCenter dashboard port.
+    location / {
+        proxy_pass http://127.0.0.1:8080;
+        proxy_http_version 1.1;
+
+        proxy_buffering off;
+        proxy_cache off;
+
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection $connection_upgrade;
+    }
+}
+EOF
+
+Create Prometheus credentials:
+
+sudo htpasswd -c /etc/nginx/.prometheus-htpasswd dzoan
+
+Enable:
+
+sudo ln -sfn \
+  /etc/nginx/sites-available/opencenter-monitoring \
+  /etc/nginx/sites-enabled/opencenter-monitoring
+
+sudo rm -f /etc/nginx/sites-enabled/default
+
+sudo nginx -t
+sudo systemctl enable --now nginx
+sudo systemctl reload nginx
+
+Configure Grafana for the subpath:
+
+sudo sed -i \
+  's|^;root_url =.*|root_url = %(protocol)s://%(domain)s/grafana/|' \
+  /etc/grafana/grafana.ini
+
+sudo sed -i \
+  's|^;serve_from_sub_path =.*|serve_from_sub_path = true|' \
+  /etc/grafana/grafana.ini
+
+sudo systemctl restart grafana-server
+8. Firewall configuration
+
+Expose only Nginx and SSH:
+
+sudo ufw allow OpenSSH
+sudo ufw allow 80/tcp
+sudo ufw allow 443/tcp
+
+sudo ufw deny 3000/tcp
+sudo ufw deny 9090/tcp
+sudo ufw deny 9100/tcp
+sudo ufw deny 9187/tcp
+
+sudo ufw enable
+sudo ufw status verbose
+
+Prometheus, Grafana, Node Exporter and the OpenCenter exporter are already configured to listen on loopback only.
+
+9. Validate the complete installation
+Services
+for service in \
+  node_exporter \
+  prometheus \
+  grafana-server \
+  opencenter-exporter \
+  nginx
+do
+  printf '%-30s' "$service"
+  systemctl is-active "$service"
+done
+Ports
+sudo ss -lntp |
+  grep -E ':(80|3000|9090|9100|9187)\b'
+
+Expected:
+
+127.0.0.1:3000
+127.0.0.1:9090
+127.0.0.1:9100
+127.0.0.1:9187
+0.0.0.0:80
+Prometheus configuration
+sudo promtool check config /etc/prometheus/prometheus.yml
+sudo promtool check rules /etc/prometheus/rules/*.yml
+Target health
+curl -s http://127.0.0.1:9090/api/v1/targets |
+  jq -r '
+    .data.activeTargets[]
+    | [
+        .labels.job,
+        .scrapeUrl,
+        .health,
+        .lastError
+      ]
+    | @tsv
+  '
+OpenCenter metrics
+curl -s http://127.0.0.1:9187/metrics |
+  grep '^opencenter_' |
+  head -50
+Grafana health
+curl -s http://127.0.0.1:3000/api/health | jq
+Provisioned dashboards
+sudo find /var/lib/grafana/dashboards/opencenter \
+  -maxdepth 1 \
+  -type f \
+  -name '*.json' \
+  -print
+Real-time logs
+journalctl -fu opencenter-exporter
+journalctl -fu prometheus
+journalctl -fu grafana-server
+10. Codex implementation instruction
+Implement and install the OpenCenter monitoring package in:
+
+/home/dzoan/OSPC2FLEX/osflex-deployer-fullmig-5.0.0420current
+
+First audit the repository and reuse its existing application framework,
+authentication, routes, configuration loading, OpenCenter path resolution,
+CSS system and service startup conventions.
+
+Required deliverables:
+
+1. Create:
+   workflow_dashboard/monitoring/opencenter_exporter.py
+
+2. The exporter must listen on:
+   127.0.0.1:9187
+
+3. Expose:
+   GET /metrics
+   GET /healthz
+
+4. Export at least:
+   opencenter_deployment_info
+   opencenter_deployment_status
+   opencenter_deployment_stage_status
+   opencenter_deployment_stage_duration_seconds
+   opencenter_deployment_total_duration_seconds
+   opencenter_deployment_failures_total
+   opencenter_deployment_resumes_total
+   opencenter_deployment_lock_conflicts_total
+   opencenter_deployment_processes
+   opencenter_gitops_clean
+   opencenter_gitops_unpushed_commits
+   opencenter_openstack_vm_status
+   opencenter_openstack_quota_usage_ratio
+   opencenter_cluster_node_ready
+   opencenter_cluster_pods
+   opencenter_flux_resource_ready
+   opencenter_platform_service_ready
+
+5. Read OpenCenter data safely from:
+   ~/.config/opencenter
+   ~/.local/state/opencenter
+
+6. Add asynchronous cached collectors for:
+   bootstrap logs
+   active deployment processes
+   GitOps state
+   OpenStack infrastructure
+   Kubernetes nodes and pods
+   Flux sources, Kustomizations and HelmReleases
+   platform services
+
+7. Never expose:
+   tokens
+   OpenRC secrets
+   passwords
+   kubeconfig contents
+   secret manifest values
+   complete sensitive command lines
+
+8. Create valid Grafana dashboards:
+   infrastructure/monitoring/grafana/dashboards/
+     opencenter-cluster-overview.json
+     opencenter-deployment.json
+     opencenter-gitops.json
+     opencenter-infrastructure.json
+
+9. Assign stable Grafana UIDs:
+   opencenter-cluster-overview
+   opencenter-deployment
+   opencenter-gitops
+   opencenter-infrastructure
+
+10. Create Grafana provisioning:
+    infrastructure/monitoring/grafana/provisioning/datasources/datasources.yaml
+    infrastructure/monitoring/grafana/provisioning/dashboards/opencenter.yaml
+
+11. All dashboards must support:
+    organization variable
+    cluster variable
+    provider variable
+    region variable
+    namespace variable
+    node variable
+    service variable
+
+12. Add:
+    scripts/monitoring/install_opencenter_monitoring.sh
+    scripts/monitoring/install_opencenter_dashboards.sh
+    scripts/monitoring/uninstall_opencenter_monitoring.sh
+    scripts/monitoring/validate_opencenter_monitoring.sh
+
+13. Installation scripts must:
+    be idempotent
+    use set -Eeuo pipefail
+    create backups before replacing configuration
+    validate Prometheus configuration with promtool
+    validate every dashboard with jq
+    fail clearly when required files are absent
+    never overwrite unrelated Grafana provisioning files
+    restart only services whose configuration changed
+
+14. Add systemd unit:
+    packaging/systemd/opencenter-exporter.service
+
+15. Add unit tests for:
+    log discovery
+    deployment stage parsing
+    duplicate process detection
+    redaction
+    GitOps state
+    metrics rendering
+    missing OpenStack credentials
+    missing kubeconfig
+    command timeouts
+    dashboard JSON validity
+
+16. Add:
+    docs/OPENCENTER_MONITORING_INSTALL.md
+
+17. Run:
+    Python tests
+    shellcheck on scripts
+    jq validation on dashboards
+    promtool validation on Prometheus configuration
+
+Do not claim installation success unless:
+- opencenter-exporter.service is active
+- /healthz returns HTTP 200
+- /metrics contains opencenter_ metrics
+- Prometheus target opencenter-exporter is UP
+- Grafana API health returns database=ok
+- all four dashboards are visible in the OpenCenter Grafana folder

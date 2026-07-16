@@ -1,0 +1,125 @@
+Set these variables once:
+
+ORG=my-org
+CLUSTER=test8cluster
+OC_STATE="$HOME/.local/state/opencenter"
+GITOPS="$HOME/.config/opencenter/clusters/gitops/$ORG"
+BLUEPRINT="$HOME/.config/opencenter/clusters/blueprints/$ORG/$CLUSTER/${CLUSTER}-config.yaml"
+OpenCenter real-time monitoring commands
+Area / tool	Role	Real-time monitoring command
+OpenCenter deployment process	Confirm whether a deployment is currently running	watch -n 2 "ps -ef | grep '[o]pencenter cluster deploy.*$ORG/$CLUSTER'"
+Latest bootstrap log	Follow the newest cluster deployment log automatically	tail -F "$(find "$OC_STATE/logs/bootstrap/$ORG/$CLUSTER" -type f -name 'bootstrap-*.log' -printf '%T@ %p\n' | sort -nr | head -1 | cut -d' ' -f2-)"
+Specific bootstrap log	Follow one known deployment execution	tail -f "$OC_STATE/logs/bootstrap/$ORG/$CLUSTER/bootstrap-20260715T162510Z.log"
+Bootstrap errors only	Display errors, failures and blockers as they appear	`tail -F "$(find "$OC_STATE/logs/bootstrap/$ORG/$CLUSTER" -type f -name 'bootstrap-*.log' -printf '%T@ %p\n' | sort -nr | head -1 | cut -d' ' -f2-)" | grep --line-buffered -Ei 'error
+Bootstrap progress only	Show step transitions and completion messages	`tail -F "$(find "$OC_STATE/logs/bootstrap/$ORG/$CLUSTER" -type f -name 'bootstrap-*.log' -printf '%T@ %p\n' | sort -nr | head -1 | cut -d' ' -f2-)" | grep --line-buffered -E '[0−9]+/[0−9]+
+Resume state	Show the current or last completed deployment step	watch -n 2 "cat '$OC_STATE/bootstrap/$ORG/$CLUSTER/state.json' 2>/dev/null"
+Deployment lock	Check which process owns the cluster lock	watch -n 2 "find '$OC_STATE' -type f -iname '*lock*' -o -iname '*.lock' 2>/dev/null | xargs -r grep -H '$CLUSTER' 2>/dev/null"
+OpenCenter validation	Re-run readiness checks continuously	watch -n 15 "opencenter cluster validate '$ORG/$CLUSTER' 2>&1 | tail -40"
+OpenCenter cluster description	Observe generated cluster metadata and paths	watch -n 10 "opencenter cluster describe '$ORG/$CLUSTER' 2>&1 | tail -80"
+Blueprint changes	Watch the source cluster configuration	`watch -d -n 2 "grep -nE 'provider:
+Git and GitOps monitoring
+Area / tool	Role	Real-time monitoring command
+GitOps working tree	Detect generated, modified or untracked files	watch -d -n 2 "git -C '$GITOPS' status --short"
+Latest GitOps commit	Watch generated commits	watch -n 3 "git -C '$GITOPS' log -5 --oneline --decorate"
+Unpushed commits	Confirm local commits were pushed	watch -n 3 "git -C '$GITOPS' rev-list --count '@{u}..HEAD' 2>/dev/null || echo 'No upstream'"
+Local versus remote branch	Compare local and GitHub branch state	watch -n 5 "git -C '$GITOPS' status -sb"
+Files changed by generation	See exactly what OpenCenter modified	watch -d -n 2 "git -C '$GITOPS' diff --stat; git -C '$GITOPS' diff --cached --stat"
+Git operation processes	Detect an active fetch, rebase, commit or push	`watch -n 2 "ps -ef | grep -E '[g]it (fetch
+GitHub remote accessibility	Test token-based repository access repeatedly	watch -n 30 "git -C '$GITOPS' ls-remote --heads origin main 2>&1 | tail -3"
+OpenTofu infrastructure monitoring
+Area / tool	Role	Real-time monitoring command
+OpenTofu process	Confirm tofu init, plan or apply is active	`watch -n 2 "ps -ef | grep -E '[t]ofu (init
+OpenTofu messages	Watch only infrastructure provisioning lines	`tail -F "$(find "$OC_STATE/logs/bootstrap/$ORG/$CLUSTER" -type f -name 'bootstrap-*.log' -printf '%T@ %p\n' | sort -nr | head -1 | cut -d' ' -f2-)" | grep --line-buffered -Ei 'opentofu
+OpenTofu errors	Isolate provider and infrastructure errors	`tail -F "$(find "$OC_STATE/logs/bootstrap/$ORG/$CLUSTER" -type f -name 'bootstrap-*.log' -printf '%T@ %p\n' | sort -nr | head -1 | cut -d' ' -f2-)" | grep --line-buffered -Ei 'Error:
+OpenTofu state resources	Observe resources currently recorded in state	watch -n 5 "cd '$GITOPS/infrastructure/clusters/$CLUSTER' && tofu state list 2>/dev/null | sort"
+OpenTofu current plan	Repeatedly inspect outstanding changes without applying	watch -n 30 "cd '$GITOPS/infrastructure/clusters/$CLUSTER' && tofu plan -no-color 2>&1 | tail -40"
+
+Do not run continuous tofu plan while an active tofu apply is holding the state lock.
+
+FLEX/OpenStack infrastructure monitoring
+
+These commands require an authenticated OpenStack CLI environment.
+
+Area / tool	Role	Real-time monitoring command
+All cluster VMs	Monitor server status, IP and power state	watch -n 5 "openstack server list --name '$CLUSTER' -f table"
+Control-plane VMs	Monitor cp0, cp1, and cp2	watch -n 5 "openstack server list -f value -c Name -c Status -c Networks | grep '^${CLUSTER}-cp'"
+Worker VMs	Monitor worker creation and status	watch -n 5 "openstack server list -f value -c Name -c Status -c Networks | grep '^${CLUSTER}-wn'"
+Bastion VM	Monitor bastion and floating IP	watch -n 5 "openstack server show '${CLUSTER}-bastion' -f yaml -c status -c addresses -c OS-EXT-STS:task_state -c fault"
+Nova build state	See scheduling/spawning state for every cluster VM	watch -n 5 "for s in \$(openstack server list --name '$CLUSTER' -f value -c ID); do openstack server show \$s -f value -c name -c status -c OS-EXT-STS:task_state -c OS-EXT-SRV-ATTR:host; echo ---; done"
+Nova events	Observe creation events for one VM	watch -n 5 "openstack server event list '${CLUSTER}-cp1'"
+Ports	Monitor Neutron port status and fixed IPs	watch -n 5 "openstack port list -f value -c Name -c Status -c 'Fixed IP Addresses' | grep '$CLUSTER'"
+Floating IPs	Monitor bastion and API floating IP associations	watch -n 5 "openstack floating ip list -f table"
+Security groups	Monitor generated cluster security groups	watch -n 10 "openstack security group list -f value -c ID -c Name | grep '$CLUSTER'"
+Security-group rules	Inspect rules for a specific group	watch -n 10 "openstack security group rule list '${CLUSTER}-controlplane' -f table"
+Network	Monitor cluster network state	`watch -n 10 "openstack network show '${CLUSTER}-k8s' -f yaml 2>&1 | grep -E 'name:
+Subnet	Monitor allocation pools and gateway	`watch -n 10 "openstack subnet show '${CLUSTER}-k8s' -f yaml 2>&1 | grep -E 'cidr:
+Router	Monitor router and external gateway	`watch -n 10 "openstack router show '${CLUSTER}-k8s' -f yaml 2>&1 | grep -E 'status:
+Image availability	Confirm the configured image remains visible	watch -n 30 "openstack image show d9fdfdb8-9eca-47cf-8cd1-fb93f1f61fa7 -f value -c name -c status -c visibility"
+Quota usage	Watch network quota availability	watch -n 15 "openstack quota show --usage --network 2>/dev/null || openstack quota show --network"
+Compute quota	Watch instance, CPU and RAM quota	watch -n 15 "openstack quota show --usage --compute 2>/dev/null || openstack quota show --compute"
+Server groups	Monitor anti-affinity groups and members	watch -n 10 "openstack server group list -f table"
+Cloud-init, SSH and Ansible monitoring
+Area / tool	Role	Real-time monitoring command
+Cloud-init step	Follow OpenCenter waiting for VM initialization	`tail -F "$(find "$OC_STATE/logs/bootstrap/$ORG/$CLUSTER" -type f -name 'bootstrap-*.log' -printf '%T@ %p\n' | sort -nr | head -1 | cut -d' ' -f2-)" | grep --line-buffered -Ei 'cloud-init
+Ansible process	Check whether Ansible or Kubespray is executing	`watch -n 2 "ps -ef | grep -E '[a]nsible-playbook
+Ansible reachability	Continuously test all cluster nodes	watch -n 10 "cd '$GITOPS/infrastructure/clusters/$CLUSTER' && source venv/bin/activate 2>/dev/null; ansible k8s_cluster -m ping 2>&1"
+Cloud-init status on all nodes	Test completion through Ansible	watch -n 10 "cd '$GITOPS/infrastructure/clusters/$CLUSTER' && source venv/bin/activate 2>/dev/null; ansible k8s_cluster -m shell -a 'cloud-init status' -b 2>&1"
+SSH availability	Test whether the bastion SSH port is open	watch -n 5 "timeout 3 bash -c '</dev/tcp/146.20.61.157/22' && echo SSH_READY || echo SSH_WAITING"
+Generated inventory	Monitor host/IP changes in the Ansible inventory	watch -d -n 3 "cat '$GITOPS/infrastructure/clusters/$CLUSTER/inventory/inventory.yaml' 2>/dev/null"
+Kubespray log lines	Follow Kubernetes installation activity	`tail -F "$(find "$OC_STATE/logs/bootstrap/$ORG/$CLUSTER" -type f -name 'bootstrap-*.log' -printf '%T@ %p\n' | sort -nr | head -1 | cut -d' ' -f2-)" | grep --line-buffered -Ei 'PLAY
+Kubernetes and kubeconfig monitoring
+
+Run these after kubeconfig has been generated.
+
+Area / tool	Role	Real-time monitoring command
+Nodes	Monitor nodes joining and becoming Ready	watch -n 5 "kubectl get nodes -o wide"
+All pods	Monitor platform pod status	watch -n 5 "kubectl get pods -A -o wide"
+Problem pods	Show pods not Running or Completed	watch -n 5 "kubectl get pods -A --no-headers | awk '\$4 != \"Running\" && \$4 != \"Completed\"'"
+Kubernetes events	Show the newest cluster events continuously	kubectl get events -A --watch --sort-by=.metadata.creationTimestamp
+Control-plane health	Monitor Kubernetes API readiness	watch -n 5 "kubectl get --raw='/readyz?verbose' 2>&1"
+Namespaces	Observe namespaces created by platform bootstrap	watch -n 5 "kubectl get namespaces"
+Services	Monitor service and external IP assignment	watch -n 5 "kubectl get svc -A -o wide"
+PVCs	Monitor Cinder storage claims	watch -n 5 "kubectl get pvc -A"
+Storage classes	Verify OpenStack CSI storage classes	watch -n 10 "kubectl get storageclass"
+Volume snapshots	Monitor CSI snapshots	watch -n 10 "kubectl get volumesnapshot -A 2>/dev/null"
+Gateway API	Monitor gateways and routes	watch -n 5 "kubectl get gateway,httproute -A 2>/dev/null"
+Certificates	Monitor cert-manager certificates	watch -n 5 "kubectl get certificate,certificaterequest -A 2>/dev/null"
+Network policies	View generated Calico/Kubernetes policies	watch -n 10 "kubectl get networkpolicy -A"
+FluxCD and GitOps reconciliation
+Area / tool	Role	Real-time monitoring command
+Flux status	Show overall GitOps readiness	watch -n 5 "flux check 2>&1"
+Flux sources	Monitor Git repository synchronization	watch -n 5 "flux get sources git -A"
+Flux Kustomizations	Monitor desired-state reconciliation	watch -n 5 "flux get kustomizations -A"
+Helm releases	Monitor platform installations	watch -n 5 "flux get helmreleases -A"
+Flux events	Follow reconciliation activity	flux events --watch
+Flux controller logs	Follow source and apply controllers	kubectl logs -n flux-system -f deployment/source-controller deployment/kustomize-controller --all-containers=true --prefix
+Helm controller logs	Follow Helm installation and upgrade activity	kubectl logs -n flux-system -f deployment/helm-controller --all-containers=true --prefix
+Notification controller	Follow GitOps notification activity	kubectl logs -n flux-system -f deployment/notification-controller --all-containers=true --prefix
+OpenCenter platform services
+Service	Real-time monitoring command
+Calico	`kubectl get pods -n calico-system -w 2>/dev/null
+cert-manager	kubectl logs -n cert-manager -f deployment/cert-manager --all-containers=true
+Envoy Gateway	`kubectl get pods -A -w
+Headlamp	`kubectl get pods,svc -A -w
+Kyverno	kubectl logs -n kyverno -f deployment/kyverno-admission-controller --all-containers=true
+OpenStack CCM	kubectl logs -n kube-system -f daemonset/openstack-cloud-controller-manager --all-containers=true
+OpenStack Cinder CSI	`kubectl get pods -n kube-system -w
+External Snapshotter	`kubectl get pods -n kube-system -w
+OLM	kubectl get pods -n olm -w 2>/dev/null
+PostgreSQL Operator	`kubectl get pods -A -w
+Grafana	`kubectl get pods,svc -A -w
+Loki	`kubectl get pods -A -w
+Tempo	`kubectl get pods -A -w
+Keycloak	`kubectl get pods,svc -A -w
+Weave GitOps	`kubectl get pods,svc -A -w
+RBAC Manager	`kubectl get pods -A -w
+etcd backup	`kubectl get cronjob,job,pods -A -w
+Best single command for your current deployment
+
+This follows the newest OpenCenter bootstrap log without needing to know its timestamp:
+
+ORG=my-org CLUSTER=test8cluster; LOG=$(find "$HOME/.local/state/opencenter/logs/bootstrap/$ORG/$CLUSTER" -type f -name 'bootstrap-*.log' -printf '%T@ %p\n' | sort -nr | head -1 | cut -d' ' -f2-); echo "Following: $LOG"; tail -F "$LOG"
+
+For a compact live dashboard in separate terminal panes, use:
+
+tmux new-session -d -s opencenter "tail -F \"\$(find ~/.local/state/opencenter/logs/bootstrap/my-org/test8cluster -type f -name 'bootstrap-*.log' -printf '%T@ %p\n' | sort -nr | head -1 | cut -d' ' -f2-)\"" \; split-window -h "watch -n 5 'openstack server list --name test8cluster -f table'" \; split-window -v "watch -n 5 'ps -ef | grep \"[o]pencenter cluster deploy\"'" \; select-layout tiled \; attach

@@ -189,6 +189,19 @@
       </table>
       </div>
 
+      <!-- Migration Strategy (embedded standalone page — same content as
+           Stage 2 → Migration Strategy, reused via iframe to avoid duplicating
+           the panel's ids/scripts). -->
+      <div style="margin-top: 40px; border-top: 1px solid #e2e8f0; padding-top: 20px;">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
+          <h2 style="color:#1e40af; margin:0; font-size: 22px;">🦬 Migration Strategy — Ontology-Based Business Systems Migration Plan</h2>
+          <button onclick="var f=document.getElementById('migStrategyEmbed');var open=f.style.display!=='none';f.style.display=open?'none':'block';this.textContent=open?'▼ Show':'▲ Hide';" style="background:#eff6ff;color:#1e40af;border:1px solid #bfdbfe;border-radius:6px;padding:5px 14px;font-size:12px;font-weight:800;cursor:pointer;">▲ Hide</button>
+          <a href="/migration-strategy/" target="_blank" style="background:#1e40af;color:#fff;border-radius:6px;padding:5px 14px;font-size:12px;font-weight:800;text-decoration:none;">↗ Open full page</a>
+        </div>
+        <iframe id="migStrategyEmbed" src="/migration-strategy/" loading="lazy" title="FLEX Migration Strategy"
+                style="display:block;width:100%;height:1200px;border:1px solid #e2e8f0;border-radius:10px;background:#fff;box-shadow:0 2px 12px rgba(0,0,0,0.06);"></iframe>
+      </div>
+
       <!-- Documentation / Guidelines Tables -->
       <div style="margin-top: 40px; border-top: 1px solid #e2e8f0; padding-top: 20px;">
         <h2 style="color:#16a34a; margin-bottom:15px; font-size: 22px;">📚 Migration Prioritization Guidelines</h2>
