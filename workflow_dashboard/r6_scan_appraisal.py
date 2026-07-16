@@ -1349,6 +1349,17 @@ def create_r6_scan_blueprint(base_dir: Path, probe_runner: Callable[..., subproc
                 run = json.loads(summary.read_text(encoding="utf-8"))
             except Exception:
                 continue
+            if run.get("status") == "RUNNING":
+                with state_lock:
+                    is_active = str(run.get("runId") or "") in active_runs
+                if not is_active:
+                    interrupted_at = utcnow()
+                    run.update({"status": "INTERRUPTED", "executionState": "INTERRUPTED", "currentComponent": None,
+                                "completedAt": interrupted_at, "executionCompletedAt": interrupted_at,
+                                "error": "The scan worker stopped during a service restart. Start a new scan."})
+                    run.setdefault("liveLog", []).append({"timestamp": interrupted_at, "level": "ERROR",
+                        "message": "Scan interrupted by service restart; start a new scan", "status": "INTERRUPTED"})
+                    summary.write_text(json.dumps(run, indent=2), encoding="utf-8")
             system = run.get("businessSystem") or {}
             if wanted_id and str(system.get("id") or "") != wanted_id:
                 continue

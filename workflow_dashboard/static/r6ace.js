@@ -1,5 +1,5 @@
 /* APPS to Container Refactor Engine v4 */
-var R6P={current:0,status:{},bs:null,components:[],captureMethod:'smart',compatConfirmed:false,yaml:'',bundle:null,artifacts:{},preflight:{},continueBlocked:true,captureRun:null,creds:{cloud:{status:'not_configured',authUrl:'',region:'',credId:'',projectId:''},registry:{type:'dockerhub',url:'docker.io',project:'dzoan/flex-apps',user:'dzoan',password:''},opencenter:{status:'not_configured',clusterRef:'rackspace-flex/flex-prod-k8s',gitDir:''},gitops:{status:'not_configured',localPath:'',branch:'main',method:'existing'}}};
+var R6P={current:0,status:{},bs:null,components:[],captureMethod:'smart',compatConfirmed:false,yaml:'',bundle:null,artifacts:{},preflight:{},continueBlocked:true,captureRun:null,creds:{cloud:{status:'not_configured',authUrl:'',region:'',credId:'',projectId:''},ssh:{user:'ubuntu',keyPath:'~/.ssh/id_rsa',knownHostsFile:'./data/ssh/known_hosts'},registry:{type:'dockerhub',url:'docker.io',project:'dzoan/flex-apps',user:'dzoan',password:''},opencenter:{status:'not_configured',clusterRef:'rackspace-flex/flex-prod-k8s',gitDir:''},gitops:{status:'not_configured',localPath:'',branch:'main',method:'existing'}}};
 var R6_SCAN_UI_VERSIONS=[{id:'scan-ui-v1',label:'Scan UI v1'}];
 R6P.scanUiVersion='scan-ui-v1';try{localStorage.setItem('r6p_scan_ui_version','scan-ui-v1');}catch(e){}
 /* Device-type badges for Stage 13 UAT rows - mirrors Stage 4's Component Test Lab
@@ -309,9 +309,9 @@ window.r6pRefreshComponentDrivenStages=function(){
 window.r6pComponentTarget=function(c){
   c=c||{};
   var nested=c.target||c.flex||c.vm||{};
-  return String(c.tgt||c.targetIp||c.targetIP||c.target_ip||c.flexIp||c.flexIP||
-    c.flex_ip||c.vmIp||c.vm_ip||c.ip||c.endpoint||c.host||
-    nested.ip||nested.address||nested.endpoint||'').trim();
+  return String(c.tgt||c.targetIp||c.targetIP||c.target_ip||c.targetUrl||c.target_url||c.flexIp||c.flexIP||
+    c.flex_ip||c.flexUrl||c.flex_url||c.vmIp||c.vm_ip||c.ip||c.endpoint||c.host||
+    nested.ip||nested.address||nested.endpoint||nested.url||'').trim();
 };
 window.r6pInputConnectionFor=function(c){
   c=c||{};
@@ -348,7 +348,7 @@ window.r6pInputConnectionFor=function(c){
   return {sshUser:sshUser,sshKeyPath:sshKeyPath,sshConfigured:!!(sshUser&&sshKeyPath),databaseEngine:dbEngine,databaseEndpoint:databaseEndpoint,matchedInput:matched||scopeMatch};
 };
 window.r6pResolveComponentVm=function(c){
-  c=c||{};var direct=c.sourceVmId||c.source_vm_id||c.vmId||c.vm_id||c.openstackServerId||c.serverId||c.flexVmId;
+  c=c||{};var direct=c.sourceVmId||c.source_vm_id||c.vmId||c.vm_id||c.openstackServerId||c.openstack_server_id||c.serverId||c.server_id||c.flexVmId||c.flex_vm_id;
   if(direct)return{id:direct,name:c.sourceVmName||c.source_vm_name||c.vmName||c.vm_name||'',ip:c.sourceIp||c.source_ip||r6pComponentTarget(c)||'',region:c.cloudRegion||c.cloud_region||''};
   var target=r6pComponentTarget(c),host='';try{host=new URL(target.indexOf('://')>=0?target:'ssh://'+target).hostname;}catch(e){host=target.replace(/^[a-z][a-z0-9+.-]*:\/\//i,'').split('/')[0].split(':')[0];}
   var rows=window._uatS1FlexVmRows||[];
@@ -400,6 +400,7 @@ window.r6pSaveCredsServer=function(){
     cloud:{authUrl:v('r6p-c-authurl'),authType:v('r6p-c-authtype'),username:v('r6p-c-username'),
       password:v('r6p-c-password'),credId:v('r6p-c-credid'),secret:v('r6p-c-secret'),
       proj:v('r6p-c-proj'),domain:v('r6p-c-domain'),region:v('r6p-c-region')},
+    ssh:{user:v('r6p-extract-user'),keyPath:v('r6p-extract-key'),knownHostsFile:v('r6p-extract-known-hosts')},
     registry:{type:v('r6p-build-regtype'),url:v('r6p-build-regurl'),project:v('r6p-build-project'),
       user:v('r6p-build-reguser'),password:v('r6p-build-regpass')},
     gitops:{repo:v('r6p-git-repo'),branch:v('r6p-git-branch'),auth:v('r6p-git-auth'),
@@ -430,13 +431,15 @@ window.r6pRegistrySave=function(){
 window.r6pLoadCredsServer=function(){
   return fetch('/api/r6/load-creds').then(function(r){return r.json();}).then(function(d){
     if(!d||!d.ok||!d.data)return;
-    var c=d.data.cloud||{},reg=d.data.registry||{},g=d.data.gitops||{};
+    var c=d.data.cloud||{},ssh=d.data.ssh||{},reg=d.data.registry||{},g=d.data.gitops||{};
     var set=function(id,val){if(!val)return;var el=document.getElementById(id);if(el&&!el.value)el.value=val;};
     set('r6p-c-authurl',c.authUrl);set('r6p-c-username',c.username);set('r6p-c-password',c.password);
     set('r6p-c-credid',c.credId);set('r6p-c-secret',c.secret);set('r6p-c-proj',c.proj);
     set('r6p-c-domain',c.domain);
     if(c.authType){var dt=document.getElementById('r6p-c-authtype');if(dt){dt.value=c.authType;r6pAuthTypeChange(c.authType);}}
     if(c.region){var rs=document.getElementById('r6p-c-region');if(rs)rs.value=c.region;}
+    set('r6p-extract-user',ssh.user);set('r6p-extract-key',ssh.keyPath);set('r6p-extract-known-hosts',ssh.knownHostsFile);
+    R6P.creds.ssh=Object.assign(R6P.creds.ssh||{},ssh);
     set('r6p-build-regurl',reg.url);set('r6p-build-project',reg.project);set('r6p-build-reguser',reg.user);set('r6p-build-regpass',reg.password);
     if(reg.type){var rt=document.getElementById('r6p-build-regtype');if(rt)rt.value=reg.type;}
     R6P.creds.registry=Object.assign(R6P.creds.registry||{},reg);
@@ -2711,8 +2714,7 @@ window.r6pStage0=function(){
     +'<div style="border:1px solid #e2e8f0;border-radius:8px;padding:14px 16px;margin:12px 16px 16px;">'
     +'<div style="font-weight:700;font-size:13px;margin-bottom:2px;">2. Source VM SSH Credentials</div>'
     +'<div style="font-size:11px;color:#64748b;margin-bottom:10px;">Used by live scan and Stage 9B sanitized VM extraction</div>'
-    +'<div style="display:grid;grid-template-columns:1.3fr 1fr 1.8fr 1.8fr;gap:10px;">'
-    +'<div><label style="font-size:11px;font-weight:700;color:#334155;display:block;">Source VM Host / IP</label><input id="r6p-source-vm-host" value="" placeholder="VM public IP, for example 174.143.59.142" style="width:100%;padding:6px;border:1px solid #cbd5e1;border-radius:5px;font-size:12px;"></div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1.8fr 1.8fr;gap:10px;">'
     +'<div><label style="font-size:11px;font-weight:700;color:#334155;display:block;">SSH User</label><input id="r6p-extract-user" value="ubuntu" style="width:100%;padding:6px;border:1px solid #cbd5e1;border-radius:5px;font-size:12px;"></div>'
     +'<div><label style="font-size:11px;font-weight:700;color:#334155;display:block;">SSH Private Key Path / Secret Ref</label><input id="r6p-extract-key" value="~/.ssh/id_rsa" style="width:100%;padding:6px;border:1px solid #cbd5e1;border-radius:5px;font-size:12px;"></div>'
     +'<div><label style="font-size:11px;font-weight:700;color:#334155;display:block;">Managed known_hosts</label><input id="r6p-extract-known-hosts" value="./data/ssh/known_hosts" style="width:100%;padding:6px;border:1px solid #cbd5e1;border-radius:5px;font-size:12px;"></div>'
@@ -3316,12 +3318,6 @@ window.r6pAppraisalAllowsStage8=function(c){
   return ['READY_FOR_STAGE_8','DB_NATIVE_REQUIRED','RETAIN_VM_RECOMMENDED'].indexOf(a.componentVerdict)>=0||
     (a.componentVerdict==='READY_FOR_STAGE_8_WITH_WARNINGS'&&R6P.appraisalReviewed===true);
 };
-window.r6pSourceVmHost=function(){
-  var entered=String((document.getElementById('r6p-source-vm-host')||{}).value||'').trim();
-  if(entered)return entered;
-  var bs=R6P.bs||{};
-  return String(bs.sourceHost||bs.sourceIp||bs.targetIp||bs.publicIp||bs.privateIp||'').trim();
-};
 window.r6pProductionScanPayloadLegacy=function(){
   var user=((document.getElementById('r6p-scan-user')||{}).value||(document.getElementById('r6p-extract-user')||{}).value||'').trim();
   var key=((document.getElementById('r6p-scan-key')||{}).value||(document.getElementById('r6p-extract-key')||{}).value||'').trim();
@@ -3329,7 +3325,7 @@ window.r6pProductionScanPayloadLegacy=function(){
   var all=(R6P.components||[]);
   var scope=(document.getElementById('r6p-scan-comp')||{}).value||'__all__';
   var selected=scope==='__all__'?all:(all[parseInt(scope,10)]?[all[parseInt(scope,10)]]:[]);
-  return {businessSystem:{id:R6P.bs&&R6P.bs.id,name:R6P.bs&&R6P.bs.name,totalComponentCount:all.length,scanScope:scope==='__all__'?'ALL_COMPONENTS':'SINGLE_COMPONENT',components:selected.map(function(c){var mapped=r6pResolveComponentVm(c),ep=r6pParseSshTarget(r6pComponentTarget(c),c)||r6pParseSshTarget(mapped.ip||r6pSourceVmHost(),c),vmId=mapped.id,dbMode=c.databaseAccessMode||c.database_access_mode||c.databaseTargetType||((/database|db/i.test(c.type||c.role||c.name||'')&&!vmId)?'UNKNOWN':null);return{id:c.id||c.name,name:c.name,sourceVmId:vmId,source_vm_id:vmId,sourceVmName:c.sourceVmName||c.source_vm_name||c.vmName||c.vm_name||mapped.name||null,sourceIp:(ep&&ep.host)||c.sourceIp||c.source_ip||mapped.ip||null,sshHost:ep&&ep.host,sshPort:ep&&ep.port,sshUser:c.sshUser||c.ssh_user||user,cloudRegion:c.cloudRegion||c.cloud_region||mapped.region||R6P.bs&&R6P.bs.region||null,scanTargetId:c.scanTargetId||c.scan_target_id||vmId,expectedFingerprint:c.expectedFingerprint||c.sshFingerprint||null,type:c.type||c.role||'',databaseAccessMode:dbMode,databaseEndpoint:c.databaseEndpoint||r6pComponentTarget(c),cloudInventory:c.cloudInventory||c.cloud_inventory||null,volumeIds:c.volumeIds||c.volume_ids||[]};})},ssh:{user:user,keyPath:key,knownHostsFile:known}};
+  return {businessSystem:{id:R6P.bs&&R6P.bs.id,name:R6P.bs&&R6P.bs.name,totalComponentCount:all.length,scanScope:scope==='__all__'?'ALL_COMPONENTS':'SINGLE_COMPONENT',components:selected.map(function(c){var mapped=r6pResolveComponentVm(c),ep=r6pParseSshTarget(r6pComponentTarget(c),c)||r6pParseSshTarget(mapped.ip,c),vmId=mapped.id,dbMode=c.databaseAccessMode||c.database_access_mode||c.databaseTargetType||((/database|db/i.test(c.type||c.role||c.name||'')&&!vmId)?'UNKNOWN':null);return{id:c.id||c.name,name:c.name,sourceVmId:vmId,source_vm_id:vmId,sourceVmName:c.sourceVmName||c.source_vm_name||c.vmName||c.vm_name||mapped.name||null,sourceIp:(ep&&ep.host)||c.sourceIp||c.source_ip||mapped.ip||null,sshHost:ep&&ep.host,sshPort:ep&&ep.port,sshUser:c.sshUser||c.ssh_user||user,cloudRegion:c.cloudRegion||c.cloud_region||mapped.region||R6P.bs&&R6P.bs.region||null,scanTargetId:c.scanTargetId||c.scan_target_id||vmId,expectedFingerprint:c.expectedFingerprint||c.sshFingerprint||null,type:c.type||c.role||'',databaseAccessMode:dbMode,databaseEndpoint:c.databaseEndpoint||r6pComponentTarget(c),cloudInventory:c.cloudInventory||c.cloud_inventory||null,volumeIds:c.volumeIds||c.volume_ids||[]};})},ssh:{user:user,keyPath:key,knownHostsFile:known}};
 };
 window.r6pProductionScanPayload=function(){
   var user=((document.getElementById('r6p-scan-user')||{}).value||(document.getElementById('r6p-extract-user')||{}).value||'').trim();
@@ -3338,7 +3334,7 @@ window.r6pProductionScanPayload=function(){
   var all=(R6P.components||[]),scope=(document.getElementById('r6p-scan-comp')||{}).value||'__all__';
   var selected=scope==='__all__'?all:(all[parseInt(scope,10)]?[all[parseInt(scope,10)]]:[]);
   var components=selected.map(function(c){
-    var mapped=r6pResolveComponentVm(c),ep=r6pParseSshTarget(r6pComponentTarget(c),c)||r6pParseSshTarget(mapped.ip||r6pSourceVmHost(),c),vmId=mapped.id;
+    var mapped=r6pResolveComponentVm(c),ep=r6pParseSshTarget(r6pComponentTarget(c),c)||r6pParseSshTarget(mapped.ip,c),vmId=mapped.id;
     var input=r6pInputConnectionFor(c),isDb=/database|db/i.test((c.type||c.role||'')+' '+(c.name||''));
     var serviceEndpoint=r6pParseTargetEndpoint(r6pComponentTarget(c)),healthPath=String(c.path||c.healthPath||c.health_path||'').split(',')[0];
     var dbMode=c.databaseAccessMode||c.database_access_mode||c.databaseTargetType||(isDb&&!vmId?(input.sshConfigured?'VM_SSH':'UNKNOWN'):null);
@@ -3395,7 +3391,12 @@ window.r6pStartProductionScan=function(){
   if(!payload.businessSystem.components.length){alert('Select a Business System with FLEX target IPs first.');return;}
   var requiresSsh=payload.businessSystem.components.some(function(c){return ['MANAGED_DATABASE','KUBERNETES_SERVICE','PRIVATE_ENDPOINT','UNKNOWN'].indexOf(String(c.databaseAccessMode||'').toUpperCase())<0;});
   if(requiresSsh&&(!payload.ssh.user||!payload.ssh.keyPath)){alert('SSH user and key path are required for VM-hosted components.');return;}
-  r6pSetProductionScanLog('Starting structured scan...');
+  try{
+    localStorage.removeItem(r6pScanRunStorageKey());localStorage.removeItem(r6pScanRunCacheKey());localStorage.removeItem(r6pScanViewCacheKey());
+    sessionStorage.removeItem(r6pScanRunCacheKey());sessionStorage.removeItem(r6pScanViewCacheKey());
+  }catch(e){}
+  R6P.scanRunId=null;R6P.structuredAppraisal=null;R6P.appraisalReviewed=false;
+  r6pSetProductionScanLog('Starting a new structured scan...');
   var button=document.getElementById('r6p-full-scan-btn');if(button)button.disabled=true;
   var send=function(attempt){
     fetch('/api/r6/scans/business-system/run',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},cache:'no-store',body:JSON.stringify(payload)})
