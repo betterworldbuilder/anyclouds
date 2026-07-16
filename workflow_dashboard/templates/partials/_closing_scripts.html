@@ -5882,6 +5882,53 @@ ${certContent}
       notes:  (document.getElementById('mfr-notes')||{}).value||'',
       strategy:'', systems:systems
     };
+    addRequestToMigrationLog(item);
+    document.getElementById('mfr-body').style.display='none';
+  }
+
+  // Waiting-list row action: push one submitted request into the Migration Log.
+  window.wlAddToLog = function(i) {
+    try {
+      var items = JSON.parse(localStorage.getItem('flex_migration_waiting_list') || '[]');
+      if (items[i]) addRequestToMigrationLog(items[i]);
+    } catch(e) { alert('Could not read the migration request: ' + e); }
+  };
+
+  // Waiting-list row action: delete one submitted request (with confirmation).
+  window.wlDeleteRequest = function(i) {
+    try {
+      var items = JSON.parse(localStorage.getItem('flex_migration_waiting_list') || '[]');
+      if (!items[i]) return;
+      if (!confirm('Delete migration request #' + (i+1) + ' (' + (items[i].company || 'unnamed') + ')? This cannot be undone.')) return;
+      items.splice(i, 1);
+      localStorage.setItem('flex_migration_waiting_list', JSON.stringify(items));
+      loadMigWaitingList();
+    } catch(e) { alert('Could not delete the migration request: ' + e); }
+  };
+
+  // Waiting-list header action: push every request into the Migration Log in
+  // one pass (single save, single summary popup), then clear the waiting list.
+  window.wlAddAllToLog = function() {
+    var items;
+    try { items = JSON.parse(localStorage.getItem('flex_migration_waiting_list') || '[]'); }
+    catch(e) { items = []; }
+    if (!items.length) { alert('No migration requests to add.'); return; }
+    if (!document.getElementById('trackerBody')) { alert('Migration Log table not found on this page.'); return; }
+    if (!confirm('Add all ' + items.length + ' request(s) to the Migration Log and clear the waiting list?')) return;
+    var added = 0;
+    items.forEach(function(item) { if (addRequestToMigrationLog(item, true)) added++; });
+    autoSaveTracker(function(){ loadTracker && loadTracker(); });
+    localStorage.setItem('flex_migration_waiting_list', '[]');
+    loadMigWaitingList();
+    alert('✅ Added ' + added + ' request(s) to the Migration Log. Waiting list cleared.');
+  };
+
+  // Shared: map one migration request (from the form panel or a waiting-list
+  // row) into Migration Log tracker rows. quiet=true skips the per-item save
+  // and popup so bulk callers can save and report once.
+  function addRequestToMigrationLog(item, quiet) {
+    var company = item.company || '';
+    var systems = Array.isArray(item.systems) ? item.systems : [];
     var tbody = document.getElementById('trackerBody');
     if (tbody) {
       var sysList = systems.length ? systems : [{name:company,archetype:'',criticality:'',wave:'',status:'Active',components:[]}];
@@ -5928,10 +5975,15 @@ ${certContent}
         };
         tbody.insertAdjacentHTML('afterbegin', _buildTrackerRow(fieldMap, '#4f46e5'));
       });
+    } else {
+      if (!quiet) alert('Migration Log table not found on this page.');
+      return false;
     }
-    document.getElementById('mfr-body').style.display='none';
-    autoSaveTracker(function(){ loadTracker && loadTracker(); });
-    alert('✅ Added to Migration Log!');
+    if (!quiet) {
+      autoSaveTracker(function(){ loadTracker && loadTracker(); });
+      alert('✅ Added to Migration Log!');
+    }
+    return true;
   }
 
   function loadMigWaitingList() {
@@ -5958,6 +6010,8 @@ ${certContent}
           + (sysCnt ? '<span style="background:#dcfce7;color:#15803d;border-radius:4px;padding:2px 7px;font-size:10px;font-weight:800;">' + sysCnt + ' systems</span>' : '')
           + '<div style="margin-left:auto;display:flex;gap:8px;">'
           + '<button onclick="showWLDetails(' + i + ')" style="background:#f0f9ff;color:#0284c7;border:1px solid #bae6fd;border-radius:6px;padding:5px 12px;font-size:11px;font-weight:900;cursor:pointer;white-space:nowrap;">🔍 Show Details</button>'
+          + '<button onclick="wlAddToLog(' + i + ')" style="background:linear-gradient(135deg,#4f46e5,#0284c7);color:#fff;border:none;border-radius:6px;padding:5px 12px;font-size:11px;font-weight:900;cursor:pointer;white-space:nowrap;">➕ Add to Migration Log</button>'
+          + '<button onclick="wlDeleteRequest(' + i + ')" style="background:#fef2f2;color:#dc2626;border:1px solid #fecaca;border-radius:6px;padding:5px 12px;font-size:11px;font-weight:900;cursor:pointer;white-space:nowrap;">🗑 Delete</button>'
           + '</div>'
           + '</div>';
       }).join('');
