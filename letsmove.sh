@@ -22,8 +22,20 @@ export PATH="$HOME/.local/bin:$PATH"
 # nginx (:5002 TLS) already listens on all interfaces; Flask itself binds per
 # this env var (app.py: WORKFLOW_DASHBOARD_HOST, default 127.0.0.1).
 export WORKFLOW_DASHBOARD_HOST="${WORKFLOW_DASHBOARD_HOST:-0.0.0.0}"
-# First non-loopback address, for the URLs printed at the end.
-PUBLIC_IP="$(hostname -I 2>/dev/null | tr ' ' '\n' | grep -v '^127\.' | grep -v '^$' | head -1)"
+# Public IPv4 address for the externally reachable URLs printed at the end.
+# PUBLIC_IP can be supplied explicitly for hosts without outbound web access.
+# Do not fall back to `hostname -I`: on cloud hosts it normally returns the
+# private service-network address and incorrectly labels it as public.
+if [[ -z "${PUBLIC_IP:-}" ]]; then
+    for PUBLIC_IP_SERVICE in \
+        "https://api.ipify.org" \
+        "https://checkip.amazonaws.com" \
+        "https://ifconfig.me/ip"; do
+        PUBLIC_IP="$(curl -4fsS --connect-timeout 2 --max-time 4 "$PUBLIC_IP_SERVICE" 2>/dev/null | tr -d '[:space:]')"
+        [[ "$PUBLIC_IP" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]] && break
+        PUBLIC_IP=""
+    done
+fi
 
 echo "================================================"
 echo " Starting OSPC to FLEX Migration Dashboard "
