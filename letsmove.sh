@@ -249,6 +249,10 @@ OPEN_OSPC_URL="$OPEN_DASHBOARD_URL/ospc_cloud_mockup/"
 OPEN_OSPC_MIGRATION_URL="$OPEN_DASHBOARD_URL/ospc_cloud_mockup/?migration=1"
 
 OPEN_URLS=("$OPEN_DASHBOARD_URL" "$OPEN_OSPC_URL" "$OPEN_OSPC_MIGRATION_URL")
+# Also open the exact localhost OSPC pages printed in the startup summary.
+# They are distinct from the public URLs on remote/cloud hosts.
+[[ "$OSPC_MOCKUP_URL" != "$OPEN_OSPC_URL" ]] && OPEN_URLS+=("$OSPC_MOCKUP_URL")
+[[ "$OSPC_MIGRATION_URL" != "$OPEN_OSPC_MIGRATION_URL" ]] && OPEN_URLS+=("$OSPC_MIGRATION_URL")
 [[ -n "$MOCKUP_PID" ]] && OPEN_URLS+=("$OPEN_FLEX_URL")
 
 open_browser_url() {
