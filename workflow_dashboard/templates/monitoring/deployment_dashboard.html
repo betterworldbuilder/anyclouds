@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Deployment Live Monitor — {{ org }}/{{ cluster }}</title>
+<link rel="stylesheet" href="/static/css/monitoring-dashboard.css">
+</head>
+<body class="mon-body" data-org="{{ org }}" data-cluster="{{ cluster }}">
+
+<header class="mon-header">
+  <span class="mon-pulse" id="mon-pulse" title="live updates"></span>
+  <span class="mon-title">📡 Deployment Live Monitor <small id="mon-ident">{{ org }}/{{ cluster }}</small></span>
+  <select class="mon-select" id="mon-cluster-select" title="switch cluster"></select>
+  <span class="mon-badge" id="mon-provider">provider —</span>
+  <span class="mon-badge" id="mon-status">…</span>
+  <span class="mon-badge" id="mon-pid">PID —</span>
+  <span class="mon-badge" id="mon-elapsed">elapsed —</span>
+  <span class="mon-badge" id="mon-logname">log —</span>
+  <span style="margin-left:auto;display:flex;gap:6px;">
+    <button class="mon-btn ghost" id="mon-pause">⏸ Pause</button>
+    <button class="mon-btn ghost" id="mon-diag">📋 Copy diagnostic bundle</button>
+    <a class="mon-btn" id="mon-open-cluster" href="#">🩺 Open cluster dashboard</a>
+  </span>
+</header>
+
+<div class="mon-wrap">
+  <div id="mon-critical"></div>
+
+  <div class="mon-card span12" style="margin-bottom:12px;">
+    <h3>Pipeline timeline <span class="spacer"></span><span id="mon-active-step" style="color:var(--mon-blue);font-weight:700;"></span></h3>
+    <div class="mon-pipeline" id="mon-pipeline"></div>
+    <div class="mon-stage-detail" id="mon-stage-detail"></div>
+  </div>
+
+  <div class="mon-grid">
+    <div class="mon-card span8">
+      <h3>Live deployment log
+        <span class="spacer"></span>
+        <select class="mon-select" id="mon-log-filter">
+          <option value="all">All</option><option value="progress">Progress</option>
+          <option value="warning">Warning</option><option value="error">Error</option>
+          <option value="tofu">OpenTofu</option><option value="ansible">Ansible</option>
+          <option value="k8s">Kubernetes</option><option value="flux">Flux</option>
+        </select>
+        <input class="mon-input" id="mon-log-search" placeholder="search…" style="width:140px;">
+        <button class="mon-btn ghost" id="mon-log-download">⬇ Download</button>
+        <button class="mon-btn ghost" id="mon-log-copy">Copy visible</button>
+      </h3>
+      <div class="mon-log" id="mon-log"></div>
+    </div>
+
+    <div class="mon-card span4">
+      <h3>Process &amp; lock</h3>
+      <div id="mon-proc"><div class="mon-empty">no deployment process detected</div></div>
+      <h3 style="margin-top:14px;">GitOps</h3>
+      <div id="mon-gitops" class="mon-kv"></div>
+    </div>
+
+    <div class="mon-card span4">
+      <h3>OpenTofu infrastructure</h3>
+      <div id="mon-tofu"></div>
+    </div>
+
+    <div class="mon-card span8">
+      <h3>FLEX / OpenStack live infrastructure <span class="spacer"></span><span id="mon-infra-note" style="color:var(--mon-dim);font-size:10px;"></span></h3>
+      <div id="mon-infra"><div class="mon-empty">waiting for provider data…</div></div>
+    </div>
+
+    <div class="mon-card span4">
+      <h3>Cloud-init &amp; Ansible</h3>
+      <div id="mon-cloudinit" class="mon-kv"></div>
+      <div id="mon-ansible" style="margin-top:8px;"></div>
+    </div>
+
+    <div class="mon-card span4">
+      <h3>Kubernetes bootstrap</h3>
+      <div id="mon-k8s"><div class="mon-empty">not available yet — kubeconfig pending</div></div>
+    </div>
+
+    <div class="mon-card span4">
+      <h3>Error intelligence</h3>
+      <div id="mon-errors"><div class="mon-empty">no classified failures</div></div>
+    </div>
+  </div>
+</div>
+
+<script src="/static/js/deployment-monitor.js"></script>
+</body>
+</html>

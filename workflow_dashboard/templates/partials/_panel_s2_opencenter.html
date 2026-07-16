@@ -424,6 +424,8 @@
           <div style="margin-top:14px;display:flex;align-items:center;flex-wrap:wrap;gap:12px;padding:12px 14px;background:linear-gradient(135deg,#0f172a,#1e3a5f);border-radius:10px;">
             <button id="ocqs-autorun-btn" onclick="ocqsAutoRunAll()" style="border:none;border-radius:8px;padding:10px 22px;font-size:13px;font-weight:900;cursor:pointer;color:#fff;background:linear-gradient(135deg,#0284c7,#38bdf8);box-shadow:0 4px 12px rgba(2,132,199,.5);">&#9889; AutoRun All Steps (A &rarr; Z)</button>
             <button id="ocqs-autorun-restart" onclick="ocqsAutoRestart()" style="border:none;border-radius:8px;padding:10px 16px;font-size:13px;font-weight:900;cursor:pointer;color:#fff;background:#475569;">&#8635; Restart</button>
+            <button onclick="var s=(typeof ocqsGetState==='function')?ocqsGetState():{};window.open('/opencenter/monitor/deployment/'+(s.org||'my-org')+'/'+(s.cluster||'my-cluster'),'_blank');" style="border:none;border-radius:8px;padding:10px 16px;font-size:13px;font-weight:900;cursor:pointer;color:#fff;background:#0f172a;border:1px solid #38bdf8;">&#128225; Deployment Live Monitor</button>
+            <button onclick="var s=(typeof ocqsGetState==='function')?ocqsGetState():{};window.open('/opencenter/monitor/cluster/'+(s.org||'my-org')+'/'+(s.cluster||'my-cluster'),'_blank');" style="border:none;border-radius:8px;padding:10px 16px;font-size:13px;font-weight:900;cursor:pointer;color:#fff;background:#0f172a;border:1px solid #34d399;">&#129657; Cluster Live Monitor</button>
             <label style="font-size:11px;color:#94a3b8;display:flex;align-items:center;gap:5px;cursor:pointer;"><input type="checkbox" id="ocqs-autorun-cont"> continue on error</label>
             <span id="ocqs-autorun-status" style="font-size:12px;font-weight:800;color:#94a3b8;"></span>
           </div>
@@ -1005,7 +1007,7 @@
         }
         guard.value='no';
         var cmd=document.getElementById('ocqs-cmd-10');
-        if(cmd) cmd.textContent='opencenter cluster destroy '+target+' --force --break-lock';
+        if(cmd) cmd.textContent='opencenter_destroy_cluster.sh '+target+' --yes';
         ocqsRunCmd('ocqs-cmd-10','ocqs-out-10','ocqs-decommission-runner');
       };
       window.ocqsFillClusterHistory = function(pairs, preferred){
@@ -1131,11 +1133,13 @@
       };
     </script>
         <!-- Prerequisites -->
-        <div class="ocqs-card" id="ocqs-prereq">
-          <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
+        <details class="ocqs-card" id="ocqs-prereq">
+          <summary style="display:flex;align-items:center;gap:8px;cursor:pointer;list-style:none;user-select:none;">
             <span class="ocqs-step-num" style="background:#6366f1;">&#10003;</span>
             <h3 style="margin:0;">Prerequisites</h3>
-          </div>
+            <span style="margin-left:auto;font-size:10px;font-weight:800;color:#6366f1;text-transform:uppercase;letter-spacing:.7px;">Show / hide setup checks</span>
+          </summary>
+          <div style="margin-top:12px;">
           <p>Before starting, ensure you have all of the following:</p>
 
           <p style="font-size:12px;font-weight:700;color:#0369a1;margin-bottom:4px;">1 — Mise (tool version manager &amp; task runner)</p>
@@ -1179,7 +1183,8 @@ cat ~/.ssh/id_ed25519.pub</div>
             <div>&#9679; <strong>VMware vSphere</strong> — with pre-provisioned VMs</div>
             <div>&#9679; <strong>AWS</strong> credentials — experimental</div>
           </div>
-        </div>
+          </div>
+        </details>
 
         <!-- Step 1 -->
         <div class="ocqs-card" id="ocqs-step-1">
@@ -1611,7 +1616,7 @@ tail -f /home/dzoan/.local/state/opencenter/logs/bootstrap/my-org/my-cluster/*.l
           <div style="margin:18px;background:rgba(255,255,255,.96);border:2px solid #111827;border-radius:8px;padding:18px;text-align:center;box-shadow:0 3px 8px rgba(0,0,0,.2);">
             <div style="font-size:9px;font-weight:900;color:#b91c1c;text-transform:uppercase;letter-spacing:2px;margin-bottom:5px;">STAGE 10 · DESTRUCTIVE ACTION</div>
             <h3 style="margin:0 0 7px;color:#111827;">&#9888; Decommission / Destroy Cluster</h3>
-            <p style="margin:0 auto 14px;max-width:680px;color:#475569;font-size:12px;">Select an existing cluster, then use the guarded switch below. Cloud infrastructure is destroyed; local blueprint and GitOps files are preserved.</p>
+            <p style="margin:0 auto 14px;max-width:680px;color:#475569;font-size:12px;">Select an existing cluster, then use the guarded switch below. Interrupted state is recovered and orphan VMs plus managed cloud infrastructure are destroyed. Shared GitOps files are preserved.</p>
             <div style="display:flex;justify-content:center;align-items:end;gap:10px;flex-wrap:wrap;">
               <label style="min-width:300px;max-width:520px;flex:1;text-align:left;font-size:10px;font-weight:900;color:#334155;text-transform:uppercase;letter-spacing:.7px;">Existing cluster
                 <select id="ocqs-decommission-cluster" style="display:block;width:100%;margin-top:5px;padding:10px 12px;border:1px solid #94a3b8;border-radius:5px;background:#fff;color:#111827;font-size:12px;"><option value="">Loading existing clusters…</option></select>
@@ -2195,7 +2200,7 @@ kubectl describe kustomization &lt;name&gt; -n flux-system</div>
             c = document.getElementById('ocqs-dstage-' + i);
             if (!c){
               c = document.createElement('div'); c.id = 'ocqs-dstage-' + i;
-              c.style.cssText = 'flex:1;min-width:130px;border:1px solid #e2e8f0;border-radius:8px;padding:8px 10px;background:#f8fafc;';
+              c.style.cssText = 'flex:1;min-width:130px;border:1px solid #fca5a5;border-radius:8px;padding:8px 10px;background:#fee2e2;';
               c.innerHTML = '<div style="font-size:10px;font-weight:800;color:#64748b;">STEP ' + i + '/' + n + '</div>' +
                 '<div class="ds-title" style="font-size:11px;font-weight:700;color:#334155;">&hellip;</div>' +
                 '<div class="ds-detail" style="font-size:10px;color:#94a3b8;margin-top:2px;min-height:12px;"></div>';
@@ -2209,8 +2214,8 @@ kubectl describe kustomization &lt;name&gt; -n flux-system</div>
           var done = icon === '\u23ed' || icon === '\u2713' || /already completed/.test(line);
           var fail = icon === '\u2717';
           var run = icon === '\u2192' && !done;
-          card.style.background = fail ? '#fee2e2' : done ? '#dcfce7' : run ? '#e0f2fe' : '#f8fafc';
-          card.style.borderColor = fail ? '#fca5a5' : done ? '#86efac' : run ? '#7dd3fc' : '#e2e8f0';
+          card.style.background = fail ? '#fecaca' : done ? '#e0f2fe' : run ? '#dcfce7' : '#fee2e2';
+          card.style.borderColor = fail ? '#dc2626' : done ? '#7dd3fc' : run ? '#86efac' : '#fca5a5';
           card.querySelector('.ds-detail').textContent = fail ? 'failed' : done ? 'completed' : run ? 'running...' : '';
           window._ocqsDsActive = run ? k : (window._ocqsDsActive === k && (done || fail) ? 0 : window._ocqsDsActive);
           return;
@@ -2583,6 +2588,7 @@ kubectl describe kustomization &lt;name&gt; -n flux-system</div>
         for (var i = 0; i < steps.length; i++){
           if (window._ocqsAuto.stop){ ocqsTermLine('-- AutoRun stopped by user --', 'hd'); break; }
           setStepStatus(i, 'run');
+          if (window.ocExpandStageCard) window.ocExpandStageCard(document.getElementById(steps[i].cmdId));
           if (stEl) stEl.textContent = 'Step ' + (i+1) + '/' + steps.length + ': ' + steps[i].name;
           setTrackLabel('STEP ' + (i+1) + '/' + steps.length + ': ' + steps[i].name.toUpperCase());
           ocqsVoice('Step ' + (i+1) + ' of ' + steps.length + ': ' + steps[i].name.replace(/-/g,' ') + '.');
@@ -2989,7 +2995,7 @@ var y5=g('ocqs-yaml-5');
         var _gitSyncFetch = s.gitAuth==='token'
           ? 'TOKEN=$(tr -d "\\r\\n" < '+s.tokFile+')\nAUTH=$(printf "x-access-token:%s" "$TOKEN" | base64 | tr -d "\\r\\n")\nGIT_TERMINAL_PROMPT=0 git -c http.extraHeader="Authorization: Basic $AUTH" fetch origin '+s.gitBranch+'\nunset TOKEN AUTH'
           : 'GIT_TERMINAL_PROMPT=0 GIT_SSH_COMMAND="ssh -i '+s.sshKey+' -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=10" git fetch origin '+s.gitBranch;
-        var _gitSyncCheck='if test -d "'+gitopsPath+'/.git" && test -z "$(git -C "'+gitopsPath+'" status --porcelain)"; then\n  git -C "'+gitopsPath+'" remote set-url origin '+(s.gitAuth==='token'?_httpsRemote:_sshRemote)+'\n  cd "'+gitopsPath+'"\n  '+_gitSyncFetch+'\n  if git show-ref --verify --quiet refs/remotes/origin/'+s.gitBranch+'; then\n    if git merge-base --is-ancestor HEAD origin/'+s.gitBranch+'; then\n      git merge --ff-only origin/'+s.gitBranch+'\n    elif ! git merge-base --is-ancestor origin/'+s.gitBranch+' HEAD; then\n      echo "[INFO] Local and remote GitOps history diverged; rebasing before generation."\n      if ! GIT_EDITOR=true git rebase origin/'+s.gitBranch+'; then\n        git rebase --abort >/dev/null 2>&1 || true\n        echo "[BLOCKED] Automatic GitOps rebase conflicted and was safely aborted; reconcile the local commits before generation" >&2\n        exit 46\n      fi\n    fi\n  fi\nelse\n  echo "[INFO] GitOps pre-sync skipped because the repository is not initialized or already contains generated changes."\nfi';
+        var _gitSyncCheck='if test -d "'+gitopsPath+'/.git" && test -z "$(git -C "'+gitopsPath+'" status --porcelain)"; then\n  git -C "'+gitopsPath+'" remote set-url origin '+(s.gitAuth==='token'?_httpsRemote:_sshRemote)+'\n  cd "'+gitopsPath+'"\n  '+_gitSyncFetch+'\n  if git show-ref --verify --quiet refs/remotes/origin/'+s.gitBranch+'; then\n    if git merge-base --is-ancestor HEAD origin/'+s.gitBranch+'; then\n      git merge --ff-only origin/'+s.gitBranch+'\n    elif ! git merge-base --is-ancestor origin/'+s.gitBranch+' HEAD; then\n      echo "[INFO] Local and remote GitOps history diverged; rebasing before generation."\n      if ! GIT_EDITOR=true git rebase origin/'+s.gitBranch+'; then\n        git rebase --abort >/dev/null 2>&1 || true\n        echo "[BLOCKED] Automatic GitOps rebase conflicted and was safely aborted; reconcile the local commits before generation" >&2\n        exit 46\n      fi\n    fi\n  fi\nelif test -d "'+gitopsPath+'/.git"; then\n  echo "[BLOCKED] GitOps repository already contains changes; commit, stash, or restore them before generation." >&2\n  git -C "'+gitopsPath+'" status --short >&2\n  exit 47\nelse\n  echo "[INFO] GitOps pre-sync skipped because the repository is not initialized yet."\nfi';
         var _gitPreflight=_gitCredentialCheck+'\n'+_gitSyncCheck;
         var c6=g('ocqs-cmd-6');
         if(c6) c6.textContent=_gitPreflight+'\nopencenter cluster validate '+s.org+'/'+s.cluster;
@@ -3000,13 +3006,18 @@ var c7b=g('ocqs-cmd-7b');
         if(c7b) c7b.textContent='grep -R "CHANGEME" '+gitopsPath+' || true';
         // Step 8
         var c8=g('ocqs-cmd-8');
-        var _c8Head='set -e\ncd "'+gitopsPath+'"\ngit status\ngit diff --cached --quiet || { echo "[BLOCKED] The Git index already contains staged changes from another run; commit or unstage them before continuing" >&2; exit 45; }\ngit add -- .gitignore .sops.yaml\nfor path in "applications/overlays/'+s.cluster+'" "infrastructure/clusters/'+s.cluster+'" "clusters/'+s.cluster+'"; do\n  test ! -e "$path" || git add -- "$path"\ndone\nif ! git diff --cached --quiet; then\n  git commit -m "Initial OpenCenter GitOps generation for '+s.cluster+'"\nfi\n';
+        var _c8Guard='FOREIGN=$(git diff --cached --name-only | grep -vE "^(\\.gitignore|\\.sops\\.yaml|applications/overlays/'+s.cluster+'/|infrastructure/clusters/'+s.cluster+'/|clusters/'+s.cluster+'/)" || true)\ntest -z "$FOREIGN" || { echo "[BLOCKED] The Git index contains staged changes outside the '+s.cluster+' paths; commit or unstage them before continuing:" >&2; echo "$FOREIGN" >&2; exit 45; }';
+        var _c8Head='set -e\ncd "'+gitopsPath+'"\ngit status\n'+_c8Guard+'\ngit add -A -- .gitignore .sops.yaml\nfor path in "applications/overlays/'+s.cluster+'" "infrastructure/clusters/'+s.cluster+'" "clusters/'+s.cluster+'"; do\n  git add -A -- "$path"\ndone\nif ! git diff --cached --quiet; then\n  git commit -m "Initial OpenCenter GitOps generation for '+s.cluster+'"\nfi\n';
         if(c8) c8.textContent = (s.gitAuth==='token')
           ? _c8Head+'TOKEN=$(tr -d "\\r\\n" < '+s.tokFile+')\ntest -n "$TOKEN" || { echo "[BLOCKED] Git token file is empty" >&2; exit 42; }\nexport GIT_TERMINAL_PROMPT=0\ngit remote set-url origin '+_httpsRemote+'\nAUTH=$(printf "x-access-token:%s" "$TOKEN" | base64 | tr -d "\\r\\n")\ngit branch -M '+s.gitBranch+'\nif ! REMOTE_HEAD=$(git -c http.extraHeader="Authorization: Basic $AUTH" ls-remote --heads origin '+s.gitBranch+'); then\n  echo "[BLOCKED] GitHub rejected the token or the repository is unavailable" >&2\n  exit 43\nfi\nif test -n "$REMOTE_HEAD"; then\n  git -c http.extraHeader="Authorization: Basic $AUTH" fetch origin '+s.gitBranch+'\n  if ! GIT_EDITOR=true git rebase origin/'+s.gitBranch+'; then\n    git rebase --abort >/dev/null 2>&1 || true\n    echo "[BLOCKED] Automatic GitOps rebase conflicted and was safely aborted" >&2\n    exit 46\n  fi\nfi\ngit -c http.extraHeader="Authorization: Basic $AUTH" push -u origin '+s.gitBranch+'\nunset TOKEN AUTH REMOTE_HEAD'
           : _c8Head+'git remote set-url origin '+_sshRemote+'\nexport GIT_TERMINAL_PROMPT=0\nexport GIT_SSH_COMMAND="ssh -i '+s.sshKey+' -o StrictHostKeyChecking=no"\ngit branch -M '+s.gitBranch+'\nif ! REMOTE_HEAD=$(git ls-remote --heads origin '+s.gitBranch+'); then\n  echo "[BLOCKED] GitHub SSH authentication failed or the repository is unavailable" >&2\n  exit 43\nfi\nif test -n "$REMOTE_HEAD"; then\n  git fetch origin '+s.gitBranch+'\n  if ! GIT_EDITOR=true git rebase origin/'+s.gitBranch+'; then\n    git rebase --abort >/dev/null 2>&1 || true\n    echo "[BLOCKED] Automatic GitOps rebase conflicted and was safely aborted" >&2\n    exit 46\n  fi\nfi\ngit push -u origin '+s.gitBranch;
 // Step 9
+        var _c9AutoPush = (s.gitAuth==='token')
+          ? 'TOKEN=$(tr -d "\\r\\n" < '+s.tokFile+')\n  AUTH=$(printf "x-access-token:%s" "$TOKEN" | base64 | tr -d "\\r\\n")\n  git remote set-url origin '+_httpsRemote+'\n  GIT_TERMINAL_PROMPT=0 git -c http.extraHeader="Authorization: Basic $AUTH" push -u origin '+s.gitBranch+'\n  unset TOKEN AUTH'
+          : 'git remote set-url origin '+_sshRemote+'\n  GIT_TERMINAL_PROMPT=0 GIT_SSH_COMMAND="ssh -i '+s.sshKey+' -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=10" git push -u origin '+s.gitBranch;
+        var _c9CommitPush='if test -n "$(git -C "'+gitopsPath+'" status --porcelain)"; then\n  echo "[INFO] GitOps generation refreshed dynamic infrastructure values; committing and pushing them automatically."\n  cd "'+gitopsPath+'"\n  '+_c8Guard+'\n  git add -A -- .gitignore .sops.yaml\n  for path in "applications/overlays/'+s.cluster+'" "infrastructure/clusters/'+s.cluster+'" "clusters/'+s.cluster+'"; do\n    git add -A -- "$path"\n  done\n  git diff --cached --quiet || git commit -m "Refresh generated GitOps manifests for '+s.cluster+'"\n  test -z "$(git status --porcelain)" || { echo "[BLOCKED] GitOps repository has changes outside the '+s.cluster+' paths; commit them manually before deployment" >&2; exit 44; }\n  '+_c9AutoPush+'\n  cd - >/dev/null\nfi';
         var c9=g('ocqs-cmd-9');
-        if(c9) c9.textContent='set -e\n'+_gitPreflight+'\ntest -z "$(git -C "'+gitopsPath+'" status --porcelain)" || { echo "[BLOCKED] GitOps repository has uncommitted changes; complete the commit and push step first" >&2; exit 44; }\ngit -C "'+gitopsPath+'" rev-parse --abbrev-ref --symbolic-full-name @{u} >/dev/null 2>&1 || { echo "[BLOCKED] GitOps branch has no upstream; complete the push step first" >&2; exit 44; }\ntest "$(git -C "'+gitopsPath+'" rev-list --count @{u}..HEAD)" -eq 0 || { echo "[BLOCKED] GitOps commits have not been pushed" >&2; exit 44; }\nopencenter cluster validate '+s.org+'/'+s.cluster+'\nopencenter cluster deploy --break-lock --yes '+s.org+'/'+s.cluster;
+        if(c9) c9.textContent='set -e\n'+_gitPreflight+'\nopencenter cluster generate '+s.org+'/'+s.cluster+'\nopencenter secrets sync '+s.org+'/'+s.cluster+'\n'+_c9CommitPush+'\ngit -C "'+gitopsPath+'" rev-parse --abbrev-ref --symbolic-full-name @{u} >/dev/null 2>&1 || { echo "[BLOCKED] GitOps branch has no upstream; complete the push step first" >&2; exit 44; }\ntest "$(git -C "'+gitopsPath+'" rev-list --count @{u}..HEAD)" -eq 0 || { echo "[BLOCKED] GitOps commits have not been pushed" >&2; exit 44; }\nopencenter cluster validate '+s.org+'/'+s.cluster+'\nopencenter cluster deploy --from-step opentofu-init --break-lock --yes '+s.org+'/'+s.cluster;
 var c9l=g('ocqs-cmd-9logs');
         if(c9l) c9l.textContent='ls -lah '+logPath+'\ntail -f '+logPath+'*.log';
 var c9b=g('ocqs-cmd-9b');
@@ -3583,6 +3594,8 @@ var c9b=g('ocqs-cmd-9b');
           <div style="margin-top:14px;display:flex;align-items:center;flex-wrap:wrap;gap:12px;padding:12px 14px;background:linear-gradient(135deg,#0f172a,#1e3a5f);border-radius:10px;">
             <button id="ocqp-autorun-btn" onclick="ocqpAutoRunAll()" style="border:none;border-radius:8px;padding:10px 22px;font-size:13px;font-weight:900;cursor:pointer;color:#fff;background:linear-gradient(135deg,#0284c7,#38bdf8);box-shadow:0 4px 12px rgba(2,132,199,.5);">&#9889; AutoRun All Steps (A &rarr; Z)</button>
             <button id="ocqp-autorun-restart" onclick="ocqpAutoRestart()" style="border:none;border-radius:8px;padding:10px 16px;font-size:13px;font-weight:900;cursor:pointer;color:#fff;background:#475569;">&#8635; Restart</button>
+            <button onclick="var s=(typeof ocqpGetState==='function')?ocqpGetState():{};window.open('/opencenter/monitor/deployment/'+(s.org||'my-org')+'/'+(s.cluster||'my-cluster'),'_blank');" style="border:none;border-radius:8px;padding:10px 16px;font-size:13px;font-weight:900;cursor:pointer;color:#fff;background:#0f172a;border:1px solid #38bdf8;">&#128225; Deployment Live Monitor</button>
+            <button onclick="var s=(typeof ocqpGetState==='function')?ocqpGetState():{};window.open('/opencenter/monitor/cluster/'+(s.org||'my-org')+'/'+(s.cluster||'my-cluster'),'_blank');" style="border:none;border-radius:8px;padding:10px 16px;font-size:13px;font-weight:900;cursor:pointer;color:#fff;background:#0f172a;border:1px solid #34d399;">&#129657; Cluster Live Monitor</button>
             <label style="font-size:11px;color:#94a3b8;display:flex;align-items:center;gap:5px;cursor:pointer;"><input type="checkbox" id="ocqp-autorun-cont"> continue on error</label>
             <span id="ocqp-autorun-status" style="font-size:12px;font-weight:800;color:#94a3b8;"></span>
           </div>
@@ -4139,7 +4152,7 @@ var c9b=g('ocqs-cmd-9b');
         }
         guard.value='no';
         var cmd=document.getElementById('ocqp-cmd-10');
-        if(cmd) cmd.textContent='opencenter cluster destroy '+target+' --force --break-lock';
+        if(cmd) cmd.textContent='opencenter_destroy_cluster.sh '+target+' --yes';
         ocqpRunCmd('ocqp-cmd-10','ocqp-out-10','ocqp-decommission-runner');
       };
       window.ocqpFillClusterHistory = function(pairs, preferred){
@@ -4265,11 +4278,13 @@ var c9b=g('ocqs-cmd-9b');
       };
     </script>
         <!-- Prerequisites -->
-        <div class="ocqs-card" id="ocqp-prereq">
-          <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
+        <details class="ocqs-card" id="ocqp-prereq">
+          <summary style="display:flex;align-items:center;gap:8px;cursor:pointer;list-style:none;user-select:none;">
             <span class="ocqs-step-num" style="background:#6366f1;">&#10003;</span>
             <h3 style="margin:0;">Prerequisites</h3>
-          </div>
+            <span style="margin-left:auto;font-size:10px;font-weight:800;color:#6366f1;text-transform:uppercase;letter-spacing:.7px;">Show / hide setup checks</span>
+          </summary>
+          <div style="margin-top:12px;">
           <p>Before starting, ensure you have all of the following:</p>
 
           <p style="font-size:12px;font-weight:700;color:#0369a1;margin-bottom:4px;">1 — Mise (tool version manager &amp; task runner)</p>
@@ -4313,7 +4328,8 @@ cat ~/.ssh/id_ed25519.pub</div>
             <div>&#9679; <strong>VMware vSphere</strong> — with pre-provisioned VMs</div>
             <div>&#9679; <strong>AWS</strong> credentials — experimental</div>
           </div>
-        </div>
+          </div>
+        </details>
 
         <!-- Step 1 -->
         <div class="ocqs-card" id="ocqp-step-1">
@@ -4745,7 +4761,7 @@ tail -f /home/dzoan/.local/state/opencenter/logs/bootstrap/my-org/my-cluster/*.l
           <div style="margin:18px;background:rgba(255,255,255,.96);border:2px solid #111827;border-radius:8px;padding:18px;text-align:center;box-shadow:0 3px 8px rgba(0,0,0,.2);">
             <div style="font-size:9px;font-weight:900;color:#b91c1c;text-transform:uppercase;letter-spacing:2px;margin-bottom:5px;">STAGE 10 · DESTRUCTIVE ACTION</div>
             <h3 style="margin:0 0 7px;color:#111827;">&#9888; Decommission / Destroy Cluster</h3>
-            <p style="margin:0 auto 14px;max-width:680px;color:#475569;font-size:12px;">Select an existing cluster, then use the guarded switch below. Cloud infrastructure is destroyed; local blueprint and GitOps files are preserved.</p>
+            <p style="margin:0 auto 14px;max-width:680px;color:#475569;font-size:12px;">Select an existing cluster, then use the guarded switch below. Interrupted state is recovered and orphan VMs plus managed cloud infrastructure are destroyed. Shared GitOps files are preserved.</p>
             <div style="display:flex;justify-content:center;align-items:end;gap:10px;flex-wrap:wrap;">
               <label style="min-width:300px;max-width:520px;flex:1;text-align:left;font-size:10px;font-weight:900;color:#334155;text-transform:uppercase;letter-spacing:.7px;">Existing cluster
                 <select id="ocqp-decommission-cluster" style="display:block;width:100%;margin-top:5px;padding:10px 12px;border:1px solid #94a3b8;border-radius:5px;background:#fff;color:#111827;font-size:12px;"><option value="">Loading existing clusters…</option></select>
@@ -5329,7 +5345,7 @@ kubectl describe kustomization &lt;name&gt; -n flux-system</div>
             c = document.getElementById('ocqp-dstage-' + i);
             if (!c){
               c = document.createElement('div'); c.id = 'ocqp-dstage-' + i;
-              c.style.cssText = 'flex:1;min-width:130px;border:1px solid #e2e8f0;border-radius:8px;padding:8px 10px;background:#f8fafc;';
+              c.style.cssText = 'flex:1;min-width:130px;border:1px solid #fca5a5;border-radius:8px;padding:8px 10px;background:#fee2e2;';
               c.innerHTML = '<div style="font-size:10px;font-weight:800;color:#64748b;">STEP ' + i + '/' + n + '</div>' +
                 '<div class="ds-title" style="font-size:11px;font-weight:700;color:#334155;">&hellip;</div>' +
                 '<div class="ds-detail" style="font-size:10px;color:#94a3b8;margin-top:2px;min-height:12px;"></div>';
@@ -5343,8 +5359,8 @@ kubectl describe kustomization &lt;name&gt; -n flux-system</div>
           var done = icon === '\u23ed' || icon === '\u2713' || /already completed/.test(line);
           var fail = icon === '\u2717';
           var run = icon === '\u2192' && !done;
-          card.style.background = fail ? '#fee2e2' : done ? '#dcfce7' : run ? '#e0f2fe' : '#f8fafc';
-          card.style.borderColor = fail ? '#fca5a5' : done ? '#86efac' : run ? '#7dd3fc' : '#e2e8f0';
+          card.style.background = fail ? '#fecaca' : done ? '#e0f2fe' : run ? '#dcfce7' : '#fee2e2';
+          card.style.borderColor = fail ? '#dc2626' : done ? '#7dd3fc' : run ? '#86efac' : '#fca5a5';
           card.querySelector('.ds-detail').textContent = fail ? 'failed' : done ? 'completed' : run ? 'running...' : '';
           window._ocqpDsActive = run ? k : (window._ocqpDsActive === k && (done || fail) ? 0 : window._ocqpDsActive);
           return;
@@ -5674,6 +5690,7 @@ kubectl describe kustomization &lt;name&gt; -n flux-system</div>
         for (var i = 0; i < steps.length; i++){
           if (window._ocqpAuto.stop){ ocqpTermLine('-- AutoRun stopped by user --', 'hd'); break; }
           setStepStatus(i, 'run');
+          if (window.ocExpandStageCard) window.ocExpandStageCard(document.getElementById(steps[i].cmdId));
           if (stEl) stEl.textContent = 'Step ' + (i+1) + '/' + steps.length + ': ' + steps[i].name;
           setTrackLabel('STEP ' + (i+1) + '/' + steps.length + ': ' + steps[i].name.toUpperCase());
           ocqpVoice('Step ' + (i+1) + ' of ' + steps.length + ': ' + steps[i].name.replace(/-/g,' ') + '.');
@@ -6080,7 +6097,7 @@ var y5=g('ocqp-yaml-5');
         var _gitSyncFetch = s.gitAuth==='token'
           ? 'TOKEN=$(tr -d "\\r\\n" < '+s.tokFile+')\nAUTH=$(printf "x-access-token:%s" "$TOKEN" | base64 | tr -d "\\r\\n")\nGIT_TERMINAL_PROMPT=0 git -c http.extraHeader="Authorization: Basic $AUTH" fetch origin '+s.gitBranch+'\nunset TOKEN AUTH'
           : 'GIT_TERMINAL_PROMPT=0 GIT_SSH_COMMAND="ssh -i '+s.sshKey+' -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=10" git fetch origin '+s.gitBranch;
-        var _gitSyncCheck='if test -d "'+gitopsPath+'/.git" && test -z "$(git -C "'+gitopsPath+'" status --porcelain)"; then\n  git -C "'+gitopsPath+'" remote set-url origin '+(s.gitAuth==='token'?_httpsRemote:_sshRemote)+'\n  cd "'+gitopsPath+'"\n  '+_gitSyncFetch+'\n  if git show-ref --verify --quiet refs/remotes/origin/'+s.gitBranch+'; then\n    if git merge-base --is-ancestor HEAD origin/'+s.gitBranch+'; then\n      git merge --ff-only origin/'+s.gitBranch+'\n    elif ! git merge-base --is-ancestor origin/'+s.gitBranch+' HEAD; then\n      echo "[INFO] Local and remote GitOps history diverged; rebasing before generation."\n      if ! GIT_EDITOR=true git rebase origin/'+s.gitBranch+'; then\n        git rebase --abort >/dev/null 2>&1 || true\n        echo "[BLOCKED] Automatic GitOps rebase conflicted and was safely aborted; reconcile the local commits before generation" >&2\n        exit 46\n      fi\n    fi\n  fi\nelse\n  echo "[INFO] GitOps pre-sync skipped because the repository is not initialized or already contains generated changes."\nfi';
+        var _gitSyncCheck='if test -d "'+gitopsPath+'/.git" && test -z "$(git -C "'+gitopsPath+'" status --porcelain)"; then\n  git -C "'+gitopsPath+'" remote set-url origin '+(s.gitAuth==='token'?_httpsRemote:_sshRemote)+'\n  cd "'+gitopsPath+'"\n  '+_gitSyncFetch+'\n  if git show-ref --verify --quiet refs/remotes/origin/'+s.gitBranch+'; then\n    if git merge-base --is-ancestor HEAD origin/'+s.gitBranch+'; then\n      git merge --ff-only origin/'+s.gitBranch+'\n    elif ! git merge-base --is-ancestor origin/'+s.gitBranch+' HEAD; then\n      echo "[INFO] Local and remote GitOps history diverged; rebasing before generation."\n      if ! GIT_EDITOR=true git rebase origin/'+s.gitBranch+'; then\n        git rebase --abort >/dev/null 2>&1 || true\n        echo "[BLOCKED] Automatic GitOps rebase conflicted and was safely aborted; reconcile the local commits before generation" >&2\n        exit 46\n      fi\n    fi\n  fi\nelif test -d "'+gitopsPath+'/.git"; then\n  echo "[BLOCKED] GitOps repository already contains changes; commit, stash, or restore them before generation." >&2\n  git -C "'+gitopsPath+'" status --short >&2\n  exit 47\nelse\n  echo "[INFO] GitOps pre-sync skipped because the repository is not initialized yet."\nfi';
         var _gitPreflight=_gitCredentialCheck+'\n'+_gitSyncCheck;
         var c6=g('ocqp-cmd-6');
         if(c6) c6.textContent=_gitPreflight+'\nopencenter cluster validate '+s.org+'/'+s.cluster;
@@ -6091,13 +6108,18 @@ var c7b=g('ocqp-cmd-7b');
         if(c7b) c7b.textContent='grep -R "CHANGEME" '+gitopsPath+' || true';
         // Step 8
         var c8=g('ocqp-cmd-8');
-        var _c8Head='set -e\ncd "'+gitopsPath+'"\ngit status\ngit diff --cached --quiet || { echo "[BLOCKED] The Git index already contains staged changes from another run; commit or unstage them before continuing" >&2; exit 45; }\ngit add -- .gitignore .sops.yaml\nfor path in "applications/overlays/'+s.cluster+'" "infrastructure/clusters/'+s.cluster+'" "clusters/'+s.cluster+'"; do\n  test ! -e "$path" || git add -- "$path"\ndone\nif ! git diff --cached --quiet; then\n  git commit -m "Initial OpenCenter GitOps generation for '+s.cluster+'"\nfi\n';
+        var _c8Guard='FOREIGN=$(git diff --cached --name-only | grep -vE "^(\\.gitignore|\\.sops\\.yaml|applications/overlays/'+s.cluster+'/|infrastructure/clusters/'+s.cluster+'/|clusters/'+s.cluster+'/)" || true)\ntest -z "$FOREIGN" || { echo "[BLOCKED] The Git index contains staged changes outside the '+s.cluster+' paths; commit or unstage them before continuing:" >&2; echo "$FOREIGN" >&2; exit 45; }';
+        var _c8Head='set -e\ncd "'+gitopsPath+'"\ngit status\n'+_c8Guard+'\ngit add -A -- .gitignore .sops.yaml\nfor path in "applications/overlays/'+s.cluster+'" "infrastructure/clusters/'+s.cluster+'" "clusters/'+s.cluster+'"; do\n  git add -A -- "$path"\ndone\nif ! git diff --cached --quiet; then\n  git commit -m "Initial OpenCenter GitOps generation for '+s.cluster+'"\nfi\n';
         if(c8) c8.textContent = (s.gitAuth==='token')
           ? _c8Head+'TOKEN=$(tr -d "\\r\\n" < '+s.tokFile+')\ntest -n "$TOKEN" || { echo "[BLOCKED] Git token file is empty" >&2; exit 42; }\nexport GIT_TERMINAL_PROMPT=0\ngit remote set-url origin '+_httpsRemote+'\nAUTH=$(printf "x-access-token:%s" "$TOKEN" | base64 | tr -d "\\r\\n")\ngit branch -M '+s.gitBranch+'\nif ! REMOTE_HEAD=$(git -c http.extraHeader="Authorization: Basic $AUTH" ls-remote --heads origin '+s.gitBranch+'); then\n  echo "[BLOCKED] GitHub rejected the token or the repository is unavailable" >&2\n  exit 43\nfi\nif test -n "$REMOTE_HEAD"; then\n  git -c http.extraHeader="Authorization: Basic $AUTH" fetch origin '+s.gitBranch+'\n  if ! GIT_EDITOR=true git rebase origin/'+s.gitBranch+'; then\n    git rebase --abort >/dev/null 2>&1 || true\n    echo "[BLOCKED] Automatic GitOps rebase conflicted and was safely aborted" >&2\n    exit 46\n  fi\nfi\ngit -c http.extraHeader="Authorization: Basic $AUTH" push -u origin '+s.gitBranch+'\nunset TOKEN AUTH REMOTE_HEAD'
           : _c8Head+'git remote set-url origin '+_sshRemote+'\nexport GIT_TERMINAL_PROMPT=0\nexport GIT_SSH_COMMAND="ssh -i '+s.sshKey+' -o StrictHostKeyChecking=no"\ngit branch -M '+s.gitBranch+'\nif ! REMOTE_HEAD=$(git ls-remote --heads origin '+s.gitBranch+'); then\n  echo "[BLOCKED] GitHub SSH authentication failed or the repository is unavailable" >&2\n  exit 43\nfi\nif test -n "$REMOTE_HEAD"; then\n  git fetch origin '+s.gitBranch+'\n  if ! GIT_EDITOR=true git rebase origin/'+s.gitBranch+'; then\n    git rebase --abort >/dev/null 2>&1 || true\n    echo "[BLOCKED] Automatic GitOps rebase conflicted and was safely aborted" >&2\n    exit 46\n  fi\nfi\ngit push -u origin '+s.gitBranch;
 // Step 9
+        var _c9AutoPush = (s.gitAuth==='token')
+          ? 'TOKEN=$(tr -d "\\r\\n" < '+s.tokFile+')\n  AUTH=$(printf "x-access-token:%s" "$TOKEN" | base64 | tr -d "\\r\\n")\n  git remote set-url origin '+_httpsRemote+'\n  GIT_TERMINAL_PROMPT=0 git -c http.extraHeader="Authorization: Basic $AUTH" push -u origin '+s.gitBranch+'\n  unset TOKEN AUTH'
+          : 'git remote set-url origin '+_sshRemote+'\n  GIT_TERMINAL_PROMPT=0 GIT_SSH_COMMAND="ssh -i '+s.sshKey+' -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=10" git push -u origin '+s.gitBranch;
+        var _c9CommitPush='if test -n "$(git -C "'+gitopsPath+'" status --porcelain)"; then\n  echo "[INFO] GitOps generation refreshed dynamic infrastructure values; committing and pushing them automatically."\n  cd "'+gitopsPath+'"\n  '+_c8Guard+'\n  git add -A -- .gitignore .sops.yaml\n  for path in "applications/overlays/'+s.cluster+'" "infrastructure/clusters/'+s.cluster+'" "clusters/'+s.cluster+'"; do\n    git add -A -- "$path"\n  done\n  git diff --cached --quiet || git commit -m "Refresh generated GitOps manifests for '+s.cluster+'"\n  test -z "$(git status --porcelain)" || { echo "[BLOCKED] GitOps repository has changes outside the '+s.cluster+' paths; commit them manually before deployment" >&2; exit 44; }\n  '+_c9AutoPush+'\n  cd - >/dev/null\nfi';
         var c9=g('ocqp-cmd-9');
-        if(c9) c9.textContent='set -e\n'+_gitPreflight+'\ntest -z "$(git -C "'+gitopsPath+'" status --porcelain)" || { echo "[BLOCKED] GitOps repository has uncommitted changes; complete the commit and push step first" >&2; exit 44; }\ngit -C "'+gitopsPath+'" rev-parse --abbrev-ref --symbolic-full-name @{u} >/dev/null 2>&1 || { echo "[BLOCKED] GitOps branch has no upstream; complete the push step first" >&2; exit 44; }\ntest "$(git -C "'+gitopsPath+'" rev-list --count @{u}..HEAD)" -eq 0 || { echo "[BLOCKED] GitOps commits have not been pushed" >&2; exit 44; }\nopencenter cluster validate '+s.org+'/'+s.cluster+'\nopencenter cluster deploy --break-lock --yes '+s.org+'/'+s.cluster;
+        if(c9) c9.textContent='set -e\n'+_gitPreflight+'\nopencenter cluster generate '+s.org+'/'+s.cluster+'\nopencenter secrets sync '+s.org+'/'+s.cluster+'\n'+_c9CommitPush+'\ngit -C "'+gitopsPath+'" rev-parse --abbrev-ref --symbolic-full-name @{u} >/dev/null 2>&1 || { echo "[BLOCKED] GitOps branch has no upstream; complete the push step first" >&2; exit 44; }\ntest "$(git -C "'+gitopsPath+'" rev-list --count @{u}..HEAD)" -eq 0 || { echo "[BLOCKED] GitOps commits have not been pushed" >&2; exit 44; }\nopencenter cluster validate '+s.org+'/'+s.cluster+'\nopencenter cluster deploy --from-step opentofu-init --break-lock --yes '+s.org+'/'+s.cluster;
 var c9l=g('ocqp-cmd-9logs');
         if(c9l) c9l.textContent='ls -lah '+logPath+'\ntail -f '+logPath+'*.log';
 var c9b=g('ocqp-cmd-9b');
@@ -7282,5 +7304,73 @@ mise run build
       </script>
     </div>
     <!-- s2rehost_manual-pane removed (runbook moved to Stage 2 documentation; not part of cost flow) -->
+
+    <script>
+    (function(){
+      // Collapse OpenCenter Quick Start stage cards by default, like the Prerequisites accordion.
+      // Cards keep their existing markup; we only move everything after the header row into a
+      // hideable wrapper and toggle it on click / auto-expand it when a Run happens.
+      function setupCollapsibleStages(prefix){
+        document.querySelectorAll('.ocqs-card[id^="' + prefix + '-step-"]').forEach(function(card){
+          if (card.dataset.ocCollapsible) return;
+          var head = card.querySelector(':scope > div[style*="display:flex"]');
+          if (!head || !head.querySelector('.ocqs-step-num')) return; // skip non-standard cards (e.g. destructive stage)
+          card.dataset.ocCollapsible = '1';
+          var body = document.createElement('div');
+          body.className = 'oc-card-body';
+          body.style.display = 'none';
+          var node = head.nextSibling;
+          var toMove = [];
+          while (node){ toMove.push(node); node = node.nextSibling; }
+          toMove.forEach(function(n){ body.appendChild(n); });
+          card.appendChild(body);
+          head.style.cursor = 'pointer';
+          var chev = document.createElement('span');
+          chev.textContent = '▸';
+          chev.style.marginLeft = 'auto';
+          chev.style.fontSize = '12px';
+          chev.style.fontWeight = '800';
+          chev.style.color = '#64748b';
+          head.appendChild(chev);
+          card._ocBody = body;
+          card._ocChev = chev;
+          head.addEventListener('click', function(){
+            var isOpen = body.style.display !== 'none';
+            body.style.display = isOpen ? 'none' : 'block';
+            chev.textContent = isOpen ? '▸' : '▾';
+          });
+        });
+      }
+      setupCollapsibleStages('ocqs');
+      setupCollapsibleStages('ocqp');
+
+      // Auto-expand the stage a Run/AutoRun step belongs to, so output stays visible.
+      window.ocExpandStageCard = function(el){
+        if (!el) return;
+        var card = el.closest ? el.closest('.ocqs-card') : null;
+        if (card && card._ocBody && card._ocBody.style.display === 'none'){
+          card._ocBody.style.display = 'block';
+          if (card._ocChev) card._ocChev.textContent = '▾';
+        }
+      };
+
+      function hookRunCmd(name){
+        var orig = window[name];
+        if (typeof orig !== 'function') return;
+        window[name] = function(cmdId, outId, btnId){
+          var anchor = document.getElementById(btnId) || document.getElementById(cmdId);
+          window.ocExpandStageCard(anchor);
+          return orig.apply(this, arguments);
+        };
+      }
+      hookRunCmd('ocqsRunCmd');
+      hookRunCmd('ocqpRunCmd');
+
+      document.addEventListener('DOMContentLoaded', function(){
+        setupCollapsibleStages('ocqs');
+        setupCollapsibleStages('ocqp');
+      });
+    })();
+    </script>
 
     <!-- R7 Repurchase -->
