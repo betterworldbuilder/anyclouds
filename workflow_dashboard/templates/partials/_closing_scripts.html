@@ -6168,8 +6168,8 @@ ${certContent}
           var scol = sys.status === 'Draft' ? 'gray' : 'green';
           var dbInScope = comps.some(function(c){ return (c.name||'').indexOf('Database') !== -1; });
           var removeBtn = usingItemSystems
-            ? '<button onclick="wldRemoveSystem(' + idx + ',' + si + ')" class="uat-s1-btn-muted" style="font-size:11px;padding:5px 10px;color:#dc2626;">Remove</button>'
-            : '';
+            ? '<button onclick="wldRemoveSystem(' + idx + ',' + si + ')" class="uat-s1-btn-muted" style="font-size:11px;padding:5px 10px;color:#dc2626;">🗑 Delete</button>'
+            : '<button onclick="wldRemoveSharedSystem(' + idx + ',\'' + _wldEsc(sys.id||'') + '\')" class="uat-s1-btn-muted" style="font-size:11px;padding:5px 10px;color:#dc2626;">🗑 Delete</button>';
           return '<div class="uat-s1-sys-card">'
             + '<div class="uat-s1-sys-head">'
             + '<div class="uat-s1-sys-name">'
@@ -6209,6 +6209,21 @@ ${certContent}
       console.error('showWLDetails', e);
       alert('Could not open Request Details: ' + e.message);
     }
+  }
+
+  // Delete a business system that lives in the shared Stage-2 engine store
+  // (used when a request has no private systems array).
+  function wldRemoveSharedSystem(itemIdx, sysId) {
+    if (!confirm('Delete this business system?')) return;
+    if (typeof window.uatS1DeleteSystem === 'function') {
+      window.uatS1DeleteSystem(sysId);
+    } else {
+      try {
+        var systems = JSON.parse(localStorage.getItem('uatS1_systems') || '[]');
+        localStorage.setItem('uatS1_systems', JSON.stringify(systems.filter(function(s){ return s.id !== sysId; })));
+      } catch(e) { alert('Delete failed: ' + e.message); return; }
+    }
+    showWLDetails(itemIdx);
   }
 
   function wldRemoveSystem(itemIdx, sysIdx) {
@@ -10581,6 +10596,15 @@ ${certContent}
     }
   };
 
+  // Global deletion entry point so external views (Request Details cards) can
+  // remove a shared business system through the engine's own state and re-render.
+  window.uatS1DeleteSystem = function(id) {
+    _state.systems = _state.systems.filter(function(s){ return s.id !== id; });
+    _save(); _render();
+    if (typeof window.r6pBusinessSystemsChanged === 'function') window.r6pBusinessSystemsChanged();
+    else if (typeof window.r6pLoadBiz === 'function') window.r6pLoadBiz();
+  };
+
   window.uatS1SaveCustomerTemplate = function() {
     var name = (_gv('uatS1Name')||'').trim();
     if (!name) { alert('Please enter a Business System Name.'); return; }
@@ -10702,11 +10726,7 @@ ${certContent}
       });
       div.querySelector('[data-bz-del]').addEventListener('click', function(){
         if (!confirm('Remove this business system?')) return;
-        var did = this.getAttribute('data-bz-del');
-        _state.systems = _state.systems.filter(function(s){ return s.id!==did; });
-        _save(); _render();
-        if (typeof window.r6pBusinessSystemsChanged === 'function') window.r6pBusinessSystemsChanged();
-        else if (typeof window.r6pLoadBiz === 'function') window.r6pLoadBiz();
+        window.uatS1DeleteSystem(this.getAttribute('data-bz-del'));
       });
       el.appendChild(div);
     });
