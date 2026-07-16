@@ -7857,25 +7857,25 @@ Kubernetes Cluster
 User Access
   └─ dashboard.&lt;cluster&gt;      → Headlamp / OpenCenter dashboard endpoint</pre>
             <div style="margin-top:12px;display:flex;flex-wrap:wrap;gap:14px;font-size:11px;font-weight:700;background:#020817;border:1px solid #1e3a5f;border-radius:8px;padding:10px 14px;">
-              <span style="color:#94a3b8;">Cluster: <span style="color:#4ade80;">my5th-opencenter-cluster</span></span>
-              <span style="color:#94a3b8;">Deployed: <span style="color:#7dd3fc;">2026-07-10 22:17 ICT</span></span>
+              <span style="color:#94a3b8;">Cluster: <span style="color:#4ade80;">test8cluster</span></span>
+              <span style="color:#94a3b8;">Deployed: <span style="color:#7dd3fc;">2026-07-15 23:12 ICT</span></span>
               <span style="color:#94a3b8;">Target region: <span style="color:#fbbf24;">FLEX IAD3</span></span>
-              <span style="color:#94a3b8;">API endpoint: <span style="color:#a78bfa;">https://146.20.63.50:443</span></span>
+              <span style="color:#94a3b8;">API endpoint: <span style="color:#a78bfa;">https://146.20.60.102:443</span></span>
               <span style="color:#94a3b8;">Kubernetes: <span style="color:#7dd3fc;">v1.35.4</span></span>
             </div>
             <table class="ocqs-req-table" style="font-size:11px;margin-top:10px;">
               <thead><tr><th>Component</th><th>Role</th><th>Status</th><th>Internal IP</th><th>External IP</th><th>OS / Runtime</th></tr></thead>
               <tbody>
-                <tr><td><code>my5th-opencenter-cluster-cp0</code></td><td>control-plane</td><td style="color:#15803d;font-weight:800;">Ready</td><td><code>10.2.128.94</code></td><td>&mdash;</td><td>Ubuntu 24.04.4 LTS &middot; containerd 2.2.3</td></tr>
-                <tr><td><code>my5th-opencenter-cluster-cp1</code></td><td>control-plane</td><td style="color:#15803d;font-weight:800;">Ready</td><td><code>10.2.131.175</code></td><td>&mdash;</td><td>Ubuntu 24.04.4 LTS &middot; containerd 2.2.3</td></tr>
-                <tr><td><code>my5th-opencenter-cluster-cp2</code></td><td>control-plane</td><td style="color:#15803d;font-weight:800;">Ready</td><td><code>10.2.131.108</code></td><td>&mdash;</td><td>Ubuntu 24.04.4 LTS &middot; containerd 2.2.3</td></tr>
-                <tr><td><code>my5th-opencenter-cluster-wn0</code></td><td>worker</td><td style="color:#15803d;font-weight:800;">Ready</td><td><code>10.2.129.83</code></td><td>&mdash;</td><td>Ubuntu 24.04.4 LTS &middot; containerd 2.2.3</td></tr>
-                <tr><td><code>my5th-opencenter-cluster-wn1</code></td><td>worker</td><td style="color:#15803d;font-weight:800;">Ready</td><td><code>10.2.128.26</code></td><td>&mdash;</td><td>Ubuntu 24.04.4 LTS &middot; containerd 2.2.3</td></tr>
-                <tr><td><code>my5th-opencenter-cluster-bastion</code></td><td>bastion / admin</td><td style="color:#15803d;font-weight:800;">Active</td><td><code>10.2.128.62</code></td><td><code>146.20.62.51</code></td><td>Ubuntu 24.04 &middot; kubeconfig + GitOps bootstrap</td></tr>
-                <tr><td><code>kube-apiserver VIP</code></td><td>API endpoint</td><td style="color:#15803d;font-weight:800;">Ready</td><td>&mdash;</td><td><code>146.20.63.50:443</code></td><td>HA VIP fronting cp0/cp1/cp2</td></tr>
+                <tr><td><code>test8cluster-cp0</code></td><td>control-plane</td><td style="color:#15803d;font-weight:800;">Ready</td><td><code>10.2.129.224</code></td><td>&mdash;</td><td>Ubuntu 22.04.5 LTS &middot; containerd 2.2.3</td></tr>
+                <tr><td><code>test8cluster-cp1</code></td><td>control-plane</td><td style="color:#15803d;font-weight:800;">Ready</td><td><code>10.2.130.25</code></td><td>&mdash;</td><td>Ubuntu 22.04.5 LTS &middot; containerd 2.2.3</td></tr>
+                <tr><td><code>test8cluster-cp2</code></td><td>control-plane</td><td style="color:#15803d;font-weight:800;">Ready</td><td><code>10.2.130.139</code></td><td>&mdash;</td><td>Ubuntu 22.04.5 LTS &middot; containerd 2.2.3</td></tr>
+                <tr><td><code>test8cluster-wn0</code></td><td>worker</td><td style="color:#15803d;font-weight:800;">Ready</td><td><code>10.2.129.33</code></td><td>&mdash;</td><td>Ubuntu 22.04.5 LTS &middot; containerd 2.2.3</td></tr>
+                <tr><td><code>test8cluster-wn1</code></td><td>worker</td><td style="color:#15803d;font-weight:800;">Ready</td><td><code>10.2.131.122</code></td><td>&mdash;</td><td>Ubuntu 22.04.5 LTS &middot; containerd 2.2.3</td></tr>
+                <tr><td><code>test8cluster-bastion</code></td><td>bastion / admin</td><td style="color:#15803d;font-weight:800;">Active</td><td><code>10.2.131.158</code></td><td><code>146.20.61.157</code></td><td>Ubuntu 22.04.5 LTS &middot; kubeconfig + GitOps bootstrap</td></tr>
+                <tr><td><code>kube-apiserver VIP</code></td><td>API endpoint</td><td style="color:#15803d;font-weight:800;">Ready</td><td>&mdash;</td><td><code>146.20.60.102:443</code></td><td>HA VIP fronting cp0/cp1/cp2</td></tr>
               </tbody>
             </table>
-            <div style="font-size:10px;color:#64748b;margin-top:6px;">Live check: <code>kubectl --kubeconfig ~/.config/opencenter/clusters/state/opencentertest-from-mission-control/my5th-opencenter-cluster/kubeconfig.yaml get nodes -o wide</code></div>
+            <div style="font-size:10px;color:#64748b;margin-top:6px;">Live check: <code>kubectl --kubeconfig ~/.config/opencenter/clusters/state/my-org/test8cluster/kubeconfig.yaml get nodes -o wide</code></div>
           </div>
           <div style="font-size:11px;font-weight:800;color:#334155;margin:14px 0 6px;">What gets created, where it lives, and which tool makes it</div>
           <table class="ocqs-req-table" style="font-size:11px;">
@@ -7999,13 +7999,13 @@ User Access
         var KEY = 'ocqs_deploy_history_v2';
         function seed(){
           return [
-            { deployment_id:'deploy-2026-07-10-005', cluster_name:'my5th-opencenter-cluster', provider:'OpenStack / FLEX (IAD3)', status:'Success',
+            { deployment_id:'deploy-2026-07-15-008', cluster_name:'test8cluster', provider:'OpenStack / FLEX (IAD3)', status:'Success',
               started_at:'2026-07-10 16:57', ended_at:'2026-07-10 22:17', duration:'5h20m (incl. 6 root-cause fixes)', operator:'dzoan',
               git_commit_sha:'6116ccc', config_checksum:'sha256:my5th-iad3', confidence_score:97, badge:'Last Known Good', redeployable:true,
-              generated_gitops_path:'~/.config/opencenter/clusters/gitops/opencentertest-from-mission-control',
+              generated_gitops_path:'~/.config/opencenter/clusters/gitops/my-org',
               tool_versions:{ opencenter:'dev (calico pin + force-conflicts + reinstall guardrail)', kubespray:'2.31.0', opentofu:'1.12.3', fluxcd:'2.9.0', helm:'4.2.2' },
               image_manifest:'ubuntu-24.04 / calico v3.31.6 / cert-manager v1.18.2 / headlamp 0.35.0',
-              opencenter_config_snapshot:'opencenter:\n  cluster:\n    cluster_name: my5th-opencenter-cluster\n    kubernetes: 1.35.4 (3 cp + 2 wn)\n    endpoint: https://146.20.63.50:443\n  infrastructure:\n    provider: openstack (IAD3)\n    application_credential_id: <from blueprint>\n    application_credential_secret: <secret-ref>\n  gitops:\n    url: ssh://git@github.com/Sherlock2019/opencenter-my-cluster-gitops.git\n    auth: ssh (~/.ssh/id_rsa)\n\nconfig files for redeploy (all committed at 6116ccc):\n  blueprint: ~/.config/opencenter/clusters/blueprints/opencentertest-from-mission-control/my5th-opencenter-cluster/my5th-opencenter-cluster-config.yaml\n  calico values: applications/overlays/my5th-opencenter-cluster/services/calico/helm-values/override_values.yaml (no windowsDataplane)\n  flux entrypoint: clusters/my5th-opencenter-cluster/apps.yaml\n  overlay placeholder: applications/overlays/my5th-opencenter-cluster/flux-system/kustomization.yaml\n  sources (quoted tags): applications/overlays/my5th-opencenter-cluster/services/sources/*.yaml\n  kubeconfig: ~/.config/opencenter/clusters/state/opencentertest-from-mission-control/my5th-opencenter-cluster/kubeconfig.yaml\n  sops key: ~/.config/opencenter/clusters/secrets/opencentertest-from-mission-control/my5th-opencenter-cluster/age/keys/\nsecrets: SOPS age (refs only)',
+              opencenter_config_snapshot:'opencenter:\n  cluster:\n    cluster_name: test8cluster\n    kubernetes: 1.35.4 (3 cp + 2 wn)\n    endpoint: https://146.20.60.102:443\n  infrastructure:\n    provider: openstack (IAD3)\n    application_credential_id: <from blueprint>\n    application_credential_secret: <secret-ref>\n  gitops:\n    url: ssh://git@github.com/Sherlock2019/opencenter-my-cluster-gitops.git\n    auth: ssh (~/.ssh/id_rsa)\n\nconfig files for redeploy (all committed at 173156f):\n  blueprint: ~/.config/opencenter/clusters/blueprints/my-org/test8cluster/test8cluster-config.yaml\n  calico values: applications/overlays/test8cluster/services/calico/helm-values/override_values.yaml (no windowsDataplane)\n  flux entrypoint: clusters/test8cluster/apps.yaml\n  overlay placeholder: applications/overlays/test8cluster/flux-system/kustomization.yaml\n  sources (quoted tags): applications/overlays/test8cluster/services/sources/*.yaml\n  kubeconfig: ~/.config/opencenter/clusters/state/my-org/test8cluster/kubeconfig.yaml\n  sops key: ~/.config/opencenter/clusters/secrets/my-org/test8cluster/age/keys/\nsecrets: SOPS age (refs only)',
               phases:[ {n:'Configure',s:'ok',d:'25m',i:3}, {n:'Generate',s:'ok',d:'4m',i:1}, {n:'Provision',s:'ok',d:'54m',i:2}, {n:'Kubernetes Install',s:'ok',d:'40m',i:3}, {n:'GitOps Reconcile',s:'ok',d:'55m',i:4}, {n:'Validate',s:'ok',d:'5m',i:0} ],
               issues:[
                 ['Configure','DFW3 secgroup quota / flavor / image not found','Region switch DFW3 to IAD3 left stale flavor + image IDs','Set IAD3 Ubuntu image + gp flavors in blueprint','Platform Engineer','Fixed'],
@@ -8020,7 +8020,7 @@ User Access
             { deployment_id:'deploy-2026-07-09-001', cluster_name:'my1st-opencenter-cluster', provider:'OpenStack / FLEX', status:'Success',
               started_at:'2026-07-09 21:26', ended_at:'2026-07-09 23:59', duration:'82 min', operator:'dzoan',
               git_commit_sha:'68266d5', config_checksum:'sha256:91ac07e2', confidence_score:98, badge:'Last Known Good', redeployable:true,
-              generated_gitops_path:'~/.config/opencenter/clusters/gitops/opencentertest-from-mission-control',
+              generated_gitops_path:'~/.config/opencenter/clusters/gitops/my-org',
               tool_versions:{ opencenter:'0.0.1-90992c1', kubespray:'2.31.0', opentofu:'1.12.3', fluxcd:'2.x', helm:'4.2.2' },
               image_manifest:'ubuntu-24.04 (6e3967a7) / calico v3.31.6 / cert-manager v1.18.2 / headlamp 0.35.0',
               opencenter_config_snapshot:'opencenter:\n  cluster:\n    cluster_name: my1st-opencenter-cluster\n    kubernetes: 1.35.4 (3 cp + 2 wn)\n  infrastructure:\n    provider: openstack (IAD3)\n    application_credential_id: 3e27a1c8...\n    application_credential_secret: <secret-ref>\n  gitops:\n    url: ssh://git@github.com/Sherlock2019/opencenter-my-cluster-gitops.git\n    auth: ssh (~/.ssh/id_rsa)\nsecrets: SOPS age (refs only)',
@@ -8037,7 +8037,7 @@ User Access
             { deployment_id:'deploy-2026-07-09-002', cluster_name:'my2nd-opencenter-cluster', provider:'OpenStack / FLEX', status:'Failed',
               started_at:'2026-07-09 23:05', ended_at:'2026-07-09 23:38', duration:'33 min', operator:'dzoan',
               git_commit_sha:'e77afc0', config_checksum:'sha256:44be19c1', confidence_score:41, badge:'Failed', redeployable:true,
-              generated_gitops_path:'~/.config/opencenter/clusters/gitops/opencentertest-from-mission-control',
+              generated_gitops_path:'~/.config/opencenter/clusters/gitops/my-org',
               tool_versions:{ opencenter:'0.0.1-90992c1', kubespray:'2.31.0', opentofu:'1.12.3', fluxcd:'2.x', helm:'4.2.2' },
               image_manifest:'ubuntu-24.04 (6e3967a7) / calico v3.31.6',
               opencenter_config_snapshot:'opencenter:\n  cluster:\n    cluster_name: my2nd-opencenter-cluster\n  infrastructure:\n    provider: openstack (IAD3)\n    external_network: 27f1ceeb...\n  gitops:\n    url: ssh://git@github.com/Sherlock2019/opencenter-my-cluster-gitops.git\nsecrets: SOPS age (refs only)',
@@ -8052,7 +8052,7 @@ User Access
             { deployment_id:'deploy-2026-07-08-000', cluster_name:'demo', provider:'OpenStack / FLEX', status:'Fixed',
               started_at:'2026-07-08 10:04', ended_at:'2026-07-08 11:12', duration:'68 min', operator:'dzoan',
               git_commit_sha:'a1b2c3d', config_checksum:'sha256:77aa01f9', confidence_score:87, badge:'Superseded', redeployable:false,
-              generated_gitops_path:'~/.config/opencenter/clusters/gitops/opencentertest-from-mission-control',
+              generated_gitops_path:'~/.config/opencenter/clusters/gitops/my-org',
               tool_versions:{ opencenter:'0.0.1', kubespray:'2.31.0', opentofu:'1.12.3', fluxcd:'2.x', helm:'4.2.2' },
               image_manifest:'ubuntu-24.04 / calico v3.31.x',
               opencenter_config_snapshot:'opencenter:\n  cluster:\n    cluster_name: demo\n  infrastructure:\n    provider: openstack\nsecrets: SOPS age (refs only)',
@@ -10741,25 +10741,25 @@ Kubernetes Cluster
 User Access
   └─ dashboard.&lt;cluster&gt;      → Headlamp / OpenCenter dashboard endpoint</pre>
             <div style="margin-top:12px;display:flex;flex-wrap:wrap;gap:14px;font-size:11px;font-weight:700;background:#020817;border:1px solid #1e3a5f;border-radius:8px;padding:10px 14px;">
-              <span style="color:#94a3b8;">Cluster: <span style="color:#4ade80;">my5th-opencenter-cluster</span></span>
-              <span style="color:#94a3b8;">Deployed: <span style="color:#7dd3fc;">2026-07-10 22:17 ICT</span></span>
+              <span style="color:#94a3b8;">Cluster: <span style="color:#4ade80;">test8cluster</span></span>
+              <span style="color:#94a3b8;">Deployed: <span style="color:#7dd3fc;">2026-07-15 23:12 ICT</span></span>
               <span style="color:#94a3b8;">Target region: <span style="color:#fbbf24;">FLEX IAD3</span></span>
-              <span style="color:#94a3b8;">API endpoint: <span style="color:#a78bfa;">https://146.20.63.50:443</span></span>
+              <span style="color:#94a3b8;">API endpoint: <span style="color:#a78bfa;">https://146.20.60.102:443</span></span>
               <span style="color:#94a3b8;">Kubernetes: <span style="color:#7dd3fc;">v1.35.4</span></span>
             </div>
             <table class="ocqs-req-table" style="font-size:11px;margin-top:10px;">
               <thead><tr><th>Component</th><th>Role</th><th>Status</th><th>Internal IP</th><th>External IP</th><th>OS / Runtime</th></tr></thead>
               <tbody>
-                <tr><td><code>my5th-opencenter-cluster-cp0</code></td><td>control-plane</td><td style="color:#15803d;font-weight:800;">Ready</td><td><code>10.2.128.94</code></td><td>&mdash;</td><td>Ubuntu 24.04.4 LTS &middot; containerd 2.2.3</td></tr>
-                <tr><td><code>my5th-opencenter-cluster-cp1</code></td><td>control-plane</td><td style="color:#15803d;font-weight:800;">Ready</td><td><code>10.2.131.175</code></td><td>&mdash;</td><td>Ubuntu 24.04.4 LTS &middot; containerd 2.2.3</td></tr>
-                <tr><td><code>my5th-opencenter-cluster-cp2</code></td><td>control-plane</td><td style="color:#15803d;font-weight:800;">Ready</td><td><code>10.2.131.108</code></td><td>&mdash;</td><td>Ubuntu 24.04.4 LTS &middot; containerd 2.2.3</td></tr>
-                <tr><td><code>my5th-opencenter-cluster-wn0</code></td><td>worker</td><td style="color:#15803d;font-weight:800;">Ready</td><td><code>10.2.129.83</code></td><td>&mdash;</td><td>Ubuntu 24.04.4 LTS &middot; containerd 2.2.3</td></tr>
-                <tr><td><code>my5th-opencenter-cluster-wn1</code></td><td>worker</td><td style="color:#15803d;font-weight:800;">Ready</td><td><code>10.2.128.26</code></td><td>&mdash;</td><td>Ubuntu 24.04.4 LTS &middot; containerd 2.2.3</td></tr>
-                <tr><td><code>my5th-opencenter-cluster-bastion</code></td><td>bastion / admin</td><td style="color:#15803d;font-weight:800;">Active</td><td><code>10.2.128.62</code></td><td><code>146.20.62.51</code></td><td>Ubuntu 24.04 &middot; kubeconfig + GitOps bootstrap</td></tr>
-                <tr><td><code>kube-apiserver VIP</code></td><td>API endpoint</td><td style="color:#15803d;font-weight:800;">Ready</td><td>&mdash;</td><td><code>146.20.63.50:443</code></td><td>HA VIP fronting cp0/cp1/cp2</td></tr>
+                <tr><td><code>test8cluster-cp0</code></td><td>control-plane</td><td style="color:#15803d;font-weight:800;">Ready</td><td><code>10.2.129.224</code></td><td>&mdash;</td><td>Ubuntu 22.04.5 LTS &middot; containerd 2.2.3</td></tr>
+                <tr><td><code>test8cluster-cp1</code></td><td>control-plane</td><td style="color:#15803d;font-weight:800;">Ready</td><td><code>10.2.130.25</code></td><td>&mdash;</td><td>Ubuntu 22.04.5 LTS &middot; containerd 2.2.3</td></tr>
+                <tr><td><code>test8cluster-cp2</code></td><td>control-plane</td><td style="color:#15803d;font-weight:800;">Ready</td><td><code>10.2.130.139</code></td><td>&mdash;</td><td>Ubuntu 22.04.5 LTS &middot; containerd 2.2.3</td></tr>
+                <tr><td><code>test8cluster-wn0</code></td><td>worker</td><td style="color:#15803d;font-weight:800;">Ready</td><td><code>10.2.129.33</code></td><td>&mdash;</td><td>Ubuntu 22.04.5 LTS &middot; containerd 2.2.3</td></tr>
+                <tr><td><code>test8cluster-wn1</code></td><td>worker</td><td style="color:#15803d;font-weight:800;">Ready</td><td><code>10.2.131.122</code></td><td>&mdash;</td><td>Ubuntu 22.04.5 LTS &middot; containerd 2.2.3</td></tr>
+                <tr><td><code>test8cluster-bastion</code></td><td>bastion / admin</td><td style="color:#15803d;font-weight:800;">Active</td><td><code>10.2.131.158</code></td><td><code>146.20.61.157</code></td><td>Ubuntu 22.04.5 LTS &middot; kubeconfig + GitOps bootstrap</td></tr>
+                <tr><td><code>kube-apiserver VIP</code></td><td>API endpoint</td><td style="color:#15803d;font-weight:800;">Ready</td><td>&mdash;</td><td><code>146.20.60.102:443</code></td><td>HA VIP fronting cp0/cp1/cp2</td></tr>
               </tbody>
             </table>
-            <div style="font-size:10px;color:#64748b;margin-top:6px;">Live check: <code>kubectl --kubeconfig ~/.config/opencenter/clusters/state/opencentertest-from-mission-control/my5th-opencenter-cluster/kubeconfig.yaml get nodes -o wide</code></div>
+            <div style="font-size:10px;color:#64748b;margin-top:6px;">Live check: <code>kubectl --kubeconfig ~/.config/opencenter/clusters/state/my-org/test8cluster/kubeconfig.yaml get nodes -o wide</code></div>
           </div>
           <div style="font-size:11px;font-weight:800;color:#334155;margin:14px 0 6px;">What gets created, where it lives, and which tool makes it</div>
           <table class="ocqs-req-table" style="font-size:11px;">
@@ -10883,13 +10883,13 @@ User Access
         var KEY = 'ocqp_deploy_history_v2';
         function seed(){
           return [
-            { deployment_id:'deploy-2026-07-10-005', cluster_name:'my5th-opencenter-cluster', provider:'OpenStack / FLEX (IAD3)', status:'Success',
+            { deployment_id:'deploy-2026-07-15-008', cluster_name:'test8cluster', provider:'OpenStack / FLEX (IAD3)', status:'Success',
               started_at:'2026-07-10 16:57', ended_at:'2026-07-10 22:17', duration:'5h20m (incl. 6 root-cause fixes)', operator:'dzoan',
               git_commit_sha:'6116ccc', config_checksum:'sha256:my5th-iad3', confidence_score:97, badge:'Last Known Good', redeployable:true,
-              generated_gitops_path:'~/.config/opencenter/clusters/gitops/opencentertest-from-mission-control',
+              generated_gitops_path:'~/.config/opencenter/clusters/gitops/my-org',
               tool_versions:{ opencenter:'dev (calico pin + force-conflicts + reinstall guardrail)', kubespray:'2.31.0', opentofu:'1.12.3', fluxcd:'2.9.0', helm:'4.2.2' },
               image_manifest:'ubuntu-24.04 / calico v3.31.6 / cert-manager v1.18.2 / headlamp 0.35.0',
-              opencenter_config_snapshot:'opencenter:\n  cluster:\n    cluster_name: my5th-opencenter-cluster\n    kubernetes: 1.35.4 (3 cp + 2 wn)\n    endpoint: https://146.20.63.50:443\n  infrastructure:\n    provider: openstack (IAD3)\n    application_credential_id: <from blueprint>\n    application_credential_secret: <secret-ref>\n  gitops:\n    url: ssh://git@github.com/Sherlock2019/opencenter-my-cluster-gitops.git\n    auth: ssh (~/.ssh/id_rsa)\n\nconfig files for redeploy (all committed at 6116ccc):\n  blueprint: ~/.config/opencenter/clusters/blueprints/opencentertest-from-mission-control/my5th-opencenter-cluster/my5th-opencenter-cluster-config.yaml\n  calico values: applications/overlays/my5th-opencenter-cluster/services/calico/helm-values/override_values.yaml (no windowsDataplane)\n  flux entrypoint: clusters/my5th-opencenter-cluster/apps.yaml\n  overlay placeholder: applications/overlays/my5th-opencenter-cluster/flux-system/kustomization.yaml\n  sources (quoted tags): applications/overlays/my5th-opencenter-cluster/services/sources/*.yaml\n  kubeconfig: ~/.config/opencenter/clusters/state/opencentertest-from-mission-control/my5th-opencenter-cluster/kubeconfig.yaml\n  sops key: ~/.config/opencenter/clusters/secrets/opencentertest-from-mission-control/my5th-opencenter-cluster/age/keys/\nsecrets: SOPS age (refs only)',
+              opencenter_config_snapshot:'opencenter:\n  cluster:\n    cluster_name: test8cluster\n    kubernetes: 1.35.4 (3 cp + 2 wn)\n    endpoint: https://146.20.60.102:443\n  infrastructure:\n    provider: openstack (IAD3)\n    application_credential_id: <from blueprint>\n    application_credential_secret: <secret-ref>\n  gitops:\n    url: ssh://git@github.com/Sherlock2019/opencenter-my-cluster-gitops.git\n    auth: ssh (~/.ssh/id_rsa)\n\nconfig files for redeploy (all committed at 173156f):\n  blueprint: ~/.config/opencenter/clusters/blueprints/my-org/test8cluster/test8cluster-config.yaml\n  calico values: applications/overlays/test8cluster/services/calico/helm-values/override_values.yaml (no windowsDataplane)\n  flux entrypoint: clusters/test8cluster/apps.yaml\n  overlay placeholder: applications/overlays/test8cluster/flux-system/kustomization.yaml\n  sources (quoted tags): applications/overlays/test8cluster/services/sources/*.yaml\n  kubeconfig: ~/.config/opencenter/clusters/state/my-org/test8cluster/kubeconfig.yaml\n  sops key: ~/.config/opencenter/clusters/secrets/my-org/test8cluster/age/keys/\nsecrets: SOPS age (refs only)',
               phases:[ {n:'Configure',s:'ok',d:'25m',i:3}, {n:'Generate',s:'ok',d:'4m',i:1}, {n:'Provision',s:'ok',d:'54m',i:2}, {n:'Kubernetes Install',s:'ok',d:'40m',i:3}, {n:'GitOps Reconcile',s:'ok',d:'55m',i:4}, {n:'Validate',s:'ok',d:'5m',i:0} ],
               issues:[
                 ['Configure','DFW3 secgroup quota / flavor / image not found','Region switch DFW3 to IAD3 left stale flavor + image IDs','Set IAD3 Ubuntu image + gp flavors in blueprint','Platform Engineer','Fixed'],
@@ -10904,7 +10904,7 @@ User Access
             { deployment_id:'deploy-2026-07-09-001', cluster_name:'my1st-opencenter-cluster', provider:'OpenStack / FLEX', status:'Success',
               started_at:'2026-07-09 21:26', ended_at:'2026-07-09 23:59', duration:'82 min', operator:'dzoan',
               git_commit_sha:'68266d5', config_checksum:'sha256:91ac07e2', confidence_score:98, badge:'Last Known Good', redeployable:true,
-              generated_gitops_path:'~/.config/opencenter/clusters/gitops/opencentertest-from-mission-control',
+              generated_gitops_path:'~/.config/opencenter/clusters/gitops/my-org',
               tool_versions:{ opencenter:'0.0.1-90992c1', kubespray:'2.31.0', opentofu:'1.12.3', fluxcd:'2.x', helm:'4.2.2' },
               image_manifest:'ubuntu-24.04 (6e3967a7) / calico v3.31.6 / cert-manager v1.18.2 / headlamp 0.35.0',
               opencenter_config_snapshot:'opencenter:\n  cluster:\n    cluster_name: my1st-opencenter-cluster\n    kubernetes: 1.35.4 (3 cp + 2 wn)\n  infrastructure:\n    provider: openstack (IAD3)\n    application_credential_id: 3e27a1c8...\n    application_credential_secret: <secret-ref>\n  gitops:\n    url: ssh://git@github.com/Sherlock2019/opencenter-my-cluster-gitops.git\n    auth: ssh (~/.ssh/id_rsa)\nsecrets: SOPS age (refs only)',
@@ -10921,7 +10921,7 @@ User Access
             { deployment_id:'deploy-2026-07-09-002', cluster_name:'my2nd-opencenter-cluster', provider:'OpenStack / FLEX', status:'Failed',
               started_at:'2026-07-09 23:05', ended_at:'2026-07-09 23:38', duration:'33 min', operator:'dzoan',
               git_commit_sha:'e77afc0', config_checksum:'sha256:44be19c1', confidence_score:41, badge:'Failed', redeployable:true,
-              generated_gitops_path:'~/.config/opencenter/clusters/gitops/opencentertest-from-mission-control',
+              generated_gitops_path:'~/.config/opencenter/clusters/gitops/my-org',
               tool_versions:{ opencenter:'0.0.1-90992c1', kubespray:'2.31.0', opentofu:'1.12.3', fluxcd:'2.x', helm:'4.2.2' },
               image_manifest:'ubuntu-24.04 (6e3967a7) / calico v3.31.6',
               opencenter_config_snapshot:'opencenter:\n  cluster:\n    cluster_name: my2nd-opencenter-cluster\n  infrastructure:\n    provider: openstack (IAD3)\n    external_network: 27f1ceeb...\n  gitops:\n    url: ssh://git@github.com/Sherlock2019/opencenter-my-cluster-gitops.git\nsecrets: SOPS age (refs only)',
@@ -10936,7 +10936,7 @@ User Access
             { deployment_id:'deploy-2026-07-08-000', cluster_name:'demo', provider:'OpenStack / FLEX', status:'Fixed',
               started_at:'2026-07-08 10:04', ended_at:'2026-07-08 11:12', duration:'68 min', operator:'dzoan',
               git_commit_sha:'a1b2c3d', config_checksum:'sha256:77aa01f9', confidence_score:87, badge:'Superseded', redeployable:false,
-              generated_gitops_path:'~/.config/opencenter/clusters/gitops/opencentertest-from-mission-control',
+              generated_gitops_path:'~/.config/opencenter/clusters/gitops/my-org',
               tool_versions:{ opencenter:'0.0.1', kubespray:'2.31.0', opentofu:'1.12.3', fluxcd:'2.x', helm:'4.2.2' },
               image_manifest:'ubuntu-24.04 / calico v3.31.x',
               opencenter_config_snapshot:'opencenter:\n  cluster:\n    cluster_name: demo\n  infrastructure:\n    provider: openstack\nsecrets: SOPS age (refs only)',
