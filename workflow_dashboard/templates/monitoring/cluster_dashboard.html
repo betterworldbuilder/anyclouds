@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cluster Live Monitor — {{ org }}/{{ cluster }}</title>
+<link rel="stylesheet" href="/static/css/monitoring-dashboard.css">
+</head>
+<body class="mon-body" data-org="{{ org }}" data-cluster="{{ cluster }}">
+
+<header class="mon-header">
+  <span class="mon-pulse" id="mon-pulse" title="live updates"></span>
+  <span class="mon-title">🩺 Cluster Live Monitor <small id="mon-ident">{{ org }}/{{ cluster }}</small></span>
+  <select class="mon-select" id="mon-cluster-select"></select>
+  <span class="mon-badge" id="mon-provider">provider —</span>
+  <span class="mon-badge" id="mon-api">API —</span>
+  <span class="mon-badge" id="mon-gitrev">rev —</span>
+  <span style="margin-left:auto;display:flex;gap:6px;">
+    <button class="mon-btn ghost" id="mon-pause">⏸ Pause</button>
+    <button class="mon-btn ghost" id="mon-diag">📋 Copy diagnostics</button>
+    <a class="mon-btn" id="mon-open-deploy" href="#">📡 Open deployment monitor</a>
+  </span>
+</header>
+
+<div class="mon-wrap">
+  <div id="mon-alerts"></div>
+
+  <div class="mon-grid" style="margin-bottom:12px;">
+    <div class="mon-card span3" style="text-align:center;">
+      <h3>Health score</h3>
+      <div class="mon-score" id="mon-score">—</div>
+      <div style="color:var(--mon-dim);font-size:11px;" id="mon-score-note"></div>
+    </div>
+    <div class="mon-card span3">
+      <h3>Control plane</h3>
+      <div class="mon-kv" id="mon-cp"></div>
+    </div>
+    <div class="mon-card span3">
+      <h3>Workers</h3>
+      <div class="mon-kv" id="mon-wk"></div>
+    </div>
+    <div class="mon-card span3">
+      <h3>Pods</h3>
+      <div class="mon-kv" id="mon-podsum"></div>
+    </div>
+  </div>
+
+  <div class="mon-grid">
+    <div class="mon-card span12">
+      <h3>Node topology</h3>
+      <div class="mon-topo" id="mon-topo"><div class="mon-empty">waiting for cluster data…</div></div>
+    </div>
+
+    <div class="mon-card span8">
+      <h3>Platform service matrix</h3>
+      <div class="mon-svc-grid" id="mon-services"></div>
+    </div>
+
+    <div class="mon-card span4">
+      <h3>GitOps &amp; Flux</h3>
+      <div id="mon-flux"></div>
+    </div>
+
+    <div class="mon-card span4">
+      <h3>Workloads</h3>
+      <div id="mon-workloads"></div>
+    </div>
+
+    <div class="mon-card span4">
+      <h3>Network &amp; ingress</h3>
+      <div id="mon-network"></div>
+    </div>
+
+    <div class="mon-card span4">
+      <h3>Storage</h3>
+      <div id="mon-storage"></div>
+    </div>
+
+    <div class="mon-card span4">
+      <h3>Certificates &amp; identity</h3>
+      <div id="mon-certs"></div>
+    </div>
+
+    <div class="mon-card span4">
+      <h3>Infrastructure &amp; quota</h3>
+      <div id="mon-quota"></div>
+    </div>
+
+    <div class="mon-card span4">
+      <h3>Security &amp; governance</h3>
+      <div id="mon-security"></div>
+    </div>
+
+    <div class="mon-card span12">
+      <h3>Events
+        <span class="spacer"></span>
+        <select class="mon-select" id="mon-ev-source">
+          <option value="all">All sources</option><option value="Warning">Warnings only</option>
+        </select>
+        <input class="mon-input" id="mon-ev-search" placeholder="filter namespace/object…" style="width:180px;">
+      </h3>
+      <div id="mon-events" style="max-height:320px;overflow-y:auto;"></div>
+    </div>
+  </div>
+</div>
+
+<script src="/static/js/cluster-monitor.js"></script>
+</body>
+</html>
