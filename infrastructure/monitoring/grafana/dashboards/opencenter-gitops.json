@@ -1,0 +1,467 @@
+{
+  "uid": "opencenter-gitops",
+  "title": "OpenCenter / GitOps",
+  "tags": [
+    "opencenter",
+    "gitops"
+  ],
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": true,
+  "refresh": "30s",
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "templating": {
+    "list": [
+      {
+        "name": "datasource",
+        "type": "datasource",
+        "query": "prometheus",
+        "label": "Prometheus",
+        "current": {}
+      },
+      {
+        "name": "loki",
+        "type": "datasource",
+        "query": "loki",
+        "label": "Loki",
+        "current": {}
+      },
+      {
+        "name": "org",
+        "type": "query",
+        "datasource": {
+          "uid": "${datasource}"
+        },
+        "query": "label_values(opencenter_deployment_info, org)",
+        "refresh": 2,
+        "includeAll": true,
+        "multi": false,
+        "label": "Organization",
+        "current": {},
+        "sort": 1
+      },
+      {
+        "name": "cluster",
+        "type": "query",
+        "datasource": {
+          "uid": "${datasource}"
+        },
+        "query": "label_values(opencenter_deployment_info{org=~\"$org\"}, cluster)",
+        "refresh": 2,
+        "includeAll": true,
+        "multi": false,
+        "label": "Cluster",
+        "current": {},
+        "sort": 1
+      },
+      {
+        "name": "region",
+        "type": "query",
+        "datasource": {
+          "uid": "${datasource}"
+        },
+        "query": "label_values(opencenter_deployment_info{org=~\"$org\",cluster=~\"$cluster\"}, region)",
+        "refresh": 2,
+        "includeAll": true,
+        "multi": false,
+        "label": "Region",
+        "current": {},
+        "sort": 1
+      },
+      {
+        "name": "namespace",
+        "type": "query",
+        "datasource": {
+          "uid": "${datasource}"
+        },
+        "query": "label_values(kube_pod_info, namespace)",
+        "refresh": 2,
+        "includeAll": true,
+        "multi": false,
+        "label": "Namespace",
+        "current": {},
+        "sort": 1
+      },
+      {
+        "name": "node",
+        "type": "query",
+        "datasource": {
+          "uid": "${datasource}"
+        },
+        "query": "label_values(kube_node_info, node)",
+        "refresh": 2,
+        "includeAll": true,
+        "multi": false,
+        "label": "Node",
+        "current": {},
+        "sort": 1
+      },
+      {
+        "name": "service",
+        "type": "query",
+        "datasource": {
+          "uid": "${datasource}"
+        },
+        "query": "label_values(opencenter_platform_service_ready, service)",
+        "refresh": 2,
+        "includeAll": true,
+        "multi": false,
+        "label": "Service",
+        "current": {},
+        "sort": 1
+      },
+      {
+        "name": "pod",
+        "type": "query",
+        "datasource": {
+          "uid": "${datasource}"
+        },
+        "query": "label_values(kube_pod_info{namespace=~\"$namespace\"}, pod)",
+        "refresh": 2,
+        "includeAll": true,
+        "multi": false,
+        "label": "Pod",
+        "current": {},
+        "sort": 1
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 64,
+      "type": "row",
+      "title": "GitOps state",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "panels": []
+    },
+    {
+      "id": 55,
+      "type": "stat",
+      "title": "GitOps tree clean",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 0,
+        "y": 1
+      },
+      "targets": [
+        {
+          "expr": "opencenter_gitops_clean{org=~\"$org\",cluster=~\"$cluster\"}",
+          "refId": "A",
+          "legendFormat": "{{__name__}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "graphMode": "area"
+      }
+    },
+    {
+      "id": 56,
+      "type": "stat",
+      "title": "Unpushed commits",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 6,
+        "y": 1
+      },
+      "targets": [
+        {
+          "expr": "opencenter_gitops_unpushed_commits{org=~\"$org\",cluster=~\"$cluster\"}",
+          "refId": "A",
+          "legendFormat": "{{__name__}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "graphMode": "area"
+      }
+    },
+    {
+      "id": 57,
+      "type": "stat",
+      "title": "Last commit age",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 12,
+        "y": 1
+      },
+      "targets": [
+        {
+          "expr": "time() - opencenter_gitops_last_commit_timestamp_seconds{org=~\"$org\",cluster=~\"$cluster\"}",
+          "refId": "A",
+          "legendFormat": "{{__name__}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "graphMode": "area"
+      }
+    },
+    {
+      "id": 58,
+      "type": "stat",
+      "title": "Flux resources ready",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 18,
+        "y": 1
+      },
+      "targets": [
+        {
+          "expr": "sum(opencenter_flux_resource_ready{org=~\"$org\",cluster=~\"$cluster\"})",
+          "refId": "A",
+          "legendFormat": "{{__name__}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "graphMode": "area"
+      }
+    },
+    {
+      "id": 65,
+      "type": "row",
+      "title": "Flux controllers",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 7
+      },
+      "panels": []
+    },
+    {
+      "id": 59,
+      "type": "timeseries",
+      "title": "Reconciliation duration p99",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 0,
+        "y": 8
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.99, sum(rate(gotk_reconcile_duration_seconds_bucket[10m])) by (le, kind))",
+          "refId": "A",
+          "legendFormat": "{{kind}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
+      "id": 60,
+      "type": "timeseries",
+      "title": "Not-ready resources",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 12,
+        "y": 8
+      },
+      "targets": [
+        {
+          "expr": "sum by (kind)(gotk_reconcile_condition{type=\"Ready\",status=\"False\"})",
+          "refId": "A",
+          "legendFormat": "{{kind}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
+      "id": 61,
+      "type": "timeseries",
+      "title": "Suspended resources",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 0,
+        "y": 15
+      },
+      "targets": [
+        {
+          "expr": "sum by (kind)(gotk_suspend_status)",
+          "refId": "A",
+          "legendFormat": "{{kind}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
+      "id": 62,
+      "type": "timeseries",
+      "title": "Reconcile failures",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 12,
+        "y": 15
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(controller_runtime_reconcile_errors_total{namespace=\"flux-system\"}[10m])) by (controller)",
+          "refId": "A",
+          "legendFormat": "{{controller}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
+      "id": 66,
+      "type": "row",
+      "title": "Flux logs (Loki)",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 22
+      },
+      "panels": []
+    },
+    {
+      "id": 63,
+      "type": "logs",
+      "title": "Flux controller errors",
+      "datasource": {
+        "type": "loki",
+        "uid": "${loki}"
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 23
+      },
+      "targets": [
+        {
+          "expr": "{namespace=\"flux-system\"} |~ \"(?i)error\"",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "showTime": true,
+        "wrapLogMessage": true
+      }
+    }
+  ],
+  "annotations": {
+    "list": []
+  }
+}

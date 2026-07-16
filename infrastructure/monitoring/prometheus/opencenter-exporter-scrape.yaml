@@ -1,0 +1,31 @@
+# Scrape config for the OpenCenter deployer-host exporter (/metrics on the
+# workflow dashboard, port 5001).
+#
+# Option A — static scrape (plain Prometheus / kube-prometheus-stack
+# additionalScrapeConfigs). Replace DEPLOYER_HOST with the reachable address:
+#
+#   - job_name: opencenter-deployer
+#     scrape_interval: 30s
+#     metrics_path: /metrics
+#     static_configs:
+#       - targets: ["DEPLOYER_HOST:5001"]
+#         labels:
+#           app: opencenter
+#
+# Option B — Prometheus Operator ScrapeConfig CR (below). Apply only when the
+# operator is installed and the deployer host is reachable from the cluster.
+apiVersion: monitoring.coreos.com/v1alpha1
+kind: ScrapeConfig
+metadata:
+  name: opencenter-deployer
+  namespace: observability
+  labels:
+    release: kube-prometheus-stack
+spec:
+  scrapeInterval: 30s
+  metricsPath: /metrics
+  staticConfigs:
+    - targets:
+        - DEPLOYER_HOST:5001
+      labels:
+        app: opencenter

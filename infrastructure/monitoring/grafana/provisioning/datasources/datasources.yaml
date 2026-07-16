@@ -1,0 +1,29 @@
+# Datasources for the OpenCenter dashboards.
+#
+# IMPORTANT: OpenCenter's kube-prometheus-stack / Loki / Tempo GitOps services
+# already provision their own datasources inside the cluster. Only apply this
+# file on Grafana instances that do NOT have them (e.g. a standalone Grafana
+# watching several clusters). Names intentionally match the defaults so the
+# dashboards resolve either way, and deleteDatasources stays empty so nothing
+# existing is ever removed.
+apiVersion: 1
+deleteDatasources: []
+datasources:
+  - name: Prometheus
+    uid: prometheus
+    type: prometheus
+    access: proxy
+    url: http://kube-prometheus-stack-prometheus.observability.svc:9090
+    isDefault: true
+    jsonData:
+      timeInterval: 30s
+  - name: Loki
+    uid: loki
+    type: loki
+    access: proxy
+    url: http://loki-gateway.observability.svc:80
+  - name: Tempo
+    uid: tempo
+    type: tempo
+    access: proxy
+    url: http://tempo.observability.svc:3200

@@ -1,0 +1,57 @@
+# Promtail config shipping OpenCenter deployer-host logs to the cluster Loki.
+# Runs on the deployer host (WSL/jumpbox), NOT inside the cluster — in-cluster
+# pod logs are already collected by the Loki GitOps service's own agent.
+#
+#   promtail -config.file=promtail-opencenter.yaml \
+#            -config.expand-env=true
+#
+# Required env: LOKI_URL (e.g. https://loki.<cluster>.<region>.k8s.opencenter.cloud)
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: ${HOME}/.local/state/opencenter/promtail-positions.yaml
+
+clients:
+  - url: ${LOKI_URL}/loki/api/v1/push
+
+scrape_configs:
+  - job_name: opencenter-bootstrap
+    static_configs:
+      - targets: [localhost]
+        labels:
+          app: opencenter
+          source: bootstrap
+          __path__: ${HOME}/.local/state/opencenter/logs/bootstrap/*/*/bootstrap-*.log
+    pipeline_stages:
+      # org/cluster from the log path; never label with message content.
+      - regex:
+          source: filename
+          expression: "logs/bootstrap/(?P<org>[^/]+)/(?P<cluster>[^/]+)/"
+      - labels:
+          org:
+          cluster:
+      - regex:
+          expression: "(?i)(?P<severity>error|warn|fatal)"
+      - template:
+          source: severity
+          template: '{{ if .Value }}{{ .Value | ToLower }}{{ else }}info{{ end }}'
+      - labels:
+          severity:
+      # redact obvious secret assignments before shipping
+      - replace:
+          expression: "(?i)((?:password|secret|token|api[_-]?key)\\s*[:=]\\s*)(\\S+)"
+          replace: "${1}<redacted>"
+
+  - job_name: opencenter-dashboard
+    static_configs:
+      - targets: [localhost]
+        labels:
+          app: opencenter
+          source: dashboard
+          __path__: /var/log/osflex-dashboard/*.log
+    pipeline_stages:
+      - replace:
+          expression: "(?i)((?:password|secret|token|api[_-]?key)\\s*[:=]\\s*)(\\S+)"
+          replace: "${1}<redacted>"

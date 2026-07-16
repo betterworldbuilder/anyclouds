@@ -1,0 +1,428 @@
+{
+  "uid": "opencenter-deployment",
+  "title": "OpenCenter / Deployment",
+  "tags": [
+    "opencenter",
+    "deployment"
+  ],
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": true,
+  "refresh": "30s",
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "templating": {
+    "list": [
+      {
+        "name": "datasource",
+        "type": "datasource",
+        "query": "prometheus",
+        "label": "Prometheus",
+        "current": {}
+      },
+      {
+        "name": "loki",
+        "type": "datasource",
+        "query": "loki",
+        "label": "Loki",
+        "current": {}
+      },
+      {
+        "name": "org",
+        "type": "query",
+        "datasource": {
+          "uid": "${datasource}"
+        },
+        "query": "label_values(opencenter_deployment_info, org)",
+        "refresh": 2,
+        "includeAll": true,
+        "multi": false,
+        "label": "Organization",
+        "current": {},
+        "sort": 1
+      },
+      {
+        "name": "cluster",
+        "type": "query",
+        "datasource": {
+          "uid": "${datasource}"
+        },
+        "query": "label_values(opencenter_deployment_info{org=~\"$org\"}, cluster)",
+        "refresh": 2,
+        "includeAll": true,
+        "multi": false,
+        "label": "Cluster",
+        "current": {},
+        "sort": 1
+      },
+      {
+        "name": "region",
+        "type": "query",
+        "datasource": {
+          "uid": "${datasource}"
+        },
+        "query": "label_values(opencenter_deployment_info{org=~\"$org\",cluster=~\"$cluster\"}, region)",
+        "refresh": 2,
+        "includeAll": true,
+        "multi": false,
+        "label": "Region",
+        "current": {},
+        "sort": 1
+      },
+      {
+        "name": "namespace",
+        "type": "query",
+        "datasource": {
+          "uid": "${datasource}"
+        },
+        "query": "label_values(kube_pod_info, namespace)",
+        "refresh": 2,
+        "includeAll": true,
+        "multi": false,
+        "label": "Namespace",
+        "current": {},
+        "sort": 1
+      },
+      {
+        "name": "node",
+        "type": "query",
+        "datasource": {
+          "uid": "${datasource}"
+        },
+        "query": "label_values(kube_node_info, node)",
+        "refresh": 2,
+        "includeAll": true,
+        "multi": false,
+        "label": "Node",
+        "current": {},
+        "sort": 1
+      },
+      {
+        "name": "service",
+        "type": "query",
+        "datasource": {
+          "uid": "${datasource}"
+        },
+        "query": "label_values(opencenter_platform_service_ready, service)",
+        "refresh": 2,
+        "includeAll": true,
+        "multi": false,
+        "label": "Service",
+        "current": {},
+        "sort": 1
+      },
+      {
+        "name": "pod",
+        "type": "query",
+        "datasource": {
+          "uid": "${datasource}"
+        },
+        "query": "label_values(kube_pod_info{namespace=~\"$namespace\"}, pod)",
+        "refresh": 2,
+        "includeAll": true,
+        "multi": false,
+        "label": "Pod",
+        "current": {},
+        "sort": 1
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 52,
+      "type": "row",
+      "title": "Deployment status",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "panels": []
+    },
+    {
+      "id": 44,
+      "type": "stat",
+      "title": "Deployment state",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 0,
+        "y": 1
+      },
+      "targets": [
+        {
+          "expr": "opencenter_deployment_status{org=~\"$org\",cluster=~\"$cluster\"} == 1",
+          "refId": "A",
+          "legendFormat": "{{status}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "graphMode": "area"
+      }
+    },
+    {
+      "id": 45,
+      "type": "timeseries",
+      "title": "Stage state (0 pend,1 run,2 pass,3 warn,4 fail)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 18,
+        "x": 6,
+        "y": 1
+      },
+      "targets": [
+        {
+          "expr": "opencenter_deployment_stage_state{org=~\"$org\",cluster=~\"$cluster\"}",
+          "refId": "A",
+          "legendFormat": "{{stage}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
+      "id": 53,
+      "type": "row",
+      "title": "Deployment history",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 9
+      },
+      "panels": []
+    },
+    {
+      "id": 46,
+      "type": "timeseries",
+      "title": "Total duration",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 8,
+        "x": 0,
+        "y": 10
+      },
+      "targets": [
+        {
+          "expr": "opencenter_deployment_total_duration_seconds{org=~\"$org\",cluster=~\"$cluster\"}",
+          "refId": "A",
+          "legendFormat": "duration"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
+      "id": 47,
+      "type": "timeseries",
+      "title": "Failures by reason",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 8,
+        "x": 8,
+        "y": 10
+      },
+      "targets": [
+        {
+          "expr": "sum by (reason)(opencenter_deployment_failures_total{org=~\"$org\",cluster=~\"$cluster\"})",
+          "refId": "A",
+          "legendFormat": "{{reason}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
+      "id": 48,
+      "type": "stat",
+      "title": "Lock conflicts",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 8,
+        "x": 16,
+        "y": 10
+      },
+      "targets": [
+        {
+          "expr": "opencenter_deployment_lock_conflicts_total{org=~\"$org\",cluster=~\"$cluster\"}",
+          "refId": "A",
+          "legendFormat": "{{__name__}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "graphMode": "area"
+      }
+    },
+    {
+      "id": 54,
+      "type": "row",
+      "title": "Deployment logs (Loki)",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 17
+      },
+      "panels": []
+    },
+    {
+      "id": 49,
+      "type": "logs",
+      "title": "Errors",
+      "datasource": {
+        "type": "loki",
+        "uid": "${loki}"
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 18
+      },
+      "targets": [
+        {
+          "expr": "{app=\"opencenter\",org=~\"$org\",cluster=~\"$cluster\"} |~ \"(?i)(error|failed|fatal|\\\\[BLOCKED\\\\])\"",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "showTime": true,
+        "wrapLogMessage": true
+      }
+    },
+    {
+      "id": 50,
+      "type": "logs",
+      "title": "Ansible/Kubespray",
+      "datasource": {
+        "type": "loki",
+        "uid": "${loki}"
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 28
+      },
+      "targets": [
+        {
+          "expr": "{app=\"opencenter\",org=~\"$org\",cluster=~\"$cluster\"} |~ \"(?i)(TASK \\\\[|PLAY RECAP|fatal:)\"",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "showTime": true,
+        "wrapLogMessage": true
+      }
+    },
+    {
+      "id": 51,
+      "type": "logs",
+      "title": "OpenTofu",
+      "datasource": {
+        "type": "loki",
+        "uid": "${loki}"
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 28
+      },
+      "targets": [
+        {
+          "expr": "{app=\"opencenter\",org=~\"$org\",cluster=~\"$cluster\"} |~ \"(?i)(Creating|Creation complete|Error:|OverQuota)\"",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "showTime": true,
+        "wrapLogMessage": true
+      }
+    }
+  ],
+  "annotations": {
+    "list": []
+  }
+}

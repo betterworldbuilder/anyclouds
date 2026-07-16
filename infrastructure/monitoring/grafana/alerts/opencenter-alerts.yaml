@@ -1,0 +1,70 @@
+# Prometheus alerting rules for OpenCenter clusters.
+# Load via kube-prometheus-stack additionalPrometheusRulesMap or a PrometheusRule CR.
+groups:
+  - name: opencenter-deployment
+    rules:
+      - alert: OpenCenterDeploymentFailed
+        expr: opencenter_deployment_status{status="FAILED"} == 1
+        for: 2m
+        labels: {severity: critical}
+        annotations:
+          summary: "OpenCenter deployment failed for {{ $labels.org }}/{{ $labels.cluster }}"
+          description: "Check the Deployment Live Monitor for the failed stage and classified root cause."
+      - alert: OpenCenterDuplicateDeployProcesses
+        expr: opencenter_deployment_lock_conflicts_total > 0
+        for: 1m
+        labels: {severity: critical}
+        annotations:
+          summary: "Multiple deploy processes on {{ $labels.org }}/{{ $labels.cluster }}"
+          description: "More than one `opencenter cluster deploy` is modifying the same cluster. Do not start another deployment."
+      - alert: OpenCenterGitOpsDirty
+        expr: opencenter_gitops_clean == 0
+        for: 30m
+        labels: {severity: warning}
+        annotations:
+          summary: "GitOps tree dirty for {{ $labels.org }}/{{ $labels.cluster }}"
+      - alert: OpenCenterGitOpsUnpushed
+        expr: opencenter_gitops_unpushed_commits > 0
+        for: 30m
+        labels: {severity: warning}
+        annotations:
+          summary: "Unpushed GitOps commits on {{ $labels.org }}/{{ $labels.cluster }}"
+
+  - name: opencenter-cluster
+    rules:
+      - alert: OpenCenterNodeNotReady
+        expr: opencenter_cluster_node_ready == 0
+        for: 5m
+        labels: {severity: critical}
+        annotations:
+          summary: "Node {{ $labels.node }} NotReady on {{ $labels.cluster }}"
+      - alert: OpenCenterFluxResourceNotReady
+        expr: opencenter_flux_resource_ready == 0
+        for: 15m
+        labels: {severity: warning}
+        annotations:
+          summary: "Flux {{ $labels.kind }} {{ $labels.namespace }}/{{ $labels.name }} not Ready"
+      - alert: OpenCenterPlatformServiceDegraded
+        expr: opencenter_platform_service_ready == 0
+        for: 10m
+        labels: {severity: warning}
+        annotations:
+          summary: "Platform service {{ $labels.service }} degraded on {{ $labels.cluster }}"
+      - alert: OpenCenterQuotaPressure
+        expr: opencenter_openstack_quota_usage_ratio >= 0.85
+        for: 10m
+        labels: {severity: warning}
+        annotations:
+          summary: "Quota {{ $labels.resource }} at {{ $value | humanizePercentage }} on {{ $labels.cluster }}"
+      - alert: OpenCenterQuotaCritical
+        expr: opencenter_openstack_quota_usage_ratio >= 0.95
+        for: 5m
+        labels: {severity: critical}
+        annotations:
+          summary: "Quota {{ $labels.resource }} nearly exhausted on {{ $labels.cluster }}"
+      - alert: OpenCenterCertificateExpiringSoon
+        expr: (certmanager_certificate_expiration_timestamp_seconds - time()) / 86400 < 14
+        for: 1h
+        labels: {severity: warning}
+        annotations:
+          summary: "Certificate {{ $labels.name }} expires in under 14 days"
