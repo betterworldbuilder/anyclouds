@@ -5945,12 +5945,12 @@ ${certContent}
           priority_rank: String(i+1),
           wave: sys.wave||'',
           flex_readiness_score: '85',
-          customer_name: company + (sys.name ? ' — '+sys.name : ''),
-          company_name: company,
+          customer_name: (sys.bowner||company) + (sys.name ? ' — '+sys.name : ''),
+          company_name: sys.bowner||company,
           contact_name: contact,
           email: sys.customerEmail||email,
           rax_sales_email: sys.raxSalesEmail||'',
-          phone: item.phone,
+          phone: sys.customerPhone||item.phone,
           industry: sys.archetype||'',
           customer_id: sys.accountNo||item.tenant||('MIG-'+(i+1)),
           request_id: item.id,
@@ -9621,6 +9621,13 @@ ${certContent}
         <h3>Add Business System</h3>
         <p>Choose an archetype, configure components, and generate UAT scope automatically.</p>
       </div>
+      <div id="uatS1CustomerBanner" style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;flex:1;justify-content:center;padding:0 16px;">
+        <div class="uat-s1-field" style="min-width:180px;"><label>Customer Name</label><input id="uatS1BOwner" value="" placeholder="GENOMI-K, S.A. DE C.V" /></div>
+        <div class="uat-s1-field" style="min-width:190px;"><label>Customer Email</label><input id="uatS1CustEmail" type="email" value="" placeholder="customer@company.com" /></div>
+        <div class="uat-s1-field" style="min-width:140px;"><label>Phone</label><input id="uatS1CustPhone" type="tel" value="" placeholder="+1 555 000 0000" /></div>
+        <div class="uat-s1-field" style="min-width:130px;"><label>Account Number</label><input id="uatS1AccountNo" value="" placeholder="e.g. 1112223" /></div>
+        <div class="uat-s1-field" style="min-width:190px;"><label>Rax Sales Email</label><input id="uatS1RaxEmail" type="email" value="" placeholder="sales@rackspace.com" /></div>
+      </div>
       <button class="uat-s1-btn-muted" onclick="uatS1CloseModal()">Close</button>
     </div>
     <div class="uat-s1-modal-body">
@@ -9646,15 +9653,7 @@ ${certContent}
         <div style="height:8px"></div>
         <div class="uat-s1-field"><label>Criticality</label><select id="uatS1Crit"><option>Critical</option><option>High</option><option>Medium</option><option>Low</option></select></div>
         <div style="height:8px"></div>
-        <div class="uat-s1-field"><label>Business Owner</label><input id="uatS1BOwner" value="" placeholder="Business Owner" /></div>
-        <div style="height:8px"></div>
         <div class="uat-s1-field"><label>Technical Owner</label><input id="uatS1TOwner" value="" placeholder="dzoan" /></div>
-        <div style="height:8px"></div>
-        <div class="uat-s1-field"><label>Account Number</label><input id="uatS1AccountNo" value="" placeholder="e.g. 1112223" /></div>
-        <div style="height:8px"></div>
-        <div class="uat-s1-field"><label>Customer Email</label><input id="uatS1CustEmail" type="email" value="" placeholder="customer@company.com" /></div>
-        <div style="height:8px"></div>
-        <div class="uat-s1-field"><label>Rax Sales Email</label><input id="uatS1RaxEmail" type="email" value="" placeholder="sales@rackspace.com" /></div>
       </div>
       <div class="uat-s1-modal-panel">
         <h4>Component Configuration</h4>
@@ -9966,7 +9965,7 @@ ${certContent}
         _sv('uatS1ArchSel', sys.archetype||'banking');
         _sv('uatS1Name', sys.name); _sv('uatS1Crit', sys.criticality||'Critical');
         _sv('uatS1BOwner', sys.bowner||''); _sv('uatS1TOwner', sys.towner||''); _sv('uatS1AccountNo', sys.accountNo||'');
-        _sv('uatS1CustEmail', sys.customerEmail||''); _sv('uatS1RaxEmail', sys.raxSalesEmail||'');
+        _sv('uatS1CustEmail', sys.customerEmail||''); _sv('uatS1RaxEmail', sys.raxSalesEmail||''); _sv('uatS1CustPhone', sys.customerPhone||'');
         _sv('uatS1Wave', sys.wave||'Wave 1'); _sv('uatS1Risk', sys.risk||'Medium');
         _sv('uatS1Region', sys.region||'');
         _sv('uatS1Desc', sys.desc||'');
@@ -9976,7 +9975,7 @@ ${certContent}
         return;
       }
     }
-    _sv('uatS1Name',''); _sv('uatS1BOwner',''); _sv('uatS1TOwner',''); _sv('uatS1AccountNo',''); _sv('uatS1CustEmail',''); _sv('uatS1RaxEmail',''); _sv('uatS1Desc','');
+    _sv('uatS1Name',''); _sv('uatS1BOwner',''); _sv('uatS1TOwner',''); _sv('uatS1AccountNo',''); _sv('uatS1CustEmail',''); _sv('uatS1RaxEmail',''); _sv('uatS1CustPhone',''); _sv('uatS1Desc','');
     if (typeof window.uatS1SelectArchetype === 'function') {
       window.uatS1SelectArchetype(presetArch || 'banking');
     } else {
@@ -10563,6 +10562,7 @@ ${certContent}
       _sv('uatS1AccountNo', tpl.accountNo || '');
       _sv('uatS1CustEmail', tpl.customerEmail || '');
       _sv('uatS1RaxEmail', tpl.raxSalesEmail || '');
+      _sv('uatS1CustPhone', tpl.customerPhone || '');
       _sv('uatS1Wave', tpl.wave || 'Wave 1');
       _sv('uatS1Risk', tpl.risk || 'Medium');
       _sv('uatS1Desc', tpl.desc || 'custom business system');
@@ -10586,6 +10586,7 @@ ${certContent}
       accountNo: _gv('uatS1AccountNo')||'',
       customerEmail: _gv('uatS1CustEmail')||'',
       raxSalesEmail: _gv('uatS1RaxEmail')||'',
+      customerPhone: _gv('uatS1CustPhone')||'',
       wave: _gv('uatS1Wave')||'Wave 1',
       risk: _gv('uatS1Risk')||'Medium',
       desc: _gv('uatS1Desc')||'custom business system',
@@ -10626,6 +10627,7 @@ ${certContent}
       accountNo:   _gv('uatS1AccountNo')||'',
       customerEmail: _gv('uatS1CustEmail')||'',
       raxSalesEmail: _gv('uatS1RaxEmail')||'',
+      customerPhone: _gv('uatS1CustPhone')||'',
       wave:        _gv('uatS1Wave')||'Wave 1',
       risk:        _gv('uatS1Risk')||'Medium',
       desc:        _gv('uatS1Desc')||'',
