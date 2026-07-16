@@ -18,6 +18,13 @@ fi
 # Ensure ~/.local/bin is on PATH (where pip installs CLIs like openstack)
 export PATH="$HOME/.local/bin:$PATH"
 
+# Expose the dashboard on every interface: public server addresses AND localhost.
+# nginx (:5002 TLS) already listens on all interfaces; Flask itself binds per
+# this env var (app.py: WORKFLOW_DASHBOARD_HOST, default 127.0.0.1).
+export WORKFLOW_DASHBOARD_HOST="${WORKFLOW_DASHBOARD_HOST:-0.0.0.0}"
+# First non-loopback address, for the URLs printed at the end.
+PUBLIC_IP="$(hostname -I 2>/dev/null | tr ' ' '\n' | grep -v '^127\.' | grep -v '^$' | head -1)"
+
 echo "================================================"
 echo " Starting OSPC to FLEX Migration Dashboard "
 echo "================================================"
@@ -36,11 +43,49 @@ fuser -k 5001/tcp >/dev/null 2>&1 || true
 fuser -k 5005/tcp >/dev/null 2>&1 || true
 sleep 1
 
+# ── FRESH-SERVER BOOTSTRAP ────────────────────────────────────────────────────
+# A brand-new Ubuntu host has no pip3/nginx and the ubuntu user has no password,
+# so plain `systemctl restart nginx` hangs on an interactive polkit prompt.
+# Everything below is non-interactive; nginx is optional (dashboard falls back
+# to plain HTTP on :5001 when it is unavailable).
+if ! command -v pip3 >/dev/null 2>&1; then
+    echo "-> Fresh host detected: installing python3-pip/python3-venv (sudo apt)..."
+    sudo apt-get update -qq && sudo apt-get install -y -qq python3-pip python3-venv || {
+        echo "ERROR: could not install python3-pip. Run manually: sudo apt-get install -y python3-pip"
+        exit 1
+    }
+fi
+if ! command -v nginx >/dev/null 2>&1; then
+    echo "-> Fresh host: installing nginx (HTTPS proxy on :5002)..."
+    sudo apt-get install -y -qq nginx || echo "WARN: nginx install failed — dashboard will be HTTP-only on :5001"
+fi
+if command -v nginx >/dev/null 2>&1 && [[ ! -f /etc/nginx/conf.d/osflex.conf ]] \
+        && [[ -f "$SCRIPT_DIR/workflow_dashboard/osflex_nginx.conf" ]]; then
+    echo "-> Fresh host: installing nginx site config + self-signed certificate..."
+    sudo mkdir -p /etc/nginx/ssl
+    if [[ ! -f /etc/nginx/ssl/osflex.key ]]; then
+        sudo openssl req -x509 -nodes -newkey rsa:2048 -days 3650 \
+            -keyout /etc/nginx/ssl/osflex.key -out /etc/nginx/ssl/osflex.crt \
+            -subj "/CN=osflex-dashboard" >/dev/null 2>&1
+    fi
+    sudo cp "$SCRIPT_DIR/workflow_dashboard/osflex_nginx.conf" /etc/nginx/conf.d/osflex.conf
+fi
+# ─────────────────────────────────────────────────────────────────────────────
+
 echo "-> Starting nginx (HTTP/2 on port 5002)..."
-systemctl restart nginx >/dev/null 2>&1 || nginx -s reload >/dev/null 2>&1 || nginx >/dev/null 2>&1 || true
+# sudo -n first: never hang on an interactive polkit/password prompt.
+sudo -n systemctl restart nginx >/dev/null 2>&1 \
+    || systemctl restart nginx >/dev/null 2>&1 \
+    || sudo -n nginx -s reload >/dev/null 2>&1 \
+    || nginx -s reload >/dev/null 2>&1 \
+    || echo "WARN: nginx not restarted — dashboard reachable directly at http://127.0.0.1:5001"
 
 echo "-> Installing dependencies..."
-pip3 install --break-system-packages -q -r "$SCRIPT_DIR/requirements/requirements.txt"
+pip3 install --break-system-packages -q -r "$SCRIPT_DIR/requirements/requirements.txt" || {
+    echo "ERROR: pip install failed — Flask cannot start without its dependencies."
+    echo "       Run manually: pip3 install --break-system-packages -r $SCRIPT_DIR/requirements/requirements.txt"
+    exit 1
+}
 
 # Navigate to dashboard directory
 cd "$SCRIPT_DIR/workflow_dashboard" || exit 1
@@ -55,6 +100,8 @@ fi
 # Start Flask via systemd user service (keeps it alive across sessions, no port conflicts)
 echo "-> Starting Flask application (via systemd user service)..."
 if systemctl --user is-enabled osflex-dashboard >/dev/null 2>&1; then
+    # Make the public bind reach the systemd-managed Flask too.
+    systemctl --user set-environment "WORKFLOW_DASHBOARD_HOST=$WORKFLOW_DASHBOARD_HOST" 2>/dev/null || true
     systemctl --user restart osflex-dashboard
     APP_PID=$(systemctl --user show osflex-dashboard --value --property MainPID 2>/dev/null || echo "")
 else
@@ -69,7 +116,7 @@ MOCKUP_LOG="$SCRIPT_DIR/flex_mockup_5005.log"
 MOCKUP_PID=""
 if [[ -f "$MOCKUP_HTML" ]]; then
     echo "-> Starting FLEX web UI mockup on $FLEX_MOCKUP_URL..."
-    (cd "$SCRIPT_DIR" && python3 -m http.server 5005 --bind 127.0.0.1) &> "$MOCKUP_LOG" &
+    (cd "$SCRIPT_DIR" && python3 -m http.server 5005 --bind 0.0.0.0) &> "$MOCKUP_LOG" &
     MOCKUP_PID=$!
 else
     echo "WARN: FLEX web UI mockup file not found: $MOCKUP_HTML"
@@ -91,6 +138,12 @@ for i in $(seq 1 30); do
     fi
     if curl -sk --max-time 1 "$DASHBOARD_URL/" > /dev/null 2>&1; then
         echo "-> Server is up!"
+        break
+    fi
+    # nginx-less fresh hosts: Flask itself answers on plain HTTP :5001
+    if curl -s --max-time 1 "http://127.0.0.1:5001/" > /dev/null 2>&1; then
+        echo "-> Server is up (direct HTTP on :5001 — nginx proxy not active)."
+        DASHBOARD_URL="http://127.0.0.1:5001"
         break
     fi
     echo "   ... waiting ($i/30)"
@@ -142,7 +195,13 @@ fi
 echo "================================================"
 echo " Dashboard is running. Press [Ctrl+C] to stop."
 echo " Logs: $SCRIPT_DIR/dashboard.log"
-echo " Dashboard: $DASHBOARD_URL"
+echo " Dashboard (localhost): $DASHBOARD_URL"
+if [[ -n "$PUBLIC_IP" ]]; then
+    echo " Dashboard (public, TLS): https://$PUBLIC_IP:5002"
+    echo " Dashboard (public, HTTP): http://$PUBLIC_IP:5001"
+    [[ -n "$MOCKUP_PID" ]] && echo " FLEX mockup (public):     http://$PUBLIC_IP:5005/Flex-Skyline-New-Ui.html"
+    echo " NOTE: open ports 5001/5002/5005 in the server's security group to reach these."
+fi
 [[ -n "$MOCKUP_PID" ]] && echo " FLEX mockup: $FLEX_MOCKUP_URL"
 echo " OSPC mockup: $OSPC_MOCKUP_URL"
 echo " OSPC mockup with Migration to FLEX open: $OSPC_MIGRATION_URL"
