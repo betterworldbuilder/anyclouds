@@ -233,33 +233,62 @@ else
     echo "WARN: OSPC web UI mockup did not respond yet. It is served by the dashboard route."
 fi
 
-echo "-> Opening Google Chrome to dashboard and mockup web UIs..."
-if command -v cmd.exe > /dev/null 2>&1; then
-    (cd /mnt/c/Windows/System32 2>/dev/null || cd /tmp; cmd.exe /C start "" chrome "$DASHBOARD_URL")
-    [[ -n "$MOCKUP_PID" ]] && (cd /mnt/c/Windows/System32 2>/dev/null || cd /tmp; cmd.exe /C start "" chrome "$FLEX_MOCKUP_URL")
-    (cd /mnt/c/Windows/System32 2>/dev/null || cd /tmp; cmd.exe /C start "" chrome "$OSPC_MIGRATION_URL")
-elif command -v explorer.exe > /dev/null 2>&1; then
-    (cd /mnt/c/Windows/System32 2>/dev/null || cd /tmp; explorer.exe "$DASHBOARD_URL")
-    [[ -n "$MOCKUP_PID" ]] && (cd /mnt/c/Windows/System32 2>/dev/null || cd /tmp; explorer.exe "$FLEX_MOCKUP_URL")
-    (cd /mnt/c/Windows/System32 2>/dev/null || cd /tmp; explorer.exe "$OSPC_MIGRATION_URL")
-elif command -v xdg-open > /dev/null 2>&1; then
-    xdg-open "$DASHBOARD_URL"
-    [[ -n "$MOCKUP_PID" ]] && xdg-open "$FLEX_MOCKUP_URL"
-    xdg-open "$OSPC_MIGRATION_URL"
+echo "-> Opening dashboard and all mockup pages in the default browser..."
+if [[ -n "$PUBLIC_IP" ]]; then
+    if [[ "$DASHBOARD_URL" == http://* ]]; then
+        OPEN_DASHBOARD_URL="http://$PUBLIC_IP:5001"
+    else
+        OPEN_DASHBOARD_URL="https://$PUBLIC_IP:5002"
+    fi
+    OPEN_FLEX_URL="http://$PUBLIC_IP:5005/Flex-Skyline-New-Ui.html?v=$(date +%s)"
 else
-    echo "Please manually open $DASHBOARD_URL in Google Chrome."
-    [[ -n "$MOCKUP_PID" ]] && echo "Please manually open $FLEX_MOCKUP_URL in Google Chrome."
-    echo "Please manually open $OSPC_MIGRATION_URL in Google Chrome."
+    OPEN_DASHBOARD_URL="$DASHBOARD_URL"
+    OPEN_FLEX_URL="$FLEX_MOCKUP_URL"
 fi
+OPEN_OSPC_URL="$OPEN_DASHBOARD_URL/ospc_cloud_mockup/"
+OPEN_OSPC_MIGRATION_URL="$OPEN_DASHBOARD_URL/ospc_cloud_mockup/?migration=1"
 
+OPEN_URLS=("$OPEN_DASHBOARD_URL" "$OPEN_OSPC_URL" "$OPEN_OSPC_MIGRATION_URL")
+[[ -n "$MOCKUP_PID" ]] && OPEN_URLS+=("$OPEN_FLEX_URL")
+
+open_browser_url() {
+    local url="$1"
+    if command -v cmd.exe > /dev/null 2>&1; then
+        (cd /mnt/c/Windows/System32 2>/dev/null || cd /tmp; cmd.exe /C start "" chrome "$url")
+    elif command -v explorer.exe > /dev/null 2>&1; then
+        (cd /mnt/c/Windows/System32 2>/dev/null || cd /tmp; explorer.exe "$url")
+    elif command -v xdg-open > /dev/null 2>&1; then
+        xdg-open "$url" > /dev/null 2>&1 &
+    elif command -v google-chrome > /dev/null 2>&1; then
+        google-chrome "$url" > /dev/null 2>&1 &
+    elif command -v chromium > /dev/null 2>&1; then
+        chromium "$url" > /dev/null 2>&1 &
+    else
+        return 1
+    fi
+}
+
+BROWSER_OPENED=1
+for url in "${OPEN_URLS[@]}"; do
+    if ! open_browser_url "$url"; then
+        BROWSER_OPENED=0
+        break
+    fi
+done
+if [[ "$BROWSER_OPENED" -eq 0 ]]; then
+    echo "No graphical browser launcher was found on this host. Open these URLs from your workstation:"
+    printf '  %s\n' "${OPEN_URLS[@]}"
+fi
 echo "================================================"
 echo " Dashboard is running. Press [Ctrl+C] to stop."
 echo " Logs: $SCRIPT_DIR/dashboard.log"
 echo " Dashboard (localhost): $DASHBOARD_URL"
 if [[ -n "$PUBLIC_IP" ]]; then
-    echo " Dashboard (public, TLS): https://$PUBLIC_IP:5002"
+    echo " Dashboard (public, TLS):  https://$PUBLIC_IP:5002"
     echo " Dashboard (public, HTTP): http://$PUBLIC_IP:5001"
-    [[ -n "$MOCKUP_PID" ]] && echo " FLEX mockup (public):     http://$PUBLIC_IP:5005/Flex-Skyline-New-Ui.html"
+    echo " OSPC mockup (public):      $OPEN_OSPC_URL"
+    echo " OSPC migration (public):   $OPEN_OSPC_MIGRATION_URL"
+    [[ -n "$MOCKUP_PID" ]] && echo " FLEX mockup (public):      $OPEN_FLEX_URL"
     echo " NOTE: open ports 5001/5002/5005 in the server's security group to reach these."
 fi
 [[ -n "$MOCKUP_PID" ]] && echo " FLEX mockup: $FLEX_MOCKUP_URL"
