@@ -365,6 +365,8 @@ def run_probe(target: Dict[str, Any], probe_id: str, runner: Callable[..., subpr
             health_port = int(health_port)
             if 1 <= health_port <= 65535:
                 remote += "; if command -v curl >/dev/null 2>&1; then code=$(curl -ksS -o /dev/null -w '%%{http_code}' --max-time 5 'http://127.0.0.1:%s%s' || true); printf '\\nHEALTH_CHECK_HTTP=%%s\\n' \"$code\"; fi" % (health_port, health_path)
+    if probe_id == "SCAN-001":
+        _import_standard_ssh_trust(host, port, Path(known_hosts))
     argv = ["ssh", "-i", str(key_path), "-p", str(port), "-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=yes", "-o", "UserKnownHostsFile=%s" % known_hosts, "-o", "ConnectTimeout=%s" % connect_timeout, "-o", "ConnectionAttempts=1", "%s@%s" % (user, host), remote]
     try:
         completed = runner(argv, capture_output=True, text=True, timeout=command_timeout, check=False)
@@ -393,7 +395,7 @@ def run_probe(target: Dict[str, Any], probe_id: str, runner: Callable[..., subpr
         result["remediation"] = result["recommendedActions"][0]
     if probe_id == "SCAN-001":
         result["hostFingerprint"] = expected or None
-        if not expected:
+        if not expected and not _read_known_host_entry(Path(known_hosts), host, port):
             # Connectivity and every downstream probe work fine here; only the managed
             # known_hosts trust record is incomplete, so this is a WARNING, not a BLOCKER.
             result["status"] = "PASS_WITH_WARNING" if result["status"] == "PASS" else result["status"]
@@ -477,6 +479,25 @@ def scan_host_key(host: str, port: int, runner: Callable[..., subprocess.Complet
         return {"ok": False, "error": "unsupported or malformed key", "status": "UNREACHABLE"}
     return {"ok": True, "line": best, "keyType": fields[1], "fingerprint": fingerprint}
 
+
+def _import_standard_ssh_trust(host: str, port: int, managed: Path) -> bool:
+    """Copy an already-verified standard SSH trust entry into the isolated scanner store."""
+    if _read_known_host_entry(managed, host, port):
+        return True
+    standard = Path.home() / ".ssh" / "known_hosts"
+    if not standard.is_file() or standard.resolve() == managed.resolve():
+        return False
+    token = _host_token(host, port)
+    found = subprocess.run(["ssh-keygen", "-F", token, "-f", str(standard)], capture_output=True, text=True, timeout=10, check=False)
+    fingerprints = {_known_host_fingerprint(line) for line in (found.stdout or "").splitlines() if line and not line.startswith("#")}
+    fingerprints.discard(None)
+    if not fingerprints:
+        return False
+    scanned = scan_host_key(host, port)
+    if not scanned.get("ok") or scanned.get("fingerprint") not in fingerprints:
+        return False
+    result, code = approve_host_key(host, port, scanned["fingerprint"], managed, actor="standard-known-hosts-import", action="IMPORT")
+    return code == 200 and bool(result.get("ok"))
 
 def get_trust_status(host: str, port: int, known_hosts_file: Optional[Path] = None,
                       runner: Callable[..., subprocess.CompletedProcess] = subprocess.run) -> Dict[str, Any]:
