@@ -1228,6 +1228,7 @@ def create_r6_scan_blueprint(base_dir: Path, probe_runner: Callable[..., subproc
             result["rootCauseId"] = "%s:COMPONENT_VM_MAPPING_MISSING" % _slug(component.get("id") or component.get("name"))
             result["remediation"] = result["recommendedActions"][0]
             results.append(result); prerequisite = result; connectivity_ok = False
+            _record_live_probe(run, component, result, 1, len(PROBES), save_live)
         elif not source_vm_id:
             # Has a host/IP but no OpenStack UUID: guest discovery over SSH can still proceed.
             # Only cloud/snapshot-based checks (SCAN-020) are affected; see _cloud_snapshot_probe.

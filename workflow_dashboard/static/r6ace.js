@@ -2711,7 +2711,8 @@ window.r6pStage0=function(){
     +'<div style="border:1px solid #e2e8f0;border-radius:8px;padding:14px 16px;margin:12px 16px 16px;">'
     +'<div style="font-weight:700;font-size:13px;margin-bottom:2px;">2. Source VM SSH Credentials</div>'
     +'<div style="font-size:11px;color:#64748b;margin-bottom:10px;">Used by live scan and Stage 9B sanitized VM extraction</div>'
-    +'<div style="display:grid;grid-template-columns:1fr 2fr 2fr;gap:10px;">'
+    +'<div style="display:grid;grid-template-columns:1.3fr 1fr 1.8fr 1.8fr;gap:10px;">'
+    +'<div><label style="font-size:11px;font-weight:700;color:#334155;display:block;">Source VM Host / IP</label><input id="r6p-source-vm-host" value="" placeholder="VM public IP, for example 174.143.59.142" style="width:100%;padding:6px;border:1px solid #cbd5e1;border-radius:5px;font-size:12px;"></div>'
     +'<div><label style="font-size:11px;font-weight:700;color:#334155;display:block;">SSH User</label><input id="r6p-extract-user" value="ubuntu" style="width:100%;padding:6px;border:1px solid #cbd5e1;border-radius:5px;font-size:12px;"></div>'
     +'<div><label style="font-size:11px;font-weight:700;color:#334155;display:block;">SSH Private Key Path / Secret Ref</label><input id="r6p-extract-key" value="~/.ssh/id_rsa" style="width:100%;padding:6px;border:1px solid #cbd5e1;border-radius:5px;font-size:12px;"></div>'
     +'<div><label style="font-size:11px;font-weight:700;color:#334155;display:block;">Managed known_hosts</label><input id="r6p-extract-known-hosts" value="./data/ssh/known_hosts" style="width:100%;padding:6px;border:1px solid #cbd5e1;border-radius:5px;font-size:12px;"></div>'
@@ -3315,6 +3316,12 @@ window.r6pAppraisalAllowsStage8=function(c){
   return ['READY_FOR_STAGE_8','DB_NATIVE_REQUIRED','RETAIN_VM_RECOMMENDED'].indexOf(a.componentVerdict)>=0||
     (a.componentVerdict==='READY_FOR_STAGE_8_WITH_WARNINGS'&&R6P.appraisalReviewed===true);
 };
+window.r6pSourceVmHost=function(){
+  var entered=String((document.getElementById('r6p-source-vm-host')||{}).value||'').trim();
+  if(entered)return entered;
+  var bs=R6P.bs||{};
+  return String(bs.sourceHost||bs.sourceIp||bs.targetIp||bs.publicIp||bs.privateIp||'').trim();
+};
 window.r6pProductionScanPayloadLegacy=function(){
   var user=((document.getElementById('r6p-scan-user')||{}).value||(document.getElementById('r6p-extract-user')||{}).value||'').trim();
   var key=((document.getElementById('r6p-scan-key')||{}).value||(document.getElementById('r6p-extract-key')||{}).value||'').trim();
@@ -3322,7 +3329,7 @@ window.r6pProductionScanPayloadLegacy=function(){
   var all=(R6P.components||[]);
   var scope=(document.getElementById('r6p-scan-comp')||{}).value||'__all__';
   var selected=scope==='__all__'?all:(all[parseInt(scope,10)]?[all[parseInt(scope,10)]]:[]);
-  return {businessSystem:{id:R6P.bs&&R6P.bs.id,name:R6P.bs&&R6P.bs.name,totalComponentCount:all.length,scanScope:scope==='__all__'?'ALL_COMPONENTS':'SINGLE_COMPONENT',components:selected.map(function(c){var ep=r6pParseSshTarget(r6pComponentTarget(c),c),mapped=r6pResolveComponentVm(c),vmId=mapped.id,dbMode=c.databaseAccessMode||c.database_access_mode||c.databaseTargetType||((/database|db/i.test(c.type||c.role||c.name||'')&&!vmId)?'UNKNOWN':null);return{id:c.id||c.name,name:c.name,sourceVmId:vmId,source_vm_id:vmId,sourceVmName:c.sourceVmName||c.source_vm_name||c.vmName||c.vm_name||mapped.name||null,sourceIp:(ep&&ep.host)||c.sourceIp||c.source_ip||mapped.ip||null,sshHost:ep&&ep.host,sshPort:ep&&ep.port,sshUser:c.sshUser||c.ssh_user||user,cloudRegion:c.cloudRegion||c.cloud_region||mapped.region||R6P.bs&&R6P.bs.region||null,scanTargetId:c.scanTargetId||c.scan_target_id||vmId,expectedFingerprint:c.expectedFingerprint||c.sshFingerprint||null,type:c.type||c.role||'',databaseAccessMode:dbMode,databaseEndpoint:c.databaseEndpoint||r6pComponentTarget(c),cloudInventory:c.cloudInventory||c.cloud_inventory||null,volumeIds:c.volumeIds||c.volume_ids||[]};})},ssh:{user:user,keyPath:key,knownHostsFile:known}};
+  return {businessSystem:{id:R6P.bs&&R6P.bs.id,name:R6P.bs&&R6P.bs.name,totalComponentCount:all.length,scanScope:scope==='__all__'?'ALL_COMPONENTS':'SINGLE_COMPONENT',components:selected.map(function(c){var mapped=r6pResolveComponentVm(c),ep=r6pParseSshTarget(r6pComponentTarget(c),c)||r6pParseSshTarget(mapped.ip||r6pSourceVmHost(),c),vmId=mapped.id,dbMode=c.databaseAccessMode||c.database_access_mode||c.databaseTargetType||((/database|db/i.test(c.type||c.role||c.name||'')&&!vmId)?'UNKNOWN':null);return{id:c.id||c.name,name:c.name,sourceVmId:vmId,source_vm_id:vmId,sourceVmName:c.sourceVmName||c.source_vm_name||c.vmName||c.vm_name||mapped.name||null,sourceIp:(ep&&ep.host)||c.sourceIp||c.source_ip||mapped.ip||null,sshHost:ep&&ep.host,sshPort:ep&&ep.port,sshUser:c.sshUser||c.ssh_user||user,cloudRegion:c.cloudRegion||c.cloud_region||mapped.region||R6P.bs&&R6P.bs.region||null,scanTargetId:c.scanTargetId||c.scan_target_id||vmId,expectedFingerprint:c.expectedFingerprint||c.sshFingerprint||null,type:c.type||c.role||'',databaseAccessMode:dbMode,databaseEndpoint:c.databaseEndpoint||r6pComponentTarget(c),cloudInventory:c.cloudInventory||c.cloud_inventory||null,volumeIds:c.volumeIds||c.volume_ids||[]};})},ssh:{user:user,keyPath:key,knownHostsFile:known}};
 };
 window.r6pProductionScanPayload=function(){
   var user=((document.getElementById('r6p-scan-user')||{}).value||(document.getElementById('r6p-extract-user')||{}).value||'').trim();
@@ -3331,7 +3338,7 @@ window.r6pProductionScanPayload=function(){
   var all=(R6P.components||[]),scope=(document.getElementById('r6p-scan-comp')||{}).value||'__all__';
   var selected=scope==='__all__'?all:(all[parseInt(scope,10)]?[all[parseInt(scope,10)]]:[]);
   var components=selected.map(function(c){
-    var ep=r6pParseSshTarget(r6pComponentTarget(c),c),mapped=r6pResolveComponentVm(c),vmId=mapped.id;
+    var mapped=r6pResolveComponentVm(c),ep=r6pParseSshTarget(r6pComponentTarget(c),c)||r6pParseSshTarget(mapped.ip||r6pSourceVmHost(),c),vmId=mapped.id;
     var input=r6pInputConnectionFor(c),isDb=/database|db/i.test((c.type||c.role||'')+' '+(c.name||''));
     var serviceEndpoint=r6pParseTargetEndpoint(r6pComponentTarget(c)),healthPath=String(c.path||c.healthPath||c.health_path||'').split(',')[0];
     var dbMode=c.databaseAccessMode||c.database_access_mode||c.databaseTargetType||(isDb&&!vmId?(input.sshConfigured?'VM_SSH':'UNKNOWN'):null);
