@@ -26,7 +26,11 @@ export WORKFLOW_DASHBOARD_HOST="${WORKFLOW_DASHBOARD_HOST:-0.0.0.0}"
 # PUBLIC_IP can be supplied explicitly for hosts without outbound web access.
 # Do not fall back to `hostname -I`: on cloud hosts it normally returns the
 # private service-network address and incorrectly labels it as public.
-if [[ -z "${PUBLIC_IP:-}" ]]; then
+# On WSL the detected IP is the home router's NAT address — unreachable
+# without port forwarding — so skip it and use localhost URLs only.
+IS_WSL=0
+grep -qi microsoft /proc/version 2>/dev/null && IS_WSL=1
+if [[ -z "${PUBLIC_IP:-}" && "$IS_WSL" -eq 0 ]]; then
     for PUBLIC_IP_SERVICE in \
         "https://api.ipify.org" \
         "https://checkip.amazonaws.com" \
