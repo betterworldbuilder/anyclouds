@@ -309,9 +309,15 @@ window.r6pRefreshComponentDrivenStages=function(){
 window.r6pComponentTarget=function(c){
   c=c||{};
   var nested=c.target||c.flex||c.vm||{};
-  var values=[c.sourceIp,c.source_ip,c.targetIp,c.targetIP,c.target_ip,c.targetUrl,c.target_url,
-    c.flexIp,c.flexIP,c.flex_ip,c.flexUrl,c.flex_url,c.src,c.ospcUrl,c.ospc_url,c.vmIp,c.vm_ip,c.ip,c.endpoint,c.host,c.tgt,
-    nested.ip,nested.address,nested.endpoint,nested.url];
+  /* FLEX target fields (what the app cards show as "Current FLEX endpoint")
+     must win over source/legacy fields, otherwise a stale sourceIp persisted
+     by an earlier scan makes the scanner probe a different VM than the one
+     displayed on the component card. */
+  var values=[c.tgt,c.targetIp,c.targetIP,c.target_ip,c.targetUrl,c.target_url,
+    c.flexIp,c.flexIP,c.flex_ip,c.flexUrl,c.flex_url,
+    nested.ip,nested.address,nested.endpoint,nested.url,
+    c.vmIp,c.vm_ip,c.ip,c.endpoint,c.host,
+    c.sourceIp,c.source_ip,c.src,c.ospcUrl,c.ospc_url];
   for(var i=0;i<values.length;i++){
     var value=String(values[i]||'').trim();
     if(!value||/^(not required|n\/?a|none|null|undefined|tbd|unknown)$/i.test(value))continue;
