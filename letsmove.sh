@@ -88,6 +88,17 @@ for pkg in "${APT_PACKAGES[@]}"; do
 done
 if ((${#MISSING_PKGS[@]})); then
     echo "-> Fresh host: installing ${#MISSING_PKGS[@]} system package(s): ${MISSING_PKGS[*]}"
+    # Fresh cloud images often have an interrupted dpkg state or a stale apt
+    # lock (cloud-init/unattended-upgrades). Wait for the lock, then repair
+    # before installing — otherwise every install fails with
+    # "E: Unmet dependencies. Try 'apt --fix-broken install'".
+    for _i in $(seq 1 30); do
+        sudo fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1 || break
+        [[ "$_i" == 1 ]] && echo "   waiting for another apt/dpkg process to finish..."
+        sleep 5
+    done
+    sudo dpkg --configure -a >/dev/null 2>&1 || true
+    sudo apt-get install -y -qq --fix-broken >/dev/null 2>&1 || true
     sudo apt-get update -qq || true
     if ! sudo apt-get install -y -qq "${MISSING_PKGS[@]}"; then
         # mysql-client is a meta package that is absent on some Ubuntu variants;
@@ -95,7 +106,8 @@ if ((${#MISSING_PKGS[@]})); then
         RETRY_PKGS=()
         for pkg in "${MISSING_PKGS[@]}"; do [[ "$pkg" == "mysql-client" ]] || RETRY_PKGS+=("$pkg"); done
         sudo apt-get install -y -qq "${RETRY_PKGS[@]}" mariadb-client || {
-            echo "ERROR: apt package installation failed. Run manually:"
+            echo "ERROR: apt package installation failed. Diagnose with:"
+            echo "       sudo apt --fix-broken install"
             echo "       sudo apt-get install -y ${MISSING_PKGS[*]}"
             exit 1
         }
