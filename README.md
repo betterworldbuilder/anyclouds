@@ -106,6 +106,70 @@ CloudJumper is a browser-based control room for OSPC to FLEX migration. It bring
 
 ## ✨ Latest Features
 
+### Stage 9 — AI Adoption & Production Factory
+
+Stage 9 now imports a real AI project, scans it without executing it, scores its
+production gaps honestly, and emits a handoff Rackspace operations can act on.
+The original Stage 9 AI Power Up flow is unchanged and remains the default
+Brownfield path.
+
+**Three adoption modes**
+
+| Mode | Question it answers | Typical source |
+|---|---|---|
+| **Greenfield** | "We need a new governed AI production platform. What seeds it?" | New project, LaunchPad PoC, AI 4 the People agent, GitHub, upload |
+| **Brownfield** | "How do we add governed AI to an existing application safely?" | Migrated FLEX business system |
+| **Existing PoC** | "How do we productionize this specific PoC?" | GitHub repo, ZIP, notebook, LaunchPad/AI4People bundle |
+
+**Pipeline** — mode → source → import → static scan → gap assessment → plan → export.
+
+| Endpoint | Does |
+|---|---|
+| `POST /ai-adoption/projects` | Create project, set adoption mode |
+| `POST /ai-adoption/projects/<id>/import` | GitHub clone / upload / FLEX system, then scan |
+| `POST /ai-adoption/projects/<id>/assess` | 5 category scores + production gaps + recommendation |
+| `POST /ai-adoption/projects/<id>/plan` | Target architecture (+Mermaid), Palantir mapping, passport, journey |
+| `GET  /ai-adoption/projects/<id>/export?format=` | `json` \| `csv` \| `markdown` |
+| `GET  /ai-adoption/meta` | Modes, sources per mode, auth state |
+
+**Scoring is visible and refuses to overstate.** Five weighted categories
+(value, data, security, production, operations) with mode-specific weights. Every
+control resolves `PASS` / `WARNING` / `FAIL` / `NOT_CHECKED`, and `NOT_CHECKED`
+is excluded from the score and reported separately as **confidence** — so a
+project that could not be scanned reads as unverified, never as a clean pass.
+The formula is printed in the UI and in every export.
+
+**A-0 Adoption Path** was added to the AI Enhancement Readiness Assessment
+(now A-0 … A-9). Completing that assessment can prefill Stage 9 and credit the
+`value` controls it genuinely evidences — each credited control is stamped with
+its source assessment id. It can never satisfy a security, production or
+operations control; those require code.
+
+**Security** — imported projects are treated as untrusted:
+
+- No execution during discovery: no notebook run, no `docker build`, no repo scripts.
+- Archive traversal, symlink, entry-count, depth and size limits enforced.
+- Secret detection records the pattern and file, never the value.
+- Shallow read-only clone into a temp workspace, deleted after normalization.
+- Private repos take a **credential reference** (the name of a server env var), never a token; the token reaches git via `GIT_ASKPASS`, never `argv`.
+- Every import and export writes an audit event.
+
+**GitHub OAuth** gates every mutating route (`/ai-adoption/auth/login`). Loopback
+is allowed by default so local use needs no setup; a request over the public bind
+must authenticate. Configure with:
+
+| Env var | Purpose |
+|---|---|
+| `AI_ADOPTION_FACTORY_ENABLED` | `0` disables the whole feature; Stage 9 reverts to its previous behaviour |
+| `AI_ADOPTION_GITHUB_CLIENT_ID` / `_SECRET` | OAuth app credentials |
+| `AI_ADOPTION_ALLOWED_LOGINS` / `_ORG` | Optional allow-lists |
+| `AI_ADOPTION_ALLOW_LOOPBACK` | `0` to require auth even locally |
+| `FLASK_SECRET_KEY` | Stable session key (sessions reset on restart without it) |
+
+Projects persist as one JSON document per project under `outputs/ai_adoption/`.
+Design notes and the full delta from the original specification are in
+[`docs/stage9-ai-adoption-implementation-plan.md`](docs/stage9-ai-adoption-implementation-plan.md).
+
 ### Discovery Dashboard (`/dashboard/`)
 
 The Discovery stage now includes a full TCO (Total Cost of Ownership) analysis engine:

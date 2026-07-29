@@ -441,6 +441,14 @@
     }
     .top-stage-dropdown:hover .top-stage-dropdown-content,
     .top-stage-dropdown:focus-within .top-stage-dropdown-content { display: flex; }
+    /* Stage 4 is the last cell in the bar: a 300px panel anchored left runs off
+       the right edge and gets clipped by body{overflow-x:hidden}. Anchor it to
+       the trigger's right edge instead so it opens inward. */
+    .top-stage-dropdown:last-child .top-stage-dropdown-content,
+    .top-stage-dropdown.ai-now-dropdown .top-stage-dropdown-content {
+      left: auto;
+      right: 0;
+    }
     .top-stage-dropdown-content .stage-btn {
       width: 100%;
       min-width: 280px;
@@ -1979,7 +1987,9 @@ body.flex-skyline-mode #subBar2 > .ospc-dropdown > .ospc-dropdown-content {
 /* Production execution-mode banner: 2x taller with stronger readable labels. */
 #stageBar.stage-bar,
 body.flex-skyline-mode #stageBar.stage-bar {
-  min-height: 82px !important;
+  /* 76px row + 2x10px padding. Anything less and the pinned-height buttons
+     overflow the bar, which is what used to raise the scrollbar. */
+  min-height: 96px !important;
   padding: 10px 6px !important;
   gap: 8px !important;
   align-items: stretch !important;
@@ -2053,7 +2063,12 @@ body.flex-skyline-mode #stageBar.stage-bar {
   display: grid !important;
   grid-template-columns: repeat(8, minmax(0, 1fr)) !important;
   grid-auto-rows: 76px !important;
-  overflow-x: auto !important;
+  /* Must stay visible on BOTH axes. A scroll container clips absolutely
+     positioned descendants, and the Stage 3/4 dropdown panels hang below the
+     bar at top:100% — an `overflow-x: auto` here made them invisible and, since
+     `visible` computes to `auto` once the other axis scrolls, also produced a
+     stray vertical scrollbar over the bar. */
+  overflow: visible !important;
 }
 #stageBar > .stage-btn,
 #stageBar > .top-stage-dropdown,
@@ -2102,7 +2117,10 @@ body.flex-skyline-mode #stageBar > .stage-btn.ai-now-stage.active {
 @media (max-width: 1280px) {
   #stageBar.stage-bar,
   body.flex-skyline-mode #stageBar.stage-bar {
-    grid-template-columns: repeat(8, minmax(150px, 1fr)) !important;
+    /* minmax(150px, …) forced a 1268px floor and pushed the last stages out of
+       view on narrower windows; let the 8 cells compress instead so the row
+       always fits without a scrollbar. */
+    grid-template-columns: repeat(8, minmax(0, 1fr)) !important;
   }
 }
 

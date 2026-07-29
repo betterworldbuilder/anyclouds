@@ -122,6 +122,31 @@ except ImportError:
     from routes.monitoring_api import create_monitoring_blueprint
 app.register_blueprint(create_monitoring_blueprint(BASE_DIR))
 
+# ── Stage 9 — AI Adoption & Production Factory ──────────────────────────────
+# Additive to the existing client-side Stage 9. With the flag off the blueprint
+# is never registered and Stage 9 behaves exactly as it did before.
+AI_ADOPTION_FACTORY_ENABLED = (
+    os.environ.get("AI_ADOPTION_FACTORY_ENABLED", "1").strip().lower() not in ("0", "false", "no")
+)
+if AI_ADOPTION_FACTORY_ENABLED:
+    try:
+        try:
+            from workflow_dashboard.ai_adoption.routes import create_ai_adoption_blueprint
+        except ImportError:
+            from ai_adoption.routes import create_ai_adoption_blueprint
+        # Sessions are required by the GitHub OAuth login. A generated key is
+        # fine for a single process but drops sessions on restart, so a stable
+        # FLASK_SECRET_KEY should be set wherever that matters.
+        if not app.secret_key:
+            app.secret_key = os.environ.get("FLASK_SECRET_KEY") or os.urandom(32)
+            if not os.environ.get("FLASK_SECRET_KEY"):
+                print("[STARTUP] FLASK_SECRET_KEY unset - AI Adoption sessions reset on restart")
+        app.register_blueprint(create_ai_adoption_blueprint(BASE_DIR))
+    except Exception as _ai_adoption_err:  # keep the dashboard bootable
+        print(f"[STARTUP] AI Adoption factory disabled (init failed): {_ai_adoption_err}")
+else:
+    print("[STARTUP] AI Adoption factory disabled by AI_ADOPTION_FACTORY_ENABLED")
+
 # ── Template caching: reload once at startup, then serve from cache ──────────
 # TEMPLATES_AUTO_RELOAD=False stops Jinja2 re-parsing combined.html (1.35 MB)
 # mid-traffic whenever its mtime changes — that re-parse blocks Flask for
