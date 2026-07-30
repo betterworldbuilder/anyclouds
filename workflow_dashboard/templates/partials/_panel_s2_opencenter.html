@@ -936,7 +936,7 @@
             <input class="ocqs-input" id="ocqs-gitrepo" placeholder="ssh://git@github.com/YOUR_USER/opencenter-my-cluster-gitops.git" oninput="ocqsUpdate();ocqsReqCheck()">
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px;">
               <div><label class="ocqs-label">Git Branch</label><input class="ocqs-input" id="ocqs-gitbranch" value="main" oninput="ocqsUpdate()"></div>
-              <div><label class="ocqs-label">Git Auth Method</label><select class="ocqs-select" id="ocqs-gitauth" onchange="ocqsUpdate();ocqsReqCheck()"><option value="token" selected>HTTPS token (default)</option><option value="ssh">SSH key (optional)</option></select></div>
+              <div><label class="ocqs-label">Git Auth Method</label><select class="ocqs-select" id="ocqs-gitauth" onchange="ocqsUpdate();ocqsReqCheck()"><option value="token">HTTPS token</option><option value="ssh" selected>SSH key (default) — uses the key OpenCenter generates for this cluster</option></select></div>
             </div>
             <div id="ocqs-auth-token-fields">
               <label class="ocqs-label" style="margin-top:8px;">Token File Path</label>
@@ -4589,7 +4589,7 @@ var c9b=g('ocqs-cmd-9b');
             <input class="ocqs-input" id="ocqp-gitrepo" placeholder="ssh://git@github.com/YOUR_USER/opencenter-my-cluster-gitops.git" oninput="ocqpUpdate();ocqpReqCheck()">
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px;">
               <div><label class="ocqs-label">Git Branch</label><input class="ocqs-input" id="ocqp-gitbranch" value="main" oninput="ocqpUpdate()"></div>
-              <div><label class="ocqs-label">Git Auth Method</label><select class="ocqs-select" id="ocqp-gitauth" onchange="ocqpUpdate();ocqpReqCheck()"><option value="token" selected>HTTPS token (default)</option><option value="ssh">SSH key (optional)</option></select></div>
+              <div><label class="ocqs-label">Git Auth Method</label><select class="ocqs-select" id="ocqp-gitauth" onchange="ocqpUpdate();ocqpReqCheck()"><option value="token">HTTPS token</option><option value="ssh" selected>SSH key (default) — uses the key OpenCenter generates for this cluster</option></select></div>
             </div>
             <div id="ocqp-auth-token-fields">
               <label class="ocqs-label" style="margin-top:8px;">Token File Path</label>
