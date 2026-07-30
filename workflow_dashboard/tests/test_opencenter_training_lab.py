@@ -203,5 +203,129 @@ class OpenCenterFiveUserDryRun(unittest.TestCase):
         self.assertEqual(sso_override.get_json()["learner"], "sso.instructor@example.com")
 
 
+class OpenCenterCohortQandA(unittest.TestCase):
+    """Q&A feedback: students ask, only instructors answer, everyone sees it."""
+
+    @classmethod
+    def setUpClass(cls):
+        app.config.update(TESTING=True)
+
+    def _session(self, name, role):
+        client = app.test_client()
+        client.post(
+            "/api/opencenter/training-login", json={"name": name, "role": role}
+        )
+        token = client.get("/api/opencenter/lab-session").get_json()["csrf"]
+        return client, {"X-OpenCenter-Lab-CSRF": token}
+
+    def _ask(self, client, headers, message):
+        response = client.post(
+            "/api/opencenter/lab-feedback",
+            json={"kind": "question", "stage": "Stage 3", "message": message},
+            headers=headers,
+        )
+        self.assertEqual(response.status_code, 200, response.get_data(as_text=True))
+        return response.get_json()["feedback"]["id"]
+
+    def test_question_kind_is_accepted_alongside_the_original_two(self):
+        client, headers = self._session("Kind Check", "Student")
+        for kind in ("improvement", "not_working", "question"):
+            response = client.post(
+                "/api/opencenter/lab-feedback",
+                json={"kind": kind, "stage": "S", "message": "a valid message"},
+                headers=headers,
+            )
+            self.assertEqual(response.status_code, 200, kind)
+        rejected = client.post(
+            "/api/opencenter/lab-feedback",
+            json={"kind": "bogus", "stage": "S", "message": "a valid message"},
+            headers=headers,
+        )
+        self.assertEqual(rejected.status_code, 400)
+
+    def test_only_an_instructor_can_answer_a_question(self):
+        student, student_headers = self._session("Asker", "Student")
+        question_id = self._ask(student, student_headers, "How do I rotate the key?")
+
+        self_answer = student.post(
+            "/api/opencenter/lab-feedback-answer",
+            json={"id": question_id, "answer": "guessing"},
+            headers=student_headers,
+        )
+        self.assertEqual(self_answer.status_code, 403)
+
+        instructor, instructor_headers = self._session("Coop", "Instructor")
+        answered = instructor.post(
+            "/api/opencenter/lab-feedback-answer",
+            json={"id": question_id, "answer": "Run sops updatekeys."},
+            headers=instructor_headers,
+        )
+        self.assertEqual(answered.status_code, 200, answered.get_data(as_text=True))
+        self.assertEqual(answered.get_json()["feedback"]["answered_by"], "Coop")
+
+    def test_answer_endpoint_validates_id_and_length_and_requires_csrf(self):
+        instructor, headers = self._session("Validator", "Instructor")
+        cases = [
+            ({"id": "not-hex", "answer": "fine"}, 400),
+            ({"id": "0" * 32, "answer": "fine"}, 404),
+        ]
+        for payload, expected in cases:
+            response = instructor.post(
+                "/api/opencenter/lab-feedback-answer", json=payload, headers=headers
+            )
+            self.assertEqual(response.status_code, expected, payload)
+
+        student, student_headers = self._session("Short", "Student")
+        question_id = self._ask(student, student_headers, "a real question here")
+        too_short = instructor.post(
+            "/api/opencenter/lab-feedback-answer",
+            json={"id": question_id, "answer": "x"},
+            headers=headers,
+        )
+        self.assertEqual(too_short.status_code, 400)
+
+        # the new route must sit behind the same lab CSRF guard as the rest
+        no_token = instructor.post(
+            "/api/opencenter/lab-feedback-answer",
+            json={"id": question_id, "answer": "no token supplied"},
+        )
+        self.assertEqual(no_token.status_code, 403)
+
+    def test_instructor_review_shows_every_learner_and_the_posted_answers(self):
+        asked = {}
+        for name in ("Zain", "Rosa"):
+            client, headers = self._session(name, "Student")
+            asked[name] = self._ask(client, headers, f"{name} asks about SOPS")
+
+        instructor, instructor_headers = self._session("Reviewer", "Instructor")
+        for name, question_id in asked.items():
+            self.assertEqual(
+                instructor.post(
+                    "/api/opencenter/lab-feedback-answer",
+                    json={"id": question_id, "answer": f"Answer for {name}."},
+                    headers=instructor_headers,
+                ).status_code,
+                200,
+            )
+
+        review = instructor.get(
+            "/api/opencenter/cohort-review", headers=instructor_headers
+        ).get_json()
+        self.assertEqual(review["viewer_role"], "Instructor")
+        by_id = {item["id"]: item for item in review["feedback"]}
+        for name, question_id in asked.items():
+            self.assertIn(question_id, by_id, f"{name}'s question is missing")
+            self.assertEqual(by_id[question_id]["author"], name)
+            self.assertEqual(by_id[question_id]["answer"], f"Answer for {name}.")
+
+        # and the learner who asked can read the answer back
+        student, student_headers = self._session("Zain", "Student")
+        student_view = student.get(
+            "/api/opencenter/cohort-review", headers=student_headers
+        ).get_json()
+        seen = {item["id"]: item for item in student_view["feedback"]}
+        self.assertEqual(seen[asked["Zain"]]["answer"], "Answer for Zain.")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

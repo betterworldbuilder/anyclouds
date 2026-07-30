@@ -116,6 +116,7 @@
         value=String(value).split('?')[0];
         return [
           '/api/opencenter/lab-session','/api/opencenter/cohort-review','/api/opencenter/lab-result','/api/opencenter/lab-feedback',
+          '/api/opencenter/lab-feedback-answer',
           '/api/opencenter/deploy-readiness','/api/opencenter/clusters','/api/opencenter/export-bundle',
           '/api/opencenter/restore-bundle','/api/openstack/quota-check',
           '/api/openstack/force-delete-security-group','/api/openstack/free-fips',
@@ -124,12 +125,28 @@
           '/api/stream/run-cmd'
         ].indexOf(value)!==-1;
       }
+      /* Re-read the session and swap in the new CSRF token. Starting a role
+         session mints a fresh token server-side; the tab that submitted the
+         login keeps the old one and every protected call then fails with
+         "invalid OpenCenter lab session token". */
+      lab.refresh = function(){
+        lab.ready = nativeFetch('/api/opencenter/lab-session', {
+          credentials:'same-origin', headers:{'Accept':'application/json'}
+        }).then(function(response){
+          if(!response.ok) throw new Error('Unable to refresh the OpenCenter lab session');
+          return response.json();
+        }).then(function(data){ lab.data=data; renderLabIdentity(data); return data; });
+        return lab.ready;
+      };
+
       window.fetch = function(input, options){
         if (!protectedLabUrl(input)) return nativeFetch(input, options);
         return lab.ready.then(function(data){
           var next = Object.assign({}, options || {});
           var headers = new Headers(next.headers || {});
-          headers.set('X-OpenCenter-Lab-CSRF', data.csrf);
+          // lab.data is kept current by refresh(); `data` is whatever the
+          // promise resolved to when this tab first loaded.
+          headers.set('X-OpenCenter-Lab-CSRF', (lab.data && lab.data.csrf) || data.csrf);
           next.headers = headers;
           next.credentials = 'same-origin';
           return nativeFetch(input, next);
@@ -281,6 +298,9 @@
             if(status){status.textContent=result.data.role+' session created for '+result.data.learner+'. Opened in a new window.';status.style.color='#15803d';}
             labWindow.location=url;
             labWindow.focus();
+            // This tab no longer reloads, so pull the new identity and token.
+            lab.refresh().then(function(){ if(typeof window.ocqsRefreshCohort==='function') window.ocqsRefreshCohort(null); })
+                         .catch(function(){});
             if(button){button.disabled=false;button.textContent='Start '+role+' session';}
           } else {
             // Popup blocked or closed - fall back to navigating this tab.
@@ -2515,7 +2535,7 @@ kubectl describe kustomization &lt;name&gt; -n flux-system</div>
             <div style="background:#fff;border:1px solid #ddd6fe;border-radius:8px;padding:12px;">
               <div style="font-size:12px;font-weight:900;color:#5b21b6;margin-bottom:8px;">Add Quick Start feedback</div>
               <label class="ocqs-label">Feedback type</label>
-              <select id="ocqs-feedback-kind" class="ocqs-select"><option value="improvement">Improvement suggestion</option><option value="not_working">Flag something not working</option></select>
+              <select id="ocqs-feedback-kind" class="ocqs-select"><option value="improvement">Improvement suggestion</option><option value="not_working">Flag something not working</option><option value="question">Q&amp;A — ask the instructor a question</option></select>
               <label class="ocqs-label" style="margin-top:8px;">Stage or feature</label>
               <input id="ocqs-feedback-stage" class="ocqs-input" maxlength="80" placeholder="e.g. Stage 3 credentials">
               <label class="ocqs-label" style="margin-top:8px;">Details</label>
@@ -2565,22 +2585,74 @@ kubectl describe kustomization &lt;name&gt; -n flux-system</div>
           }
           var feedback=document.getElementById('ocqs-cohort-feedback');
           if(feedback){
+            var KINDS={
+              not_working:{label:'Not working', edge:'#dc2626', line:'#fecaca'},
+              question:   {label:'Question',    edge:'#7c3aed', line:'#ddd6fe'},
+              improvement:{label:'Improvement', edge:'#0284c7', line:'#bae6fd'}
+            };
+            var isInstructor=String(data.viewer_role||'').toLowerCase()==='instructor';
+            var items=(data.feedback||[]).slice();
+            /* Unanswered questions first for the instructor - they are the only
+               entries that need an action, and burying them under suggestions is
+               how a learner ends up waiting on an answer nobody saw. */
+            items.sort(function(a,b){
+              function rank(x){
+                if(x.kind==='question') return x.answer ? 1 : 0;
+                return 2;
+              }
+              return rank(a)-rank(b);
+            });
             feedback.textContent='';
-            (data.feedback||[]).forEach(function(item){
+
+            var open=items.filter(function(x){return x.kind==='question'&&!x.answer;}).length;
+            var head=document.createElement('div');
+            head.style.cssText='font-size:11px;font-weight:900;color:#475569;margin-bottom:8px;';
+            head.textContent=items.length+' submission'+(items.length===1?'':'s')+
+              ' from this cohort'+(open?' · '+open+' question'+(open===1?'':'s')+' awaiting an answer':'');
+            if(items.length) feedback.appendChild(head);
+
+            items.forEach(function(item){
+              var kind=KINDS[item.kind]||KINDS.improvement;
               var card=document.createElement('div');
-              card.style.cssText='border:1px solid '+(item.kind==='not_working'?'#fecaca':'#bae6fd')+';border-left:4px solid '+(item.kind==='not_working'?'#dc2626':'#0284c7')+';border-radius:7px;padding:9px;background:#f8fafc;';
+              card.style.cssText='border:1px solid '+kind.line+';border-left:4px solid '+kind.edge+
+                ';border-radius:7px;padding:9px;background:#f8fafc;margin-bottom:8px;';
               var title=document.createElement('div');
               title.style.cssText='font-size:11px;font-weight:900;color:#0f172a;';
-              title.textContent=(item.kind==='not_working'?'Not working':'Improvement')+' · '+item.stage;
+              title.textContent=kind.label+' · '+item.stage;
               var message=document.createElement('div');
               message.style.cssText='font-size:12px;color:#334155;line-height:1.5;margin-top:4px;white-space:pre-wrap;';
               message.textContent=item.message;
               var meta=document.createElement('div');
               meta.style.cssText='font-size:10px;color:#64748b;margin-top:5px;';
               meta.textContent=item.author+' ('+item.author_role+') · '+item.created_at;
-              card.appendChild(title);card.appendChild(message);card.appendChild(meta);feedback.appendChild(card);
+              card.appendChild(title);card.appendChild(message);card.appendChild(meta);
+
+              if(item.answer){
+                var ans=document.createElement('div');
+                ans.style.cssText='margin-top:8px;padding:8px 10px;border-radius:6px;background:#f5f3ff;border-left:3px solid #7c3aed;';
+                var alab=document.createElement('div');
+                alab.style.cssText='font-size:10px;font-weight:900;color:#6d28d9;text-transform:uppercase;letter-spacing:.5px;';
+                alab.textContent='Instructor answer';
+                var atxt=document.createElement('div');
+                atxt.style.cssText='font-size:12px;color:#334155;line-height:1.5;margin-top:3px;white-space:pre-wrap;';
+                atxt.textContent=item.answer;
+                var ameta=document.createElement('div');
+                ameta.style.cssText='font-size:10px;color:#64748b;margin-top:4px;';
+                ameta.textContent=(item.answered_by||'Instructor')+' · '+(item.answered_at||'');
+                ans.appendChild(alab);ans.appendChild(atxt);ans.appendChild(ameta);card.appendChild(ans);
+              } else if(isInstructor && item.kind==='question'){
+                var box=document.createElement('textarea');
+                box.rows=2;box.placeholder='Answer this question for the cohort...';
+                box.style.cssText='width:100%;margin-top:8px;font:inherit;font-size:12px;padding:6px 8px;border:1px solid #c4b5fd;border-radius:6px;box-sizing:border-box;';
+                var send=document.createElement('button');
+                send.type='button';send.textContent='Post answer';
+                send.style.cssText='margin-top:6px;background:#7c3aed;color:#fff;border:none;border-radius:6px;padding:6px 12px;font-size:11px;font-weight:900;cursor:pointer;';
+                send.onclick=function(){ window.ocqsAnswerQuestion(item.id,box,send); };
+                card.appendChild(box);card.appendChild(send);
+              }
+              feedback.appendChild(card);
             });
-            if(!(data.feedback||[]).length){
+            if(!items.length){
               var none=document.createElement('div');none.style.cssText='font-size:12px;color:#64748b;';none.textContent='No feedback submitted yet.';feedback.appendChild(none);
             }
           }
@@ -2593,6 +2665,26 @@ kubectl describe kustomization &lt;name&gt; -n flux-system</div>
             .then(function(result){if(!result.ok) throw new Error(result.d.error||'review unavailable');renderCohort(result.d);return result.d;})
             .catch(function(error){var s=document.getElementById('ocqs-result-status');if(s){s.textContent=error.message;s.style.color='#dc2626';}})
             .finally(function(){if(button){button.disabled=false;button.textContent=old;}});
+        };
+        window.ocqsAnswerQuestion=function(id,box,button){
+          var answer=(box&&box.value||'').trim();
+          var status=document.getElementById('ocqs-feedback-status');
+          if(answer.length<2){
+            if(status){status.textContent='Write an answer first.';status.style.color='#dc2626';}
+            return;
+          }
+          if(button){button.disabled=true;button.textContent='Posting...';}
+          fetch('/api/opencenter/lab-feedback-answer',{method:'POST',headers:{'Content-Type':'application/json'},
+                body:JSON.stringify({id:id,answer:answer})})
+            .then(function(r){return r.json().then(function(d){return {ok:r.ok,d:d};});})
+            .then(function(result){
+              if(!result.ok) throw new Error(result.d.error||'answer was not posted');
+              if(status){status.textContent='Answer posted to the cohort.';status.style.color='#15803d';}
+              return ocqsRefreshCohort(null);
+            }).catch(function(error){
+              if(status){status.textContent=error.message;status.style.color='#dc2626';}
+              if(button){button.disabled=false;button.textContent='Post answer';}
+            });
         };
         window.ocqsPublishLabResult=function(button){
           var state=ocqsGetState(), completed=0;

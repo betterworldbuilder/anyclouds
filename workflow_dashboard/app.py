@@ -94,6 +94,7 @@ _OPENCENTER_LAB_PROTECTED_PATHS = {
     "/api/opencenter/cohort-review",
     "/api/opencenter/lab-result",
     "/api/opencenter/lab-feedback",
+    "/api/opencenter/lab-feedback-answer",
     "/api/opencenter/deploy-readiness",
     "/api/opencenter/clusters",
     "/api/opencenter/export-bundle",
@@ -659,8 +660,10 @@ def opencenter_submit_lab_feedback():
     assert context is not None
     body = request.get_json(force=True, silent=True) or {}
     kind = str(body.get("kind") or "").strip().lower()
-    if kind not in {"improvement", "not_working"}:
-        return jsonify({"ok": False, "error": "choose improvement or not working"}), 400
+    if kind not in {"improvement", "not_working", "question"}:
+        return jsonify(
+            {"ok": False, "error": "choose improvement, not working, or question"}
+        ), 400
     message = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]", "", str(body.get("message") or "")).strip()
     if len(message) < 5 or len(message) > 2000:
         return jsonify({"ok": False, "error": "feedback must be 5 to 2000 characters"}), 400
@@ -681,6 +684,45 @@ def opencenter_submit_lab_feedback():
         value["feedback"] = value["feedback"][-500:]
         _opencenter_save_cohort(context, value)
     return jsonify({"ok": True, "feedback": item})
+
+
+@app.post("/api/opencenter/lab-feedback-answer")
+def opencenter_answer_lab_feedback():
+    """Instructor answer to a cohort question.
+
+    The feedback id travels in the body rather than the path so this stays an
+    exact-match entry in _OPENCENTER_LAB_PROTECTED_PATHS - the CSRF guard
+    compares request.path literally and a /<id> segment would slip past it.
+    """
+    context = _opencenter_lab_context(create=False)
+    assert context is not None
+    if str(context["identity"]["role"] or "").strip().lower() != "instructor":
+        return jsonify({"ok": False, "error": "only an instructor can answer"}), 403
+    body = request.get_json(force=True, silent=True) or {}
+    target = str(body.get("id") or "").strip()
+    if not re.fullmatch(r"[a-f0-9]{32}", target):
+        return jsonify({"ok": False, "error": "invalid feedback id"}), 400
+    answer = re.sub(
+        r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]", "", str(body.get("answer") or "")
+    ).strip()
+    if len(answer) < 2 or len(answer) > 2000:
+        return jsonify({"ok": False, "error": "answer must be 2 to 2000 characters"}), 400
+    with _OPENCENTER_COHORT_LOCK:
+        value = _opencenter_load_cohort(context)
+        found = None
+        for entry in value["feedback"]:
+            if entry.get("id") == target:
+                found = entry
+                break
+        if found is None:
+            return jsonify({"ok": False, "error": "question not found"}), 404
+        found["answer"] = answer
+        found["answered_by"] = context["identity"]["display"]
+        found["answered_at"] = (
+            datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+        )
+        _opencenter_save_cohort(context, value)
+    return jsonify({"ok": True, "feedback": found})
 
 
 @app.before_request
