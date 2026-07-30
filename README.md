@@ -84,13 +84,13 @@ Browser-based orbital migration cockpit for safely jumping Rackspace OpenStack P
 
 Move the customers who trusted Rackspace OpenStack Private Cloud into the next Rackspace cloud chapter: FLEX.
 
-CloudJumper is a migration cockpit for discovering OSPC estates, translating their topology, moving their VM images, repairing old guest operating systems, and validating workloads on Rackspace FLEX. It is built for the practical middle of migration work: the place where APIs, snapshots, old kernels, customer timelines, and operator judgment all meet.
+Flex Migration Hub is a migration cockpit for discovering OSPC estates, translating their topology, moving their VM images, repairing old guest operating systems, and validating workloads on Rackspace FLEX. It is built for the practical middle of migration work: the place where APIs, snapshots, old kernels, customer timelines, and operator judgment all meet.
 
 *(The full historical telemetry and operator manual has been restored in `README.long.MD`)*
 
 ## 🛰️ Mission Capabilities (What It Does)
 
-CloudJumper is a browser-based control room for OSPC to FLEX migration. It brings together:
+Flex Migration Hub is a browser-based control room for OSPC to FLEX migration. It brings together:
 
 - **Deep Space Recon**: OSPC and FLEX discovery.
 - **Flight Path Tracking**: Customer migration tracking.
@@ -356,7 +356,7 @@ Backup of original monolithic file: `workflow_dashboard/templates/backups/combin
 
 **Why:** OSPC was a powerful chapter in Rackspace cloud history. It gave customers dedicated OpenStack environments, real control, familiar APIs, and the confidence of a managed private cloud. But platforms age. Images accumulate assumptions. Networks drift. Kernels, initramfs, cloud-init, virtio drivers, static routes, bootloaders, and application dependencies all remember the cloud they came from. FLEX is the forward path: modern Rackspace cloud capacity, newer operating models, cleaner automation targets, and a better place for customers to keep building. The challenge is carrying customer trust forward without losing the details that make their workloads boot, connect, and serve traffic.
 
-**So What:** Migration should not feel like a blind leap from one console to another. CloudJumper turns migration into an observable workflow:
+**So What:** Migration should not feel like a blind leap from one console to another. Flex Migration Hub turns migration into an observable workflow:
 - See the source estate before you move it.
 - Map the target before you build it.
 - Generate scripts instead of hand-copying commands.
@@ -368,7 +368,7 @@ The result is fewer mystery failures, faster test boots, cleaner customer update
 
 ## 🚀 Full-Cycle Migration Phases (How)
 
-CloudJumper works as a full-cycle migration Mission Control. Each stage turns unknowns into artifacts: CSVs, maps, scripts, repaired images, booted test instances, verification results, and rollback path
+Flex Migration Hub works as a full-cycle migration Mission Control. Each stage turns unknowns into artifacts: CSVs, maps, scripts, repaired images, booted test instances, verification results, and rollback path
 
 | Phase | Stage | Mission Control Function | Benefit |
 |:---:|---|---|---|
@@ -547,7 +547,7 @@ Jumphost credentials (IP, SSH user, SSH key) and OSPC/FLEX cloud credentials are
 
 ## 👨‍🚀 For Who
 
-CloudJumper is for:
+Flex Migration Hub is for:
 - **Rackspace Migration Engineers** moving customer workloads from OSPC to FLEX.
 - **Cloud Operators** who need repeatable VM, image, topology, and data migration workflows.
 - **Architects** planning customer modernization paths.
@@ -620,7 +620,7 @@ sudo apt-get install -y \
 
 ## 🔭 What Next: The GitOps Horizon
 
-CloudJumper is the migration cockpit. The next step is turning its output into a durable modernization pipeline.
+Flex Migration Hub is the migration cockpit. The next step is turning its output into a durable modernization pipeline.
 
 The vision is a **Full Cycle Migration Mission Control** that produces structured data for GitOps workflows:
 - Discovery output becomes versioned infrastructure intent.
@@ -670,9 +670,9 @@ Stage 5: Migration Output Bundle
 
 UAT does not need a separate disconnected artifact. It reuses the Migration Output Bundle through `uat-input/`, and that UAT view points back to `discovery-output/` and `stage2-migration-output/` so testers can validate what was discovered, what migrated, what was repaired, and what evidence exists before cutover.
 
-That means CloudJumper can interconnect with FinOps reporting, **GitOps** remotes, and other control planes. TCO / FinOps turns the migration into financial evidence: source baseline, target run-rate, right-sizing candidates, and executive reporting. **IAC DR Backup and Restore** is the repeatable customer handoff layer: Terraform-first desired state, region mapping, backup policy, tested restore runbooks, and optional GitOps/OpenCenter-oriented restore prep when you use Option B in that stage.
+That means Flex Migration Hub can interconnect with FinOps reporting, **GitOps** remotes, and other control planes. TCO / FinOps turns the migration into financial evidence: source baseline, target run-rate, right-sizing candidates, and executive reporting. **IAC DR Backup and Restore** is the repeatable customer handoff layer: Terraform-first desired state, region mapping, backup policy, tested restore runbooks, and optional GitOps/OpenCenter-oriented restore prep when you use Option B in that stage.
 
-AI OPS becomes the private intelligence layer over the whole chain after GitOps/OpenCenter reconciliation. It reads the CloudJumper output bundle plus IAC DR outputs (and optional bundle slices such as `opencenter/` when generated), then produces risk scores, autorepair plans, right-sizing recommendations, runbook improvements, and infrastructure patch suggestions without losing the customer-specific context.
+AI OPS becomes the private intelligence layer over the whole chain after GitOps/OpenCenter reconciliation. It reads the Flex Migration Hub output bundle plus IAC DR outputs (and optional bundle slices such as `opencenter/` when generated), then produces risk scores, autorepair plans, right-sizing recommendations, runbook improvements, and infrastructure patch suggestions without losing the customer-specific context.
 
 Instead of finishing with a one-time migration script, the customer leaves with a repeatable operating model: infrastructure saved as code, repairs encoded as playbooks, topology represented as reviewable templates, and deployment state controlled through pull requests.
 
@@ -682,7 +682,7 @@ From there, AI agents can help with the work that usually gets lost after migrat
 
 OSPC carried important workloads for a long time. FLEX is where those workloads can keep moving.
 
-CloudJumper is the bridge: part scanner, part repair bench, part launch console, part field notebook. It does not replace engineering judgment. It gives that judgment a cockpit, a checklist, and a live instrument panel.
+Flex Migration Hub is the bridge: part scanner, part repair bench, part launch console, part field notebook. It does not replace engineering judgment. It gives that judgment a cockpit, a checklist, and a live instrument panel.
 
 **Move carefully. Verify everything. Bring the customer forward.**
 

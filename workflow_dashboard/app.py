@@ -6669,7 +6669,7 @@ def generate_migration_output_bundle():
         "sources": ["discovery inventory", "app dependency scanner", "migration telemetry"],
     }
     discovery_output = {
-        "kind": "CloudJumperDiscoveryOutput",
+        "kind": "Flex Migration HubDiscoveryOutput",
         "customer": customer,
         "stage": "stage1_discovery",
         "outputs": [
@@ -6685,7 +6685,7 @@ def generate_migration_output_bundle():
         "sources": ["tracker", "uploaded csv maps", "OpenStack discovery scans"],
     }
     stage2_output = {
-        "kind": "CloudJumperStage2MigrationOutput",
+        "kind": "Flex Migration HubStage2MigrationOutput",
         "customer": customer,
         "stage": "stage2_migration",
         "outputs": [
@@ -6700,7 +6700,7 @@ def generate_migration_output_bundle():
         "sources": ["migration jobs", "image jobs", "repair logs", "stage2 generated scripts"],
     }
     uat_input = {
-        "kind": "CloudJumperUATInput",
+        "kind": "Flex Migration HubUATInput",
         "customer": customer,
         "purpose": "UAT injection pack generated from pre-UAT migration evidence.",
         "reuse_strategy": "UAT reuses the Migration Output Bundle as the source of truth and reads the uat-input/ view for validation.",
@@ -6728,7 +6728,7 @@ def generate_migration_output_bundle():
         ],
     }
     finops = {
-        "kind": "CloudJumperFinOpsExport",
+        "kind": "Flex Migration HubFinOpsExport",
         "customer": customer,
         "inputs": [
             "../migration_manifest.json",
@@ -6747,7 +6747,7 @@ def generate_migration_output_bundle():
         },
     }
     opencenter = {
-        "kind": "CloudJumperOpenCenterExport",
+        "kind": "Flex Migration HubOpenCenterExport",
         "customer": customer,
         "day2_platform_view": True,
         "inputs": [
@@ -6766,7 +6766,7 @@ def generate_migration_output_bundle():
         "migration_manifest": "../migration_manifest.json",
     }
     tenant_iac_dr = {
-        "kind": "CloudJumperTenantIaCDRPack",
+        "kind": "Flex Migration HubTenantIaCDRPack",
         "customer": customer,
         "target_cloud": "openstack-flex-tenant",
         "inputs": [
@@ -6802,7 +6802,7 @@ def generate_migration_output_bundle():
         ],
     }
     ai_anywhere = {
-        "kind": "CloudJumperAIAnywhereContext",
+        "kind": "Flex Migration HubAIAnywhereContext",
         "customer": customer,
         "purpose": "Private AI Anywhere context pack for migration repair, risk, right-sizing, GitOps, and runbook agents.",
         "inputs": {

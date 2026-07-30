@@ -142,6 +142,7 @@
           <select id="sai-adopt-flexsys" style="border:1px solid #475569;border-radius:7px;padding:8px;background:#0f172a;color:#e2e8f0;font-size:13px;"></select>
         </label>
         <div id="sai-adopt-flex-origin" style="font-size:10px;margin-top:4px;color:#64748b;"></div>
+        <div id="sai-adopt-flex-detail" style="display:none;margin-top:8px;"></div>
         <div id="sai-adopt-demo-warn" style="display:none;margin-top:7px;background:rgba(245,158,11,.14);border:1px solid rgba(251,191,36,.45);border-radius:7px;padding:7px 11px;font-size:11px;color:#fcd34d;">
           ⚠️ <b>DEMO system</b> — this is sample data, not a real customer system. Anything produced from it is labelled DEMO.
         </div>
@@ -204,7 +205,7 @@
   <!-- ── Ready-PoC only: the bundle and where it goes ── -->
   <div id="sai-adopt-bundle" style="display:none;margin-top:16px;border-top:1px solid rgba(139,92,246,.2);padding-top:16px;">
     <div style="font-size:13px;font-weight:800;color:#e2e8f0;margin-bottom:3px;">This agent is already built</div>
-    <div style="font-size:11px;color:#64748b;margin-bottom:10px;">No PoC needed. We import it, close the production gaps CloudJumper finds, and hand it to Rackspace delivery.</div>
+    <div style="font-size:11px;color:#64748b;margin-bottom:10px;">No PoC needed. We import it, close the production gaps Flex Migration Hub finds, and hand it to Rackspace delivery.</div>
     <div style="background:rgba(0,0,0,.2);border-left:3px solid #34d399;border-radius:0 7px 7px 0;padding:9px 12px;font-size:11px;color:#94a3b8;">
       YES AI CAN and AI 4 the People can also send bundles here <b style="color:#6ee7b7;">directly</b> from their own
       Deployment in Production stage — no download and re-upload. A Palantir Foundry export is imported the same way.
@@ -293,7 +294,7 @@
   var $ = function (id) { return document.getElementById(id); };
 
   // Four substages over three adoption modes. The enum stays GREENFIELD /
-  // BROWNFIELD / EXISTING_POC because it is baked into CloudJumper's scoring,
+  // BROWNFIELD / EXISTING_POC because it is baked into Flex Migration Hub's scoring,
   // YES AI CAN, AI 4 the People and every handoff manifest already sent —
   // "Goldenfield" and "Palantir-ready" are presentation and presets, not new
   // contract values.
@@ -554,16 +555,53 @@
     if (state.source === 'FLEX_BUSINESS_SYSTEM') fillFlexSystems();
   }
 
+  // Same archetype labels the Migration Log and UAT stages use, so a system
+  // reads identically wherever it appears.
+  var ARCHETYPES = {
+    banking: 'Banking', ecommerce: 'Ecommerce', crm: 'CRM', erp: 'ERP', saas: 'SaaS',
+    api: 'API Platform', reporting: 'Reporting / BI', batch: 'Batch / Worker',
+    data: 'Data Platform', custom: 'Custom'
+  };
+
   function fillFlexSystems() {
     var sel = $('sai-adopt-flexsys');
     if (!sel || sel.options.length) return;
     var systems = [];
     var origin = '';
 
-    // Stage 1 discovery first: the real migrated inventory already lives in the
-    // tool, so making someone re-pick from a demo list was duplicate entry.
+    // The business systems defined in the Migration Log stage are the richest
+    // source in the tool: archetype, criticality and the component list that
+    // the UAT and cutover stages already work from. Read them first so Stage 4
+    // judges the same systems, not a parallel list.
     try {
-      var tracker = localStorage.getItem('osflex_migration_tracker');
+      var uat = localStorage.getItem('uatS1_systems');
+      if (uat) {
+        var rows = JSON.parse(uat) || [];
+        systems = (Array.isArray(rows) ? rows : []).map(function (s) {
+          var comps = s.components || s.parts || [];
+          return {
+            id: s.id || s.name,
+            name: s.name || s.system || s.label,
+            vms: (s.vms || comps.length || 0),
+            sensitivity: (s.sensitivity || s.confidentiality || '').toUpperCase(),
+            status: s.status || 'MIGRATED',
+            // Carried through so the card can show what kind of system it is.
+            archetype: ARCHETYPES[String(s.type || s.archetype || s.systemType || '').toLowerCase()]
+                       || s.type || s.archetype || '',
+            criticality: s.criticality || '',
+            components: comps.map(function (c) {
+              return typeof c === 'string' ? c : (c.name || c.component || '');
+            }).filter(Boolean)
+          };
+        }).filter(function (s) { return s.name; });
+        if (systems.length) origin = 'Migration Log business systems';
+      }
+    } catch (e) { systems = []; }
+
+    // Then Stage 1 discovery: the migrated inventory, if no business systems
+    // have been defined yet.
+    try {
+      var tracker = systems.length ? null : localStorage.getItem('osflex_migration_tracker');
       if (tracker) {
         var t = JSON.parse(tracker) || {};
         var rows = t.systems || t.rows || t.servers || (Array.isArray(t) ? t : []);
@@ -616,8 +654,13 @@
     }
 
     sel.innerHTML = systems.map(function (s, i) {
-      var prefix = s.is_demo ? 'DEMO — ' : '';
-      return '<option value="' + i + '">' + esc(prefix + s.name) + ' — ' + esc(s.vms || 0) + ' VMs</option>';
+      var bits = [];
+      if (s.archetype) bits.push(s.archetype);
+      bits.push((s.vms || 0) + ' VMs');
+      if (s.components && s.components.length) bits.push(s.components.length + ' components');
+      if (s.criticality) bits.push(s.criticality);
+      return '<option value="' + i + '">' + esc((s.is_demo ? 'DEMO — ' : '') + s.name) +
+             ' — ' + esc(bits.join(' · ')) + '</option>';
     }).join('');
     // Real systems first, so a real one is selected by default when present.
     sel.value = '0';
@@ -634,6 +677,34 @@
     var sys = (sel._systems || [])[sel.value | 0] || {};
     show(warn, !!sys.is_demo);
     state.isDemo = !!sys.is_demo;
+
+    // Show the components the Migration Log stage already defined, so the AI
+    // layer is planned against the real shape of the system.
+    var detail = $('sai-adopt-flex-detail');
+    if (!detail) return;
+    if (!(sys.components && sys.components.length) && !sys.archetype) {
+      show(detail, false);
+      return;
+    }
+    detail.innerHTML =
+      (sys.archetype
+        ? '<span style="display:inline-block;background:rgba(0,122,255,.12);color:#0040DD;' +
+          'border-radius:980px;padding:3px 10px;font-size:10px;font-weight:800;">' +
+          esc(sys.archetype) + '</span> '
+        : '') +
+      (sys.criticality
+        ? '<span style="display:inline-block;background:rgba(255,149,0,.14);color:#B25000;' +
+          'border-radius:980px;padding:3px 10px;font-size:10px;font-weight:800;margin-left:4px;">' +
+          esc(sys.criticality) + '</span>'
+        : '') +
+      (sys.components && sys.components.length
+        ? '<div style="margin-top:7px;font-size:11px;color:rgba(60,60,67,.6);">Components: ' +
+          sys.components.map(function (c) {
+            return '<span style="display:inline-block;background:rgba(120,120,128,.12);border-radius:6px;' +
+                   'padding:2px 7px;margin:2px 3px 2px 0;font-weight:600;">' + esc(c) + '</span>';
+          }).join('') + '</div>'
+        : '');
+    show(detail, true);
   }
 
   function badge(text, bg, fg) {
@@ -905,7 +976,7 @@
       hint.textContent = {
         GREENFIELD: 'Nothing exists yet. Declare what should improve, then pick what seeds the build.',
         BROWNFIELD: 'The application stays the system of record. The AI layer must be separately deployable and reversible.',
-        GOLDENFIELD: 'Already built and validated. Close its production gaps and send it to CloudJumper.',
+        GOLDENFIELD: 'Already built and validated. Close its production gaps and send it to Flex Migration Hub.',
         PALANTIR_READY: 'No Foundry export needed. Declare the ontology here; we deploy the runtime and hand Foundry the mapping.'
       }[state.scenario] || '';
     }

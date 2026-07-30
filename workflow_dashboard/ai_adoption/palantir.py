@@ -20,7 +20,7 @@ What is and is not possible, verified against Palantir's documentation:
 
 So a Palantir import produces two things: an inventory of what the Foundry
 project contains, and the connection kit needed to point Foundry at a workload
-CloudJumper will deploy.
+Flex Migration Hub will deploy.
 """
 
 from __future__ import annotations
@@ -281,7 +281,7 @@ def _how_to(pattern: str, target: str) -> List[Dict[str, str]]:
     return [
         {"step": "Describe the business problem", "who": "You",
          "detail": "Name the system, what hurts, what goes in and what should come out."},
-        {"step": "We produce the mapping", "who": "CloudJumper",
+        {"step": "We produce the mapping", "who": "Flex Migration Hub",
          "detail": "Objects, relationships and AI tool definitions, each tied to a pain point."},
         {"step": "Your Foundry team implements it", "who": "You",
          "detail": "Nothing is installed by us at this stage."},

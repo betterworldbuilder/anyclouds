@@ -4,6 +4,12 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>OSPC to FLEX Migration Dashboard</title>
+  <!-- Flex Migration Hub default colour schema: the iOS system palette.
+       Loaded before the inline styles so its variables are available, and its
+       scoped rules correct panels that were built with dark inline colours -
+       the AI panels forced a light background, which left dark inline text
+       unreadable on it. Change the palette in ios-theme.css, not in a template. -->
+  <link rel="stylesheet" href="/static/ios-theme.css?v={{ cache_bust or '1' }}" />
   <script>
     /* Focus mode: flag this as early as possible (before <header>/#stageBar are
        parsed) so embedded customer pages never paint the full dashboard first.
@@ -2867,10 +2873,11 @@ body.flex-skyline-mode .uat-s1-template-tab.active {
   </div>
   <!-- R5 Data Replatform / Full Manual Runbook removed — see Stage 2 migration tools -->
   <div class="ospc-dropdown nav-stage-group">
-    <button class="sub-btn-dropdown" type="button" aria-haspopup="true">Move FLEX Apps to K8 Cluster &#9662;</button>
+    <button class="sub-btn-dropdown" type="button" aria-haspopup="true">Flex to OpenCenter K8 Replatform &#9662;</button>
     <div class="ospc-dropdown-content">
-      <button class="sub-btn" data-sub="s2rehost_p2_2">&#128640; APPS to Container Refactor Engine</button>
-      <button class="sub-btn" data-sub="s2opencenter">🚀 OpenCenter K8s Cluster Migration</button>
+      <!-- Deployment leads: it is the destination the refactor feeds into. -->
+      <button class="sub-btn" data-sub="s2opencenter">🚀 Flex to OpenCenter K8 Deployment</button>
+      <button class="sub-btn" data-sub="s2rehost_p2_2">&#128640; Container Refactor Engine</button>
     </div>
   </div>
   <div class="ospc-dropdown nav-stage-group migration-hub-substage">

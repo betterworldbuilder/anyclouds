@@ -2852,7 +2852,7 @@
     setMessage('UAT full report downloaded as Excel file.');
   };
 
-  window.CloudJumperUAT = {load: loadUAT};
+  window.Flex Migration HubUAT = {load: loadUAT};
   window.uatRenderPerformance = renderPerformance;
   window._uatFlavorData = window._uatFlavorData || null;
 

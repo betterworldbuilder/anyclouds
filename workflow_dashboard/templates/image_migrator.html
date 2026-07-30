@@ -4061,7 +4061,7 @@
                                     onchange="localStorage.setItem('mig_windows_repair_method', this.value); toggleNbdPanel();">
                                     <option value="windows_method_a">Method A — Offline Repair</option>
                                     <option value="windows_method_b_hypervisor">Method B — Hypervisor Two-Phase</option>
-                                    <option value="windows_method_c_dynamic_auto">Method C — Dynamic Auto Repair (CloudJumper)</option>
+                                    <option value="windows_method_c_dynamic_auto">Method C — Dynamic Auto Repair (Flex Migration Hub)</option>
                                     <option value="windows_method_d_safe_ide_boot">Method D — Safe IDE Boot (OSPC Zen → FLEX KVM)</option>
                                     <option value="windows_method_e_b_capture_g_deploy">Method E — B-Capture + G-Deploy (SSH → Rescue → VirtIO Snapshot)</option>
                                     <option value="windows_method_g_simple_ssh_dummy_virtio" selected>Method G Simple — SSH Capture + Dummy VirtIO Boot</option>
@@ -4088,11 +4088,11 @@
                                 <span style="display:inline-flex; align-items:center; gap:8px; flex-wrap:wrap;">
                                     <button type="button" id="cloudboot_force_new_btn"
                                         style="background:#0b1220; border:1px solid rgba(244,114,182,0.55); border-radius:8px; color:#fbcfe8; font-size:11px; font-weight:800; padding:6px 12px; cursor:pointer; white-space:nowrap;"
-                                        title="Method C (CloudJumper): when ON, the dashboard sends cloudboot_force_new so the worker drops any cached compare/repair bundle, re-runs source-vs-target discovery, and writes a brand-new boot-repair script instead of resuming the last bundle."
+                                        title="Method C (Flex Migration Hub): when ON, the dashboard sends cloudboot_force_new so the worker drops any cached compare/repair bundle, re-runs source-vs-target discovery, and writes a brand-new boot-repair script instead of resuming the last bundle."
                                         onclick="const cb=document.getElementById('cloudboot_force_new'); cb.checked=!cb.checked; localStorage.setItem('mig_cloudboot_force_new', cb.checked?'1':'0'); this.textContent = cb.checked ? 'CREATE NEW BOOT REPAIR SCRIPT: ON' : 'CREATE NEW BOOT REPAIR SCRIPT';">
                                         CREATE NEW BOOT REPAIR SCRIPT
                                     </button>
-                                    <label for="cloudboot_force_new" style="display:inline-flex; align-items:center; gap:6px; color:#fbcfe8; font-size:11px; font-weight:800; white-space:nowrap; cursor:pointer; margin:0;" title="Method C: same as the button — check to force a fresh CloudJumper compare and regenerate the repair/boot script; uncheck to allow resuming cached bundle when the worker supports it.">
+                                    <label for="cloudboot_force_new" style="display:inline-flex; align-items:center; gap:6px; color:#fbcfe8; font-size:11px; font-weight:800; white-space:nowrap; cursor:pointer; margin:0;" title="Method C: same as the button — check to force a fresh Flex Migration Hub compare and regenerate the repair/boot script; uncheck to allow resuming cached bundle when the worker supports it.">
                                         <input type="checkbox" id="cloudboot_force_new"
                                             style="width:14px; height:14px; accent-color:#f472b6; cursor:pointer; flex-shrink:0;"
                                             onchange="localStorage.setItem('mig_cloudboot_force_new', this.checked ? '1' : '0'); const b=document.getElementById('cloudboot_force_new_btn'); if(b) b.textContent=this.checked?'CREATE NEW BOOT REPAIR SCRIPT: ON':'CREATE NEW BOOT REPAIR SCRIPT';">
@@ -4110,11 +4110,11 @@
                                         <li><strong style="color:#fca5a5;">Still not magic:</strong> if two jobs truly run <strong>at the same time</strong> against the <strong>same VM / same label</strong>, you can still get double full-disk capture, heavy guest IO, and overlapping artifacts — the lock is what prevents that class of overlap.</li>
                                     </ul>
                                 </div>
-                                <div><strong style="color:#fbcfe8;">Create new boot repair script / Force new</strong> — Applies to <strong style="color:#5eead4;">Method C (CloudJumper)</strong> only: clears the &quot;resume&quot; path so compare + repair bundle generation runs from scratch instead of reusing the last saved CloudJumper artifacts.</div>
+                                <div><strong style="color:#fbcfe8;">Create new boot repair script / Force new</strong> — Applies to <strong style="color:#5eead4;">Method C (Flex Migration Hub)</strong> only: clears the &quot;resume&quot; path so compare + repair bundle generation runs from scratch instead of reusing the last saved Flex Migration Hub artifacts.</div>
                         </div>
                         </div>
 	                        <div id="cloudboot-target-panel" style="display:flex; align-items:center; gap:8px; background:rgba(20,184,166,0.08); padding:7px 12px; border-radius:8px; border:1px solid rgba(45,212,191,0.32); flex-wrap:wrap;"
-	                             title="FLEX/reference Windows VM used by CloudJumper Stage 3b for source-vs-target boot comparison before Method A repair.">
+	                             title="FLEX/reference Windows VM used by Flex Migration Hub Stage 3b for source-vs-target boot comparison before Method A repair.">
 	                            <label for="cloudboot_target_public_ip" style="color:#99f6e4; font-weight:700; font-size:0.78rem; white-space:nowrap;">CloudBoot FLEX target:</label>
 	                            <input type="text" id="cloudboot_target_public_ip" placeholder="public IP"
 	                                style="width:118px; padding:4px 8px; background:#0f172a; border:1px solid #14b8a6; border-radius:6px; color:#99f6e4; font-size:0.78rem; font-family:monospace;"
@@ -4154,7 +4154,7 @@
                                     </tr>
                                     <tr>
                                         <td style="padding:7px 8px; border-top:1px solid rgba(51,65,85,0.55); color:#5eead4; font-weight:700;">Method C</td>
-                                        <td style="padding:7px 8px; border-top:1px solid rgba(51,65,85,0.55);">CloudJumper source/target compare -> dynamic repair bundle -> Method A boot flow</td>
+                                        <td style="padding:7px 8px; border-top:1px solid rgba(51,65,85,0.55);">Flex Migration Hub source/target compare -> dynamic repair bundle -> Method A boot flow</td>
                                         <td style="padding:7px 8px; border-top:1px solid rgba(51,65,85,0.55);">When target reference VM is reachable</td>
                                     </tr>
                                     <tr>
@@ -4171,7 +4171,7 @@
                                     Target Windows preparation for comparison (Method C)
                                 </div>
                                 <div style="color:#94a3b8; font-size:11px;">
-                                    Use when target FLEX Windows VM is reachable by RDP but CloudJumper cannot reach SSH/WinRM.
+                                    Use when target FLEX Windows VM is reachable by RDP but Flex Migration Hub cannot reach SSH/WinRM.
                                 </div>
                             </div>
 
@@ -4216,7 +4216,7 @@ if (-not (Get-NetFirewallRule -DisplayName "ospc2flex-SSH" -ErrorAction Silently
 
 Write-Host "[ospc2flex] WinRM(5985) configured; SSH(22) attempted."</pre>
                                     <div style="margin-top:8px; color:#94a3b8; font-size:11px;">
-                                        After this, rerun <strong>Method C</strong>. CloudJumper should be able to collect the target profile via WinRM and generate the dynamic bundle.
+                                        After this, rerun <strong>Method C</strong>. Flex Migration Hub should be able to collect the target profile via WinRM and generate the dynamic bundle.
                                     </div>
                                 </div>
                             </div>
@@ -11643,20 +11643,20 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
                     if (isMethodGSimple) { s3el.style.border = ''; s3el.style.background = ''; }
                     else { s3el.style.border = '1px solid rgba(245,158,11,0.3)'; s3el.style.background = '#1a0f00'; }
                 }
-                _ps('pipeline-step-4',  '4',   'Offline Repair', isWinSafeIdeMethod ? (isMethodGSimple ? 'Linux: standard inline repair · Windows: qemu convert + repair + registry-safe VirtIO prep' : 'Linux: standard inline repair · Windows: offline repair + staged VirtIO payload for safe IDE rescue boot') : (winMethodSel === 'windows_method_c_dynamic_auto' ? 'Linux: standard inline repair · Windows: CloudJumper compare + dynamic repair bundle + Method A offline repair' : 'Linux: standard inline repair · Windows: offline repair with current Method A workflow'), '~2–5 min', '#7dd3fc');
+                _ps('pipeline-step-4',  '4',   'Offline Repair', isWinSafeIdeMethod ? (isMethodGSimple ? 'Linux: standard inline repair · Windows: qemu convert + repair + registry-safe VirtIO prep' : 'Linux: standard inline repair · Windows: offline repair + staged VirtIO payload for safe IDE rescue boot') : (winMethodSel === 'windows_method_c_dynamic_auto' ? 'Linux: standard inline repair · Windows: Flex Migration Hub compare + dynamic repair bundle + Method A offline repair' : 'Linux: standard inline repair · Windows: offline repair with current Method A workflow'), '~2–5 min', '#7dd3fc');
                 s45title.innerHTML = 'Upload to Glance <span style="color:#0ea5e9;font-weight:400;font-size:10px;">· FLEX</span>';
                 s45desc.innerHTML  = isMethodGSimple
                     ? 'Windows: upload IDE rescue image from repaired qcow2 · dummy VirtIO disk · pnputil · snapshot · final virtio-scsi boot + healthcheck'
                     : (isWinSafeIdeMethod
                     ? 'Linux uploads normally · Windows uploads IDE rescue image first, then pivots to final VirtIO image after in-guest driver binding'
                     : (winMethodSel === 'windows_method_c_dynamic_auto'
-                        ? 'Linux uploads normally · Windows runs dynamic CloudJumper repair generation, then follows Method A upload/boot path'
+                        ? 'Linux uploads normally · Windows runs dynamic Flex Migration Hub repair generation, then follows Method A upload/boot path'
                         : 'Linux uploads normally · Windows follows current Method A upload/boot path'));
                 const s45el = document.getElementById('pipeline-step-45');
                 if (s45el) { const t45 = s45el.querySelector('.ps-time'); if (t45) t45.textContent = '~10–20 min'; }
-                _ps('pipeline-step-46', '6',   isWinSafeIdeMethod ? 'Safe first boot + online VirtIO binding' : 'Boot VM + Floating IP', isWinSafeIdeMethod ? 'Linux: normal boot · Windows: boot IDE/e1000 rescue VM, wait for WinRM/SSH, run pnputil, reboot, then shutdown cleanly' : (winMethodSel === 'windows_method_c_dynamic_auto' ? 'Create VM from image repaired via CloudJumper dynamic bundle · attach public IP' : 'Create VM from image · attach public IP · staggered per VM'), '~2–15 min', '#fb923c');
+                _ps('pipeline-step-46', '6',   isWinSafeIdeMethod ? 'Safe first boot + online VirtIO binding' : 'Boot VM + Floating IP', isWinSafeIdeMethod ? 'Linux: normal boot · Windows: boot IDE/e1000 rescue VM, wait for WinRM/SSH, run pnputil, reboot, then shutdown cleanly' : (winMethodSel === 'windows_method_c_dynamic_auto' ? 'Create VM from image repaired via Flex Migration Hub dynamic bundle · attach public IP' : 'Create VM from image · attach public IP · staggered per VM'), '~2–15 min', '#fb923c');
                 _ps('pipeline-step-5',  '7',   isWinSafeIdeMethod ? 'VirtIO-ready snapshot + final optimized boot' : 'SSH Verify', isWinSafeIdeMethod ? 'Windows only: snapshot rescue VM into final VirtIO/SCSI image and verify final production boot' : (winMethodSel === 'windows_method_c_dynamic_auto' ? 'Verify dynamic auto-repair boot outcome via SSH/WinRM readiness checks' : 'Test SSH: flex key + origin key · multiple users · 24 retries'), '~2–10 min', '#4ade80');
-                _ps('pipeline-step-55', '8',   'Report Results',            isWinSafeIdeMethod ? 'Linux reports normally · Windows emits safe-boot + bind + snapshot + final-boot status artifacts' : (winMethodSel === 'windows_method_c_dynamic_auto' ? 'Log CloudJumper compare outcome + dynamic repair status + VM result IDs' : 'Log SSH OK/FAIL · record Image ID + VM ID + FIP'), '~5s', '#7dd3fc');
+                _ps('pipeline-step-55', '8',   'Report Results',            isWinSafeIdeMethod ? 'Linux reports normally · Windows emits safe-boot + bind + snapshot + final-boot status artifacts' : (winMethodSel === 'windows_method_c_dynamic_auto' ? 'Log Flex Migration Hub compare outcome + dynamic repair status + VM result IDs' : 'Log SSH OK/FAIL · record Image ID + VM ID + FIP'), '~5s', '#7dd3fc');
                 _ps('pipeline-step-6',  '✅',  'Migration Complete',        'All steps done · VM running on FLEX with public IP',                  '',        '#4ade80');
             } else if (method === 'generic') {
                 if (pTitle) pTitle.innerHTML = '⚙ Generic Migration Pipeline';

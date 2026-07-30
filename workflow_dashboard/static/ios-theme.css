@@ -1,0 +1,511 @@
+/* ============================================================================
+   Flex Migration Hub — iOS palette
+   Default colour schema. Apple HIG system colours, light appearance.
+
+   Loaded after style.css so it can correct panels that were built with dark
+   inline styles. The AI panels are the reason this exists: #panel-sai forces a
+   light background, so inline dark text rendered near-invisible on it — the
+   "How it works" list was unreadable. Rather than hand-edit a hundred inline
+   styles, this maps those known inline values onto their iOS equivalents.
+
+   Everything is a variable. Change the palette here, not in a template.
+   ========================================================================== */
+
+:root {
+  /* ---- iOS system colours, light appearance ---- */
+  --ios-blue:        #007AFF;
+  --ios-green:       #34C759;
+  --ios-indigo:      #5856D6;
+  --ios-orange:      #FF9500;
+  --ios-red:         #FF3B30;
+  --ios-teal:        #30B0C7;
+  --ios-light-blue:  #5AC8FA;
+  --ios-purple:      #AF52DE;
+  --ios-yellow:      #FFCC00;
+  --ios-pink:        #FF2D55;
+
+  /* Greys, from the same swatch set */
+  --ios-gray:        #8E8E93;
+  --ios-gray2:       #AEAEB2;
+  --ios-gray3:       #C7C7CC;
+  --ios-gray4:       #D1D1D6;
+  --ios-gray5:       #E5E5EA;
+  --ios-gray6:       #F2F2F7;
+
+  /* Text-safe variants. The system colours above are tuned for fills; on white
+     they fail contrast at small sizes, so text uses the darker pair. */
+  --ios-blue-text:   #0040DD;
+  --ios-green-text:  #248A3D;
+  --ios-orange-text: #B25000;
+  --ios-red-text:    #D70015;
+  --ios-teal-text:   #0071A4;
+  --ios-indigo-text: #3634A3;
+
+  /* ---- Labels ---- */
+  --ios-label:            #000000;
+  --ios-label-secondary:  rgba(60, 60, 67, 0.60);
+  --ios-label-tertiary:   rgba(60, 60, 67, 0.30);
+  --ios-label-quaternary: rgba(60, 60, 67, 0.18);
+
+  /* ---- Backgrounds ---- */
+  --ios-bg:            #FFFFFF;
+  --ios-bg-secondary:  #F2F2F7;
+  --ios-bg-tertiary:   #FFFFFF;
+  --ios-fill:          rgba(120, 120, 128, 0.12);
+  --ios-fill-soft:     rgba(120, 120, 128, 0.06);
+
+  /* ---- Separators ---- */
+  --ios-separator:     rgba(60, 60, 67, 0.29);
+  --ios-separator-opaque: #C6C6C8;
+
+  /* ---- Elevation. iOS uses soft, low-contrast shadow, not a hard border. ---- */
+  --ios-shadow-1: 0 1px 2px rgba(0, 0, 0, 0.04), 0 1px 8px rgba(0, 0, 0, 0.04);
+  --ios-shadow-2: 0 2px 6px rgba(0, 0, 0, 0.05), 0 8px 24px rgba(0, 0, 0, 0.06);
+
+  /* ---- Geometry ---- */
+  --ios-radius-sm: 8px;
+  --ios-radius:    12px;
+  --ios-radius-lg: 16px;
+
+  --ios-font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI",
+              Roboto, Helvetica, Arial, sans-serif;
+}
+
+/* ==========================================================================
+   AI panels. Scoped so nothing outside them is affected.
+   ========================================================================== */
+
+#panel-sai,
+#panel-sai_readiness,
+#sai-readiness-page {
+  font-family: var(--ios-font);
+  background: var(--ios-bg-secondary) !important;
+  color: var(--ios-label) !important;
+}
+
+/* ---- Cards: white surface, soft shadow, hairline separator ---------------- */
+#sai-adopt-root,
+#panel-sai [id^="sai-adopt-"],
+#panel-sai [id^="sai-onto-"],
+#panel-sai [id^="sai-int-"],
+#panel-sai [id^="sai-foundry-"],
+#panel-sai [id^="sai-overview-"] {
+  font-family: var(--ios-font);
+}
+
+#sai-adopt-root {
+  background: var(--ios-bg) !important;
+  border: 1px solid var(--ios-separator) !important;
+  border-radius: var(--ios-radius-lg) !important;
+  box-shadow: var(--ios-shadow-1);
+  color: var(--ios-label) !important;
+}
+
+/* Nested blocks inside the AI panel that were built dark. Attribute matching is
+   the pattern _ai_powerup.html already uses for the legacy panel. */
+#panel-sai [style*="background:rgba(15,23,42"],
+#panel-sai [style*="background:rgba(0,0,0"],
+#panel-sai [style*="background:rgba(124,58,237,.16"],
+#panel-sai [style*="background:rgba(124,58,237,.2"],
+#panel-sai [style*="background:rgba(124,58,237,.22"] {
+  background: var(--ios-bg) !important;
+  border-color: var(--ios-separator) !important;
+  box-shadow: var(--ios-shadow-1) !important;
+}
+
+/* Tinted callouts keep their meaning, at iOS tint strength. */
+#panel-sai [style*="background:rgba(6,182,212"]   { background: rgba(0, 122, 255, 0.08) !important; border-color: rgba(0, 122, 255, 0.22) !important; }
+#panel-sai [style*="background:rgba(16,185,129"]  { background: rgba(52, 199, 89, 0.10) !important; border-color: rgba(52, 199, 89, 0.24) !important; }
+#panel-sai [style*="background:rgba(245,158,11"]  { background: rgba(255, 149, 0, 0.10) !important; border-color: rgba(255, 149, 0, 0.26) !important; }
+#panel-sai [style*="background:rgba(239,68,68"]   { background: rgba(255, 59, 48, 0.09) !important; border-color: rgba(255, 59, 48, 0.24) !important; }
+#panel-sai [style*="background:rgba(139,92,246"]  { background: rgba(88, 86, 214, 0.09) !important; border-color: rgba(88, 86, 214, 0.24) !important; }
+
+/* ---- Text. This is the part that was unreadable. ------------------------- */
+#panel-sai [style*="color:#e2e8f0"],
+#panel-sai [style*="color:#f0fdf4"],
+#panel-sai [style*="color:#fff"]:not(button):not(a) {
+  color: var(--ios-label) !important;
+  text-shadow: none !important;
+}
+#panel-sai [style*="color:#94a3b8"],
+#panel-sai [style*="color:#cbd5e1"],
+#panel-sai [style*="color:#d1d5db"] { color: var(--ios-label-secondary) !important; }
+#panel-sai [style*="color:#64748b"],
+#panel-sai [style*="color:#475569"] { color: var(--ios-label-secondary) !important; }
+
+/* Accents, remapped to text-safe iOS tints. */
+#panel-sai [style*="color:#a78bfa"],
+#panel-sai [style*="color:#c4b5fd"] { color: var(--ios-indigo-text) !important; }
+#panel-sai [style*="color:#67e8f9"],
+#panel-sai [style*="color:#22d3ee"] { color: var(--ios-teal-text) !important; }
+#panel-sai [style*="color:#6ee7b7"],
+#panel-sai [style*="color:#34d399"],
+#panel-sai [style*="color:#86efac"] { color: var(--ios-green-text) !important; }
+#panel-sai [style*="color:#fcd34d"],
+#panel-sai [style*="color:#fbbf24"],
+#panel-sai [style*="color:#fdba74"] { color: var(--ios-orange-text) !important; }
+#panel-sai [style*="color:#fca5a5"],
+#panel-sai [style*="color:#f87171"] { color: var(--ios-red-text) !important; }
+
+/* ---- Lists. The "How it works" steps were dark-on-dark. ------------------ */
+#panel-sai ol,
+#panel-sai ul { color: var(--ios-label-secondary) !important; }
+#panel-sai ol li,
+#panel-sai ul li { color: var(--ios-label-secondary) !important; }
+#panel-sai ol li b,
+#panel-sai ul li b,
+#panel-sai li strong { color: var(--ios-label) !important; }
+
+/* ---- Form controls: iOS grouped-inset style ------------------------------ */
+#panel-sai input[type="text"],
+#panel-sai input[type="file"],
+#panel-sai select,
+#panel-sai textarea {
+  background: var(--ios-bg) !important;
+  border: 1px solid var(--ios-separator) !important;
+  border-radius: var(--ios-radius-sm) !important;
+  color: var(--ios-label) !important;
+  font-family: var(--ios-font);
+}
+#panel-sai input::placeholder,
+#panel-sai textarea::placeholder { color: var(--ios-label-tertiary) !important; }
+#panel-sai input[type="text"]:focus,
+#panel-sai select:focus,
+#panel-sai textarea:focus {
+  outline: none !important;
+  border-color: var(--ios-blue) !important;
+  box-shadow: 0 0 0 3.5px rgba(0, 122, 255, 0.18) !important;
+}
+#panel-sai input[type="checkbox"] { accent-color: var(--ios-green); width: 16px; height: 16px; }
+
+/* ---- Buttons: filled iOS blue, or tinted secondary ---------------------- */
+#panel-sai #sai-adopt-run,
+#panel-sai #sai-onto-run,
+#panel-sai #sai-foundry-check,
+#panel-sai #sai-adopt-prefill-btn {
+  background: var(--ios-blue) !important;
+  border: none !important;
+  border-radius: 980px !important;   /* iOS pill */
+  color: #fff !important;
+  font-family: var(--ios-font);
+  font-weight: 600 !important;
+  padding: 10px 20px !important;
+  box-shadow: none !important;
+  transition: filter .15s ease;
+}
+#panel-sai #sai-adopt-run:hover,
+#panel-sai #sai-onto-run:hover,
+#panel-sai #sai-foundry-check:hover { filter: brightness(0.92); }
+#panel-sai #sai-adopt-run:disabled { background: var(--ios-fill) !important; color: var(--ios-label-tertiary) !important; }
+
+#panel-sai #sai-adopt-reset {
+  background: var(--ios-fill) !important;
+  border: none !important;
+  border-radius: 980px !important;
+  color: var(--ios-blue-text) !important;
+  font-weight: 600 !important;
+}
+
+/* Source pills and pain-point chips read as iOS segmented choices. */
+#sai-adopt-source-btns button,
+#sai-onto-pains button {
+  background: var(--ios-fill-soft) !important;
+  border: 1px solid var(--ios-separator) !important;
+  border-radius: 980px !important;
+  color: var(--ios-label) !important;
+  font-family: var(--ios-font);
+  font-weight: 500 !important;
+}
+#sai-adopt-source-btns button[style*="#22d3ee"],
+#sai-onto-pains button[style*="#22d3ee"] {
+  background: var(--ios-blue) !important;
+  border-color: var(--ios-blue) !important;
+  color: #fff !important;
+}
+
+/* ---- Tables: iOS inset grouped list ------------------------------------- */
+#panel-sai table { background: var(--ios-bg) !important; border: none !important; border-radius: var(--ios-radius) !important; overflow: hidden; }
+#panel-sai th { background: var(--ios-bg-secondary) !important; color: var(--ios-label-secondary) !important; border-bottom: 1px solid var(--ios-separator) !important; font-weight: 600 !important; }
+#panel-sai td { border-bottom: 1px solid var(--ios-separator) !important; color: var(--ios-label) !important; }
+#panel-sai tr:last-child td { border-bottom: none !important; }
+
+/* ---- The adoption-mode strip and overview cards ------------------------- */
+#sai-adopt-modes > div,
+#sai-overview-paths > div {
+  background: var(--ios-bg) !important;
+  border: 1px solid var(--ios-separator) !important;
+  border-radius: var(--ios-radius) !important;
+  box-shadow: var(--ios-shadow-1) !important;
+  color: var(--ios-label) !important;
+}
+#sai-overview-paths > div:hover {
+  border-color: var(--ios-blue) !important;
+  box-shadow: var(--ios-shadow-2) !important;
+}
+
+/* ==========================================================================
+   Stage 4 sub-bar: iOS segmented control
+   ========================================================================== */
+#subBar4 {
+  background: var(--ios-bg-secondary) !important;
+  border-bottom: 1px solid var(--ios-separator) !important;
+  gap: 4px !important;
+  padding: 7px 10px !important;
+}
+#subBar4 .sub-btn {
+  background: transparent !important;
+  border: none !important;
+  border-radius: var(--ios-radius-sm) !important;
+  color: var(--ios-label-secondary) !important;
+  font-family: var(--ios-font);
+  font-weight: 500 !important;
+  transition: background .15s ease, color .15s ease;
+}
+#subBar4 .sub-btn:hover { background: var(--ios-fill-soft) !important; color: var(--ios-label) !important; }
+#subBar4 .sub-btn.active {
+  background: var(--ios-bg) !important;
+  color: var(--ios-label) !important;
+  font-weight: 600 !important;
+  box-shadow: var(--ios-shadow-1) !important;
+}
+
+/* ==========================================================================
+   Readiness assessment (A-0 … A-9) — already light, aligned to the same palette
+   ========================================================================== */
+#sai-readiness-page .sai-r-hero,
+#sai-readiness-page .sai-r-main,
+#sai-readiness-page .sai-r-summary,
+#sai-readiness-page .sai-r-card {
+  background: var(--ios-bg) !important;
+  border: 1px solid var(--ios-separator) !important;
+  border-radius: var(--ios-radius) !important;
+  box-shadow: var(--ios-shadow-1) !important;
+}
+#sai-readiness-page .sai-r-btn {
+  background: var(--ios-blue) !important;
+  border: none !important;
+  border-radius: 980px !important;
+  font-weight: 600 !important;
+}
+#sai-readiness-page .sai-r-btn.secondary { background: var(--ios-fill) !important; color: var(--ios-blue-text) !important; }
+#sai-readiness-page .sai-r-btn.green { background: var(--ios-green) !important; }
+#sai-readiness-page .sai-r-chip {
+  background: rgba(0, 122, 255, 0.10) !important;
+  border: none !important;
+  border-radius: 980px !important;
+  color: var(--ios-blue-text) !important;
+}
+#sai-readiness-page .sai-r-progress button {
+  background: var(--ios-fill-soft) !important;
+  border: 1px solid var(--ios-separator) !important;
+  border-radius: var(--ios-radius-sm) !important;
+  color: var(--ios-label-secondary) !important;
+}
+#sai-readiness-page .sai-r-progress button.active { background: rgba(0, 122, 255, 0.12) !important; border-color: var(--ios-blue) !important; color: var(--ios-blue-text) !important; }
+#sai-readiness-page .sai-r-progress button.done { background: rgba(52, 199, 89, 0.12) !important; border-color: var(--ios-green) !important; color: var(--ios-green-text) !important; }
+#sai-readiness-page .sai-r-field input,
+#sai-readiness-page .sai-r-field select,
+#sai-readiness-page .sai-r-field textarea {
+  border: 1px solid var(--ios-separator) !important;
+  border-radius: var(--ios-radius-sm) !important;
+}
+
+/* ==========================================================================
+   VIBRANT LAYER
+   The rules above make the AI panels readable. These make them look like an
+   iOS app rather than a spreadsheet: saturated accents, filled badges, and a
+   colour per card rotating through the five-colour strip.
+
+   The rotation is red → orange → green → blue → indigo, applied with nth-child
+   so a grid of any length stays colourful without hard-coding each item.
+   ========================================================================== */
+
+/* ---- Numbered step circles: filled, not outlined --------------------------
+   The 0/1/2/3 step markers are inline-styled purple circles. Give each a
+   different palette colour so the flow reads as distinct stages. */
+#panel-sai [style*="border-radius:50%"][style*="background:#7c3aed"],
+#panel-sai [style*="border-radius:50%"][style*="background:#0891b2"] {
+  background: var(--ios-blue) !important;
+  color: #fff !important;
+  font-weight: 700 !important;
+  box-shadow: 0 2px 6px rgba(0, 122, 255, 0.35) !important;
+}
+
+/* ---- The four path cards: one palette colour each ------------------------ */
+#sai-overview-paths > div {
+  position: relative;
+  overflow: hidden;
+  padding-top: 15px !important;
+  transition: transform .16s ease, box-shadow .16s ease;
+}
+/* A 4px colour bar across the top, iOS widget style. */
+#sai-overview-paths > div::before {
+  content: "";
+  position: absolute; top: 0; left: 0; right: 0; height: 4px;
+}
+#sai-overview-paths > div:nth-child(1)::before { background: var(--ios-green); }
+#sai-overview-paths > div:nth-child(2)::before { background: var(--ios-blue); }
+#sai-overview-paths > div:nth-child(3)::before { background: var(--ios-orange); }
+#sai-overview-paths > div:nth-child(4)::before { background: var(--ios-indigo); }
+
+#sai-overview-paths > div:nth-child(1) { background: linear-gradient(180deg, rgba(52,199,89,.09), #fff 62%) !important; }
+#sai-overview-paths > div:nth-child(2) { background: linear-gradient(180deg, rgba(0,122,255,.09), #fff 62%) !important; }
+#sai-overview-paths > div:nth-child(3) { background: linear-gradient(180deg, rgba(255,149,0,.10), #fff 62%) !important; }
+#sai-overview-paths > div:nth-child(4) { background: linear-gradient(180deg, rgba(88,86,214,.09), #fff 62%) !important; }
+
+#sai-overview-paths > div:nth-child(1) > div:first-child { color: var(--ios-green-text) !important; }
+#sai-overview-paths > div:nth-child(2) > div:first-child { color: var(--ios-blue-text) !important; }
+#sai-overview-paths > div:nth-child(3) > div:first-child { color: var(--ios-orange-text) !important; }
+#sai-overview-paths > div:nth-child(4) > div:first-child { color: var(--ios-indigo-text) !important; }
+
+#sai-overview-paths > div:hover { transform: translateY(-2px); box-shadow: var(--ios-shadow-2) !important; }
+/* The "Start here →" affordance, as a tinted pill. */
+#sai-overview-paths > div > div:last-child {
+  display: inline-block;
+  margin-top: 9px !important;
+  padding: 4px 11px;
+  border-radius: 980px;
+  background: var(--ios-fill);
+  font-weight: 700 !important;
+}
+
+/* ---- The three framing cards: tinted, not white -------------------------- */
+#sai-adopt-overview [style*="border-left:3px solid #34d399"] { background: rgba(52,199,89,.10) !important; border-left: 4px solid var(--ios-green) !important; }
+#sai-adopt-overview [style*="border-left:3px solid #fbbf24"] { background: rgba(255,149,0,.11) !important; border-left: 4px solid var(--ios-orange) !important; }
+#sai-adopt-overview [style*="border-left:3px solid #22d3ee"] { background: rgba(0,122,255,.10) !important; border-left: 4px solid var(--ios-blue) !important; }
+#sai-adopt-overview [style*="border-left:3px solid #a78bfa"] { background: rgba(88,86,214,.10) !important; border-left: 4px solid var(--ios-indigo) !important; }
+
+/* ---- The 6-step table: a coloured chip per step -------------------------- */
+#sai-adopt-overview table tr td:first-child {
+  font-weight: 700 !important;
+  color: var(--ios-label) !important;
+}
+#sai-adopt-overview table tr:nth-child(2) td:first-child { box-shadow: inset 4px 0 0 var(--ios-red); }
+#sai-adopt-overview table tr:nth-child(3) td:first-child { box-shadow: inset 4px 0 0 var(--ios-orange); }
+#sai-adopt-overview table tr:nth-child(4) td:first-child { box-shadow: inset 4px 0 0 var(--ios-yellow); }
+#sai-adopt-overview table tr:nth-child(5) td:first-child { box-shadow: inset 4px 0 0 var(--ios-green); }
+#sai-adopt-overview table tr:nth-child(6) td:first-child { box-shadow: inset 4px 0 0 var(--ios-blue); }
+#sai-adopt-overview table tr:nth-child(7) td:first-child { box-shadow: inset 4px 0 0 var(--ios-indigo); }
+#sai-adopt-overview table tr td:first-child { padding-left: 14px !important; }
+/* "You get" is the payoff column - make it read as success. */
+#sai-adopt-overview table tr td:last-child { color: var(--ios-green-text) !important; font-weight: 500 !important; }
+#panel-sai table th { color: var(--ios-blue-text) !important; letter-spacing: .04em; }
+
+/* ---- Business-system cards: rotate the palette, filled MIGRATED badge ---- */
+#sai-systems-grid > div {
+  border-radius: var(--ios-radius) !important;
+  border: 1px solid var(--ios-separator) !important;
+  transition: transform .16s ease, box-shadow .16s ease;
+  border-top-width: 4px !important;
+}
+#sai-systems-grid > div:nth-child(5n+1) { border-top-color: var(--ios-red) !important; }
+#sai-systems-grid > div:nth-child(5n+2) { border-top-color: var(--ios-orange) !important; }
+#sai-systems-grid > div:nth-child(5n+3) { border-top-color: var(--ios-green) !important; }
+#sai-systems-grid > div:nth-child(5n+4) { border-top-color: var(--ios-blue) !important; }
+#sai-systems-grid > div:nth-child(5n+5) { border-top-color: var(--ios-indigo) !important; }
+#sai-systems-grid > div:hover { transform: translateY(-2px); box-shadow: var(--ios-shadow-2) !important; }
+
+/* MIGRATED / status chips: solid green pill, white text. */
+#panel-sai [style*="MIGRATED"],
+#sai-systems-grid span,
+#sai-systems-grid [style*="border-radius:99px"],
+#sai-systems-grid [style*="border-radius:4px"] {
+  background: var(--ios-green) !important;
+  color: #fff !important;
+  border: none !important;
+  border-radius: 980px !important;
+  font-weight: 700 !important;
+  letter-spacing: .04em;
+  padding: 3px 9px !important;
+}
+
+/* ---- AI goal cards: coloured icon tiles ---------------------------------- */
+#sai-goals-grid > div {
+  border-radius: var(--ios-radius) !important;
+  border: 1px solid var(--ios-separator) !important;
+  transition: transform .16s ease, box-shadow .16s ease;
+}
+#sai-goals-grid > div:hover { transform: translateY(-2px); box-shadow: var(--ios-shadow-2) !important; }
+/* The leading emoji becomes a rounded colour tile, like a Settings row icon. */
+#sai-goals-grid > div > div:first-child,
+#sai-data-grid > button > span:first-child {
+  display: inline-flex !important;
+  align-items: center; justify-content: center;
+  width: 34px; height: 34px;
+  border-radius: 9px;
+  font-size: 17px !important;
+  margin-bottom: 8px;
+}
+#sai-goals-grid > div:nth-child(5n+1) > div:first-child { background: rgba(255,59,48,.14); }
+#sai-goals-grid > div:nth-child(5n+2) > div:first-child { background: rgba(255,149,0,.16); }
+#sai-goals-grid > div:nth-child(5n+3) > div:first-child { background: rgba(52,199,89,.16); }
+#sai-goals-grid > div:nth-child(5n+4) > div:first-child { background: rgba(0,122,255,.14); }
+#sai-goals-grid > div:nth-child(5n+5) > div:first-child { background: rgba(88,86,214,.14); }
+/* Selected goal: filled blue, iOS selection. */
+#sai-goals-grid > div[style*="#38bdf8"],
+#sai-goals-grid > div[style*="border-color:#2563eb"] {
+  background: rgba(0,122,255,.10) !important;
+  border-color: var(--ios-blue) !important;
+  box-shadow: 0 0 0 3px rgba(0,122,255,.14) !important;
+}
+
+/* ---- Counters: big vibrant numbers -------------------------------------- */
+#sai-counters > div { border-radius: var(--ios-radius-lg) !important; border: 1px solid var(--ios-separator) !important; }
+#sai-counters > div:nth-child(1) { background: linear-gradient(180deg, rgba(88,86,214,.12), #fff 70%) !important; }
+#sai-counters > div:nth-child(2) { background: linear-gradient(180deg, rgba(0,122,255,.12), #fff 70%) !important; }
+#sai-counters > div:nth-child(3) { background: linear-gradient(180deg, rgba(52,199,89,.13), #fff 70%) !important; }
+#sai-counters > div:nth-child(4) { background: linear-gradient(180deg, rgba(255,149,0,.14), #fff 70%) !important; }
+#sai-counters > div:nth-child(1) > div:first-child { color: var(--ios-indigo) !important; }
+#sai-counters > div:nth-child(2) > div:first-child { color: var(--ios-blue) !important; }
+#sai-counters > div:nth-child(3) > div:first-child { color: var(--ios-green) !important; }
+#sai-counters > div:nth-child(4) > div:first-child { color: var(--ios-orange) !important; }
+#sai-counters > div > div:first-child { font-weight: 800 !important; letter-spacing: -1px; }
+
+/* ---- Hero: a soft iOS gradient wash ------------------------------------- */
+#panel-sai > div > div:first-child {
+  background: linear-gradient(135deg, rgba(0,122,255,.10), rgba(88,86,214,.09) 45%, rgba(52,199,89,.09)) !important;
+  border: 1px solid var(--ios-separator) !important;
+  border-radius: var(--ios-radius-lg) !important;
+}
+#panel-sai > div > div:first-child [style*="letter-spacing:3px"] { color: var(--ios-indigo-text) !important; font-weight: 800 !important; }
+
+/* Hero action buttons: filled pills in palette order, not four red boxes. */
+#panel-sai > div > div:first-child button:nth-of-type(1) { background: var(--ios-blue) !important; }
+#panel-sai > div > div:first-child button:nth-of-type(2) { background: var(--ios-indigo) !important; }
+#panel-sai > div > div:first-child button:nth-of-type(3) { background: var(--ios-green) !important; }
+#panel-sai > div > div:first-child button:nth-of-type(4) { background: var(--ios-orange) !important; }
+#panel-sai > div > div:first-child button {
+  border: none !important;
+  border-radius: 980px !important;
+  color: #fff !important;
+  font-weight: 600 !important;
+  padding: 10px 18px !important;
+  box-shadow: none !important;
+  transition: filter .15s ease;
+}
+#panel-sai > div > div:first-child button:hover { filter: brightness(.92); }
+
+/* ---- Step section headers: coloured, so the flow is legible at a glance -- */
+#panel-sai [style*="font-size:15px"][style*="font-weight:800"] { color: var(--ios-label) !important; }
+
+/* ---- Sub-bar active tab: filled iOS blue -------------------------------- */
+#subBar4 .sub-btn.active {
+  background: var(--ios-blue) !important;
+  color: #fff !important;
+  box-shadow: 0 2px 8px rgba(0,122,255,.30) !important;
+}
+
+/* ---- Verdict and severity badges: solid iOS colour --------------------- */
+#panel-sai [style*="background:rgba(16,185,129,.2"]  { background: var(--ios-green) !important;  color: #fff !important; border-radius: 980px !important; }
+#panel-sai [style*="background:rgba(59,130,246,.2"]  { background: var(--ios-blue) !important;   color: #fff !important; border-radius: 980px !important; }
+#panel-sai [style*="background:rgba(245,158,11,.2"]  { background: var(--ios-orange) !important; color: #fff !important; border-radius: 980px !important; }
+#panel-sai [style*="background:rgba(239,68,68,.2"]   { background: var(--ios-red) !important;    color: #fff !important; border-radius: 980px !important; }
+#panel-sai [style*="background:rgba(148,163,184,.2"] { background: var(--ios-gray) !important;   color: #fff !important; border-radius: 980px !important; }
+
+/* Respect a reduced-motion preference: the transitions above are decorative. */
+@media (prefers-reduced-motion: reduce) {
+  #panel-sai *, #subBar4 *, #sai-overview-paths > div, #sai-systems-grid > div, #sai-goals-grid > div {
+    transition: none !important;
+    transform: none !important;
+  }
+}

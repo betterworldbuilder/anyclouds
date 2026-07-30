@@ -35,7 +35,7 @@ AI product quickly. Scope was cut to the path that produces that outcome.
 | 12 reports | **1** mode-aware report in the existing 3 formats (JSON/CSV/Markdown). |
 | 30 endpoints | **6** — most listed operations are computed fields of one document. |
 | AI Integration Gateway (generated security middleware) | **Removed.** Generating an unaudited auth/PII/circuit-breaker proxy is a liability. Replaced by a gateway *configuration* for review. |
-| Canary orchestration + live KPI capture | **Removed.** CloudJumper is not in the traffic path and cannot measure success rate/latency/quality. Replaced by a canary runbook + rollback matrix in the handoff. |
+| Canary orchestration + live KPI capture | **Removed.** Flex Migration Hub is not in the traffic path and cannot measure success rate/latency/quality. Replaced by a canary runbook + rollback matrix in the handoff. |
 | Integration codegen (stubs, tests, retry config) | **Removed.** The API→Tool→Action *mapping table* is kept — it is the Palantir input. |
 
 Additions not in the spec:
