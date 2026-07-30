@@ -49,7 +49,10 @@
         if (studentSlug && studentSlug !== 'learner') {
           var priorOrgDefault = window.OCQS_DEFAULT_ORG;
           var priorClusterDefault = window.OCQS_DEFAULT_CLUSTER;
-          window.OCQS_DEFAULT_ORG = studentSlug + '-org';
+          // lab-<name> keeps the same "lab-" prefix the server's own
+          // suggested_org/suggested_cluster already use (lab-<session-hash>),
+          // just swapping the anonymous hash for the learner's actual name.
+          window.OCQS_DEFAULT_ORG = 'lab-' + studentSlug;
           window.OCQS_DEFAULT_CLUSTER = studentSlug + '-cluster1';
           ['ocqs', 'ocqp'].forEach(function (prefix) {
             var orgInput = document.getElementById(prefix + '-org');
