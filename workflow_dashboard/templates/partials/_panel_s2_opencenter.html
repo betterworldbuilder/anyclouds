@@ -166,6 +166,17 @@
         return String(value || '')
           .replace(/((?:password|secret|token|application_credential_secret)\s*[:=]\s*)\S+/ig,'$1[REDACTED]');
       };
+      // Some documented install steps (piping a remote script to a shell
+      // interpreter, or a sudo-based system install) can never pass the lab's
+      // command policy - the shared sandbox intentionally refuses to execute
+      // arbitrary fetched code or touch host paths outside the isolated
+      // per-learner directory. Rather than let the learner hit a bare
+      // "[ERROR] ..." after clicking Run, say so up front and point at the
+      // path that does work inside the lab.
+      window.ocLabExplainUnrunnable = function(outId, why){
+        var out = document.getElementById(outId);
+        if (out) out.textContent = '$ not runnable in the shared lab\n' + why;
+      };
       window.ocLabCommandId = function(command){
         var match = '';
         document.querySelectorAll('.ocqs-cmd[id]').forEach(function(element){
@@ -1608,7 +1619,7 @@ source ~/.bashrc
 mise --version</div>
           <div style="display:flex;gap:6px;margin:6px 0;">
             <button class="ocqs-btn ocqs-btn-copy" onclick="ocqsCopyCmd('ocqs-cmd-pre-mise','')">&#128203; Copy</button>
-            <button id="ocqs-run-pre-mise" onclick="ocqsRunCmd('ocqs-cmd-pre-mise','ocqs-out-pre-mise','ocqs-run-pre-mise')" style="background:#1e3a5f;color:#7dd3fc;border:1px solid #334155;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;">&#9654; Run</button><button onclick="ocqsCopyOut('ocqs-out-pre-mise',this)" style="background:#334155;color:#cbd5e1;border:1px solid #475569;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#128203; Copy Output</button>
+            <button id="ocqs-run-pre-mise" onclick="ocLabExplainUnrunnable('ocqs-out-pre-mise','This installer pipes a script fetched from the internet straight to a shell (curl | sh). The shared lab intentionally does not execute that for everyone&#8217;s safety - copy the command above and run it in your own terminal instead.')" title="Piped-script installers do not run inside the shared lab - copy and run this in your own terminal" style="background:#3f2b0f;color:#fbbf24;border:1px solid #92400e;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;">&#9888; Run in your own terminal</button><button onclick="ocqsCopyOut('ocqs-out-pre-mise',this)" style="background:#334155;color:#cbd5e1;border:1px solid #475569;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#128203; Copy Output</button>
           </div>
           <div id="ocqs-out-pre-mise" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#00ff41;white-space:pre-wrap;max-height:180px;overflow-y:auto;margin-bottom:10px;">$ waiting...
 </div>
@@ -1695,7 +1706,7 @@ chmod +x /tmp/opencenter && /tmp/opencenter version
 sudo mv /tmp/opencenter /usr/local/bin/opencenter
 opencenter version</div>
           <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;">
-            <button class="ocqs-btn ocqs-btn-copy" onclick="ocqsCopyCmd('ocqs-cmd-1b','ocqs-st-1')">📋 Copy</button><button id="ocqs-run-1b" onclick="ocqsRunCmd('ocqs-cmd-1b','ocqs-out-1b','ocqs-run-1b')" style="background:#1e3a5f;color:#7dd3fc;border:1px solid #334155;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#9654; Run</button><button onclick="ocqsCopyOut('ocqs-out-1b',this)" style="background:#334155;color:#cbd5e1;border:1px solid #475569;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#128203; Copy Output</button>
+            <button class="ocqs-btn ocqs-btn-copy" onclick="ocqsCopyCmd('ocqs-cmd-1b','ocqs-st-1')">📋 Copy</button><button id="ocqs-run-1b" onclick="ocLabExplainUnrunnable('ocqs-out-1b','This alternative needs sudo (system package install, writing to /usr/local/bin), which the shared lab does not grant - each learner has an isolated directory, not root on a real machine. Use the Recommended clone &amp; build method above, or copy this command and run it in your own terminal.')" title="This method needs sudo/root - not available in the shared lab" style="background:#3f2b0f;color:#fbbf24;border:1px solid #92400e;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#9888; Run in your own terminal</button><button onclick="ocqsCopyOut('ocqs-out-1b',this)" style="background:#334155;color:#cbd5e1;border:1px solid #475569;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#128203; Copy Output</button>
           </div>
 <div id="ocqs-out-1b" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#00ff41;white-space:pre-wrap;word-break:break-all;max-height:240px;overflow-y:auto;margin-top:6px;">$ waiting for command...
 </div>
@@ -5224,7 +5235,7 @@ source ~/.bashrc
 mise --version</div>
           <div style="display:flex;gap:6px;margin:6px 0;">
             <button class="ocqs-btn ocqs-btn-copy" onclick="ocqpCopyCmd('ocqp-cmd-pre-mise','')">&#128203; Copy</button>
-            <button id="ocqp-run-pre-mise" onclick="ocqpRunCmd('ocqp-cmd-pre-mise','ocqp-out-pre-mise','ocqp-run-pre-mise')" style="background:#1e3a5f;color:#7dd3fc;border:1px solid #334155;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;">&#9654; Run</button><button onclick="ocqpCopyOut('ocqp-out-pre-mise',this)" style="background:#334155;color:#cbd5e1;border:1px solid #475569;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#128203; Copy Output</button>
+            <button id="ocqp-run-pre-mise" onclick="ocLabExplainUnrunnable('ocqp-out-pre-mise','This installer pipes a script fetched from the internet straight to a shell (curl | sh). The shared lab intentionally does not execute that for everyone&#8217;s safety - copy the command above and run it in your own terminal instead.')" title="Piped-script installers do not run inside the shared lab - copy and run this in your own terminal" style="background:#3f2b0f;color:#fbbf24;border:1px solid #92400e;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;">&#9888; Run in your own terminal</button><button onclick="ocqpCopyOut('ocqp-out-pre-mise',this)" style="background:#334155;color:#cbd5e1;border:1px solid #475569;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#128203; Copy Output</button>
           </div>
           <div id="ocqp-out-pre-mise" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#00ff41;white-space:pre-wrap;max-height:180px;overflow-y:auto;margin-bottom:10px;">$ waiting...
 </div>
@@ -5311,7 +5322,7 @@ chmod +x /tmp/opencenter && /tmp/opencenter version
 sudo mv /tmp/opencenter /usr/local/bin/opencenter
 opencenter version</div>
           <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;">
-            <button class="ocqs-btn ocqs-btn-copy" onclick="ocqpCopyCmd('ocqp-cmd-1b','ocqp-st-1')">📋 Copy</button><button id="ocqp-run-1b" onclick="ocqpRunCmd('ocqp-cmd-1b','ocqp-out-1b','ocqp-run-1b')" style="background:#1e3a5f;color:#7dd3fc;border:1px solid #334155;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#9654; Run</button><button onclick="ocqpCopyOut('ocqp-out-1b',this)" style="background:#334155;color:#cbd5e1;border:1px solid #475569;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#128203; Copy Output</button>
+            <button class="ocqs-btn ocqs-btn-copy" onclick="ocqpCopyCmd('ocqp-cmd-1b','ocqp-st-1')">📋 Copy</button><button id="ocqp-run-1b" onclick="ocLabExplainUnrunnable('ocqp-out-1b','This alternative needs sudo (system package install, writing to /usr/local/bin), which the shared lab does not grant - each learner has an isolated directory, not root on a real machine. Use the Recommended clone &amp; build method above, or copy this command and run it in your own terminal.')" title="This method needs sudo/root - not available in the shared lab" style="background:#3f2b0f;color:#fbbf24;border:1px solid #92400e;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#9888; Run in your own terminal</button><button onclick="ocqpCopyOut('ocqp-out-1b',this)" style="background:#334155;color:#cbd5e1;border:1px solid #475569;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#128203; Copy Output</button>
           </div>
 <div id="ocqp-out-1b" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#00ff41;white-space:pre-wrap;word-break:break-all;max-height:240px;overflow-y:auto;margin-top:6px;">$ waiting for command...
 </div>

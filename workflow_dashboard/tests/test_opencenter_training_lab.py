@@ -21,7 +21,11 @@ os.environ["OPENCENTER_TRAINING_DEFAULT_COHORT"] = "Five User Dry Run"
 os.environ["FLASK_SECRET_KEY"] = "test-only-opencenter-lab-secret"
 os.environ["WORKFLOW_DASHBOARD_DISABLE_SELF_RESTART"] = "1"
 
-from workflow_dashboard.app import app  # noqa: E402
+from workflow_dashboard.app import (  # noqa: E402
+    app,
+    _opencenter_inject_kubectl_timeout,
+    _opencenter_lab_command_policy,
+)
 
 
 class OpenCenterFiveUserDryRun(unittest.TestCase):
@@ -427,6 +431,126 @@ class OpenCenterTrainingLogExport(unittest.TestCase):
         self.assertEqual(
             student.get("/api/opencenter/training-log.csv").status_code, 403
         )
+
+
+class OpenCenterCommandPolicyDirectoryTraversal(unittest.TestCase):
+    """The one documented "cd .." idiom must pass; everything else with ".."
+    must still be blocked, since the lab isolates learners by directory
+    under _OPENCENTER_LAB_BASE rather than by OS user or chroot."""
+
+    RECOMMENDED_INSTALL = (
+        "export GIT_TERMINAL_PROMPT=0 MISE_YES=1\n"
+        "if [ -x openCenter-cli/bin/opencenter ]; then\n"
+        '  echo "OpenCenter CLI already built - skipping clone and build"\n'
+        "else\n"
+        "  [ -d openCenter-cli/.git ] || git clone --depth 1 "
+        "https://github.com/opencenter-cloud/openCenter-cli.git\n"
+        "  cd openCenter-cli\n"
+        "  mise trust\n"
+        "  mise install\n"
+        "  mise run build\n"
+        "  cd ..\n"
+        "fi\n\n"
+        "./openCenter-cli/bin/opencenter version"
+    )
+
+    def test_the_actual_recommended_install_command_is_allowed(self):
+        allowed, reason = _opencenter_lab_command_policy(
+            "ocqs-cmd-1rec", self.RECOMMENDED_INSTALL
+        )
+        self.assertTrue(allowed, reason)
+
+    def test_bare_cd_up_does_not_trip_the_traversal_check(self):
+        # A bare "cd .." has no curriculum marker (git/opencenter/etc.) of its
+        # own, so it is correctly rejected by that later, unrelated check -
+        # this test isolates the traversal check specifically by confirming
+        # that rejection reason, not the marker one, is what does NOT fire.
+        allowed, reason = _opencenter_lab_command_policy("ocqs-cmd-x", "cd ..")
+        self.assertFalse(allowed)
+        self.assertNotIn("traversal", reason)
+        self.assertIn("curriculum", reason)
+
+    def test_cd_up_as_only_statement_in_a_chain_is_allowed(self):
+        allowed, _ = _opencenter_lab_command_policy(
+            "ocqs-cmd-x", "cd openCenter-cli && mise run build; cd ..; echo done"
+        )
+        self.assertTrue(allowed)
+
+    def test_chained_cd_up_twice_is_still_blocked(self):
+        allowed, reason = _opencenter_lab_command_policy(
+            "ocqs-cmd-x", "cd ..;cd .."
+        )
+        self.assertFalse(allowed)
+        self.assertIn("traversal", reason)
+
+    def test_cd_up_into_a_named_path_is_still_blocked(self):
+        allowed, _ = _opencenter_lab_command_policy("ocqs-cmd-x", "cd ../foo")
+        self.assertFalse(allowed)
+
+    def test_dotdot_embedded_in_another_path_is_still_blocked(self):
+        allowed, _ = _opencenter_lab_command_policy(
+            "ocqs-cmd-x", "cat ../../secrets/token"
+        )
+        self.assertFalse(allowed)
+
+    def test_dotdot_after_a_safe_cd_up_is_still_blocked(self):
+        allowed, _ = _opencenter_lab_command_policy(
+            "ocqs-cmd-x", "cd ..; cat ../secrets"
+        )
+        self.assertFalse(allowed)
+
+
+class OpenCenterKubectlTimeoutInjection(unittest.TestCase):
+    """kubectl get against an undeployed/unreachable cluster must fail fast
+    instead of retrying client-go's backoff for minutes."""
+
+    def test_simple_get_gains_the_flag(self):
+        self.assertEqual(
+            _opencenter_inject_kubectl_timeout("kubectl get nodes"),
+            "kubectl get --request-timeout=15s nodes",
+        )
+
+    def test_flag_lands_before_a_trailing_pipe_not_after(self):
+        out = _opencenter_inject_kubectl_timeout(
+            "kubectl get pods -A -o wide 2>&1 | head -30"
+        )
+        self.assertEqual(
+            out, "kubectl get --request-timeout=15s pods -A -o wide 2>&1 | head -30"
+        )
+        self.assertNotIn("head -30 --request-timeout", out)
+
+    def test_multiple_invocations_in_one_multiline_command_all_get_it(self):
+        cmd = (
+            "kubectl get nodes\n"
+            "kubectl get kustomizations -n flux-system\n"
+            "kubectl get helmreleases -A"
+        )
+        out = _opencenter_inject_kubectl_timeout(cmd)
+        self.assertEqual(out.count("--request-timeout=15s"), 3)
+
+    def test_idempotent_when_flag_already_present(self):
+        cmd = "kubectl get nodes --request-timeout=30s"
+        self.assertEqual(_opencenter_inject_kubectl_timeout(cmd), cmd)
+
+    def test_non_get_kubectl_subcommands_are_untouched(self):
+        cmd = "kubectl describe node my-node\nkubectl logs my-pod"
+        self.assertEqual(_opencenter_inject_kubectl_timeout(cmd), cmd)
+
+    def test_non_kubectl_commands_are_untouched(self):
+        cmd = "opencenter cluster validate myorg/mycluster"
+        self.assertEqual(_opencenter_inject_kubectl_timeout(cmd), cmd)
+
+    def test_the_actual_transcript_command_gets_all_three_flags(self):
+        cmd = (
+            "export KUBECONFIG=$HOME/.config/opencenter/clusters/gitops/"
+            "dzoanorg/infrastructure/clusters/cluster1/kubeconfig.yaml\n"
+            "kubectl get nodes\n"
+            "kubectl get kustomizations -n flux-system\n"
+            "kubectl get helmreleases -A"
+        )
+        out = _opencenter_inject_kubectl_timeout(cmd)
+        self.assertEqual(out.count("--request-timeout=15s"), 3)
+        self.assertIn("export KUBECONFIG=", out)
 
 
 if __name__ == "__main__":

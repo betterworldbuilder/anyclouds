@@ -408,7 +408,21 @@ def _opencenter_lab_command_policy(command_id: str, command: str) -> Tuple[bool,
         return False, "invalid or oversized lab command"
     lowered = command.lower()
     if ".." in command:
-        return False, "parent-directory traversal is not allowed in lab commands"
+        # The lab isolates learners by directory under _OPENCENTER_LAB_BASE, not
+        # by OS user or chroot, so ".." is genuinely dangerous here - it is how
+        # one learner could reach a sibling session's kubeconfig or credentials
+        # (e.g. "cd ../../<other-session-id>"). But a single, standalone "cd .."
+        # is a common, safe idiom (build in a subdirectory, then return to the
+        # parent - still fully inside the same sandbox) and documented curriculum
+        # steps use exactly that. Allow only that one exact shape: the command
+        # must contain ".." exactly once, and that occurrence must be a bare
+        # "cd .." clause with nothing else on it. Anything else containing ".."
+        # - chained "cd ..;cd ..", "cd ../foo", a ".." inside another path -
+        # still hits this check as before.
+        if command.count("..") != 1 or not re.search(
+            r"(?:^|[;&\n]|&&|\|\|)\s*cd\s+\.\.\s*(?=$|[;&\n]|&&|\|\|)", command
+        ):
+            return False, "parent-directory traversal is not allowed in lab commands"
     if str(_OPENCENTER_LAB_BASE).lower() in lowered:
         return False, "lab internals cannot be addressed by commands"
     blocked_paths = re.search(
@@ -457,6 +471,32 @@ def _opencenter_lab_command_policy(command_id: str, command: str) -> Tuple[bool,
     if not any(marker in lowered for marker in required_markers):
         return False, "command is outside the OpenCenter training curriculum"
     return True, ""
+
+
+_KUBECTL_GET_RE = re.compile(r"\bkubectl\s+get\b")
+
+
+def _opencenter_inject_kubectl_timeout(command: str) -> str:
+    """kubectl has no default request timeout, so 'kubectl get' against an
+    unreachable API server - e.g. a cluster that was only initialised, never
+    deployed - retries with client-go's internal backoff for as long as the
+    caller lets it run (in practice several minutes), filling the lab
+    terminal with repeated connection-refused noise instead of failing fast.
+
+    Inserted right after "get" - a global kubectl flag valid anywhere in the
+    arg list - rather than at the end of the shell clause, so it is not
+    swallowed by a trailing pipe such as "| head -30".
+    """
+    out = []
+    pos = 0
+    for match in _KUBECTL_GET_RE.finditer(command):
+        out.append(command[pos:match.end()])
+        tail = command[match.end():match.end() + 40]
+        if "--request-timeout" not in tail:
+            out.append(" --request-timeout=15s")
+        pos = match.end()
+    out.append(command[pos:])
+    return "".join(out)
 
 
 @app.get("/api/opencenter/lab-session")
@@ -25462,6 +25502,7 @@ def stream_run_cmd():
     allowed, reason = _opencenter_lab_command_policy(command_id, cmd)
     if not allowed:
         return jsonify({"ok": False, "error": reason}), 403
+    cmd = _opencenter_inject_kubectl_timeout(cmd)
     context = _opencenter_lab_context(create=False)
     assert context is not None
     with _OPENCENTER_LAB_COMMAND_LOCK:
