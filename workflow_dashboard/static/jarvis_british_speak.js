@@ -84,4 +84,10 @@
   window.jarvisResetErrorReviewAlert = function () {
     window.__jarvisErrorReviewState = { announced: false };
   };
+  // Interrupts whatever is speaking right now. Distinct from the enable/
+  // disable checkbox, which only affects announcements made after it's
+  // toggled - this stops the CURRENT utterance immediately.
+  window.jarvisStop = function () {
+    if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+  };
 })();

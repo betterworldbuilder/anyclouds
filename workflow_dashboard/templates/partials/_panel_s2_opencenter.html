@@ -3183,6 +3183,7 @@ kubectl describe kustomization &lt;name&gt; -n flux-system</div>
           <button class="oct-mini" onclick="ocqsAutoRestart()" style="background:#475569;color:#fff;border-color:#475569;">&#8635; Restart</button>
           <button class="oct-mini" onclick="octCopyLog('ocqs-term',this)" title="Copy all terminal output to the clipboard" style="background:#0f766e;color:#fff;border-color:#0f766e;">&#128203; Copy Log</button>
           <button class="oct-mini" onclick="var t=document.getElementById('ocqs-term');if(t)t.innerHTML='';">Clear</button>
+          <button class="oct-mini" onclick="if(window.jarvisStop)jarvisStop();" title="Stop the voice-over immediately" style="background:#7c2d12;color:#fff;border-color:#7c2d12;">&#128263; Mute</button>
           <button class="oct-mini" onclick="document.getElementById('ocqs-term-float').classList.toggle('oct-min');this.textContent=this.textContent==='&#8722;'?'&#9634;':'&#8722;';">&#8722;</button>
         </div>
         <div class="oct-term-body" style="display:flex;flex-direction:column;flex:1;min-height:0;">
@@ -6612,6 +6613,7 @@ kubectl describe kustomization &lt;name&gt; -n flux-system</div>
           <button class="oct-mini" onclick="ocqpAutoRestart()" style="background:#475569;color:#fff;border-color:#475569;">&#8635; Restart</button>
           <button class="oct-mini" onclick="octCopyLog('ocqp-term',this)" title="Copy all terminal output to the clipboard" style="background:#0f766e;color:#fff;border-color:#0f766e;">&#128203; Copy Log</button>
           <button class="oct-mini" onclick="var t=document.getElementById('ocqp-term');if(t)t.innerHTML='';">Clear</button>
+          <button class="oct-mini" onclick="if(window.jarvisStop)jarvisStop();" title="Stop the voice-over immediately" style="background:#7c2d12;color:#fff;border-color:#7c2d12;">&#128263; Mute</button>
           <button class="oct-mini" onclick="document.getElementById('ocqp-term-float').classList.toggle('oct-min');this.textContent=this.textContent==='&#8722;'?'&#9634;':'&#8722;';">&#8722;</button>
         </div>
         <div class="oct-term-body" style="display:flex;flex-direction:column;flex:1;min-height:0;">
