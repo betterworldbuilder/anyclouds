@@ -44,6 +44,24 @@
         // overwrites a field that is still empty, or still holds whichever
         // default it was auto-filled with a moment ago (before identity
         // resolved) - never something the learner actually typed.
+        //
+        // The page loads anonymously before any identity is known, so the
+        // server's own suggested_org/suggested_cluster (lab-<session-hash>)
+        // fill the fields first - then renderWelcome runs a moment later once
+        // a real name resolves (SSO, or "Start Student session" after page
+        // load). Resolving a real identity mints a NEW lab_id server-side
+        // (the anonymous and authenticated states are different sessions),
+        // so THIS render's data.suggested_org is a different hash than
+        // whatever the earlier anonymous render already wrote into the
+        // field - an exact-match comparison against the current call's
+        // suggestion can never catch it. Match the shape instead: anything
+        // that still looks like an auto-generated lab-<hash> /
+        // first-cluster-<hash> placeholder, from any session, is safe to
+        // personalize over. Without this, the field already looks
+        // "non-generic" even though the learner never typed it, and
+        // lab-<hash> wins over lab-<name> permanently.
+        var isAutoOrgPlaceholder = /^lab-[0-9a-f]{6,}$/i;
+        var isAutoClusterPlaceholder = /^first-cluster-[0-9a-f]{6,}$/i;
         var studentSlug = String(name || '').trim().toLowerCase()
           .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
         if (studentSlug && studentSlug !== 'learner') {
@@ -58,12 +76,12 @@
             var orgInput = document.getElementById(prefix + '-org');
             if (orgInput) {
               var ov = (orgInput.value || '').trim();
-              if (!ov || ov === priorOrgDefault) orgInput.value = window.OCQS_DEFAULT_ORG;
+              if (!ov || ov === priorOrgDefault || isAutoOrgPlaceholder.test(ov)) orgInput.value = window.OCQS_DEFAULT_ORG;
             }
             var clusterInput = document.getElementById(prefix + '-cluster');
             if (clusterInput) {
               var cv = (clusterInput.value || '').trim();
-              if (!cv || cv === priorClusterDefault) clusterInput.value = window.OCQS_DEFAULT_CLUSTER;
+              if (!cv || cv === priorClusterDefault || isAutoClusterPlaceholder.test(cv)) clusterInput.value = window.OCQS_DEFAULT_CLUSTER;
             }
           });
         }
