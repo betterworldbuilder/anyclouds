@@ -38,6 +38,33 @@
       function renderWelcome(data){
         var name = data.learner || 'learner';
         var role = data.role || 'Student';
+
+        // Personalize the cluster identity defaults per student instead of
+        // every learner colliding on the same generic myorg/cluster1. Only
+        // overwrites a field that is still empty, or still holds whichever
+        // default it was auto-filled with a moment ago (before identity
+        // resolved) - never something the learner actually typed.
+        var studentSlug = String(name || '').trim().toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+        if (studentSlug && studentSlug !== 'learner') {
+          var priorOrgDefault = window.OCQS_DEFAULT_ORG;
+          var priorClusterDefault = window.OCQS_DEFAULT_CLUSTER;
+          window.OCQS_DEFAULT_ORG = studentSlug + '-org';
+          window.OCQS_DEFAULT_CLUSTER = studentSlug + '-cluster1';
+          ['ocqs', 'ocqp'].forEach(function (prefix) {
+            var orgInput = document.getElementById(prefix + '-org');
+            if (orgInput) {
+              var ov = (orgInput.value || '').trim();
+              if (!ov || ov === priorOrgDefault) orgInput.value = window.OCQS_DEFAULT_ORG;
+            }
+            var clusterInput = document.getElementById(prefix + '-cluster');
+            if (clusterInput) {
+              var cv = (clusterInput.value || '').trim();
+              if (!cv || cv === priorClusterDefault) clusterInput.value = window.OCQS_DEFAULT_CLUSTER;
+            }
+          });
+        }
+
         ['ocqs','ocqp'].forEach(function(prefix){
           var banner=document.getElementById(prefix+'-welcome-banner');
           var line=document.getElementById(prefix+'-welcome-line');
@@ -933,7 +960,7 @@
             <label class="ocqs-label">Git Provider</label>
             <select class="ocqs-select" id="ocqs-gitprovider" onchange="ocqsUpdate()"><option value="github" selected>GitHub</option><option value="gitlab">GitLab</option><option value="other">Other HTTPS Git</option></select>
             <label class="ocqs-label" style="margin-top:8px;">GitOps Repository URL</label>
-            <input class="ocqs-input" id="ocqs-gitrepo" placeholder="ssh://git@github.com/YOUR_USER/opencenter-my-cluster-gitops.git" oninput="ocqsUpdate();ocqsReqCheck()">
+            <input class="ocqs-input" id="ocqs-gitrepo" value="ssh://git@github.com/betterworldbuilder/iac-Gitops.git" placeholder="ssh://git@github.com/YOUR_USER/opencenter-my-cluster-gitops.git" oninput="ocqsUpdate();ocqsReqCheck()">
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px;">
               <div><label class="ocqs-label">Git Branch</label><input class="ocqs-input" id="ocqs-gitbranch" value="main" oninput="ocqsUpdate()"></div>
               <div><label class="ocqs-label">Git Auth Method</label><select class="ocqs-select" id="ocqs-gitauth" onchange="ocqsUpdate();ocqsReqCheck()"><option value="token">HTTPS token</option><option value="ssh" selected>SSH key (default) — uses the key OpenCenter generates for this cluster</option></select></div>
@@ -1021,6 +1048,18 @@
         var scp = raw.match(/^git@([^:]+):(.+)$/i);
         if(scp) return 'https://' + scp[1] + '/' + scp[2];
         return raw;
+      };
+      // "studentname-cluster1" is the starting default; a student's SECOND new
+      // cluster should not collide with their first, so number up from
+      // whatever clusters they already have under this org rather than
+      // repeating window.OCQS_DEFAULT_CLUSTER verbatim every time.
+      window.ocLabNextClusterName = function(org, pairs){
+        var base = String(window.OCQS_DEFAULT_CLUSTER || 'cluster1').replace(/\d+$/, '') || 'cluster';
+        var existing = (pairs || []).filter(function(p){ return p.organization === org; })
+          .map(function(p){ return p.cluster; });
+        var n = 1;
+        while (existing.indexOf(base + n) !== -1) n++;
+        return base + n;
       };
       window.ocOpenCenterSSHKey = function(prefix){
         var org = _v(prefix + '-org') || window.OCQS_DEFAULT_ORG || 'myorg';
@@ -1590,7 +1629,10 @@
         if(!input) return;
         if(cluster==='__new__'){
           // Same rule as the organization field: never blank what is already there.
-          if(!(input.value||'').trim()) input.value=window.OCQS_DEFAULT_CLUSTER;
+          if(!(input.value||'').trim()){
+            var org=(document.getElementById('ocqs-org')||{}).value||'';
+            input.value=window.ocLabNextClusterName(org, window._ocqsClusterPairs);
+          }
           input.style.display='block'; ocqsShowOrgWarning(false);
         }else{
           input.value=cluster; input.style.display='none'; ocqsShowOrgWarning(true);
@@ -4586,7 +4628,7 @@ var c9b=g('ocqs-cmd-9b');
             <label class="ocqs-label">Git Provider</label>
             <select class="ocqs-select" id="ocqp-gitprovider" onchange="ocqpUpdate()"><option value="github" selected>GitHub</option><option value="gitlab">GitLab</option><option value="other">Other HTTPS Git</option></select>
             <label class="ocqs-label" style="margin-top:8px;">GitOps Repository URL</label>
-            <input class="ocqs-input" id="ocqp-gitrepo" placeholder="ssh://git@github.com/YOUR_USER/opencenter-my-cluster-gitops.git" oninput="ocqpUpdate();ocqpReqCheck()">
+            <input class="ocqs-input" id="ocqp-gitrepo" value="ssh://git@github.com/betterworldbuilder/iac-Gitops.git" placeholder="ssh://git@github.com/YOUR_USER/opencenter-my-cluster-gitops.git" oninput="ocqpUpdate();ocqpReqCheck()">
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px;">
               <div><label class="ocqs-label">Git Branch</label><input class="ocqs-input" id="ocqp-gitbranch" value="main" oninput="ocqpUpdate()"></div>
               <div><label class="ocqs-label">Git Auth Method</label><select class="ocqs-select" id="ocqp-gitauth" onchange="ocqpUpdate();ocqpReqCheck()"><option value="token">HTTPS token</option><option value="ssh" selected>SSH key (default) — uses the key OpenCenter generates for this cluster</option></select></div>
@@ -5212,7 +5254,10 @@ var c9b=g('ocqs-cmd-9b');
         var input=document.getElementById('ocqp-cluster');
         if(!input) return;
         if(cluster==='__new__'){
-          if(!(input.value||'').trim()) input.value=window.OCQS_DEFAULT_CLUSTER;
+          if(!(input.value||'').trim()){
+            var org=(document.getElementById('ocqp-org')||{}).value||'';
+            input.value=window.ocLabNextClusterName(org, window._ocqpClusterPairs);
+          }
           input.style.display='block'; ocqpShowOrgWarning(false);
         }else{
           input.value=cluster; input.style.display='none'; ocqpShowOrgWarning(true);
