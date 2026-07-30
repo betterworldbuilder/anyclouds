@@ -177,6 +177,83 @@
         var out = document.getElementById(outId);
         if (out) out.textContent = '$ not runnable in the shared lab\n' + why;
       };
+      // GitHub rejects an OpenCenter-generated deploy key until its .pub half
+      // is registered on the repo - there was previously no way to see that
+      // content without leaving the lab. read-config already resolves any
+      // path through this learner's sandboxed home (the same resolver used
+      // for the config YAML), so this reuses it rather than adding a new
+      // endpoint just to read one more file.
+      function ocLabShowPublicKey(prefix, sshInputId, outId, copyId, statusId){
+        var raw = (document.getElementById(sshInputId)||{}).value || window.ocOpenCenterSSHKey(prefix);
+        var pubPath = raw.replace(/\.pub$/,'') + '.pub';
+        var out = document.getElementById(outId);
+        var copyBtn = document.getElementById(copyId);
+        var status = document.getElementById(statusId);
+        if(status){ status.textContent='Loading...'; status.style.color='#64748b'; }
+        return fetch('/api/openrc/read-config?path='+encodeURIComponent(pubPath))
+          .then(function(r){ return r.json().then(function(d){ return {ok:r.ok, d:d}; }); })
+          .then(function(result){
+            if(!result.ok || !result.d.ok) throw new Error((result.d&&result.d.error) || 'could not read the public key');
+            var content = (result.d.content||'').trim();
+            if(!content){
+              if(status){ status.textContent='No key yet - run Stage 2 (cluster init) first, it generates this pair.'; status.style.color='#b45309'; }
+              if(out) out.style.display='none';
+              if(copyBtn) copyBtn.style.display='none';
+              return;
+            }
+            if(out){ out.textContent=content; out.style.display='block'; }
+            if(copyBtn) copyBtn.style.display='inline-block';
+            if(status){ status.textContent='Copy this into the repo’s Deploy Keys (with write access), or your GitHub account’s SSH keys.'; status.style.color='#15803d'; }
+          })
+          .catch(function(error){
+            if(status){ status.textContent=error.message; status.style.color='#dc2626'; }
+            if(out) out.style.display='none';
+            if(copyBtn) copyBtn.style.display='none';
+          });
+      }
+      function ocLabCopyPublicKey(outId, button){
+        var out = document.getElementById(outId);
+        if(!out || !out.textContent) return;
+        navigator.clipboard.writeText(out.textContent).then(function(){
+          if(button){ var old=button.textContent; button.textContent='✓ Copied'; setTimeout(function(){ button.textContent=old; },1200); }
+        });
+      }
+      window.ocqsShowPublicKey = function(){ ocLabShowPublicKey('ocqs','ocqs-sshkey','ocqs-pubkey-out','ocqs-pubkey-copy','ocqs-pubkey-status'); };
+      window.ocqsCopyPublicKey = function(btn){ ocLabCopyPublicKey('ocqs-pubkey-out', btn); };
+      window.ocqpShowPublicKey = function(){ ocLabShowPublicKey('ocqp','ocqp-sshkey','ocqp-pubkey-out','ocqp-pubkey-copy','ocqp-pubkey-status'); };
+      window.ocqpCopyPublicKey = function(btn){ ocLabCopyPublicKey('ocqp-pubkey-out', btn); };
+
+      // The token FIELD only ever fed a masked "echo ••••••••••••> file" preview
+      // into the runnable command box - since the preview and the executed text
+      // are the same DOM element, clicking Run there wrote the mask characters
+      // themselves to disk, never the real token. Save it directly via
+      // save-config instead, the same endpoint the config-file editor already
+      // uses, so the real value only ever travels in a POST body, never through
+      // anything rendered on screen or replayable from the terminal log.
+      function ocLabSaveGitToken(prefix, tokValId, tokFileId, statusId){
+        var value = (document.getElementById(tokValId)||{}).value || '';
+        var path = (document.getElementById(tokFileId)||{}).value ||
+          '$HOME/.config/opencenter/tokens/git-token.txt';
+        var status = document.getElementById(statusId);
+        if(!value.trim()){
+          if(status){ status.textContent='Enter a token first.'; status.style.color='#dc2626'; }
+          return;
+        }
+        if(status){ status.textContent='Saving...'; status.style.color='#64748b'; }
+        return fetch('/api/openrc/save-config', {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({path:path, content: value.trim() + '\n'})
+        }).then(function(r){ return r.json().then(function(d){ return {ok:r.ok, d:d}; }); })
+          .then(function(result){
+            if(!result.ok || !result.d.ok) throw new Error((result.d&&result.d.error) || 'save failed');
+            if(status){ status.textContent='✓ Saved to '+path; status.style.color='#15803d'; }
+          }).catch(function(error){
+            if(status){ status.textContent=error.message; status.style.color='#dc2626'; }
+          });
+      }
+      window.ocqsSaveGitToken = function(){ ocLabSaveGitToken('ocqs','ocqs-tokval','ocqs-tokfile','ocqs-tokval-save-status'); };
+      window.ocqpSaveGitToken = function(){ ocLabSaveGitToken('ocqp','ocqp-tokval','ocqp-tokfile','ocqp-tokval-save-status'); };
+
       window.ocLabCommandId = function(command){
         var match = '';
         document.querySelectorAll('.ocqs-cmd[id]').forEach(function(element){
@@ -866,11 +943,21 @@
               <input class="ocqs-input" id="ocqs-tokfile" value="$HOME/.config/opencenter/tokens/git-token.txt" oninput="ocqsUpdate()">
               <label class="ocqs-label" style="margin-top:8px;">Git Token Value <span style="color:#64748b;font-size:10px;">(for HTTPS auth)</span></label>
               <input class="ocqs-input" id="ocqs-tokval" type="password" placeholder="ghp_xxxxxxxxxxxxxxxxxxxxx" oninput="ocqsUpdate();ocqsReqCheck()">
+              <div style="display:flex;align-items:center;gap:8px;margin-top:6px;">
+                <button type="button" onclick="ocqsSaveGitToken(this)" style="background:#15803d;color:#fff;border:none;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;">&#128190; Save Token to File</button>
+                <span id="ocqs-tokval-save-status" style="font-size:11px;color:#64748b;"></span>
+              </div>
             </div>
             <div id="ocqs-auth-ssh-fields">
               <label class="ocqs-label" style="margin-top:8px;">SSH Key Path <span style="color:#64748b;font-size:10px;">(for SSH auth — used in git push)</span></label>
               <input class="ocqs-input" id="ocqs-sshkey" placeholder="OpenCenter generated cluster SSH key" oninput="ocqsUpdate();ocqsReqCheck()">
               <div style="font-size:11px;color:#64748b;margin-top:4px;">Defaults to the SSH key generated for this OpenCenter cluster. Add the corresponding <code>.pub</code> key to the Git provider as a deploy key.</div>
+              <div style="display:flex;align-items:center;gap:8px;margin-top:6px;">
+                <button type="button" onclick="ocqsShowPublicKey(this)" style="background:#0369a1;color:#fff;border:none;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;">&#128065; Show Public Key</button>
+                <button type="button" onclick="ocqsCopyPublicKey(this)" style="display:none;background:#334155;color:#cbd5e1;border:1px solid #475569;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;" id="ocqs-pubkey-copy">&#128203; Copy</button>
+                <span id="ocqs-pubkey-status" style="font-size:11px;color:#64748b;"></span>
+              </div>
+              <pre id="ocqs-pubkey-out" style="display:none;background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#00ff41;white-space:pre-wrap;word-break:break-all;margin-top:6px;"></pre>
             </div>
             <label class="ocqs-label" style="margin-top:10px;">GitOps Repo Folder <span style="color:#64748b;font-size:10px;">(local generated repo — leave blank for default)</span></label>
             <input class="ocqs-input" id="ocqs-gitopsfolder" placeholder="$HOME/.config/opencenter/clusters/gitops/my-org" oninput="ocqsUpdate()" style="font-size:11px;">
@@ -3794,7 +3881,7 @@ var c2b=g('ocqs-cmd-2b');
         var _httpsRemote=ocGitHTTPSURL(s.gitRepo||'YOUR_GIT_REPO_URL');
         var c4=g('ocqs-cmd-4');
         if(c4) c4.textContent = (s.gitAuth==='token')
-          ? 'mkdir -p $HOME/.config/opencenter/tokens\n# Write your token:\necho "'+( s.tokVal?'••••••••••••':'YOUR_GIT_TOKEN' )+'" > '+s.tokFile+'\nchmod 600 '+s.tokFile
+          ? '# Token auth selected — verify the token file exists (use "Save Token to File" above to create it; the real value never appears in this command)\ntest -s '+s.tokFile+' && echo "[OK] token file present: '+s.tokFile+' ($(wc -c < '+s.tokFile+') bytes)" || echo "[MISSING] Click Save Token to File above, then re-run this check."'
           : '# SSH auth selected — verify the OpenCenter key exists and '+_gitHost+' accepts it\nls -l '+s.sshKey+' '+s.sshKey+'.pub\nssh -T -i '+s.sshKey+' -o StrictHostKeyChecking=no git@'+_gitHost+' 2>&1 | head -2';
 var y4=g('ocqs-yaml-4');
         if(y4) y4.textContent = (s.gitAuth==='token')
@@ -4503,11 +4590,21 @@ var c9b=g('ocqs-cmd-9b');
               <input class="ocqs-input" id="ocqp-tokfile" value="$HOME/.config/opencenter/tokens/git-token.txt" oninput="ocqpUpdate()">
               <label class="ocqs-label" style="margin-top:8px;">Git Token Value <span style="color:#64748b;font-size:10px;">(for HTTPS auth)</span></label>
               <input class="ocqs-input" id="ocqp-tokval" type="password" placeholder="ghp_xxxxxxxxxxxxxxxxxxxxx" oninput="ocqpUpdate();ocqpReqCheck()">
+              <div style="display:flex;align-items:center;gap:8px;margin-top:6px;">
+                <button type="button" onclick="ocqpSaveGitToken(this)" style="background:#15803d;color:#fff;border:none;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;">&#128190; Save Token to File</button>
+                <span id="ocqp-tokval-save-status" style="font-size:11px;color:#64748b;"></span>
+              </div>
             </div>
             <div id="ocqp-auth-ssh-fields">
               <label class="ocqs-label" style="margin-top:8px;">SSH Key Path <span style="color:#64748b;font-size:10px;">(for SSH auth — used in git push)</span></label>
               <input class="ocqs-input" id="ocqp-sshkey" placeholder="OpenCenter generated cluster SSH key" oninput="ocqpUpdate();ocqpReqCheck()">
               <div style="font-size:11px;color:#64748b;margin-top:4px;">Defaults to the SSH key generated for this OpenCenter cluster. Add the corresponding <code>.pub</code> key to the Git provider as a deploy key.</div>
+              <div style="display:flex;align-items:center;gap:8px;margin-top:6px;">
+                <button type="button" onclick="ocqpShowPublicKey(this)" style="background:#0369a1;color:#fff;border:none;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;">&#128065; Show Public Key</button>
+                <button type="button" onclick="ocqpCopyPublicKey(this)" style="display:none;background:#334155;color:#cbd5e1;border:1px solid #475569;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;" id="ocqp-pubkey-copy">&#128203; Copy</button>
+                <span id="ocqp-pubkey-status" style="font-size:11px;color:#64748b;"></span>
+              </div>
+              <pre id="ocqp-pubkey-out" style="display:none;background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#00ff41;white-space:pre-wrap;word-break:break-all;margin-top:6px;"></pre>
             </div>
             <label class="ocqs-label" style="margin-top:10px;">GitOps Repo Folder <span style="color:#64748b;font-size:10px;">(local generated repo — leave blank for default)</span></label>
             <input class="ocqs-input" id="ocqp-gitopsfolder" placeholder="$HOME/.config/opencenter/clusters/gitops/my-org" oninput="ocqpUpdate()" style="font-size:11px;">
@@ -7131,7 +7228,7 @@ var c2b=g('ocqp-cmd-2b');
         var _httpsRemote=ocGitHTTPSURL(s.gitRepo||'YOUR_GIT_REPO_URL');
         var c4=g('ocqp-cmd-4');
         if(c4) c4.textContent = (s.gitAuth==='token')
-          ? 'mkdir -p $HOME/.config/opencenter/tokens\n# Write your token:\necho "'+( s.tokVal?'••••••••••••':'YOUR_GIT_TOKEN' )+'" > '+s.tokFile+'\nchmod 600 '+s.tokFile
+          ? '# Token auth selected — verify the token file exists (use "Save Token to File" above to create it; the real value never appears in this command)\ntest -s '+s.tokFile+' && echo "[OK] token file present: '+s.tokFile+' ($(wc -c < '+s.tokFile+') bytes)" || echo "[MISSING] Click Save Token to File above, then re-run this check."'
           : '# SSH auth selected — verify the OpenCenter key exists and '+_gitHost+' accepts it\nls -l '+s.sshKey+' '+s.sshKey+'.pub\nssh -T -i '+s.sshKey+' -o StrictHostKeyChecking=no git@'+_gitHost+' 2>&1 | head -2';
 var y4=g('ocqp-yaml-4');
         if(y4) y4.textContent = (s.gitAuth==='token')
