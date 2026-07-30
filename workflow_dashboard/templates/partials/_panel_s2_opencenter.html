@@ -467,13 +467,13 @@
         </div>
       </div>
 
-      <!-- ── OpenCenter Quick Start Guide (collapsed) ── -->
+      <!-- ── OpenCenter BootCamp Training Lab (collapsed) ── -->
       <div id="ocqs-outer-wrap" style="margin-bottom:18px;border:2px solid #38bdf8;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(14,165,233,.2);">
         <div id="ocqs-inline-toggle" onclick="(function(){var b=document.getElementById('ocqs-inline-body');var a=document.getElementById('ocqs-inline-arrow');var open=b.style.display!=='none';b.style.display=open?'none':'block';a.textContent=open?'▶':'▼';})()" style="display:flex;align-items:center;justify-content:space-between;padding:14px 20px;background:linear-gradient(135deg,#0369a1,#0ea5e9,#38bdf8);cursor:pointer;user-select:none;">
           <div style="display:flex;align-items:center;gap:12px;">
             <span style="font-size:20px;">🚀</span>
             <div>
-              <div style="font-size:15px;font-weight:800;color:#fff;">OpenCenter Quick Start Guide</div>
+              <div style="font-size:15px;font-weight:800;color:#fff;">OpenCenter BootCamp Training Lab</div>
               <div style="font-size:12px;color:#bfdbfe;margin-top:2px;">Install CLI · Configure credentials · Generate GitOps · Deploy your first cluster</div>
             </div>
           </div>
@@ -2069,27 +2069,6 @@ tail -f $HOME/.local/state/opencenter/logs/bootstrap/my-org/my-cluster/*.log</di
           </div>
         </div>
 
-        <!-- Step 10: Decommission / Destroy Cluster -->
-        <div class="ocqs-card" id="ocqs-step-10" style="padding:0;overflow:hidden;border:2px solid #111827;background:repeating-linear-gradient(135deg,#ffef00 0,#ffef00 34px,#111827 34px,#111827 68px);box-shadow:0 6px 16px rgba(15,23,42,.18);">
-          <div style="margin:18px;background:rgba(255,255,255,.96);border:2px solid #111827;border-radius:8px;padding:18px;text-align:center;box-shadow:0 3px 8px rgba(0,0,0,.2);">
-            <div style="font-size:9px;font-weight:900;color:#b91c1c;text-transform:uppercase;letter-spacing:2px;margin-bottom:5px;">STAGE 10 · DESTRUCTIVE ACTION</div>
-            <h3 style="margin:0 0 7px;color:#111827;">&#9888; Decommission / Destroy Cluster</h3>
-            <p style="margin:0 auto 14px;max-width:680px;color:#475569;font-size:12px;">Select an existing cluster, then use the guarded switch below. Interrupted state is recovered and orphan VMs plus managed cloud infrastructure are destroyed. Shared GitOps files are preserved.</p>
-            <div style="display:flex;justify-content:center;align-items:end;gap:10px;flex-wrap:wrap;">
-              <label style="min-width:300px;max-width:520px;flex:1;text-align:left;font-size:10px;font-weight:900;color:#334155;text-transform:uppercase;letter-spacing:.7px;">Existing cluster
-                <select id="ocqs-decommission-cluster" style="display:block;width:100%;margin-top:5px;padding:10px 12px;border:1px solid #94a3b8;border-radius:5px;background:#fff;color:#111827;font-size:12px;"><option value="">Loading existing clusters…</option></select>
-              </label>
-              <label style="min-width:230px;text-align:left;font-size:10px;font-weight:900;color:#991b1b;text-transform:uppercase;letter-spacing:.7px;">Are you sure?
-                <select id="ocqs-decommission-confirm" style="display:block;width:100%;margin-top:5px;padding:10px 12px;border:2px solid #dc2626;border-radius:5px;background:#fff;color:#111827;font-size:12px;font-weight:800;"><option value="no">No</option><option value="yes">Yes</option></select>
-              </label>
-              <button id="ocqs-decommission-button" onclick="ocqsDecommissionCluster()" style="min-height:39px;background:#111827;color:#ffef00;border:3px solid #ffef00;outline:2px solid #111827;border-radius:5px;padding:8px 20px;font-size:12px;font-weight:900;cursor:pointer;text-transform:uppercase;letter-spacing:.4px;">&#9211; Decommission Cluster</button>
-            </div>
-            <div class="ocqs-cmd" id="ocqs-cmd-10" style="margin-top:14px;text-align:left;">Select a cluster to prepare the destroy command.</div>
-            <button onclick="ocqsCopyOut('ocqs-out-10',this)" style="margin-top:7px;background:#334155;color:#fff;border:0;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;">&#128203; Copy Output</button>
-            <div id="ocqs-out-10" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#94a3b8;white-space:pre-wrap;word-break:break-all;max-height:240px;overflow-y:auto;margin-top:7px;text-align:left;">$ waiting...</div>
-            <div style="margin-top:10px;color:#991b1b;font-size:11px;font-weight:800;">This destructive stage is intentionally excluded from AutoRun and requires Yes confirmation.</div>
-          </div>
-        </div>
       </div>
 
       <!-- Section D: Minimal Command Flow -->
@@ -2852,6 +2831,29 @@ kubectl describe kustomization &lt;name&gt; -n flux-system</div>
         document.addEventListener('DOMContentLoaded',function(){setTimeout(function(){ocqsRefreshCohort(null);},700);});
       })();
       </script>
+
+      <!-- Last task in the lab: decommission, run only after everything above
+           - including publishing results and feedback - is done. -->
+      <div class="ocqs-card" id="ocqs-step-10" style="padding:0;overflow:hidden;border:2px solid #111827;background:repeating-linear-gradient(135deg,#ffef00 0,#ffef00 34px,#111827 34px,#111827 68px);box-shadow:0 6px 16px rgba(15,23,42,.18);">
+          <div style="margin:18px;background:rgba(255,255,255,.96);border:2px solid #111827;border-radius:8px;padding:18px;text-align:center;box-shadow:0 3px 8px rgba(0,0,0,.2);">
+            <div style="font-size:9px;font-weight:900;color:#b91c1c;text-transform:uppercase;letter-spacing:2px;margin-bottom:5px;">FINAL STEP · DESTRUCTIVE ACTION</div>
+            <h3 style="margin:0 0 7px;color:#111827;">&#9888; Decommission / Destroy Cluster</h3>
+            <p style="margin:0 auto 14px;max-width:680px;color:#475569;font-size:12px;">Select an existing cluster, then use the guarded switch below. Interrupted state is recovered and orphan VMs plus managed cloud infrastructure are destroyed. Shared GitOps files are preserved.</p>
+            <div style="display:flex;justify-content:center;align-items:end;gap:10px;flex-wrap:wrap;">
+              <label style="min-width:300px;max-width:520px;flex:1;text-align:left;font-size:10px;font-weight:900;color:#334155;text-transform:uppercase;letter-spacing:.7px;">Existing cluster
+                <select id="ocqs-decommission-cluster" style="display:block;width:100%;margin-top:5px;padding:10px 12px;border:1px solid #94a3b8;border-radius:5px;background:#fff;color:#111827;font-size:12px;"><option value="">Loading existing clusters…</option></select>
+              </label>
+              <label style="min-width:230px;text-align:left;font-size:10px;font-weight:900;color:#991b1b;text-transform:uppercase;letter-spacing:.7px;">Are you sure?
+                <select id="ocqs-decommission-confirm" style="display:block;width:100%;margin-top:5px;padding:10px 12px;border:2px solid #dc2626;border-radius:5px;background:#fff;color:#111827;font-size:12px;font-weight:800;"><option value="no">No</option><option value="yes">Yes</option></select>
+              </label>
+              <button id="ocqs-decommission-button" onclick="ocqsDecommissionCluster()" style="min-height:39px;background:#111827;color:#ffef00;border:3px solid #ffef00;outline:2px solid #111827;border-radius:5px;padding:8px 20px;font-size:12px;font-weight:900;cursor:pointer;text-transform:uppercase;letter-spacing:.4px;">&#9211; Decommission Cluster</button>
+            </div>
+            <div class="ocqs-cmd" id="ocqs-cmd-10" style="margin-top:14px;text-align:left;">Select a cluster to prepare the destroy command.</div>
+            <button onclick="ocqsCopyOut('ocqs-out-10',this)" style="margin-top:7px;background:#334155;color:#fff;border:0;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;">&#128203; Copy Output</button>
+            <div id="ocqs-out-10" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#94a3b8;white-space:pre-wrap;word-break:break-all;max-height:240px;overflow-y:auto;margin-top:7px;text-align:left;">$ waiting...</div>
+            <div style="margin-top:10px;color:#991b1b;font-size:11px;font-weight:800;">This destructive stage is intentionally excluded from AutoRun and requires Yes confirmation.</div>
+          </div>
+        </div>
 
     </div></div><!-- end ocqs-left -->
 
@@ -5683,27 +5685,6 @@ tail -f $HOME/.local/state/opencenter/logs/bootstrap/my-org/my-cluster/*.log</di
           </div>
         </div>
 
-        <!-- Step 10: Decommission / Destroy Cluster -->
-        <div class="ocqs-card" id="ocqp-step-10" style="padding:0;overflow:hidden;border:2px solid #111827;background:repeating-linear-gradient(135deg,#ffef00 0,#ffef00 34px,#111827 34px,#111827 68px);box-shadow:0 6px 16px rgba(15,23,42,.18);">
-          <div style="margin:18px;background:rgba(255,255,255,.96);border:2px solid #111827;border-radius:8px;padding:18px;text-align:center;box-shadow:0 3px 8px rgba(0,0,0,.2);">
-            <div style="font-size:9px;font-weight:900;color:#b91c1c;text-transform:uppercase;letter-spacing:2px;margin-bottom:5px;">STAGE 10 · DESTRUCTIVE ACTION</div>
-            <h3 style="margin:0 0 7px;color:#111827;">&#9888; Decommission / Destroy Cluster</h3>
-            <p style="margin:0 auto 14px;max-width:680px;color:#475569;font-size:12px;">Select an existing cluster, then use the guarded switch below. Interrupted state is recovered and orphan VMs plus managed cloud infrastructure are destroyed. Shared GitOps files are preserved.</p>
-            <div style="display:flex;justify-content:center;align-items:end;gap:10px;flex-wrap:wrap;">
-              <label style="min-width:300px;max-width:520px;flex:1;text-align:left;font-size:10px;font-weight:900;color:#334155;text-transform:uppercase;letter-spacing:.7px;">Existing cluster
-                <select id="ocqp-decommission-cluster" style="display:block;width:100%;margin-top:5px;padding:10px 12px;border:1px solid #94a3b8;border-radius:5px;background:#fff;color:#111827;font-size:12px;"><option value="">Loading existing clusters…</option></select>
-              </label>
-              <label style="min-width:230px;text-align:left;font-size:10px;font-weight:900;color:#991b1b;text-transform:uppercase;letter-spacing:.7px;">Are you sure?
-                <select id="ocqp-decommission-confirm" style="display:block;width:100%;margin-top:5px;padding:10px 12px;border:2px solid #dc2626;border-radius:5px;background:#fff;color:#111827;font-size:12px;font-weight:800;"><option value="no">No</option><option value="yes">Yes</option></select>
-              </label>
-              <button id="ocqp-decommission-button" onclick="ocqpDecommissionCluster()" style="min-height:39px;background:#111827;color:#ffef00;border:3px solid #ffef00;outline:2px solid #111827;border-radius:5px;padding:8px 20px;font-size:12px;font-weight:900;cursor:pointer;text-transform:uppercase;letter-spacing:.4px;">&#9211; Decommission Cluster</button>
-            </div>
-            <div class="ocqs-cmd" id="ocqp-cmd-10" style="margin-top:14px;text-align:left;">Select a cluster to prepare the destroy command.</div>
-            <button onclick="ocqpCopyOut('ocqp-out-10',this)" style="margin-top:7px;background:#334155;color:#fff;border:0;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;">&#128203; Copy Output</button>
-            <div id="ocqp-out-10" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#94a3b8;white-space:pre-wrap;word-break:break-all;max-height:240px;overflow-y:auto;margin-top:7px;text-align:left;">$ waiting...</div>
-            <div style="margin-top:10px;color:#991b1b;font-size:11px;font-weight:800;">This destructive stage is intentionally excluded from AutoRun and requires Yes confirmation.</div>
-          </div>
-        </div>
       </div>
 
       <!-- Section D: Minimal Command Flow -->
@@ -6140,6 +6121,28 @@ kubectl describe kustomization &lt;name&gt; -n flux-system</div>
         </div>
 
       </div>
+
+      <!-- Last task in the lab: decommission, run only after everything above is done. -->
+      <div class="ocqs-card" id="ocqp-step-10" style="padding:0;overflow:hidden;border:2px solid #111827;background:repeating-linear-gradient(135deg,#ffef00 0,#ffef00 34px,#111827 34px,#111827 68px);box-shadow:0 6px 16px rgba(15,23,42,.18);">
+          <div style="margin:18px;background:rgba(255,255,255,.96);border:2px solid #111827;border-radius:8px;padding:18px;text-align:center;box-shadow:0 3px 8px rgba(0,0,0,.2);">
+            <div style="font-size:9px;font-weight:900;color:#b91c1c;text-transform:uppercase;letter-spacing:2px;margin-bottom:5px;">FINAL STEP · DESTRUCTIVE ACTION</div>
+            <h3 style="margin:0 0 7px;color:#111827;">&#9888; Decommission / Destroy Cluster</h3>
+            <p style="margin:0 auto 14px;max-width:680px;color:#475569;font-size:12px;">Select an existing cluster, then use the guarded switch below. Interrupted state is recovered and orphan VMs plus managed cloud infrastructure are destroyed. Shared GitOps files are preserved.</p>
+            <div style="display:flex;justify-content:center;align-items:end;gap:10px;flex-wrap:wrap;">
+              <label style="min-width:300px;max-width:520px;flex:1;text-align:left;font-size:10px;font-weight:900;color:#334155;text-transform:uppercase;letter-spacing:.7px;">Existing cluster
+                <select id="ocqp-decommission-cluster" style="display:block;width:100%;margin-top:5px;padding:10px 12px;border:1px solid #94a3b8;border-radius:5px;background:#fff;color:#111827;font-size:12px;"><option value="">Loading existing clusters…</option></select>
+              </label>
+              <label style="min-width:230px;text-align:left;font-size:10px;font-weight:900;color:#991b1b;text-transform:uppercase;letter-spacing:.7px;">Are you sure?
+                <select id="ocqp-decommission-confirm" style="display:block;width:100%;margin-top:5px;padding:10px 12px;border:2px solid #dc2626;border-radius:5px;background:#fff;color:#111827;font-size:12px;font-weight:800;"><option value="no">No</option><option value="yes">Yes</option></select>
+              </label>
+              <button id="ocqp-decommission-button" onclick="ocqpDecommissionCluster()" style="min-height:39px;background:#111827;color:#ffef00;border:3px solid #ffef00;outline:2px solid #111827;border-radius:5px;padding:8px 20px;font-size:12px;font-weight:900;cursor:pointer;text-transform:uppercase;letter-spacing:.4px;">&#9211; Decommission Cluster</button>
+            </div>
+            <div class="ocqs-cmd" id="ocqp-cmd-10" style="margin-top:14px;text-align:left;">Select a cluster to prepare the destroy command.</div>
+            <button onclick="ocqpCopyOut('ocqp-out-10',this)" style="margin-top:7px;background:#334155;color:#fff;border:0;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;">&#128203; Copy Output</button>
+            <div id="ocqp-out-10" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#94a3b8;white-space:pre-wrap;word-break:break-all;max-height:240px;overflow-y:auto;margin-top:7px;text-align:left;">$ waiting...</div>
+            <div style="margin-top:10px;color:#991b1b;font-size:11px;font-weight:800;">This destructive stage is intentionally excluded from AutoRun and requires Yes confirmation.</div>
+          </div>
+        </div>
 
     </div></div><!-- end ocqp-left -->
 
