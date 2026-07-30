@@ -5,6 +5,7 @@ import csv
 import io
 import os
 import shutil
+import subprocess
 import tempfile
 import threading
 import unittest
@@ -27,6 +28,7 @@ from workflow_dashboard.app import (  # noqa: E402
     _opencenter_lab_command_policy,
     _opencenter_lab_context,
     _opencenter_lab_credential_exists,
+    _opencenter_lab_env,
 )
 
 
@@ -690,6 +692,53 @@ class OpenCenterOwnGitOpsRepoCommandPolicy(unittest.TestCase):
         for cmd in cases:
             allowed, _ = _opencenter_lab_command_policy("ocqs-cmd-x", cmd)
             self.assertFalse(allowed, cmd)
+
+
+class OpenCenterLearnerBuiltCliOnPath(unittest.TestCase):
+    """Stage 1 builds the CLI to ~/openCenter-cli/bin/opencenter and never
+    installs it onto PATH. Bare `opencenter ...` in later stages therefore
+    only worked on hosts that happened to have a pre-installed copy at
+    ~/.local/bin/opencenter - true on the dev box, false on a fresh hosted
+    deployment, where every stage failed with "command not found"."""
+
+    def test_learner_build_dir_is_on_path(self):
+        home = Path(tempfile.mkdtemp())
+        env = _opencenter_lab_env(home)
+        self.assertIn(str(home / "openCenter-cli" / "bin"), env["PATH"])
+
+    def test_learner_build_precedes_the_shared_server_copy(self):
+        # A student's own freshly-built CLI should win over a stale shared one.
+        home = Path(tempfile.mkdtemp())
+        paths = _opencenter_lab_env(home)["PATH"].split(os.pathsep)
+        learner = paths.index(str(home / "openCenter-cli" / "bin"))
+        shared = [
+            i for i, p in enumerate(paths)
+            if p.endswith("/.local/bin") and str(home) not in p
+        ]
+        if shared:
+            self.assertLess(learner, shared[0])
+
+    def test_bare_opencenter_resolves_with_no_preinstalled_copy(self):
+        """The actual hosted-deployment failure case, end to end."""
+        home = Path(tempfile.mkdtemp())
+        cli_bin = home / "openCenter-cli" / "bin"
+        cli_bin.mkdir(parents=True)
+        built = cli_bin / "opencenter"
+        built.write_text('#!/bin/sh\necho "opencenter version: student-build"\n')
+        built.chmod(0o755)
+
+        # Strip every path except the learner's own, simulating a host where
+        # no shared /home/<user>/.local/bin/opencenter was ever provisioned.
+        hosted_path = os.pathsep.join(
+            [str(home / ".local" / "bin"), str(cli_bin), "/usr/bin", "/bin"]
+        )
+        env = dict(_opencenter_lab_env(home), PATH=hosted_path)
+        result = subprocess.run(
+            ["/bin/bash", "--noprofile", "--norc", "-lc", "opencenter version"],
+            env=env, cwd=str(home), capture_output=True, text=True,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("student-build", result.stdout)
 
 
 if __name__ == "__main__":

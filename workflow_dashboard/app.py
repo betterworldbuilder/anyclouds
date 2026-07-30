@@ -315,6 +315,19 @@ def _opencenter_lab_home() -> Path:
 def _opencenter_lab_env(home: Path) -> Dict[str, str]:
     server_local_bin = _OPENCENTER_SERVER_HOME / ".local" / "bin"
     project_scripts = BASE_DIR / "scripts"
+    # Stage 1 builds the CLI to ./openCenter-cli/bin/opencenter inside the
+    # learner's own HOME and never installs it onto PATH (the .mise.toml build
+    # task only does `go build -o bin/opencenter`). Bare `opencenter ...` in
+    # every later stage therefore only worked on hosts that happened to have a
+    # pre-installed copy at ~/.local/bin/opencenter - true on the dev box,
+    # false on a fresh hosted deployment, where every stage failed with
+    # "opencenter: command not found" for every learner.
+    #
+    # Putting the learner's own build directory on PATH makes the documented
+    # Stage 1 flow self-sufficient: build it, and it resolves. The shared
+    # server copy stays on PATH after it, so a host that does provide one
+    # still works as a fallback.
+    learner_cli_bin = home / "openCenter-cli" / "bin"
     return {
         "HOME": str(home),
         "USER": "opencenter-learner",
@@ -325,6 +338,7 @@ def _opencenter_lab_env(home: Path) -> Dict[str, str]:
         "PATH": os.pathsep.join(
             (
                 str(home / ".local" / "bin"),
+                str(learner_cli_bin),
                 str(server_local_bin),
                 str(project_scripts),
                 "/usr/local/bin",
