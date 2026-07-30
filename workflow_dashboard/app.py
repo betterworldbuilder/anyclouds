@@ -115,8 +115,14 @@ _OPENCENTER_LAB_PROTECTED_PATHS = {
 _OPENCENTER_LAB_COMMAND_LOCK = threading.Lock()
 _OPENCENTER_LAB_RUNNING: Dict[str, subprocess.Popen] = {}
 _OPENCENTER_COHORT_LOCK = threading.Lock()
+# Concurrent *commands* across the whole lab, not concurrent learners - sessions
+# themselves are uncapped. Each slot is a subprocess plus a long-lived SSE stream
+# held for the duration (up to OPENCENTER_TRAINING_DEPLOY_TIMEOUT_SECONDS, 90min
+# by default), and the server is werkzeug threaded=True in a single process, so
+# every slot in flight is also a thread parked on that stream. Raise with care
+# and watch RAM and thread count; lower it if the dashboard turns sluggish.
 _OPENCENTER_LAB_CAPACITY = threading.BoundedSemaphore(
-    max(1, int(os.environ.get("OPENCENTER_TRAINING_MAX_COMMANDS", "8")))
+    max(1, int(os.environ.get("OPENCENTER_TRAINING_MAX_COMMANDS", "50")))
 )
 
 
