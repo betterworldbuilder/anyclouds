@@ -659,5 +659,38 @@ class OpenCenterSshCredentialPathResolution(unittest.TestCase):
             )
 
 
+class OpenCenterOwnGitOpsRepoCommandPolicy(unittest.TestCase):
+    """gh (GitHub CLI) commands for the "create your own GitOps repo" flow -
+    device-flow auth, repo creation, deploy-key registration - must be
+    allowed, while the policy's other safety checks still apply to them."""
+
+    def test_the_actual_commands_this_feature_sends_are_all_allowed(self):
+        commands = [
+            "gh auth login --hostname github.com --git-protocol ssh --web",
+            "gh auth status --hostname github.com",
+            'gh repo create alice-opencenter-gitops --private --description "OpenCenter GitOps repo"'
+            ' || echo "[INFO] repo may already exist, continuing"',
+            "GH_OWNER=$(gh api user --jq .login)",
+            "gh repo deploy-key add $HOME/.config/opencenter/clusters/secrets/"
+            "alice-org/alice-cluster1/ssh/alice-cluster1.pub --repo \"$GH_OWNER/"
+            'alice-opencenter-gitops" --title "alice-opencenter-gitops-deploy-key" --allow-write'
+            ' || echo "[INFO] deploy key may already be registered"',
+            "echo REPO_URL=ssh://git@github.com/$GH_OWNER/alice-opencenter-gitops.git",
+        ]
+        for cmd in commands:
+            allowed, reason = _opencenter_lab_command_policy("ocqs-cmd-owngitops-create", cmd)
+            self.assertTrue(allowed, f"{reason}: {cmd!r}")
+
+    def test_gh_does_not_open_a_backdoor_around_other_safety_checks(self):
+        cases = [
+            "gh auth login --web; sudo rm -rf /",
+            "gh repo create x --private && cat /etc/shadow",
+            "gh repo create x; cd ..; cd ..",
+        ]
+        for cmd in cases:
+            allowed, _ = _opencenter_lab_command_policy("ocqs-cmd-x", cmd)
+            self.assertFalse(allowed, cmd)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

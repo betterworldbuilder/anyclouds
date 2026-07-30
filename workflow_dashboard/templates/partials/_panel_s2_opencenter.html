@@ -281,6 +281,92 @@
       window.ocqsSaveGitToken = function(){ ocLabSaveGitToken('ocqs','ocqs-tokval','ocqs-tokfile','ocqs-tokval-save-status'); };
       window.ocqpSaveGitToken = function(){ ocLabSaveGitToken('ocqp','ocqp-tokval','ocqp-tokfile','ocqp-tokval-save-status'); };
 
+      // Let a student create their own GitOps repo instead of relying on the
+      // shared lab one. GitHub's device flow (gh auth login --web) prints a
+      // one-time code and a github.com/login/device URL and then polls in the
+      // background - the browser approval happens entirely on GitHub's own
+      // site, so no token is ever typed into this form. gh persists the
+      // resulting auth under this lab session's own $HOME, so Step B can reuse
+      // it without asking again.
+      function ocLabRunOwnGitOpsAuth(prefix){
+        var cmdEl=document.getElementById(prefix+'-cmd-owngitops-auth');
+        var out=document.getElementById(prefix+'-out-owngitops-auth');
+        var btn=document.getElementById(prefix+'-run-owngitops-auth');
+        var cmd=(cmdEl&&cmdEl.textContent||'').trim();
+        if(!cmd||!out) return;
+        out.textContent='$ '+cmd.split('\n')[0]+'...\n';
+        if(btn){btn.disabled=true;btn.textContent='Waiting for you to finish in your browser...';}
+        var es=new EventSource('/api/stream/run-cmd?cmd='+encodeURIComponent(cmd));
+        es.onmessage=function(e){
+          out.textContent+=e.data+'\n';
+          out.scrollTop=out.scrollHeight;
+          if(e.data.indexOf('[EXIT')===0||e.data.indexOf('[ERROR]')===0){
+            es.close();
+            if(btn){btn.disabled=false;btn.textContent='▶ Run — watch below for your one-time code';}
+          }
+        };
+        es.onerror=function(){ es.close(); if(btn){btn.disabled=false;btn.textContent='▶ Run — watch below for your one-time code';} };
+      }
+      window.ocqsAuthenticateGitHub=function(){ ocLabRunOwnGitOpsAuth('ocqs'); };
+      window.ocqpAuthenticateGitHub=function(){ ocLabRunOwnGitOpsAuth('ocqp'); };
+
+      function ocLabRunOwnGitOpsCreate(prefix){
+        var nameInput=document.getElementById(prefix+'-owngitops-name');
+        var repoName=(nameInput&&nameInput.value||'').trim().toLowerCase()
+          .replace(/[^a-z0-9-]+/g,'-').replace(/^-+|-+$/g,'');
+        var status=document.getElementById(prefix+'-owngitops-status');
+        if(!repoName){
+          if(status){status.textContent='Enter a repo name first.';status.style.color='#dc2626';}
+          return;
+        }
+        var sshKeyInput=document.getElementById(prefix+'-sshkey');
+        var sshKey=(sshKeyInput&&sshKeyInput.value||'').trim()||window.ocOpenCenterSSHKey(prefix);
+        // gh repo create/deploy-key add both fail loudly if run twice, which is
+        // exactly what happens if a learner re-runs this after already
+        // creating it once - fall through instead of stopping the sequence.
+        var cmd=[
+          'gh repo create '+repoName+' --private --description "OpenCenter GitOps repo" || echo "[INFO] repo may already exist, continuing"',
+          'GH_OWNER=$(gh api user --jq .login)',
+          'gh repo deploy-key add '+sshKey+'.pub --repo "$GH_OWNER/'+repoName+'" --title "'+repoName+'-deploy-key" --allow-write || echo "[INFO] deploy key may already be registered"',
+          'echo REPO_URL=ssh://git@github.com/$GH_OWNER/'+repoName+'.git'
+        ].join('\n');
+        var cmdEl=document.getElementById(prefix+'-cmd-owngitops-create');
+        if(cmdEl) cmdEl.textContent=cmd;
+        var out=document.getElementById(prefix+'-out-owngitops-create');
+        var btn=document.getElementById(prefix+'-run-owngitops-create');
+        if(!out) return;
+        out.textContent='$ '+cmd.split('\n')[0]+'...\n';
+        if(btn){btn.disabled=true;btn.textContent='Working...';}
+        if(status){status.textContent='';}
+        var buffer='';
+        var es=new EventSource('/api/stream/run-cmd?cmd='+encodeURIComponent(cmd));
+        es.onmessage=function(e){
+          buffer+=e.data+'\n';
+          out.textContent+=e.data+'\n';
+          out.scrollTop=out.scrollHeight;
+          if(e.data.indexOf('[EXIT')===0||e.data.indexOf('[ERROR]')===0){
+            es.close();
+            if(btn){btn.disabled=false;btn.textContent='▶ Create repo + register key';}
+            var ok=e.data==='[EXIT 0]';
+            var match=buffer.match(/REPO_URL=(\S+)/);
+            if(ok && match){
+              var url=match[1];
+              var repoInput=document.getElementById(prefix+'-gitrepo');
+              if(repoInput){ repoInput.value=url; repoInput.dispatchEvent(new Event('input',{bubbles:true})); }
+              if(status){status.textContent='✓ Created — filled into GitOps Repository URL below: '+url;status.style.color='#15803d';}
+            } else if(status){
+              status.textContent = ok
+                ? 'Finished, but could not read the new URL from the output above — copy it manually into the field below.'
+                : 'Something failed — check the output above (did Step A finish authenticating first?).';
+              status.style.color = ok ? '#b45309' : '#dc2626';
+            }
+          }
+        };
+        es.onerror=function(){ es.close(); if(btn){btn.disabled=false;btn.textContent='▶ Create repo + register key';} };
+      }
+      window.ocqsCreateOwnGitOpsRepo=function(){ ocLabRunOwnGitOpsCreate('ocqs'); };
+      window.ocqpCreateOwnGitOpsRepo=function(){ ocLabRunOwnGitOpsCreate('ocqp'); };
+
       window.ocLabCommandId = function(command){
         var match = '';
         document.querySelectorAll('.ocqs-cmd[id]').forEach(function(element){
@@ -736,8 +822,8 @@
               <tr><td><strong>Git</strong></td><td><code>git --version</code></td><td><span id="ocqs-req-git" class="ocqs-badge-missing">Missing</span></td></tr>
               <tr><td><strong>GitHub/GitLab repo</strong></td><td>opencenter-my-cluster-gitops</td><td><span id="ocqs-req-repo" class="ocqs-badge-missing">Missing</span></td></tr>
               <tr><td><strong>Git credential</strong></td><td>OpenCenter SSH key (token fallback)</td><td><span id="ocqs-req-token" class="ocqs-badge-missing">Missing</span></td></tr>
-              <tr><td><strong>OpenStack App Cred ID</strong></td><td>from Horizon / App Credentials</td><td><span id="ocqs-req-credid" class="ocqs-badge-missing">Missing</span></td></tr>
-              <tr><td><strong>OpenStack App Cred Secret</strong></td><td>from Horizon / App Credentials</td><td><span id="ocqs-req-credsec" class="ocqs-badge-missing">Missing</span></td></tr>
+              <tr><td><strong>OpenStack Credentials (ID)</strong></td><td>App Cred ID from Horizon, <em>or</em> the username from an imported OpenRC file</td><td><span id="ocqs-req-credid" class="ocqs-badge-missing">Missing</span></td></tr>
+              <tr><td><strong>OpenStack Credentials (Secret)</strong></td><td>App Cred Secret from Horizon, <em>or</em> the password from an imported OpenRC file</td><td><span id="ocqs-req-credsec" class="ocqs-badge-missing">Missing</span></td></tr>
               <tr><td><strong>Region</strong></td><td>dfw3, sjc3, iad3</td><td><span id="ocqs-req-region" class="ocqs-badge-missing">Missing</span></td></tr>
               <tr><td><strong>Network / Flavor / Image</strong></td><td>from FLEX/OpenStack tenant</td><td><span class="ocqs-badge-opt">Optional</span></td></tr>
               <tr><td><strong>Docker / Kind</strong></td><td>local test cluster</td><td><span class="ocqs-badge-opt">Optional</span></td></tr>
@@ -1081,7 +1167,11 @@
           btn.title = masked ? 'Show sensitive credential fields' : 'Hide sensitive credential fields';
         }
       };
-      setTimeout(function(){ if(window.ocqsToggleSensitiveMask) window.ocqsToggleSensitiveMask(true); }, 0);
+      // Unmasked by default: a masked field can't be visually checked for a
+      // typo, and a mistyped credential is exactly what a 401 from Keystone
+      // usually means. The toggle is still there to re-mask before sharing a
+      // screen.
+      setTimeout(function(){ if(window.ocqsToggleSensitiveMask) window.ocqsToggleSensitiveMask(false); }, 0);
       window.ocqsNavJump = function(ev, id){ ev.preventDefault(); var el = document.getElementById(id); if (el) el.scrollIntoView({ behavior:'smooth', block:'start' }); };window.ocqsNavSync = function(){ var nav = document.getElementById('ocqs-stepnav'); if (!nav) return; nav.querySelectorAll('.ocqs-navlink').forEach(function(a){ var st = a.getAttribute('data-step'); var badge = document.getElementById('ocqs-st-' + st); var dot = document.getElementById('ocqs-navdot-' + st); if (!badge || !dot) return; var t = (badge.textContent || '').toLowerCase(); dot.className = 'ocqs-navdot' + (t.indexOf('pass') >= 0 || t.indexOf('done') >= 0 || t.indexOf('success') >= 0 ? ' pass' : t.indexOf('fail') >= 0 ? ' fail' : t.indexOf('run') >= 0 ? ' run' : ''); }); };setInterval(function(){ if (typeof ocqsNavSync === 'function') ocqsNavSync(); }, 2000);window.ocqsGetState=function(){
         try{
           var _svcs={keycloak:false,loki:false,tempo:false,velero:false,monitoring:false};
@@ -1096,10 +1186,12 @@
             projDomain:_v('ocqs-projdomain')||'rackspace_cloud_domain',
             projectId:_v('ocqs-projectid'), credId:_v('ocqs-credid'), credSec:_v('ocqs-credsec'),
             floatNet:_v('ocqs-floatnet'), networkId:_v('ocqs-networkid'), subnetId:_v('ocqs-subnetid'),
+            gitProvider:_v('ocqs-gitprovider')||'github',
             gitRepo:_v('ocqs-gitrepo'), gitBranch:_v('ocqs-gitbranch')||'main',
             gitAuth:_v('ocqs-gitauth')||'token', gitopsFolder:_v('ocqs-gitopsfolder'),
             tokFile:_v('ocqs-tokfile')||'$HOME/.config/opencenter/tokens/git-token.txt',
-            tokVal:_v('ocqs-tokval'), sshKey:_v('ocqs-sshkey')||ocOpenCenterSSHKey('ocqs'), services:_svcs
+            tokVal:_v('ocqs-tokval'), sshKey:_v('ocqs-sshkey')||ocOpenCenterSSHKey('ocqs'),
+            ownGitOpsName:_v('ocqs-owngitops-name'), services:_svcs
           };
         }catch(e){return {};}
       };
@@ -1114,7 +1206,9 @@
             userDomain:s.userDomain,projDomain:s.projDomain,projectId:s.projectId,
             credId:s.credId,
             floatNet:s.floatNet,networkId:s.networkId,subnetId:s.subnetId,
+            gitProvider:s.gitProvider,
             gitRepo:s.gitRepo,gitBranch:s.gitBranch,gitAuth:s.gitAuth,gitopsFolder:s.gitopsFolder,tokFile:s.tokFile,sshKey:s.sshKey,
+            ownGitOpsName:s.ownGitOpsName,
             credentialsPersisted:false,
             services:(window._qs&&window._qs.services)||s.services||{}
           }));
@@ -1769,6 +1863,30 @@ cat ~/.ssh/id_ed25519.pub</div>
             <div>&#9679; <strong>VMware vSphere</strong> — with pre-provisioned VMs</div>
             <div>&#9679; <strong>AWS</strong> credentials — experimental</div>
           </div>
+
+          <p style="font-size:12px;font-weight:700;color:#0369a1;margin:14px 0 4px;">4 — Create your own GitOps repo (optional)</p>
+          <div style="font-size:11px;color:#64748b;margin-bottom:8px;">Signs in to GitHub in your own browser tab — no token is ever typed into this form — creates a private repo for you, and registers this cluster's own key on it as a deploy key automatically. Skip this if you're using the shared lab repo already filled in below.</div>
+          <label class="ocqs-label">Repo name</label>
+          <input class="ocqs-input" id="ocqs-owngitops-name" placeholder="opencenter-gitops" oninput="ocqsUpdate()">
+
+          <p style="font-size:11px;color:#334155;margin:10px 0 4px;"><strong>Step A — Sign in to GitHub</strong></p>
+          <div class="ocqs-cmd" id="ocqs-cmd-owngitops-auth">gh auth login --hostname github.com --git-protocol ssh --web
+gh auth status --hostname github.com</div>
+          <div style="display:flex;gap:6px;margin:6px 0;">
+            <button class="ocqs-btn ocqs-btn-copy" onclick="ocqsCopyCmd('ocqs-cmd-owngitops-auth','')">&#128203; Copy</button>
+            <button id="ocqs-run-owngitops-auth" onclick="ocqsAuthenticateGitHub()" style="background:#1e3a5f;color:#7dd3fc;border:1px solid #334155;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;">&#9654; Run — watch below for your one-time code</button>
+          </div>
+          <div id="ocqs-out-owngitops-auth" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#00ff41;white-space:pre-wrap;max-height:180px;overflow-y:auto;margin-bottom:6px;">$ waiting...</div>
+          <div style="font-size:11px;color:#b45309;margin-bottom:10px;">&#9888; A one-time code and a github.com/login/device link will appear above. Open that link in any browser tab and enter the code — this stays running until you finish there.</div>
+
+          <p style="font-size:11px;color:#334155;margin:10px 0 4px;"><strong>Step B — Create the repo &amp; register this cluster's key</strong></p>
+          <div class="ocqs-cmd" id="ocqs-cmd-owngitops-create"># enter a repo name above, then Run</div>
+          <div style="display:flex;gap:6px;margin:6px 0;">
+            <button class="ocqs-btn ocqs-btn-copy" onclick="ocqsCopyCmd('ocqs-cmd-owngitops-create','')">&#128203; Copy</button>
+            <button id="ocqs-run-owngitops-create" onclick="ocqsCreateOwnGitOpsRepo()" style="background:#15803d;color:#fff;border:none;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;">&#9654; Create repo + register key</button>
+          </div>
+          <div id="ocqs-out-owngitops-create" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#00ff41;white-space:pre-wrap;max-height:180px;overflow-y:auto;margin-bottom:6px;">$ waiting...</div>
+          <div id="ocqs-owngitops-status" style="font-size:11px;color:#64748b;margin-bottom:10px;"></div>
           </div>
         </details>
 
@@ -4254,10 +4372,12 @@ var c9b=g('ocqs-cmd-9b');
           sv2('ocqs-projectid',saved.projectId); sv2('ocqs-credid',saved.credId);
           sv2('ocqs-credsec',saved.credSec); sv2('ocqs-floatnet',saved.floatNet);
           sv2('ocqs-networkid',saved.networkId); sv2('ocqs-subnetid',saved.subnetId);
+          if(saved.gitProvider){ var gp=g('ocqs-gitprovider'); if(gp) gp.value=saved.gitProvider; }
           sv2('ocqs-gitrepo',saved.gitRepo); sv2('ocqs-gitbranch',saved.gitBranch);
           sv2('ocqs-tokfile',saved.tokFile); sv2('ocqs-tokval',saved.tokVal);
           if(saved.sshKey && saved.sshKey!=='~/.ssh/id_rsa') sv2('ocqs-sshkey',saved.sshKey);
           sv2('ocqs-gitopsfolder',saved.gitopsFolder);
+          sv2('ocqs-owngitops-name',saved.ownGitOpsName);
           if(saved.gitAuth){ var ga=g('ocqs-gitauth'); if(ga) ga.value=saved.gitAuth; }
           if(saved.services){
             _qs.services=Object.assign(_qs.services,saved.services);
@@ -4404,8 +4524,8 @@ var c9b=g('ocqs-cmd-9b');
               <tr><td><strong>Git</strong></td><td><code>git --version</code></td><td><span id="ocqp-req-git" class="ocqs-badge-missing">Missing</span></td></tr>
               <tr><td><strong>GitHub/GitLab repo</strong></td><td>opencenter-my-cluster-gitops</td><td><span id="ocqp-req-repo" class="ocqs-badge-missing">Missing</span></td></tr>
               <tr><td><strong>Git credential</strong></td><td>OpenCenter SSH key (token fallback)</td><td><span id="ocqp-req-token" class="ocqs-badge-missing">Missing</span></td></tr>
-              <tr><td><strong>OpenStack App Cred ID</strong></td><td>from Horizon / App Credentials</td><td><span id="ocqp-req-credid" class="ocqs-badge-missing">Missing</span></td></tr>
-              <tr><td><strong>OpenStack App Cred Secret</strong></td><td>from Horizon / App Credentials</td><td><span id="ocqp-req-credsec" class="ocqs-badge-missing">Missing</span></td></tr>
+              <tr><td><strong>OpenStack Credentials (ID)</strong></td><td>App Cred ID from Horizon, <em>or</em> the username from an imported OpenRC file</td><td><span id="ocqp-req-credid" class="ocqs-badge-missing">Missing</span></td></tr>
+              <tr><td><strong>OpenStack Credentials (Secret)</strong></td><td>App Cred Secret from Horizon, <em>or</em> the password from an imported OpenRC file</td><td><span id="ocqp-req-credsec" class="ocqs-badge-missing">Missing</span></td></tr>
               <tr><td><strong>Region</strong></td><td>dfw3, sjc3, iad3</td><td><span id="ocqp-req-region" class="ocqs-badge-missing">Missing</span></td></tr>
               <tr><td><strong>Network / Flavor / Image</strong></td><td>from FLEX/OpenStack tenant</td><td><span class="ocqs-badge-opt">Optional</span></td></tr>
               <tr><td><strong>Docker / Kind</strong></td><td>local test cluster</td><td><span class="ocqs-badge-opt">Optional</span></td></tr>
@@ -4712,7 +4832,7 @@ var c9b=g('ocqs-cmd-9b');
           btn.title = masked ? 'Show sensitive credential fields' : 'Hide sensitive credential fields';
         }
       };
-      setTimeout(function(){ if(window.ocqpToggleSensitiveMask) window.ocqpToggleSensitiveMask(true); }, 0);
+      setTimeout(function(){ if(window.ocqpToggleSensitiveMask) window.ocqpToggleSensitiveMask(false); }, 0);
       window.ocqpNavJump = function(ev, id){ ev.preventDefault(); var el = document.getElementById(id); if (el) el.scrollIntoView({ behavior:'smooth', block:'start' }); };window.ocqpNavSync = function(){ var nav = document.getElementById('ocqp-stepnav'); if (!nav) return; nav.querySelectorAll('.ocqs-navlink').forEach(function(a){ var st = a.getAttribute('data-step'); var badge = document.getElementById('ocqp-st-' + st); var dot = document.getElementById('ocqp-navdot-' + st); if (!badge || !dot) return; var t = (badge.textContent || '').toLowerCase(); dot.className = 'ocqp-navdot' + (t.indexOf('pass') >= 0 || t.indexOf('done') >= 0 || t.indexOf('success') >= 0 ? ' pass' : t.indexOf('fail') >= 0 ? ' fail' : t.indexOf('run') >= 0 ? ' run' : ''); }); };setInterval(function(){ if (typeof ocqpNavSync === 'function') ocqpNavSync(); }, 2000);window.ocqpGetState=function(){
         try{
           var _svcs={keycloak:false,loki:false,tempo:false,velero:false,monitoring:false};
@@ -4727,10 +4847,12 @@ var c9b=g('ocqs-cmd-9b');
             projDomain:_v('ocqp-projdomain')||'rackspace_cloud_domain',
             projectId:_v('ocqp-projectid'), credId:_v('ocqp-credid'), credSec:_v('ocqp-credsec'),
             floatNet:_v('ocqp-floatnet'), networkId:_v('ocqp-networkid'), subnetId:_v('ocqp-subnetid'),
+            gitProvider:_v('ocqp-gitprovider')||'github',
             gitRepo:_v('ocqp-gitrepo'), gitBranch:_v('ocqp-gitbranch')||'main',
             gitAuth:_v('ocqp-gitauth')||'token', gitopsFolder:_v('ocqp-gitopsfolder'),
             tokFile:_v('ocqp-tokfile')||'$HOME/.config/opencenter/tokens/git-token.txt',
-            tokVal:_v('ocqp-tokval'), sshKey:_v('ocqp-sshkey')||ocOpenCenterSSHKey('ocqp'), services:_svcs
+            tokVal:_v('ocqp-tokval'), sshKey:_v('ocqp-sshkey')||ocOpenCenterSSHKey('ocqp'),
+            ownGitOpsName:_v('ocqp-owngitops-name'), services:_svcs
           };
         }catch(e){return {};}
       };
@@ -4745,7 +4867,9 @@ var c9b=g('ocqs-cmd-9b');
             userDomain:s.userDomain,projDomain:s.projDomain,projectId:s.projectId,
             credId:s.credId,
             floatNet:s.floatNet,networkId:s.networkId,subnetId:s.subnetId,
+            gitProvider:s.gitProvider,
             gitRepo:s.gitRepo,gitBranch:s.gitBranch,gitAuth:s.gitAuth,gitopsFolder:s.gitopsFolder,tokFile:s.tokFile,sshKey:s.sshKey,
+            ownGitOpsName:s.ownGitOpsName,
             credentialsPersisted:false,
             services:(window._qp&&window._qp.services)||s.services||{}
           }));
@@ -5392,6 +5516,30 @@ cat ~/.ssh/id_ed25519.pub</div>
             <div>&#9679; <strong>VMware vSphere</strong> — with pre-provisioned VMs</div>
             <div>&#9679; <strong>AWS</strong> credentials — experimental</div>
           </div>
+
+          <p style="font-size:12px;font-weight:700;color:#0369a1;margin:14px 0 4px;">4 — Create your own GitOps repo (optional)</p>
+          <div style="font-size:11px;color:#64748b;margin-bottom:8px;">Signs in to GitHub in your own browser tab — no token is ever typed into this form — creates a private repo for you, and registers this cluster's own key on it as a deploy key automatically. Skip this if you're using the shared lab repo already filled in below.</div>
+          <label class="ocqs-label">Repo name</label>
+          <input class="ocqs-input" id="ocqp-owngitops-name" placeholder="opencenter-gitops" oninput="ocqpUpdate()">
+
+          <p style="font-size:11px;color:#334155;margin:10px 0 4px;"><strong>Step A — Sign in to GitHub</strong></p>
+          <div class="ocqs-cmd" id="ocqp-cmd-owngitops-auth">gh auth login --hostname github.com --git-protocol ssh --web
+gh auth status --hostname github.com</div>
+          <div style="display:flex;gap:6px;margin:6px 0;">
+            <button class="ocqs-btn ocqs-btn-copy" onclick="ocqpCopyCmd('ocqp-cmd-owngitops-auth','')">&#128203; Copy</button>
+            <button id="ocqp-run-owngitops-auth" onclick="ocqpAuthenticateGitHub()" style="background:#1e3a5f;color:#7dd3fc;border:1px solid #334155;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;">&#9654; Run — watch below for your one-time code</button>
+          </div>
+          <div id="ocqp-out-owngitops-auth" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#00ff41;white-space:pre-wrap;max-height:180px;overflow-y:auto;margin-bottom:6px;">$ waiting...</div>
+          <div style="font-size:11px;color:#b45309;margin-bottom:10px;">&#9888; A one-time code and a github.com/login/device link will appear above. Open that link in any browser tab and enter the code — this stays running until you finish there.</div>
+
+          <p style="font-size:11px;color:#334155;margin:10px 0 4px;"><strong>Step B — Create the repo &amp; register this cluster's key</strong></p>
+          <div class="ocqs-cmd" id="ocqp-cmd-owngitops-create"># enter a repo name above, then Run</div>
+          <div style="display:flex;gap:6px;margin:6px 0;">
+            <button class="ocqs-btn ocqs-btn-copy" onclick="ocqpCopyCmd('ocqp-cmd-owngitops-create','')">&#128203; Copy</button>
+            <button id="ocqp-run-owngitops-create" onclick="ocqpCreateOwnGitOpsRepo()" style="background:#15803d;color:#fff;border:none;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;">&#9654; Create repo + register key</button>
+          </div>
+          <div id="ocqp-out-owngitops-create" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#00ff41;white-space:pre-wrap;max-height:180px;overflow-y:auto;margin-bottom:6px;">$ waiting...</div>
+          <div id="ocqp-owngitops-status" style="font-size:11px;color:#64748b;margin-bottom:10px;"></div>
           </div>
         </details>
 
@@ -7605,10 +7753,12 @@ var c9b=g('ocqp-cmd-9b');
           sv2('ocqp-projectid',saved.projectId); sv2('ocqp-credid',saved.credId);
           sv2('ocqp-credsec',saved.credSec); sv2('ocqp-floatnet',saved.floatNet);
           sv2('ocqp-networkid',saved.networkId); sv2('ocqp-subnetid',saved.subnetId);
+          if(saved.gitProvider){ var gp=g('ocqp-gitprovider'); if(gp) gp.value=saved.gitProvider; }
           sv2('ocqp-gitrepo',saved.gitRepo); sv2('ocqp-gitbranch',saved.gitBranch);
           sv2('ocqp-tokfile',saved.tokFile); sv2('ocqp-tokval',saved.tokVal);
           if(saved.sshKey && saved.sshKey!=='~/.ssh/id_rsa') sv2('ocqp-sshkey',saved.sshKey);
           sv2('ocqp-gitopsfolder',saved.gitopsFolder);
+          sv2('ocqp-owngitops-name',saved.ownGitOpsName);
           if(saved.gitAuth){ var ga=g('ocqp-gitauth'); if(ga) ga.value=saved.gitAuth; }
           if(saved.services){
             _qp.services=Object.assign(_qp.services,saved.services);
