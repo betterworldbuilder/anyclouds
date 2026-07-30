@@ -90,7 +90,10 @@
         [['ocqs-org',data.suggested_org],['ocqs-cluster',data.suggested_cluster],
          ['ocqp-org',data.suggested_org],['ocqp-cluster',data.suggested_cluster]].forEach(function(pair){
           var input=document.getElementById(pair[0]);
-          if(input && (!input.value || /^(my-org|my-cluster)$/.test(input.value))){
+          // Only overwrite a still-default field. Both the old placeholders and
+          // the current defaults count, or a lab session stops seeding its
+          // suggested names the moment the defaults change.
+          if(input && (!input.value || /^(my-org|my-cluster|myorg|cluster1)$/.test(input.value))){
             input.value=pair[1];
             input.dispatchEvent(new Event('input',{bubbles:true}));
           }
@@ -672,19 +675,19 @@
               <div>
                 <label class="ocqs-label">Organization Name</label>
                 <select class="ocqs-select" id="ocqs-org-select" onchange="ocqsChooseOrganization(this.value)">
-                  <option value="my-org">my-org</option>
+                  <option value="myorg">myorg</option>
                   <option value="__new__">＋ Create a new organization…</option>
                 </select>
-                <input class="ocqs-input" id="ocqs-org" value="my-org" placeholder="new-organization-name" oninput="ocqsUpdate()" style="display:none;margin-top:6px;">
+                <input class="ocqs-input" id="ocqs-org" value="myorg" placeholder="new-organization-name" oninput="ocqsUpdate()" style="display:none;margin-top:6px;">
                 <div id="ocqs-org-lock-warning" role="alert" style="display:none;font-size:10px;font-weight:800;color:#b45309;margin-top:4px;">&#9888; New Org not allowed for existing clusters</div>
               </div>
               <div>
                 <label class="ocqs-label">Cluster Name</label>
                 <select class="ocqs-select" id="ocqs-cluster-select" onchange="ocqsChooseCluster(this.value)">
-                  <option value="my-cluster">my-cluster</option>
+                  <option value="cluster1">cluster1</option>
                   <option value="__new__">＋ Create a new cluster…</option>
                 </select>
-                <input class="ocqs-input" id="ocqs-cluster" value="my-cluster" placeholder="new-cluster-name" oninput="ocqsUpdate()" onchange="ocqsRecordClusterName(this.value)" style="display:none;margin-top:6px;">
+                <input class="ocqs-input" id="ocqs-cluster" value="cluster1" placeholder="new-cluster-name" oninput="ocqsUpdate()" onchange="ocqsRecordClusterName(this.value)" style="display:none;margin-top:6px;">
                 <div id="ocqs-cluster-list-status" style="font-size:10px;color:#64748b;margin-top:4px;">Loading configured clusters…</div>
                 <div role="note" style="margin-top:7px;padding:8px 10px;border:1px solid #f59e0b;border-left:4px solid #d97706;border-radius:6px;background:#fffbeb;color:#92400e;font-size:10px;font-weight:700;line-height:1.45;">&#9888; Organization&ndash;cluster pairing rule: Once a cluster is created under an organization, it is permanently associated with that organization and cannot be reassigned to another organization.</div>
               </div>
@@ -703,7 +706,7 @@
             </div>
             <div style="margin-top:10px;">
               <div class="ocqs-label">Config Path</div>
-              <div class="ocqs-path-badge" id="ocqs-configpath" style="font-size:10px;">$HOME/.config/opencenter/clusters/blueprints/my-org/my-cluster/my-cluster-config.yaml</div>
+              <div class="ocqs-path-badge" id="ocqs-configpath" style="font-size:10px;">$HOME/.config/opencenter/clusters/blueprints/myorg/cluster1/cluster1-config.yaml</div>
             </div>
             <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:12px;">
               <button class="ocqs-btn ocqs-btn-primary" id="ocqs-update-identity-btn" onclick="ocqsUpdateClusterIdentity(this)">&#128260; Update Cluster</button>
@@ -922,8 +925,8 @@
         return raw;
       };
       window.ocOpenCenterSSHKey = function(prefix){
-        var org = _v(prefix + '-org') || 'my-org';
-        var cluster = _v(prefix + '-cluster') || 'my-cluster';
+        var org = _v(prefix + '-org') || window.OCQS_DEFAULT_ORG || 'myorg';
+        var cluster = _v(prefix + '-cluster') || window.OCQS_DEFAULT_CLUSTER || 'cluster1';
         return '$HOME/.config/opencenter/clusters/secrets/' + org + '/' + cluster + '/ssh/' + cluster;
       };
       window._ocqsSensitiveMasked = true;
@@ -947,7 +950,7 @@
           var _svcs={keycloak:false,loki:false,tempo:false,velero:false,monitoring:false};
           try{_svcs=window._qs?window._qs.services:_svcs;}catch(e){}
           return {
-            org:_v('ocqs-org')||'my-org', cluster:_v('ocqs-cluster')||'my-cluster',
+            org:_v('ocqs-org')||window.OCQS_DEFAULT_ORG||'myorg', cluster:_v('ocqs-cluster')||window.OCQS_DEFAULT_CLUSTER||'cluster1',
             env:_v('ocqs-env')||'dev', provider:_v('ocqs-provider')||'openstack',
             authUrl:ocqsAuthUrlForRegion(_v('ocqs-authurl')||'https://keystone.api.iad3.rackspacecloud.com/v3/', _v('ocqs-region')),
             region:ocqsCanonicalRegion(_v('ocqs-region'), _v('ocqs-authurl')), authType:_v('ocqs-authtype')||'password',
@@ -990,7 +993,7 @@
         var region = ocqsCanonicalRegion(s.region, s.authUrl);
         var regionSlug = region.toLowerCase();
         var authUrl = ocqsAuthUrlForRegion(s.authUrl, region);
-        var fqdn = (s.cluster || 'my-cluster') + '.' + regionSlug + '.k8s.opencenter.cloud';
+        var fqdn = (s.cluster || window.OCQS_DEFAULT_CLUSTER || 'cluster1') + '.' + regionSlug + '.k8s.opencenter.cloud';
         if(silent && !s.password && !s.credSec) return;
         var st = silent ? null : document.getElementById('ocqs-apply-status');
         var cfgEl = document.getElementById('ocqs-configpath');
@@ -1380,6 +1383,11 @@
 
       // Existing clusters are immutable organization/cluster pairs.
       window._ocqsClusterPairs = [];
+      // Starting names for a first-time lab. Used instead of blanking the field,
+      // so "Create a new cluster..." is immediately usable rather than an empty
+      // box that later refreshes silently clear.
+      window.OCQS_DEFAULT_ORG = 'myorg';
+      window.OCQS_DEFAULT_CLUSTER = 'cluster1';
       window.ocqsShowOrgWarning = function(show){
         var warning=document.getElementById('ocqs-org-lock-warning');
         if(warning) warning.style.display=show?'block':'none';
@@ -1409,8 +1417,12 @@
         var orgSelect=document.getElementById('ocqs-org-select');
         if(!orgInput||!orgSelect) return;
         if(organization==='__new__'){
-          orgSelect.value='__new__'; orgInput.value=''; orgInput.style.display='block'; orgInput.readOnly=false;
-          ocqsFillClustersForOrg('__new__','__new__'); orgInput.focus();
+          orgSelect.value='__new__';
+          // Keep whatever is already typed - this runs again on every cluster
+          // list refresh, and blanking it here wipes in-progress input.
+          if(!(orgInput.value||'').trim()) orgInput.value=window.OCQS_DEFAULT_ORG;
+          orgInput.style.display='block'; orgInput.readOnly=false;
+          ocqsFillClustersForOrg('__new__','__new__');
         }else{
           orgSelect.value=organization; orgInput.value=organization; orgInput.style.display='none'; orgInput.readOnly=true;
           ocqsFillClustersForOrg(organization,preferredCluster);
@@ -1479,7 +1491,9 @@
         var input=document.getElementById('ocqs-cluster');
         if(!input) return;
         if(cluster==='__new__'){
-          input.value=''; input.style.display='block'; ocqsShowOrgWarning(false); input.focus();
+          // Same rule as the organization field: never blank what is already there.
+          if(!(input.value||'').trim()) input.value=window.OCQS_DEFAULT_CLUSTER;
+          input.style.display='block'; ocqsShowOrgWarning(false);
         }else{
           input.value=cluster; input.style.display='none'; ocqsShowOrgWarning(true);
         }
@@ -1534,7 +1548,9 @@
           ids.forEach(function(id){ var el=document.getElementById(id); if(el) el.addEventListener('input', window.ocqsPersist); });
           // Restore saved credentials AFTER _ocqsRestore completes
           setTimeout(ocqsRestoreCreds, 400);
-          ocqsFillClusterHistory();
+          // ocqsSeedClusterHistory() populates the lists and handles its own
+          // failure path, so the bare call that used to sit here only rebuilt
+          // the selects early and reset the identity fields a second time.
           setTimeout(ocqsSeedClusterHistory, 800);
           setTimeout(function(){ if (window.ocqsVerifyReadiness) ocqsVerifyReadiness(null); }, 1500);
           setTimeout(function(){ window._ocqsRegionPrev = ((document.getElementById('ocqs-region')||{}).value||'').trim().toUpperCase(); }, 900);
@@ -3494,8 +3510,8 @@ kubectl describe kustomization &lt;name&gt; -n flux-system</div>
       window.ocqsUpdateClusterIdentity = function(btn){
         var s = ocqsGetState();
         var slug = function(x){ return (x||'').trim().toLowerCase().replace(/[^a-z0-9-]+/g,'-').replace(/^-+|-+$/g,''); };
-        var org = slug(s.org) || 'my-org';
-        var cluster = slug(s.cluster) || 'my-cluster';
+        var org = slug(s.org) || window.OCQS_DEFAULT_ORG;
+        var cluster = slug(s.cluster) || window.OCQS_DEFAULT_CLUSTER;
         var env = (s.env === 'production' || s.env === 'staging') ? s.env : 'dev';
         var provider = (s.provider || 'openstack').trim().toLowerCase();
         var st = document.getElementById('ocqs-update-identity-status');
@@ -5017,8 +5033,12 @@ var c9b=g('ocqs-cmd-9b');
         var orgSelect=document.getElementById('ocqp-org-select');
         if(!orgInput||!orgSelect) return;
         if(organization==='__new__'){
-          orgSelect.value='__new__'; orgInput.value=''; orgInput.style.display='block'; orgInput.readOnly=false;
-          ocqpFillClustersForOrg('__new__','__new__'); orgInput.focus();
+          orgSelect.value='__new__';
+          // Same rule as the Quick Start panel: a list refresh must not wipe
+          // whatever the learner has already typed.
+          if(!(orgInput.value||'').trim()) orgInput.value=window.OCQS_DEFAULT_ORG;
+          orgInput.style.display='block'; orgInput.readOnly=false;
+          ocqpFillClustersForOrg('__new__','__new__');
         }else{
           orgSelect.value=organization; orgInput.value=organization; orgInput.style.display='none'; orgInput.readOnly=true;
           ocqpFillClustersForOrg(organization,preferredCluster);
@@ -5087,7 +5107,8 @@ var c9b=g('ocqs-cmd-9b');
         var input=document.getElementById('ocqp-cluster');
         if(!input) return;
         if(cluster==='__new__'){
-          input.value=''; input.style.display='block'; ocqpShowOrgWarning(false); input.focus();
+          if(!(input.value||'').trim()) input.value=window.OCQS_DEFAULT_CLUSTER;
+          input.style.display='block'; ocqpShowOrgWarning(false);
         }else{
           input.value=cluster; input.style.display='none'; ocqpShowOrgWarning(true);
         }
