@@ -967,8 +967,8 @@
           <div style="margin-top:14px;display:flex;align-items:center;flex-wrap:wrap;gap:12px;padding:12px 14px;background:linear-gradient(135deg,#0f172a,#1e3a5f);border-radius:10px;">
             <button id="ocqs-autorun-btn" onclick="ocqsAutoRunAll()" style="border:none;border-radius:8px;padding:10px 22px;font-size:13px;font-weight:900;cursor:pointer;color:#fff;background:linear-gradient(135deg,#0284c7,#38bdf8);box-shadow:0 4px 12px rgba(2,132,199,.5);">&#9889; AutoRun All Steps (A &rarr; Z)</button>
             <button id="ocqs-autorun-restart" onclick="ocqsAutoRestart()" style="border:none;border-radius:8px;padding:10px 16px;font-size:13px;font-weight:900;cursor:pointer;color:#fff;background:#475569;">&#8635; Restart</button>
-            <button onclick="var s=(typeof ocqsGetState==='function')?ocqsGetState():{};window.open('/opencenter/monitor/deployment/'+(s.org||'my-org')+'/'+(s.cluster||'my-cluster'),'_blank');" style="border:none;border-radius:8px;padding:10px 16px;font-size:13px;font-weight:900;cursor:pointer;color:#fff;background:#0f172a;border:1px solid #38bdf8;">&#128225; Deployment Live Monitor</button>
-            <button onclick="var s=(typeof ocqsGetState==='function')?ocqsGetState():{};window.open('/opencenter/monitor/cluster/'+(s.org||'my-org')+'/'+(s.cluster||'my-cluster'),'_blank');" style="border:none;border-radius:8px;padding:10px 16px;font-size:13px;font-weight:900;cursor:pointer;color:#fff;background:#0f172a;border:1px solid #34d399;">&#129657; Cluster Live Monitor</button>
+            <button onclick="var s=(typeof ocqsGetState==='function')?ocqsGetState():{};window.open('/opencenter/monitor/deployment/'+(s.org||window.OCQS_DEFAULT_ORG||'myorg')+'/'+(s.cluster||window.OCQS_DEFAULT_CLUSTER||'cluster1'),'_blank');" style="border:none;border-radius:8px;padding:10px 16px;font-size:13px;font-weight:900;cursor:pointer;color:#fff;background:#0f172a;border:1px solid #38bdf8;">&#128225; Deployment Live Monitor</button>
+            <button onclick="var s=(typeof ocqsGetState==='function')?ocqsGetState():{};window.open('/opencenter/monitor/cluster/'+(s.org||window.OCQS_DEFAULT_ORG||'myorg')+'/'+(s.cluster||window.OCQS_DEFAULT_CLUSTER||'cluster1'),'_blank');" style="border:none;border-radius:8px;padding:10px 16px;font-size:13px;font-weight:900;cursor:pointer;color:#fff;background:#0f172a;border:1px solid #34d399;">&#129657; Cluster Live Monitor</button>
             <label style="font-size:11px;color:#94a3b8;display:flex;align-items:center;gap:5px;cursor:pointer;"><input type="checkbox" id="ocqs-autorun-cont"> continue on error</label>
             <span id="ocqs-autorun-status" style="font-size:12px;font-weight:800;color:#94a3b8;"></span>
           </div>
@@ -1992,7 +1992,7 @@ git push -u origin main</div>
         <script>
         window.ocqsExportBundle = function(){
           var s = (typeof ocqsGetState==='function') ? ocqsGetState() : {};
-          window.open('/api/opencenter/export-bundle?org='+encodeURIComponent(s.org||'my-org')+'&cluster='+encodeURIComponent(s.cluster||'my-cluster')+'&lab_token='+encodeURIComponent((ocTrainingLab.data||{}).csrf||''), '_blank');
+          window.open('/api/opencenter/export-bundle?org='+encodeURIComponent(s.org||window.OCQS_DEFAULT_ORG||'myorg')+'&cluster='+encodeURIComponent(s.cluster||window.OCQS_DEFAULT_CLUSTER||'cluster1')+'&lab_token='+encodeURIComponent((ocTrainingLab.data||{}).csrf||''), '_blank');
         };
         window.ocqsRestoreBundle = function(inp){
           var st = document.getElementById('ocqs-bundle-status');
@@ -3523,8 +3523,8 @@ kubectl describe kustomization &lt;name&gt; -n flux-system</div>
 
       function ocqsGetState(){
         return {
-          org:    v('ocqs-org') || 'my-org',
-          cluster:v('ocqs-cluster') || 'my-cluster',
+          org:    v('ocqs-org') || window.OCQS_DEFAULT_ORG || 'myorg',
+          cluster:v('ocqs-cluster') || window.OCQS_DEFAULT_CLUSTER || 'cluster1',
           env:    v('ocqs-env') || 'dev',
           provider: v('ocqs-provider') || 'openstack',
           authUrl:  v('ocqs-authurl') || 'https://keystone.api.iad3.rackspacecloud.com/v3/',
@@ -3612,6 +3612,12 @@ kubectl describe kustomization &lt;name&gt; -n flux-system</div>
         if(btn){ btn.disabled=true; btn.textContent='Updating...'; }
         if(st){ st.textContent='Updating cluster config...'; st.style.color='#0369a1'; }
         var cmd = [
+          // opencenter is a pre-installed shared binary, on PATH for every
+          // session - but if that host state ever drifts (a redeploy, a
+          // brief server restart) the three lines below would otherwise fail
+          // with a bare, unexplained "command not found" each. Fail once,
+          // clearly, pointing at Stage 1, instead.
+          'command -v opencenter >/dev/null 2>&1 || { echo "[BLOCKED] OpenCenter CLI not found on PATH. Run Stage 1 (Install OpenCenter CLI) above, then retry Update Cluster." >&2; exit 42; }',
           'opencenter cluster init '+cluster+' --org '+org+(provider==='kind'?' --type kind':'')+' || true',
           'opencenter cluster use '+org+'/'+cluster,
           'opencenter cluster set '+org+'/'+cluster+
@@ -3777,8 +3783,8 @@ try{ localStorage.setItem('r6ace_deploy_target', p); }catch(e){}
         if(typeof ocqsSave==='function') ocqsSave();
         // Slugify org/cluster names — OpenCenter identifiers must be DNS-safe (no spaces/uppercase)
         var _slug = function(x){ return (x||'').trim().toLowerCase().replace(/[^a-z0-9-]+/g,'-').replace(/^-+|-+$/g,''); };
-        s.org = _slug(s.org) || 'my-org';
-        s.cluster = _slug(s.cluster) || 'my-cluster';
+        s.org = _slug(s.org) || window.OCQS_DEFAULT_ORG || 'myorg';
+        s.cluster = _slug(s.cluster) || window.OCQS_DEFAULT_CLUSTER || 'cluster1';
         // Where to Deploy: kind (local Docker + local Gitea) vs openstack (production)
         var isKind = (s.provider === 'kind');
         var _dcSel = function(id,on){ var el=g(id); if(!el) return; el.style.borderColor=on?'#0369a1':'#e2e8f0'; el.style.background=on?'#eff6ff':'#fff'; el.style.boxShadow=on?'0 0 0 3px rgba(3,105,161,.12)':'none'; };
@@ -4614,8 +4620,8 @@ var c9b=g('ocqs-cmd-9b');
           <div style="margin-top:14px;display:flex;align-items:center;flex-wrap:wrap;gap:12px;padding:12px 14px;background:linear-gradient(135deg,#0f172a,#1e3a5f);border-radius:10px;">
             <button id="ocqp-autorun-btn" onclick="ocqpAutoRunAll()" style="border:none;border-radius:8px;padding:10px 22px;font-size:13px;font-weight:900;cursor:pointer;color:#fff;background:linear-gradient(135deg,#0284c7,#38bdf8);box-shadow:0 4px 12px rgba(2,132,199,.5);">&#9889; AutoRun All Steps (A &rarr; Z)</button>
             <button id="ocqp-autorun-restart" onclick="ocqpAutoRestart()" style="border:none;border-radius:8px;padding:10px 16px;font-size:13px;font-weight:900;cursor:pointer;color:#fff;background:#475569;">&#8635; Restart</button>
-            <button onclick="var s=(typeof ocqpGetState==='function')?ocqpGetState():{};window.open('/opencenter/monitor/deployment/'+(s.org||'my-org')+'/'+(s.cluster||'my-cluster'),'_blank');" style="border:none;border-radius:8px;padding:10px 16px;font-size:13px;font-weight:900;cursor:pointer;color:#fff;background:#0f172a;border:1px solid #38bdf8;">&#128225; Deployment Live Monitor</button>
-            <button onclick="var s=(typeof ocqpGetState==='function')?ocqpGetState():{};window.open('/opencenter/monitor/cluster/'+(s.org||'my-org')+'/'+(s.cluster||'my-cluster'),'_blank');" style="border:none;border-radius:8px;padding:10px 16px;font-size:13px;font-weight:900;cursor:pointer;color:#fff;background:#0f172a;border:1px solid #34d399;">&#129657; Cluster Live Monitor</button>
+            <button onclick="var s=(typeof ocqpGetState==='function')?ocqpGetState():{};window.open('/opencenter/monitor/deployment/'+(s.org||window.OCQS_DEFAULT_ORG||'myorg')+'/'+(s.cluster||window.OCQS_DEFAULT_CLUSTER||'cluster1'),'_blank');" style="border:none;border-radius:8px;padding:10px 16px;font-size:13px;font-weight:900;cursor:pointer;color:#fff;background:#0f172a;border:1px solid #38bdf8;">&#128225; Deployment Live Monitor</button>
+            <button onclick="var s=(typeof ocqpGetState==='function')?ocqpGetState():{};window.open('/opencenter/monitor/cluster/'+(s.org||window.OCQS_DEFAULT_ORG||'myorg')+'/'+(s.cluster||window.OCQS_DEFAULT_CLUSTER||'cluster1'),'_blank');" style="border:none;border-radius:8px;padding:10px 16px;font-size:13px;font-weight:900;cursor:pointer;color:#fff;background:#0f172a;border:1px solid #34d399;">&#129657; Cluster Live Monitor</button>
             <label style="font-size:11px;color:#94a3b8;display:flex;align-items:center;gap:5px;cursor:pointer;"><input type="checkbox" id="ocqp-autorun-cont"> continue on error</label>
             <span id="ocqp-autorun-status" style="font-size:12px;font-weight:800;color:#94a3b8;"></span>
           </div>
@@ -4670,7 +4676,7 @@ var c9b=g('ocqs-cmd-9b');
           var _svcs={keycloak:false,loki:false,tempo:false,velero:false,monitoring:false};
           try{_svcs=window._qp?window._qp.services:_svcs;}catch(e){}
           return {
-            org:_v('ocqp-org')||'my-org', cluster:_v('ocqp-cluster')||'my-cluster',
+            org:_v('ocqp-org')||window.OCQS_DEFAULT_ORG||'myorg', cluster:_v('ocqp-cluster')||window.OCQS_DEFAULT_CLUSTER||'cluster1',
             env:_v('ocqp-env')||'dev', provider:_v('ocqp-provider')||'openstack',
             authUrl:ocqpAuthUrlForRegion(_v('ocqp-authurl')||'https://keystone.api.iad3.rackspacecloud.com/v3/', _v('ocqp-region')),
             region:ocqpCanonicalRegion(_v('ocqp-region'), _v('ocqp-authurl')), authType:_v('ocqp-authtype')||'password',
@@ -4713,7 +4719,7 @@ var c9b=g('ocqs-cmd-9b');
         var region = ocqpCanonicalRegion(s.region, s.authUrl);
         var regionSlug = region.toLowerCase();
         var authUrl = ocqpAuthUrlForRegion(s.authUrl, region);
-        var fqdn = (s.cluster || 'my-cluster') + '.' + regionSlug + '.k8s.opencenter.cloud';
+        var fqdn = (s.cluster || window.OCQS_DEFAULT_CLUSTER || 'cluster1') + '.' + regionSlug + '.k8s.opencenter.cloud';
         if(silent && !s.password && !s.credSec) return;
         var st = silent ? null : document.getElementById('ocqp-apply-status');
         var cfgEl = document.getElementById('ocqp-configpath');
@@ -5606,7 +5612,7 @@ git push -u origin main</div>
         <script>
         window.ocqpExportBundle = function(){
           var s = (typeof ocqpGetState==='function') ? ocqpGetState() : {};
-          window.open('/api/opencenter/export-bundle?org='+encodeURIComponent(s.org||'my-org')+'&cluster='+encodeURIComponent(s.cluster||'my-cluster')+'&lab_token='+encodeURIComponent((ocTrainingLab.data||{}).csrf||''), '_blank');
+          window.open('/api/opencenter/export-bundle?org='+encodeURIComponent(s.org||window.OCQS_DEFAULT_ORG||'myorg')+'&cluster='+encodeURIComponent(s.cluster||window.OCQS_DEFAULT_CLUSTER||'cluster1')+'&lab_token='+encodeURIComponent((ocTrainingLab.data||{}).csrf||''), '_blank');
         };
         window.ocqpRestoreBundle = function(inp){
           var st = document.getElementById('ocqp-bundle-status');
@@ -6870,8 +6876,8 @@ kubectl describe kustomization &lt;name&gt; -n flux-system</div>
 
       function ocqpGetState(){
         return {
-          org:    v('ocqp-org') || 'my-org',
-          cluster:v('ocqp-cluster') || 'my-cluster',
+          org:    v('ocqp-org') || window.OCQS_DEFAULT_ORG || 'myorg',
+          cluster:v('ocqp-cluster') || window.OCQS_DEFAULT_CLUSTER || 'cluster1',
           env:    v('ocqp-env') || 'dev',
           provider: v('ocqp-provider') || 'openstack',
           authUrl:  v('ocqp-authurl') || 'https://keystone.api.iad3.rackspacecloud.com/v3/',
@@ -6946,8 +6952,8 @@ kubectl describe kustomization &lt;name&gt; -n flux-system</div>
       window.ocqpUpdateClusterIdentity = function(btn){
         var s = ocqpGetState();
         var slug = function(x){ return (x||'').trim().toLowerCase().replace(/[^a-z0-9-]+/g,'-').replace(/^-+|-+$/g,''); };
-        var org = slug(s.org) || 'my-org';
-        var cluster = slug(s.cluster) || 'my-cluster';
+        var org = slug(s.org) || window.OCQS_DEFAULT_ORG || 'myorg';
+        var cluster = slug(s.cluster) || window.OCQS_DEFAULT_CLUSTER || 'cluster1';
         var env = (s.env === 'production' || s.env === 'staging') ? s.env : 'dev';
         var provider = (s.provider || 'openstack').trim().toLowerCase();
         var st = document.getElementById('ocqp-update-identity-status');
@@ -6959,6 +6965,7 @@ kubectl describe kustomization &lt;name&gt; -n flux-system</div>
         if(btn){ btn.disabled=true; btn.textContent='Updating...'; }
         if(st){ st.textContent='Updating cluster config...'; st.style.color='#0369a1'; }
         var cmd = [
+          'command -v opencenter >/dev/null 2>&1 || { echo "[BLOCKED] OpenCenter CLI not found on PATH. Run Stage 1 (Install OpenCenter CLI) above, then retry Update Cluster." >&2; exit 42; }',
           'opencenter cluster init '+cluster+' --org '+org+(provider==='kind'?' --type kind':'')+' || true',
           'opencenter cluster use '+org+'/'+cluster,
           'opencenter cluster set '+org+'/'+cluster+
@@ -7124,8 +7131,8 @@ try{ localStorage.setItem('r6ace_deploy_target', p); }catch(e){}
         if(typeof ocqpSave==='function') ocqpSave();
         // Slugify org/cluster names — OpenCenter identifiers must be DNS-safe (no spaces/uppercase)
         var _slug = function(x){ return (x||'').trim().toLowerCase().replace(/[^a-z0-9-]+/g,'-').replace(/^-+|-+$/g,''); };
-        s.org = _slug(s.org) || 'my-org';
-        s.cluster = _slug(s.cluster) || 'my-cluster';
+        s.org = _slug(s.org) || window.OCQS_DEFAULT_ORG || 'myorg';
+        s.cluster = _slug(s.cluster) || window.OCQS_DEFAULT_CLUSTER || 'cluster1';
         // Where to Deploy: kind (local Docker + local Gitea) vs openstack (production)
         var isKind = (s.provider === 'kind');
         var _dcSel = function(id,on){ var el=g(id); if(!el) return; el.style.borderColor=on?'#0369a1':'#e2e8f0'; el.style.background=on?'#eff6ff':'#fff'; el.style.boxShadow=on?'0 0 0 3px rgba(3,105,161,.12)':'none'; };
