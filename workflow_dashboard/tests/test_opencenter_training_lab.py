@@ -25,6 +25,8 @@ from workflow_dashboard.app import (  # noqa: E402
     app,
     _opencenter_inject_kubectl_timeout,
     _opencenter_lab_command_policy,
+    _opencenter_lab_context,
+    _opencenter_lab_credential_exists,
 )
 
 
@@ -551,6 +553,110 @@ class OpenCenterKubectlTimeoutInjection(unittest.TestCase):
         out = _opencenter_inject_kubectl_timeout(cmd)
         self.assertEqual(out.count("--request-timeout=15s"), 3)
         self.assertIn("export KUBECONFIG=", out)
+
+
+class OpenCenterSshCredentialPathResolution(unittest.TestCase):
+    """A real bug from a live run: cluster init generates the SSH keypair at
+    exactly the path the UI shows and defaults GitOps SSH auth to, but the
+    existence check used os.path.expanduser - which only handles a leading
+    "~" and leaves the literal string "$HOME" untouched - so the check always
+    reported the key missing even when cluster init had already created it."""
+
+    @classmethod
+    def setUpClass(cls):
+        app.config.update(TESTING=True)
+
+    def test_home_templated_path_resolves_to_a_real_generated_key(self):
+        with app.test_client() as client:
+            client.post(
+                "/api/opencenter/training-login",
+                json={"name": "CredCheck", "role": "Student"},
+            )
+            token = client.get("/api/opencenter/lab-session").get_json()["csrf"]
+            headers = {"X-OpenCenter-Lab-CSRF": token}
+            context = _opencenter_lab_context(create=False)
+            home = context["home"]
+
+            org, cluster = "credorg", "credcluster"
+            ssh_dir = home / ".config" / "opencenter" / "clusters" / "secrets" / org / cluster / "ssh"
+            ssh_dir.mkdir(parents=True, exist_ok=True)
+            (ssh_dir / cluster).write_text("fake-private-key\n", encoding="utf-8")
+            (ssh_dir / f"{cluster}.pub").write_text("fake-public-key\n", encoding="utf-8")
+
+            private_ui_path = f"$HOME/.config/opencenter/clusters/secrets/{org}/{cluster}/ssh/{cluster}"
+            public_ui_path = private_ui_path + ".pub"
+
+            # Same helper the endpoint uses - exercised directly, not just via HTTP.
+            self.assertTrue(_opencenter_lab_credential_exists(private_ui_path))
+            self.assertTrue(_opencenter_lab_credential_exists(public_ui_path))
+
+            cfg_path = f"$HOME/.config/opencenter/clusters/blueprints/{org}/{cluster}/{cluster}-config.yaml"
+            response = client.post(
+                "/api/openrc/patch-config",
+                json={
+                    "path": cfg_path,
+                    "git_auth_mode": "ssh",
+                    "fields": {
+                        "opencenter.gitops.repository.url": "ssh://git@github.com/x/y.git",
+                        "opencenter.gitops.auth.ssh.private_key": private_ui_path,
+                        "opencenter.gitops.auth.ssh.public_key": public_ui_path,
+                    },
+                },
+                headers=headers,
+            )
+            payload = response.get_json()
+            self.assertEqual(response.status_code, 200, payload)
+            self.assertTrue(payload["ok"], payload)
+            self.assertTrue(payload["credential_checks"]["private_key_exists"])
+            self.assertTrue(payload["credential_checks"]["public_key_exists"])
+
+    def test_a_genuinely_missing_key_is_still_correctly_reported_missing(self):
+        with app.test_client() as client:
+            client.post(
+                "/api/opencenter/training-login",
+                json={"name": "CredCheckMissing", "role": "Student"},
+            )
+            token = client.get("/api/opencenter/lab-session").get_json()["csrf"]
+            headers = {"X-OpenCenter-Lab-CSRF": token}
+            missing_path = (
+                "$HOME/.config/opencenter/clusters/secrets/"
+                "neverinit/nocluster/ssh/nocluster"
+            )
+            response = client.post(
+                "/api/openrc/patch-config",
+                json={
+                    "path": "$HOME/.config/opencenter/clusters/blueprints/"
+                    "neverinit/nocluster/nocluster-config.yaml",
+                    "git_auth_mode": "ssh",
+                    "fields": {
+                        "opencenter.gitops.repository.url": "ssh://git@github.com/x/y.git",
+                        "opencenter.gitops.auth.ssh.private_key": missing_path,
+                        "opencenter.gitops.auth.ssh.public_key": missing_path + ".pub",
+                    },
+                },
+                headers=headers,
+            )
+            payload = response.get_json()
+            self.assertEqual(response.status_code, 400)
+            self.assertFalse(payload["ok"])
+            self.assertIn("SSH credential is missing", payload["error"])
+            self.assertFalse(payload["credential_checks"]["private_key_exists"])
+            self.assertFalse(payload["credential_checks"]["public_key_exists"])
+
+    def test_empty_input_is_false_without_needing_a_session(self):
+        # Short-circuits before touching the lab session at all.
+        self.assertFalse(_opencenter_lab_credential_exists(""))
+
+    def test_path_escaping_input_is_false_not_a_crash(self):
+        with app.test_client() as client:
+            client.post(
+                "/api/opencenter/training-login",
+                json={"name": "CredCheckEscape", "role": "Student"},
+            )
+            client.get("/api/opencenter/lab-session")
+            self.assertFalse(
+                _opencenter_lab_credential_exists("../../../../etc/passwd")
+            )
 
 
 if __name__ == "__main__":

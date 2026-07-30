@@ -365,6 +365,23 @@ def _opencenter_lab_resolve_path(raw_path: str) -> Path:
     return resolved
 
 
+def _opencenter_lab_credential_exists(raw_path: str) -> bool:
+    """Does a $HOME/${HOME}/~ -templated UI path point at a real file?
+
+    os.path.expanduser only handles a leading "~" - it leaves the literal
+    string "$HOME" untouched, so a path exactly as the UI displays it (e.g.
+    "$HOME/.config/opencenter/clusters/secrets/<org>/<cluster>/ssh/<cluster>")
+    never matches a real file even when cluster init already generated it.
+    Route through the same resolver already used for cfg_path.
+    """
+    if not raw_path:
+        return False
+    try:
+        return _opencenter_lab_resolve_path(raw_path).is_file()
+    except ValueError:
+        return False
+
+
 def _opencenter_lab_validate_remote_url(value: str, label: str = "endpoint") -> str:
     """Allow Rackspace Keystone/service endpoints or explicit training hosts."""
     raw = str(value or "").strip()
@@ -25801,14 +25818,12 @@ def patch_config_file():
         if git_auth_mode == "ssh":
             private_key = str(get_nested(data, "opencenter.gitops.auth.ssh.private_key") or "").strip()
             public_key = str(get_nested(data, "opencenter.gitops.auth.ssh.public_key") or "").strip()
-            private_path = os.path.expanduser(private_key)
-            public_path = os.path.expanduser(public_key)
             credential_checks = {
                 "auth_mode": "ssh",
                 "private_key": private_key,
-                "private_key_exists": bool(private_key and os.path.isfile(private_path)),
+                "private_key_exists": _opencenter_lab_credential_exists(private_key),
                 "public_key": public_key,
-                "public_key_exists": bool(public_key and os.path.isfile(public_path)),
+                "public_key_exists": _opencenter_lab_credential_exists(public_key),
             }
             if not credential_checks["private_key_exists"] or not credential_checks["public_key_exists"]:
                 missing = []
