@@ -1854,9 +1854,20 @@
           </summary>
           <div style="margin-top:12px;">
           <p>Before starting, ensure you have all of the following:</p>
-          <div class="ocqs-info-box" style="margin-bottom:10px;"><strong>mise</strong> (tool version manager) is already installed for you in this shared lab - the Recommended install command in Stage 1 uses it directly, no separate setup step needed.</div>
 
-          <p style="font-size:12px;font-weight:700;color:#0369a1;margin-bottom:4px;">1 — Git (version control)</p>
+          <p style="font-size:12px;font-weight:700;color:#0369a1;margin-bottom:4px;">1 — Mise (tool version manager &amp; task runner)</p>
+          <div class="ocqs-cmd" id="ocqs-cmd-pre-mise"># Linux
+curl https://mise.run | sh
+echo 'eval "$($HOME/.local/bin/mise activate bash)"' >> ~/.bashrc
+source ~/.bashrc
+mise --version</div>
+          <div style="display:flex;gap:6px;margin:6px 0;">
+            <button class="ocqs-btn ocqs-btn-copy" onclick="ocqsCopyCmd('ocqs-cmd-pre-mise','')">&#128203; Copy</button>
+            <button id="ocqs-run-pre-mise" onclick="ocLabExplainUnrunnable('ocqs-out-pre-mise','This installer pipes a script fetched from the internet straight to a shell (curl | sh). The shared lab does not execute that for everyone&#8217;s safety - copy the command above and run it once on the lab host itself. Re-running letsmove.sh also installs mise automatically on a fresh host.')" title="Piped-script installers do not run inside the shared lab - copy and run this on the host" style="background:#3f2b0f;color:#fbbf24;border:1px solid #92400e;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;">&#9888; Run on the host</button><button onclick="ocqsCopyOut('ocqs-out-pre-mise',this)" style="background:#334155;color:#cbd5e1;border:1px solid #475569;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#128203; Copy Output</button>
+          </div>
+          <div id="ocqs-out-pre-mise" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#00ff41;white-space:pre-wrap;max-height:180px;overflow-y:auto;margin-bottom:10px;">$ waiting...</div>
+
+          <p style="font-size:12px;font-weight:700;color:#0369a1;margin-bottom:4px;">2 — Git (version control)</p>
           <div class="ocqs-cmd" id="ocqs-cmd-pre-git">git --version
 # Should show: git version 2.x or higher</div>
           <div style="display:flex;gap:6px;margin:6px 0;">
@@ -1866,7 +1877,7 @@
           <div id="ocqs-out-pre-git" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#00ff41;white-space:pre-wrap;max-height:120px;overflow-y:auto;margin-bottom:10px;">$ waiting...
 </div>
 
-          <p style="font-size:12px;font-weight:700;color:#0369a1;margin-bottom:4px;">2 — SSH Key (for cluster access)</p>
+          <p style="font-size:12px;font-weight:700;color:#0369a1;margin-bottom:4px;">3 — SSH Key (for cluster access)</p>
           <div class="ocqs-cmd" id="ocqs-cmd-pre-ssh"># Generate if you don't have one
 ssh-keygen -t ed25519 -C "your-email@example.com"
 cat ~/.ssh/id_ed25519.pub</div>
@@ -1877,7 +1888,7 @@ cat ~/.ssh/id_ed25519.pub</div>
           <div id="ocqs-out-pre-ssh" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#00ff41;white-space:pre-wrap;max-height:120px;overflow-y:auto;margin-bottom:10px;">$ waiting...
 </div>
 
-          <p style="font-size:12px;font-weight:700;color:#0369a1;margin-bottom:4px;">3 — Infrastructure access (choose one)</p>
+          <p style="font-size:12px;font-weight:700;color:#0369a1;margin-bottom:4px;">4 — Infrastructure access (choose one)</p>
           <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px;font-size:12px;line-height:1.8;">
             <div>&#9679; <strong>OpenStack</strong> cloud credentials — recommended for production (FLEX IAD3)</div>
             <div>&#9679; <strong>Kind</strong> — local development, needs Docker: <code>sudo apt install -y docker.io</code></div>
@@ -1885,7 +1896,7 @@ cat ~/.ssh/id_ed25519.pub</div>
             <div>&#9679; <strong>AWS</strong> credentials — experimental</div>
           </div>
 
-          <p style="font-size:12px;font-weight:700;color:#0369a1;margin:14px 0 4px;">4 — Create your own GitOps repo (optional)</p>
+          <p style="font-size:12px;font-weight:700;color:#0369a1;margin:14px 0 4px;">5 — Create your own GitOps repo (optional)</p>
           <div style="font-size:11px;color:#64748b;margin-bottom:8px;">Signs in to GitHub in your own browser tab — no token is ever typed into this form — creates a private repo for you, and registers this cluster's own key on it as a deploy key automatically. Skip this if you're using the shared lab repo already filled in below.</div>
           <label class="ocqs-label">Repo name</label>
           <input class="ocqs-input" id="ocqs-owngitops-name" placeholder="opencenter-gitops" oninput="ocqsUpdate()">
@@ -5508,9 +5519,20 @@ var c9b=g('ocqs-cmd-9b');
           </summary>
           <div style="margin-top:12px;">
           <p>Before starting, ensure you have all of the following:</p>
-          <div class="ocqs-info-box" style="margin-bottom:10px;"><strong>mise</strong> (tool version manager) is already installed for you in this shared lab - the Recommended install command in Stage 1 uses it directly, no separate setup step needed.</div>
 
-          <p style="font-size:12px;font-weight:700;color:#0369a1;margin-bottom:4px;">1 — Git (version control)</p>
+          <p style="font-size:12px;font-weight:700;color:#0369a1;margin-bottom:4px;">1 — Mise (tool version manager &amp; task runner)</p>
+          <div class="ocqs-cmd" id="ocqp-cmd-pre-mise"># Linux
+curl https://mise.run | sh
+echo 'eval "$($HOME/.local/bin/mise activate bash)"' >> ~/.bashrc
+source ~/.bashrc
+mise --version</div>
+          <div style="display:flex;gap:6px;margin:6px 0;">
+            <button class="ocqs-btn ocqs-btn-copy" onclick="ocqpCopyCmd('ocqp-cmd-pre-mise','')">&#128203; Copy</button>
+            <button id="ocqp-run-pre-mise" onclick="ocLabExplainUnrunnable('ocqp-out-pre-mise','This installer pipes a script fetched from the internet straight to a shell (curl | sh). The shared lab does not execute that for everyone&#8217;s safety - copy the command above and run it once on the lab host itself. Re-running letsmove.sh also installs mise automatically on a fresh host.')" title="Piped-script installers do not run inside the shared lab - copy and run this on the host" style="background:#3f2b0f;color:#fbbf24;border:1px solid #92400e;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;">&#9888; Run on the host</button><button onclick="ocqpCopyOut('ocqp-out-pre-mise',this)" style="background:#334155;color:#cbd5e1;border:1px solid #475569;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#128203; Copy Output</button>
+          </div>
+          <div id="ocqp-out-pre-mise" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#00ff41;white-space:pre-wrap;max-height:180px;overflow-y:auto;margin-bottom:10px;">$ waiting...</div>
+
+          <p style="font-size:12px;font-weight:700;color:#0369a1;margin-bottom:4px;">2 — Git (version control)</p>
           <div class="ocqs-cmd" id="ocqp-cmd-pre-git">git --version
 # Should show: git version 2.x or higher</div>
           <div style="display:flex;gap:6px;margin:6px 0;">
@@ -5520,7 +5542,7 @@ var c9b=g('ocqs-cmd-9b');
           <div id="ocqp-out-pre-git" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#00ff41;white-space:pre-wrap;max-height:120px;overflow-y:auto;margin-bottom:10px;">$ waiting...
 </div>
 
-          <p style="font-size:12px;font-weight:700;color:#0369a1;margin-bottom:4px;">2 — SSH Key (for cluster access)</p>
+          <p style="font-size:12px;font-weight:700;color:#0369a1;margin-bottom:4px;">3 — SSH Key (for cluster access)</p>
           <div class="ocqs-cmd" id="ocqp-cmd-pre-ssh"># Generate if you don't have one
 ssh-keygen -t ed25519 -C "your-email@example.com"
 cat ~/.ssh/id_ed25519.pub</div>
@@ -5531,7 +5553,7 @@ cat ~/.ssh/id_ed25519.pub</div>
           <div id="ocqp-out-pre-ssh" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#00ff41;white-space:pre-wrap;max-height:120px;overflow-y:auto;margin-bottom:10px;">$ waiting...
 </div>
 
-          <p style="font-size:12px;font-weight:700;color:#0369a1;margin-bottom:4px;">3 — Infrastructure access (choose one)</p>
+          <p style="font-size:12px;font-weight:700;color:#0369a1;margin-bottom:4px;">4 — Infrastructure access (choose one)</p>
           <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px;font-size:12px;line-height:1.8;">
             <div>&#9679; <strong>OpenStack</strong> cloud credentials — recommended for production (FLEX IAD3)</div>
             <div>&#9679; <strong>Kind</strong> — local development, needs Docker: <code>sudo apt install -y docker.io</code></div>
@@ -5539,7 +5561,7 @@ cat ~/.ssh/id_ed25519.pub</div>
             <div>&#9679; <strong>AWS</strong> credentials — experimental</div>
           </div>
 
-          <p style="font-size:12px;font-weight:700;color:#0369a1;margin:14px 0 4px;">4 — Create your own GitOps repo (optional)</p>
+          <p style="font-size:12px;font-weight:700;color:#0369a1;margin:14px 0 4px;">5 — Create your own GitOps repo (optional)</p>
           <div style="font-size:11px;color:#64748b;margin-bottom:8px;">Signs in to GitHub in your own browser tab — no token is ever typed into this form — creates a private repo for you, and registers this cluster's own key on it as a deploy key automatically. Skip this if you're using the shared lab repo already filled in below.</div>
           <label class="ocqs-label">Repo name</label>
           <input class="ocqs-input" id="ocqp-owngitops-name" placeholder="opencenter-gitops" oninput="ocqpUpdate()">

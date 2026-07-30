@@ -262,6 +262,19 @@ if ! command -v flux >/dev/null 2>&1; then
     curl -fsSL --max-time 120 https://fluxcd.io/install.sh 2>/dev/null | sudo bash >/dev/null 2>&1 \
         || echo "WARN: flux CLI install failed — OpenCenter flux bootstrap needs it on deployer hosts"
 fi
+# mise: the OpenCenter Quick Start training lab's Stage 1 builds the CLI with
+# `mise trust && mise install && mise run build`. The lab's command policy
+# deliberately refuses to pipe a fetched installer into a shell for a learner
+# (shared multi-tenant sandbox), so mise has to exist on the host before any
+# student session starts. Without it Stage 1 fails with "mise: command not
+# found" for every learner and the CLI never gets built - which is why the
+# hosted deployment failed while a dev box with a manually-installed copy at
+# ~/.local/bin/mise worked fine.
+if ! command -v mise >/dev/null 2>&1 && [[ ! -x "$HOME/.local/bin/mise" ]]; then
+    echo "-> Fresh host: installing mise (OpenCenter training lab Stage 1 needs it)..."
+    curl -fsSL --max-time 120 https://mise.run 2>/dev/null | sh >/dev/null 2>&1 \
+        || echo "WARN: mise install failed — OpenCenter Quick Start Stage 1 cannot build the CLI without it"
+fi
 if command -v nginx >/dev/null 2>&1 && [[ ! -f /etc/nginx/conf.d/osflex.conf ]] \
         && [[ -f "$SCRIPT_DIR/workflow_dashboard/osflex_nginx.conf" ]]; then
     echo "-> Fresh host: installing nginx site config + self-signed certificate..."
