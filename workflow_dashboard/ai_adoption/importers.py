@@ -313,13 +313,36 @@ def import_upload(archive_path: Path, workspace: Path, display_name: str = "") -
 
 
 def import_flex_system(system: Dict[str, Any]) -> Dict[str, Any]:
-    """Brownfield: the 'source' is an already-migrated FLEX business system.
+    """The 'source' is an already-migrated FLEX business system.
 
-    There is no code to fetch — the system of record stays where it is. What we
-    capture is the declared shape of the application so the integration
-    readiness assessment has something to judge.
+    Used by both modes: Brownfield adds AI beside the app, Greenfield builds a
+    new AI platform seeded from it. Either way there is no code to fetch — the
+    application stays where it is.
+
+    What we do capture is its **cloud-native posture**. A containerized app
+    already running on OpenCenter Kubernetes, with health endpoints and a
+    published API, is materially readier to host AI features than a lift-and-
+    shifted VM, and the assessment should be able to tell them apart instead of
+    reporting everything as unchecked.
     """
     name = str(system.get("name") or "Business System").strip()
+
+    def _flag(*keys: str) -> bool:
+        for key in keys:
+            if bool(system.get(key)):
+                return True
+        return False
+
+    posture = {
+        "containerised": _flag("containerised", "containerized", "container_image"),
+        "kubernetes": _flag("kubernetes", "openceter", "opencenter", "k8s", "namespace"),
+        "health_endpoint": _flag("health_endpoint", "health"),
+        "api_published": _flag("openapi", "api_spec", "api_published"),
+        "container_image": str(system.get("container_image") or "").strip(),
+        "namespace": str(system.get("namespace") or "").strip(),
+    }
+    posture["cloud_native"] = posture["containerised"] and posture["kubernetes"]
+
     return {
         "provider": "FLEX_BUSINESS_SYSTEM",
         "source_uri": f"flex://{system.get('id') or name}",
@@ -338,10 +361,59 @@ def import_flex_system(system: Dict[str, Any]) -> Dict[str, Any]:
             "sensitivity": (system.get("sensitivity") or "").upper(),
             "status": system.get("status") or "MIGRATED",
         },
+        "posture": posture,
     }
 
 
 # ---------------------------------------------------------------- manifests
+
+
+def import_opencenter_workload(workload: Dict[str, Any]) -> Dict[str, Any]:
+    """A containerised FLEX application already running on OpenCenter.
+
+    No source tree either, but unlike a declared FLEX system this one arrives
+    *from* Kubernetes — so containerised and orchestrated are observed facts,
+    not assertions. Health and API posture still have to be declared, because a
+    workload can run happily on Kubernetes without exposing either.
+    """
+    name = str(workload.get("name") or workload.get("deployment") or "Workload").strip()
+    image = str(workload.get("image") or workload.get("container_image") or "").strip()
+    namespace = str(workload.get("namespace") or "").strip()
+
+    posture = {
+        # Observed: it is running on OpenCenter.
+        "containerised": True,
+        "kubernetes": True,
+        # Declared: a probe or a published spec may or may not exist.
+        "health_endpoint": bool(workload.get("health_endpoint") or workload.get("readiness_probe")),
+        "api_published": bool(workload.get("openapi") or workload.get("api_published")),
+        "container_image": image,
+        "namespace": namespace,
+        "cloud_native": True,
+        "observed_from": "OpenCenter",
+    }
+
+    return {
+        "provider": "OPENCENTER",
+        "source_uri": f"opencenter://{namespace or 'default'}/{name}",
+        "display_name": name,
+        "branch": "",
+        "commit_sha": "",
+        "project_path": "",
+        "root": "",
+        "imported_at": now_ms(),
+        "import_status": "OK",
+        "warnings": [] if image else ["container image digest not supplied — deployment is not reproducible"],
+        "credential_reference": "",
+        "declared": {
+            "cluster": str(workload.get("cluster") or "").strip(),
+            "namespace": namespace,
+            "replicas": workload.get("replicas") or 0,
+            "image": image,
+            "sensitivity": str(workload.get("sensitivity") or "").upper(),
+        },
+        "posture": posture,
+    }
 
 
 LAUNCHPAD_MANIFEST = "launchpad-project.json"

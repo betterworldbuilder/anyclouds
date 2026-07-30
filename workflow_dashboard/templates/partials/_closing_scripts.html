@@ -6639,7 +6639,7 @@ ${certContent}
   }
 
   // "only=<token>" focus mode: keep only the requested panel visible (chrome + other panels hidden),
-  // e.g. only=aipower shows just Stage 9 AI Power Up. Walks up hiding siblings; keeps the panel's JS
+  // e.g. only=aipower shows just Stage 4 AI Power Up. Walks up hiding siblings; keeps the panel's JS
   // alive (unlike a static extract) so its interactive buttons still work.
   function applyOnlyFocus() {
     var params = new URLSearchParams(window.location.search || '');
@@ -8801,7 +8801,7 @@ ${certContent}
         {id:'panel-s8',  key:'s8',  label:'Stage 7 — IaC Backup, DR \u0026 Restore',     vidKey:'pnl-s8',  vidTitle:'Stage 7 \u2014 IaC Backup, DR \u0026 Restore Tutorial'},
         {id:'panel-s9',  key:'s9',  label:'Stage 8 — GitOps \u0026 OpenCenter Mod.',      vidKey:'pnl-s9',  vidTitle:'Stage 8 \u2014 GitOps \u0026 OpenCenter Modernization Tutorial'},
         {id:'panel-s10', key:'s10', label:'Stage 9 — AIOps \u0026 Continuous Ops',        vidKey:'pnl-s10', vidTitle:'Stage 9 \u2014 AIOps \u0026 Continuous Operations Tutorial'},
-        {id:'panel-sai', key:'sai', label:'Stage 9 — AI Power Up',                           vidKey:'pnl-sai', vidTitle:'Stage 9 \u2014 AI Power Up Tutorial'}
+        {id:'panel-sai', key:'sai', label:'Stage 4 — AI Power Up',                           vidKey:'pnl-sai', vidTitle:'Stage 9 \u2014 AI Power Up Tutorial'}
       ];
       panels.forEach(p => {
           const panelEl = document.querySelector('#' + p.id);

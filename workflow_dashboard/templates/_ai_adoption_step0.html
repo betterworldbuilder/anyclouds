@@ -1,14 +1,14 @@
 <!-- ════════════════════════════════════════
-     STEP 0 — AI ADOPTION MODE  (Stage 9 AI Adoption & Production Factory)
-     Additive: everything below this block is the original Stage 9 flow.
+     STEP 0 — AI ADOPTION MODE  (Stage 4 AI Adoption & Production Factory)
+     Additive: everything below this block is the original Stage 4 flow.
      Hides itself entirely when AI_ADOPTION_FACTORY_ENABLED is off.
 ═════════════════════════════════════════ -->
 <div id="sai-adopt-root" style="display:none;background:rgba(15,23,42,.6);border:1px solid rgba(139,92,246,.2);border-radius:12px;padding:22px;margin-bottom:20px;">
   <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
     <div style="background:#7c3aed;color:#fff;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:13px;flex-shrink:0;">0</div>
     <div style="flex:1;">
-      <div style="font-size:15px;font-weight:800;color:#e2e8f0;">Select your AI adoption mode</div>
-      <div style="font-size:11px;color:#64748b;margin-top:2px;">Build new AI, add AI to an existing application, or industrialize an AI PoC you already have</div>
+      <div id="sai-adopt-heading" style="font-size:15px;font-weight:800;color:#e2e8f0;">Select your AI adoption mode</div>
+      <div id="sai-adopt-scenario-hint" style="font-size:11px;color:#64748b;margin-top:2px;">Build new AI, add AI to an existing application, or deploy an agent you already have</div>
     </div>
     <div id="sai-adopt-auth" style="font-size:11px;color:#64748b;"></div>
   </div>
@@ -19,6 +19,77 @@
   </div>
 
   <div id="sai-adopt-modes" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin-bottom:18px;"></div>
+
+  <!-- ── Overview: read this first. Shown by the "What is Stage 4?" substage. ── -->
+  <div id="sai-adopt-overview" style="display:none;">
+    <div style="background:rgba(0,0,0,.22);border:1px solid rgba(139,92,246,.28);border-radius:11px;padding:16px 18px;margin-bottom:14px;">
+      <div style="font-size:15px;font-weight:800;color:#e2e8f0;margin-bottom:4px;">What Stage 4 is for</div>
+      <div style="font-size:12px;color:#cbd5e1;line-height:1.65;">
+        Your workloads are on FLEX. Stage 4 turns a <b>business problem</b> into a
+        <b>governed AI workload in production</b> — and tells you honestly what is still missing,
+        rather than reporting a clean pass on things nobody checked.
+      </div>
+    </div>
+
+    <div style="overflow-x:auto;margin-bottom:14px;">
+      <table style="width:100%;border-collapse:collapse;font-size:11.5px;min-width:680px;">
+        <tr style="text-align:left;color:#a78bfa;font-size:10px;text-transform:uppercase;letter-spacing:.06em;">
+          <th style="padding:7px 9px;border-bottom:1px solid rgba(139,92,246,.3);">Step</th>
+          <th style="padding:7px 9px;border-bottom:1px solid rgba(139,92,246,.3);">What it does</th>
+          <th style="padding:7px 9px;border-bottom:1px solid rgba(139,92,246,.3);">You give</th>
+          <th style="padding:7px 9px;border-bottom:1px solid rgba(139,92,246,.3);">You get</th>
+        </tr>
+        <tr><td style="padding:7px 9px;color:#e2e8f0;font-weight:700;">1 · Pick a path</td>
+            <td style="padding:7px 9px;color:#94a3b8;">Matches your situation to one of four routes</td>
+            <td style="padding:7px 9px;color:#94a3b8;">Your situation</td>
+            <td style="padding:7px 9px;color:#6ee7b7;">The right questions, not all of them</td></tr>
+        <tr><td style="padding:7px 9px;color:#e2e8f0;font-weight:700;">2 · Import</td>
+            <td style="padding:7px 9px;color:#94a3b8;">Fetches the project. Never runs it.</td>
+            <td style="padding:7px 9px;color:#94a3b8;">A FLEX app, an OpenCenter container, a repo, a bundle — or nothing</td>
+            <td style="padding:7px 9px;color:#6ee7b7;">An inventory of what you actually have</td></tr>
+        <tr><td style="padding:7px 9px;color:#e2e8f0;font-weight:700;">3 · Describe the problem</td>
+            <td style="padding:7px 9px;color:#94a3b8;">Turns pain points into AI tools worth building</td>
+            <td style="padding:7px 9px;color:#94a3b8;">What hurts, what goes in, what should come out, who else it touches</td>
+            <td style="padding:7px 9px;color:#6ee7b7;">Tools that each cite the pain that justified them</td></tr>
+        <tr><td style="padding:7px 9px;color:#e2e8f0;font-weight:700;">4 · Score the gaps</td>
+            <td style="padding:7px 9px;color:#94a3b8;">Checks 19–24 controls across five areas</td>
+            <td style="padding:7px 9px;color:#94a3b8;">Owners, data classification, model licence</td>
+            <td style="padding:7px 9px;color:#6ee7b7;">A score, a confidence figure, and named gaps</td></tr>
+        <tr><td style="padding:7px 9px;color:#e2e8f0;font-weight:700;">5 · Plan</td>
+            <td style="padding:7px 9px;color:#94a3b8;">Picks the service, the cluster and the architecture</td>
+            <td style="padding:7px 9px;color:#94a3b8;">Nothing more — it is derived</td>
+            <td style="padding:7px 9px;color:#6ee7b7;">Target architecture, diagram, Palantir mapping, passport</td></tr>
+        <tr><td style="padding:7px 9px;color:#e2e8f0;font-weight:700;">6 · Hand off</td>
+            <td style="padding:7px 9px;color:#94a3b8;">Packages everything for the delivery team</td>
+            <td style="padding:7px 9px;color:#94a3b8;">—</td>
+            <td style="padding:7px 9px;color:#6ee7b7;">One checksummed ZIP: report, plan, mapping, passport</td></tr>
+      </table>
+    </div>
+
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:11px;margin-bottom:14px;">
+      <div style="background:rgba(0,0,0,.2);border-left:3px solid #34d399;border-radius:0 8px 8px 0;padding:10px 12px;">
+        <div style="font-size:11px;font-weight:800;color:#6ee7b7;text-transform:uppercase;letter-spacing:.05em;">What it does do</div>
+        <div style="font-size:11px;color:#94a3b8;margin-top:5px;line-height:1.6;">
+          Plans, scores and evidences. Produces a handoff a delivery team can act on.
+        </div>
+      </div>
+      <div style="background:rgba(0,0,0,.2);border-left:3px solid #fbbf24;border-radius:0 8px 8px 0;padding:10px 12px;">
+        <div style="font-size:11px;font-weight:800;color:#fcd34d;text-transform:uppercase;letter-spacing:.05em;">What it does not</div>
+        <div style="font-size:11px;color:#94a3b8;margin-top:5px;line-height:1.6;">
+          It does not deploy, run your code, or watch live traffic. Everything is marked <b>PROPOSED</b>.
+        </div>
+      </div>
+      <div style="background:rgba(0,0,0,.2);border-left:3px solid #22d3ee;border-radius:0 8px 8px 0;padding:10px 12px;">
+        <div style="font-size:11px;font-weight:800;color:#67e8f9;text-transform:uppercase;letter-spacing:.05em;">Why the score is honest</div>
+        <div style="font-size:11px;color:#94a3b8;margin-top:5px;line-height:1.6;">
+          Anything unverified reads <b>NOT_CHECKED</b> and lowers confidence — it never counts as a pass.
+        </div>
+      </div>
+    </div>
+
+    <div style="font-size:12px;font-weight:800;color:#e2e8f0;margin-bottom:8px;">Which path is yours?</div>
+    <div id="sai-overview-paths" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(235px,1fr));gap:10px;"></div>
+  </div>
 
   <!-- source selector -->
   <div id="sai-adopt-source" style="display:none;border-top:1px solid rgba(139,92,246,.2);padding-top:16px;">
@@ -70,6 +141,18 @@
         <label style="display:flex;flex-direction:column;gap:4px;font-size:10px;font-weight:800;color:#94a3b8;text-transform:uppercase;">Migrated FLEX business system
           <select id="sai-adopt-flexsys" style="border:1px solid #475569;border-radius:7px;padding:8px;background:#0f172a;color:#e2e8f0;font-size:13px;"></select>
         </label>
+        <div id="sai-adopt-flex-origin" style="font-size:10px;margin-top:4px;color:#64748b;"></div>
+        <div id="sai-adopt-demo-warn" style="display:none;margin-top:7px;background:rgba(245,158,11,.14);border:1px solid rgba(251,191,36,.45);border-radius:7px;padding:7px 11px;font-size:11px;color:#fcd34d;">
+          ⚠️ <b>DEMO system</b> — this is sample data, not a real customer system. Anything produced from it is labelled DEMO.
+        </div>
+        <div style="margin-top:10px;font-size:10px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em;">Cloud-native posture of this app</div>
+        <div style="display:flex;flex-wrap:wrap;gap:14px;margin-top:6px;">
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#cbd5e1;cursor:pointer;"><input type="checkbox" id="sai-adopt-containerised"> Containerised</label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#cbd5e1;cursor:pointer;"><input type="checkbox" id="sai-adopt-k8s"> On OpenCenter / Kubernetes</label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#cbd5e1;cursor:pointer;"><input type="checkbox" id="sai-adopt-health"> Health endpoint</label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#cbd5e1;cursor:pointer;"><input type="checkbox" id="sai-adopt-api"> Published API / OpenAPI</label>
+        </div>
+        <div style="font-size:10px;color:#64748b;margin-top:6px;">There is no source tree to scan, so these are declared facts. Each one you tick is credited to the score with its source recorded — leave unticked what you have not verified.</div>
       </div>
 
       <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;">
@@ -79,6 +162,126 @@
     </div>
   </div>
 
+  <!-- ── Brownfield only: how the AI layer attaches, and how it comes off ── -->
+  <div id="sai-adopt-integration" style="display:none;margin-top:16px;border-top:1px solid rgba(139,92,246,.2);padding-top:16px;">
+    <div style="font-size:13px;font-weight:800;color:#e2e8f0;margin-bottom:3px;">How does the AI layer attach — and how does it come off?</div>
+    <div style="font-size:11px;color:#64748b;margin-bottom:12px;">The application stays the system of record. Anything here that is not answered stays <b>NOT_CHECKED</b>; nothing is assumed safe.</div>
+
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px;">
+      <label style="display:flex;flex-direction:column;gap:4px;font-size:10px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em;">Integration pattern
+        <select id="sai-int-pattern" style="border:1px solid #475569;border-radius:7px;padding:8px;background:#0f172a;color:#e2e8f0;font-size:12px;">
+          <option value="">— not decided —</option>
+          <option>API-based</option><option>Event-driven</option><option>Sidecar</option>
+          <option>Read-only data adapter</option><option>Integration facade</option>
+          <option>Embedded UI widget</option>
+        </select>
+      </label>
+      <label style="display:flex;flex-direction:column;gap:4px;font-size:10px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em;">Agent access to the app
+        <select id="sai-int-access" style="border:1px solid #475569;border-radius:7px;padding:8px;background:#0f172a;color:#e2e8f0;font-size:12px;">
+          <option value="">— not decided —</option>
+          <option value="READ_ONLY">Read-only</option>
+          <option value="WRITE_APPROVED">Write, human-approved</option>
+          <option value="WRITE_AUTO">Write, automated</option>
+        </select>
+      </label>
+      <label style="display:flex;flex-direction:column;gap:4px;font-size:10px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em;">Activation level to start
+        <select id="sai-int-activation" style="border:1px solid #475569;border-radius:7px;padding:8px;background:#0f172a;color:#e2e8f0;font-size:12px;">
+          <option value="">— not decided —</option>
+          <option>Offline testing</option><option>Shadow mode</option>
+          <option>Advisory</option><option>Human-approved action</option>
+        </select>
+      </label>
+    </div>
+
+    <div style="display:flex;flex-wrap:wrap;gap:14px;margin-top:12px;">
+      <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#cbd5e1;cursor:pointer;"><input type="checkbox" id="sai-int-works-without"> The existing workflow still works with AI disabled</label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#cbd5e1;cursor:pointer;"><input type="checkbox" id="sai-int-rollback-tested"> Rollback has been tested</label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#cbd5e1;cursor:pointer;"><input type="checkbox" id="sai-int-apis-documented"> Application APIs are documented</label>
+    </div>
+    <div id="sai-int-warning" style="display:none;margin-top:10px;background:rgba(239,68,68,.12);border:1px solid rgba(248,113,113,.4);border-radius:8px;padding:9px 12px;font-size:11px;color:#fca5a5;"></div>
+  </div>
+
+  <!-- ── Ready-PoC only: the bundle and where it goes ── -->
+  <div id="sai-adopt-bundle" style="display:none;margin-top:16px;border-top:1px solid rgba(139,92,246,.2);padding-top:16px;">
+    <div style="font-size:13px;font-weight:800;color:#e2e8f0;margin-bottom:3px;">This agent is already built</div>
+    <div style="font-size:11px;color:#64748b;margin-bottom:10px;">No PoC needed. We import it, close the production gaps CloudJumper finds, and hand it to Rackspace delivery.</div>
+    <div style="background:rgba(0,0,0,.2);border-left:3px solid #34d399;border-radius:0 7px 7px 0;padding:9px 12px;font-size:11px;color:#94a3b8;">
+      YES AI CAN and AI 4 the People can also send bundles here <b style="color:#6ee7b7;">directly</b> from their own
+      Deployment in Production stage — no download and re-upload. A Palantir Foundry export is imported the same way.
+    </div>
+  </div>
+
+  <!-- ── Palantir-ready build: Foundry-shaped, without a Foundry export ── -->
+  <div id="sai-adopt-foundry" style="display:none;margin-top:16px;border-top:1px solid rgba(139,92,246,.2);padding-top:16px;">
+    <div style="font-size:13px;font-weight:800;color:#e2e8f0;margin-bottom:3px;">🧩 Foundry-ready, without a Foundry export</div>
+    <div style="font-size:11px;color:#64748b;margin-bottom:12px;">
+      You do not need anything from Palantir to start. Declare the ontology below — business system, pain points,
+      inputs, outputs, related teams — and we produce the object, link and AIP tool mapping their Foundry team
+      implements, plus the connection kit for registering your FLEX-hosted runtime as an externally hosted model.
+    </div>
+
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px;">
+      <label style="display:flex;flex-direction:column;gap:4px;font-size:10px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em;">Where the runtime is hosted
+        <select id="sai-foundry-host" style="border:1px solid #475569;border-radius:7px;padding:8px;background:#0f172a;color:#e2e8f0;font-size:12px;">
+          <option>AI LaunchPad</option>
+          <option>Rackspace Spot</option>
+          <option>FLEX + OpenCenter</option>
+          <option>Managed OSPC</option>
+        </select>
+      </label>
+      <label style="display:flex;flex-direction:column;gap:4px;font-size:10px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em;">Foundry enrollment (optional)
+        <input id="sai-foundry-enrollment" type="text" placeholder="acme.palantirfoundry.com" style="border:1px solid #475569;border-radius:7px;padding:8px;background:#0f172a;color:#e2e8f0;font-size:12px;">
+      </label>
+      <label style="display:flex;flex-direction:column;gap:4px;font-size:10px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em;">Target ontology name (optional)
+        <input id="sai-foundry-ontology" type="text" placeholder="acme-production" style="border:1px solid #475569;border-radius:7px;padding:8px;background:#0f172a;color:#e2e8f0;font-size:12px;">
+      </label>
+    </div>
+
+    <div style="display:flex;flex-wrap:wrap;gap:14px;margin-top:12px;">
+      <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#cbd5e1;cursor:pointer;"><input type="checkbox" id="sai-foundry-transfer"> Data may leave our environment</label>
+      <span style="font-size:10px;color:#64748b;align-self:center;">Leave unticked if it must stay put — that is the normal answer for regulated data.</span>
+    </div>
+
+    <button id="sai-foundry-check" style="margin-top:12px;background:linear-gradient(135deg,#7c3aed,#6d28d9);border:1px solid #a78bfa;border-radius:8px;color:#fff;padding:9px 16px;font-size:12px;font-weight:800;cursor:pointer;">🧩 Which Foundry setup do we need?</button>
+    <div id="sai-foundry-result" style="display:none;margin-top:12px;"></div>
+
+    <div style="margin-top:11px;background:rgba(0,0,0,.2);border-left:3px solid #a78bfa;border-radius:0 7px 7px 0;padding:9px 12px;font-size:11px;color:#94a3b8;line-height:1.55;">
+      <b style="color:#c4b5fd;">To be clear about what we do here.</b>
+      We produce the mapping and the plan. We do <b>not</b> call Foundry, hold your credentials, or sync anything —
+      everything is marked <b>PROPOSED</b>, and every step someone else has to take is marked <b>NOT_CHECKED</b>
+      until they confirm it.
+    </div>
+  </div>
+
+  <!-- ── Business-system ontology: pain in, AI tools out ── -->
+  <div id="sai-adopt-onto" style="display:none;margin-top:16px;border-top:1px solid rgba(139,92,246,.2);padding-top:16px;">
+    <div style="font-size:13px;font-weight:800;color:#e2e8f0;margin-bottom:3px;">What should AI improve about this business system?</div>
+    <div style="font-size:11px;color:#64748b;margin-bottom:12px;">Five answers. Every tool we propose cites the pain point that produced it — declare nothing and we propose nothing.</div>
+
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;">
+      <div>
+        <div style="font-size:10px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;">1 · What hurts today?</div>
+        <div id="sai-onto-pains" style="display:flex;flex-wrap:wrap;gap:5px;"></div>
+      </div>
+      <div>
+        <div style="font-size:10px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;">2 · What goes in today?</div>
+        <input id="sai-onto-inputs" type="text" placeholder="PDF invoices, ERP records, emails" style="width:100%;border:1px solid #475569;border-radius:7px;padding:8px;background:#0f172a;color:#e2e8f0;font-size:12px;">
+        <div style="font-size:10px;color:#64748b;margin-top:3px;">Comma separated.</div>
+      </div>
+      <div>
+        <div style="font-size:10px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;">3 · What should come out?</div>
+        <input id="sai-onto-outputs" type="text" placeholder="matched invoice + confidence, exception queue" style="width:100%;border:1px solid #475569;border-radius:7px;padding:8px;background:#0f172a;color:#e2e8f0;font-size:12px;">
+      </div>
+      <div>
+        <div style="font-size:10px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;">4 · Which other teams does it touch?</div>
+        <input id="sai-onto-orgs" type="text" placeholder="Finance, Collections, Customer Portal" style="width:100%;border:1px solid #475569;border-radius:7px;padding:8px;background:#0f172a;color:#e2e8f0;font-size:12px;">
+      </div>
+    </div>
+
+    <button id="sai-onto-run" style="margin-top:12px;background:linear-gradient(135deg,#0891b2,#0e7490);border:1px solid #22d3ee;border-radius:8px;color:#fff;padding:9px 16px;font-size:12px;font-weight:800;cursor:pointer;">🔍 Show me what to build</button>
+    <div id="sai-onto-result" style="display:none;margin-top:12px;"></div>
+  </div>
+
   <div id="sai-adopt-progress" style="display:none;margin-top:14px;background:rgba(6,182,212,.08);border:1px solid rgba(34,211,238,.25);border-radius:8px;padding:11px 14px;font-size:12px;color:#67e8f9;"></div>
   <div id="sai-adopt-result" style="display:none;margin-top:16px;"></div>
 </div>
@@ -86,22 +289,97 @@
 <script>
 (function () {
   var API = '/ai-adoption';
-  var state = { mode: '', source: '', projectId: '', meta: null };
+  var state = { scenario: '', mode: '', palantir: false, source: '', projectId: '', meta: null };
   var $ = function (id) { return document.getElementById(id); };
 
-  var MODES = [
-    { id: 'GREENFIELD', icon: '🌱', title: 'Greenfield AI Platform Build',
-      blurb: 'Create a new governed AI environment from a new idea, LaunchPad PoC, AI 4 the People agent, GitHub project, or uploaded project.' },
-    { id: 'BROWNFIELD', icon: '🔗', title: 'Brownfield AI Augmentation',
-      blurb: 'Add an AI agent to an existing business application while preserving the application as the system of record.' },
-    { id: 'EXISTING_POC', icon: '🚀', title: 'Existing AI PoC Industrialization',
-      blurb: 'Import an existing PoC, close its production gaps, and move it into governed FLEX/OpenCenter production.' }
+  // Four substages over three adoption modes. The enum stays GREENFIELD /
+  // BROWNFIELD / EXISTING_POC because it is baked into CloudJumper's scoring,
+  // YES AI CAN, AI 4 the People and every handoff manifest already sent —
+  // "Goldenfield" and "Palantir-ready" are presentation and presets, not new
+  // contract values.
+  var SCENARIOS = [
+    { id: 'OVERVIEW', mode: 'GREENFIELD', overview: true, icon: '📖', title: 'What is Stage 4?', tag: 'Read first',
+      blurb: 'What this stage is for, what it does, and what you get out.',
+      what: 'Stage 4 turns a business problem into a governed AI workload running in production — and tells you honestly what is still missing.',
+      how: ['Pick the path that matches your situation',
+            'Point us at what exists — an app, a repo, a bundle, or nothing yet',
+            'We scan it without running it, and score what production needs',
+            'You get a plan, a target architecture and a handoff pack'],
+      good_for: 'Anyone deciding where to start.' },
+
+    { id: 'GREENFIELD', mode: 'GREENFIELD', icon: '🌱', title: 'Greenfield', tag: 'Greenfield',
+      blurb: 'You have no AI here yet. Build it.',
+      what: 'You want AI you do not have yet. We start from your business problem and build something new.',
+      how: ['Say which system you want to improve and what hurts about it',
+            'Pick what the build starts from — a migrated FLEX app, a container on OpenCenter, a repo, or nothing at all',
+            'We score what is missing and produce a build plan',
+            'You get a costed plan and a handoff pack for the delivery team'],
+      good_for: 'A business problem with no software behind it yet.' },
+
+    { id: 'BROWNFIELD', mode: 'BROWNFIELD', icon: '🔗', title: 'Brownfield', tag: 'Brownfield',
+      blurb: 'You have a working app. Add AI beside it.',
+      what: 'Your application keeps doing its job. We add an AI layer next to it that you can switch off again.',
+      how: ['Pick the application that is already running',
+            'Say how the AI attaches — read-only, write with approval, or automated',
+            'Confirm the app still works with the AI turned off, and that rollback was tested',
+            'We will not pass it as ready until rollback is proven'],
+      good_for: 'An app you cannot risk breaking.' },
+
+    { id: 'GOLDENFIELD', mode: 'EXISTING_POC', icon: '🏆', title: 'Goldenfield', tag: 'Ready agent',
+      blurb: 'The agent already exists and works. Get it live.',
+      what: 'Someone already built and validated this agent. No more proving it — we close the gaps that stop it going to production.',
+      how: ['Bring the agent in from AI 4 the People, YES AI CAN, a repo, or a Palantir export',
+            'We scan it without running it and list what production needs',
+            'Fix the gaps we name',
+            'It goes to the delivery team as a signed, checksummed bundle'],
+      good_for: 'A finished agent stuck in a lab.' },
+
+    { id: 'PALANTIR_READY', mode: 'GREENFIELD', palantir: true, icon: '🧩', title: 'Palantir Foundry', tag: 'Foundry',
+      blurb: 'Run AI on Palantir Foundry, operated by Rackspace.',
+      what: 'You do not need anything from Palantir to start here. Describe the business problem and we turn it into the objects, relationships and AI tools Foundry works with — then we tell you where Foundry itself should run.',
+      how: ['Describe the business system and what hurts about it',
+            'Answer three things: who owns the data, where must it live, may it leave',
+            'We pick the right Foundry setup from those answers and show you why',
+            'You get the mapping, the plan, and who does each step next'],
+      good_for: 'Regulated or sovereign data that cannot move.' }
   ];
+
+  // The four working paths as clickable cards, so the overview is a way in
+  // rather than a dead end.
+  function renderOverviewPaths() {
+    var wrap = $('sai-overview-paths');
+    if (!wrap) return;
+    wrap.innerHTML = SCENARIOS.filter(function (s) { return !s.overview; }).map(function (s) {
+      return '<div data-goto="' + s.id + '" style="cursor:pointer;border-radius:10px;padding:12px;' +
+        'border:1px solid rgba(139,92,246,.28);background:rgba(15,23,42,.5);">' +
+        '<div style="font-size:13px;font-weight:800;color:#e2e8f0;">' + s.icon + ' ' + esc(s.title) + '</div>' +
+        '<div style="font-size:11px;color:#94a3b8;margin-top:4px;line-height:1.5;">' + esc(s.blurb) + '</div>' +
+        '<div style="font-size:10px;color:#6ee7b7;margin-top:6px;">' + esc(s.good_for) + '</div>' +
+        '<div style="font-size:10px;color:#a78bfa;margin-top:6px;font-weight:800;">Start here →</div></div>';
+    }).join('');
+    Array.prototype.forEach.call(wrap.children, function (card) {
+      card.onclick = function () {
+        var sc = scenarioById(card.getAttribute('data-goto'));
+        state.scenario = sc.id; state.mode = sc.mode; state.palantir = !!sc.palantir; state.source = '';
+        renderModes(); renderSources(); applyScenario();
+      };
+    });
+  }
+
+  function scenarioById(id) {
+    return SCENARIOS.filter(function (s) { return s.id === id; })[0] || SCENARIOS[0];
+  }
+
+  // Kept so existing code that reasons about adoption modes still works.
+  var MODES = SCENARIOS;
 
   var SOURCE_LABEL = {
     GITHUB: '🐙 GitHub repository', UPLOAD: '📦 Upload project / ZIP', NOTEBOOK: '📓 Upload notebook',
-    FLEX_BUSINESS_SYSTEM: '🏢 Migrated FLEX system', NEW_PROJECT: '✨ New AI project',
-    LAUNCHPAD: '🚀 Rackspace AI LaunchPad bundle', AI4PEOPLE: '🤝 AI 4 the People package', MANUAL: '✍️ Register manually'
+    FLEX_BUSINESS_SYSTEM: '🏢 Migrated FLEX app',
+    OPENCENTER: '📦 Containerised app on OpenCenter', NEW_PROJECT: '✨ New AI project',
+    LAUNCHPAD: '🚀 Rackspace AI LaunchPad bundle',
+    AI4PEOPLE: '🤝 AI 4 the People / YES AI CAN agent',
+    PALANTIR: '🧩 Palantir Foundry export', MANUAL: '✍️ Register manually'
   };
   // LaunchPad and AI4People arrive as uploads; their manifest is detected server-side.
   var UPLOAD_KINDS = { UPLOAD: 1, NOTEBOOK: 1, LAUNCHPAD: 1, AI4PEOPLE: 1, NEW_PROJECT: 1, MANUAL: 1 };
@@ -186,19 +464,63 @@
     });
   }
 
+  // The Stage 4 sub-bar is the scenario selector. Rendering the same three
+  // choices again as cards inside the panel was pure duplication, so once a
+  // scenario is active this collapses to a one-line confirmation of it.
+  // The cards only appear as a fallback when the sub-bar is not in the DOM
+  // (e.g. the ?only= embed), so the panel is never a dead end.
   function renderModes() {
     var wrap = $('sai-adopt-modes');
-    wrap.innerHTML = MODES.map(function (m) {
-      var on = state.mode === m.id;
+    var hasSubBar = !!document.getElementById('subBar4');
+
+    if (hasSubBar && state.scenario) {
+      var m = scenarioById(state.scenario);
+      if (!m) { return; }
+      wrap.style.display = 'block';
+      wrap.innerHTML =
+        '<div style="border-radius:10px;padding:13px 15px;border:1px solid rgba(139,92,246,.35);' +
+        'background:rgba(124,58,237,.16);">' +
+        // Header line: which path you are on.
+        '<div style="display:flex;align-items:center;gap:10px;">' +
+        '<span style="font-size:20px;">' + m.icon + '</span>' +
+        '<span style="font-size:14px;font-weight:800;color:#e2e8f0;">' + esc(m.title) + '</span>' +
+        '<span style="font-size:12px;color:#c4b5fd;flex:1;">' + esc(m.blurb) + '</span>' +
+        '<span style="font-size:10px;color:#64748b;white-space:nowrap;">change above ↑</span></div>' +
+        // What it is.
+        '<div style="margin-top:10px;font-size:12px;color:#e2e8f0;line-height:1.6;">' +
+        '<b style="color:#c4b5fd;">What this is:</b> ' + esc(m.what) + '</div>' +
+        // How to, numbered.
+        '<div style="margin-top:9px;font-size:11px;color:#94a3b8;">' +
+        '<b style="color:#c4b5fd;font-size:12px;">How it works:</b>' +
+        '<ol style="margin:5px 0 0 18px;padding:0;line-height:1.7;">' +
+        m.how.map(function (h) { return '<li>' + esc(h) + '</li>'; }).join('') +
+        '</ol></div>' +
+        '<div style="margin-top:9px;font-size:11px;color:#6ee7b7;">' +
+        '<b>Pick this when:</b> ' + esc(m.good_for) + '</div>' +
+        '</div>';
+      return;
+    }
+
+    // Fallback: no sub-bar, so the panel must offer the choice itself.
+    wrap.style.display = 'grid';
+    wrap.innerHTML = SCENARIOS.map(function (m) {
+      var on = state.scenario === m.id;
       return '<div data-mode="' + m.id + '" style="cursor:pointer;border-radius:11px;padding:15px;border:1px solid ' +
         (on ? '#a78bfa' : 'rgba(139,92,246,.25)') + ';background:' + (on ? 'rgba(124,58,237,.22)' : 'rgba(15,23,42,.5)') +
         ';transition:.15s;">' +
-        '<div style="font-size:22px;margin-bottom:6px;">' + m.icon + '</div>' +
+        '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">' +
+        '<span style="font-size:22px;">' + m.icon + '</span>' +
+        '<span style="font-size:9px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;color:#a78bfa;' +
+        'border:1px solid rgba(139,92,246,.4);border-radius:99px;padding:2px 7px;">' + esc(m.tag) + '</span></div>' +
         '<div style="font-size:13px;font-weight:800;color:#e2e8f0;margin-bottom:5px;">' + esc(m.title) + '</div>' +
         '<div style="font-size:11px;color:#94a3b8;line-height:1.5;">' + esc(m.blurb) + '</div></div>';
     }).join('');
     Array.prototype.forEach.call(wrap.children, function (card) {
-      card.onclick = function () { state.mode = card.getAttribute('data-mode'); renderModes(); renderSources(); };
+      card.onclick = function () {
+        var sc = scenarioById(card.getAttribute('data-mode'));
+        state.scenario = sc.id; state.mode = sc.mode; state.palantir = !!sc.palantir;
+        renderModes(); renderSources(); applyScenario();
+      };
     });
   }
 
@@ -206,9 +528,12 @@
     if (!state.mode || !state.meta) return;
     show($('sai-adopt-source'), true);
     var list = (state.meta.sources_by_mode || {})[state.mode] || [];
-    $('sai-adopt-source-title').textContent = state.mode === 'GREENFIELD'
-      ? 'Where should this new AI production platform begin?'
-      : (state.mode === 'BROWNFIELD' ? 'Which existing application are we adding AI to?' : 'Where is the existing PoC?');
+    $('sai-adopt-source-title').textContent = {
+      GREENFIELD: 'Where should this new AI production platform begin?',
+      BROWNFIELD: 'Which existing application are we adding AI to?',
+      GOLDENFIELD: 'Where is the ready agent?',
+      PALANTIR_READY: 'What should the Foundry-ready runtime be built from?'
+    }[state.scenario] || 'Where should this begin?';
     var btns = $('sai-adopt-source-btns');
     btns.innerHTML = list.map(function (s) {
       var on = state.source === s;
@@ -219,7 +544,7 @@
     Array.prototype.forEach.call(btns.children, function (b) {
       b.onclick = function () { state.source = b.getAttribute('data-src'); renderSources(); };
     });
-    if (state.source) { show($('sai-adopt-form'), true); renderForm(); }
+    if (state.source) { show($('sai-adopt-form'), true); renderForm(); show($('sai-adopt-onto'), true); }
   }
 
   function renderForm() {
@@ -233,20 +558,82 @@
     var sel = $('sai-adopt-flexsys');
     if (!sel || sel.options.length) return;
     var systems = [];
+    var origin = '';
+
+    // Stage 1 discovery first: the real migrated inventory already lives in the
+    // tool, so making someone re-pick from a demo list was duplicate entry.
     try {
-      // Reuse whatever the existing Stage 9 flow already imported.
-      var raw = localStorage.getItem('ospcFlex_stage9_aiPowerUp');
-      if (raw) systems = (JSON.parse(raw) || {}).systems || [];
+      var tracker = localStorage.getItem('osflex_migration_tracker');
+      if (tracker) {
+        var t = JSON.parse(tracker) || {};
+        var rows = t.systems || t.rows || t.servers || (Array.isArray(t) ? t : []);
+        systems = (rows || []).map(function (x) {
+          return {
+            id: x.id || x.name || x.system || x.server_name,
+            name: x.name || x.system || x.server_name || x.label,
+            vms: x.vms || x.vm_count || x.apps || 1,
+            sensitivity: (x.sensitivity || x.confidentiality || '').toUpperCase(),
+            status: x.status || 'MIGRATED'
+          };
+        }).filter(function (x) { return x.name; });
+        if (systems.length) origin = 'Stage 1 migration tracker';
+      }
     } catch (e) { systems = []; }
+
+    // Then anything the existing Stage 4 flow imported.
     if (!systems.length) {
-      systems = [{ name: 'Customer Portal', vms: 4, sensitivity: 'MEDIUM' }, { name: 'Billing Platform', vms: 6, sensitivity: 'HIGH' },
-                 { name: 'Support Knowledge Base', vms: 2, sensitivity: 'LOW' }, { name: 'Claims / Ticketing', vms: 5, sensitivity: 'HIGH' },
-                 { name: 'Data Warehouse', vms: 8, sensitivity: 'MEDIUM' }, { name: 'ERP / Finance System', vms: 10, sensitivity: 'REGULATED' }];
+      try {
+        var raw = localStorage.getItem('ospcFlex_stage9_aiPowerUp');
+        if (raw) systems = (JSON.parse(raw) || {}).systems || [];
+        if (systems.length) origin = 'Stage 4 imported systems';
+      } catch (e) { systems = []; }
     }
+
+    var realCount = systems.length;
+    systems.forEach(function (s) { s.is_demo = false; });
+
+    // Demo systems are always offered so the page is never empty and the flow
+    // can be walked without customer data — but they are labelled DEMO
+    // everywhere, and the flag travels with the project so no report can
+    // present a demo run as a real one.
+    var demos = [
+      { name: 'Customer Portal', vms: 4, sensitivity: 'MEDIUM' },
+      { name: 'Billing Platform', vms: 6, sensitivity: 'HIGH' },
+      { name: 'Support Knowledge Base', vms: 2, sensitivity: 'LOW' },
+      { name: 'Claims / Ticketing', vms: 5, sensitivity: 'HIGH' },
+      { name: 'Data Warehouse', vms: 8, sensitivity: 'MEDIUM' },
+      { name: 'ERP / Finance System', vms: 10, sensitivity: 'REGULATED' }
+    ].map(function (d) { d.is_demo = true; return d; });
+    systems = systems.concat(demos);
+
+    var note = $('sai-adopt-flex-origin');
+    if (note) {
+      note.innerHTML = realCount
+        ? '<b style="color:#6ee7b7;">' + realCount + ' real system(s)</b> from your ' + esc(origin) +
+          ', plus ' + demos.length + ' demo system(s) marked DEMO.'
+        : '<b style="color:#fcd34d;">No migrated systems found</b> — only DEMO systems are listed. ' +
+          'Run Stage 1 discovery to load your real inventory.';
+    }
+
     sel.innerHTML = systems.map(function (s, i) {
-      return '<option value="' + i + '">' + esc(s.name) + ' — ' + esc(s.vms || 0) + ' VMs</option>';
+      var prefix = s.is_demo ? 'DEMO — ' : '';
+      return '<option value="' + i + '">' + esc(prefix + s.name) + ' — ' + esc(s.vms || 0) + ' VMs</option>';
     }).join('');
+    // Real systems first, so a real one is selected by default when present.
+    sel.value = '0';
     sel._systems = systems;
+    sel.onchange = markDemo;
+    markDemo();
+  }
+
+  // Keep the demo warning visible for as long as a demo system is selected.
+  function markDemo() {
+    var sel = $('sai-adopt-flexsys');
+    var warn = $('sai-adopt-demo-warn');
+    if (!sel || !warn) return;
+    var sys = (sel._systems || [])[sel.value | 0] || {};
+    show(warn, !!sys.is_demo);
+    state.isDemo = !!sys.is_demo;
   }
 
   function badge(text, bg, fg) {
@@ -383,8 +770,31 @@
       source_type: state.source === 'FLEX_BUSINESS_SYSTEM' ? 'FLEX_BUSINESS_SYSTEM' : (state.source === 'GITHUB' ? 'GITHUB' : 'UPLOAD'),
       data_sensitivity: $('sai-adopt-sens').value || '',
       business_owner: ($('sai-adopt-owner').value || '').trim(),
-      business_goal: (window.saiState && window.saiState.selectedGoal) || ''
+      business_goal: (window.saiState && window.saiState.selectedGoal) || '',
+      palantir_required: !!state.palantir,
+      is_demo: !!state.isDemo
     };
+    if (state.palantir) {
+      // Declared intent, not a Foundry connection. Nothing here reaches Palantir.
+      payload.sovereignty_requirements = payload.sovereignty_requirements || '';
+      payload.target_environment = $('sai-foundry-host').value || '';
+      payload.foundry_target = {
+        enrollment: ($('sai-foundry-enrollment').value || '').trim(),
+        ontology: ($('sai-foundry-ontology').value || '').trim(),
+        hosted_on: $('sai-foundry-host').value || ''
+      };
+    }
+    // Brownfield integration answers. Blank means undecided, never "safe".
+    if (state.mode === 'BROWNFIELD') {
+      payload.integration = {
+        pattern: $('sai-int-pattern').value || '',
+        agent_access: $('sai-int-access').value || '',
+        activation_level: $('sai-int-activation').value || '',
+        works_without_ai: $('sai-int-works-without').checked,
+        rollback_tested: $('sai-int-rollback-tested').checked,
+        apis_documented: $('sai-int-apis-documented').checked
+      };
+    }
     // Attach the readiness assessment as attributed evidence, if it was used.
     if (state.prefilled && state.assessment) {
       var a = state.assessment;
@@ -416,6 +826,14 @@
         if (state.source === 'FLEX_BUSINESS_SYSTEM') {
           var sel = $('sai-adopt-flexsys');
           var sys = (sel._systems || [])[sel.value | 0] || {};
+          // Declared cloud-native posture. Only ticked boxes are sent, so an
+          // unverified attribute stays NOT_CHECKED rather than defaulting false.
+          sys = Object.assign({}, sys, {
+            containerised: $('sai-adopt-containerised').checked,
+            kubernetes: $('sai-adopt-k8s').checked,
+            health_endpoint: $('sai-adopt-health').checked,
+            api_published: $('sai-adopt-api').checked
+          });
           return api('/projects/' + state.projectId + '/import', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ kind: 'FLEX', system: sys })
@@ -438,6 +856,276 @@
       .then(function () { $('sai-adopt-run').disabled = false; });
   }
 
+  // Which sections belong to which scenario. One panel, not three: the
+  // pipeline is identical, only the framing differs.
+  var SECTIONS = {
+    // The overview is read-only: no source picker, no forms.
+    OVERVIEW:       { onto: false, flex: false, integration: false, bundle: false, foundry: false },
+    GREENFIELD:     { onto: true,  flex: true,  integration: false, bundle: false, foundry: false },
+    BROWNFIELD:     { onto: true,  flex: true,  integration: true,  bundle: false, foundry: false },
+    GOLDENFIELD:    { onto: false, flex: false, integration: false, bundle: true,  foundry: false },
+    // Ontology is the whole point here: it is what Foundry receives.
+    PALANTIR_READY: { onto: true,  flex: true,  integration: false, bundle: false, foundry: true }
+  };
+
+  function applyScenario() {
+    var s = SECTIONS[state.scenario] || SECTIONS.GREENFIELD;
+    var isOverview = state.scenario === 'OVERVIEW';
+
+    // The overview replaces the working form rather than sitting above it.
+    show($('sai-adopt-overview'), isOverview);
+    show($('sai-adopt-source'), !isOverview && !!state.meta);
+    if (isOverview) {
+      renderOverviewPaths();
+      show($('sai-adopt-form'), false);
+      show($('sai-adopt-onto'), false);
+      show($('sai-adopt-integration'), false);
+      show($('sai-adopt-bundle'), false);
+      show($('sai-adopt-foundry'), false);
+      show($('sai-adopt-result'), false);
+      return;
+    }
+    show($('sai-adopt-foundry'), s.foundry && !!state.source);
+    // The ontology asks "what should we build?" — pointless for an agent that
+    // is already built, so it is hidden for a ready PoC.
+    show($('sai-adopt-onto'), s.onto && !!state.source);
+    show($('sai-adopt-integration'), s.integration && !!state.source);
+    show($('sai-adopt-bundle'), s.bundle && !!state.source);
+
+    // With the sub-bar present this section confirms a choice rather than
+    // asking for one, so the heading must not say "select".
+    var heading = $('sai-adopt-heading');
+    if (heading) {
+      heading.textContent = document.getElementById('subBar4')
+        ? 'Your AI adoption path' : 'Select your AI adoption mode';
+    }
+
+    var hint = $('sai-adopt-scenario-hint');
+    if (hint) {
+      hint.textContent = {
+        GREENFIELD: 'Nothing exists yet. Declare what should improve, then pick what seeds the build.',
+        BROWNFIELD: 'The application stays the system of record. The AI layer must be separately deployable and reversible.',
+        GOLDENFIELD: 'Already built and validated. Close its production gaps and send it to CloudJumper.',
+        PALANTIR_READY: 'No Foundry export needed. Declare the ontology here; we deploy the runtime and hand Foundry the mapping.'
+      }[state.scenario] || '';
+    }
+
+    // Keep the sub-bar in step with the panel, whichever one was clicked.
+    Array.prototype.forEach.call(document.querySelectorAll('.adopt-sub'), function (b) {
+      if (b.getAttribute('data-scenario') === state.scenario) { b.classList.add('active'); }
+      else { b.classList.remove('active'); }
+    });
+  }
+
+  // Both the Stage 4 dropdown and the sub-bar carry data-adopt-mode, so one
+  // delegated handler serves both: the dropdown is how you arrive from another
+  // stage, the sub-bar is how you move between scenarios once you are here.
+  function wireStageMenu() {
+    document.addEventListener('click', function (evt) {
+      var btn = evt.target && evt.target.closest ? evt.target.closest('[data-scenario]') : null;
+      if (!btn) return;
+      var id = btn.getAttribute('data-scenario');
+      if (!SCENARIOS.some(function (s) { return s.id === id; })) return;
+      var sc = scenarioById(id);
+      state.scenario = id;
+      state.mode = sc.mode;              // the enum the API sees
+      state.palantir = !!sc.palantir;    // preset, not a separate mode
+      state.source = '';
+      renderModes();
+      renderSources();
+      applyScenario();
+      var bar = document.getElementById('subBar4');
+      if (bar) bar.style.display = '';
+      // The panel is revealed by the stage router; wait a frame before scrolling.
+      setTimeout(function () {
+        var root = $('sai-adopt-root');
+        if (root && root.scrollIntoView) root.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 120);
+    }, true);
+
+    // Show the sub-bar whenever an AI stage is opened, hide it elsewhere.
+    document.addEventListener('click', function (evt) {
+      var btn = evt.target && evt.target.closest ? evt.target.closest('[data-stage]') : null;
+      if (!btn) return;
+      var stage = btn.getAttribute('data-stage');
+      var bar = document.getElementById('subBar4');
+      if (bar) bar.style.display = (stage === 'sai' || stage === 'sai_readiness') ? '' : 'none';
+    }, true);
+  }
+
+  // ── Business-system ontology ────────────────────────────────────────────
+  var ontoState = { pains: [], derived: null };
+
+  function renderPains(categories) {
+    var box = $('sai-onto-pains');
+    box.innerHTML = categories.map(function (c) {
+      var on = ontoState.pains.indexOf(c) >= 0;
+      return '<button type="button" data-pain="' + esc(c) + '" style="border-radius:99px;padding:5px 10px;' +
+        'font-size:11px;font-weight:700;cursor:pointer;border:1px solid ' + (on ? '#22d3ee' : '#475569') +
+        ';background:' + (on ? 'rgba(6,182,212,.22)' : 'rgba(15,23,42,.6)') +
+        ';color:' + (on ? '#67e8f9' : '#cbd5e1') + ';">' + (on ? '✓ ' : '') + esc(c) + '</button>';
+    }).join('');
+    Array.prototype.forEach.call(box.children, function (b) {
+      b.onclick = function () {
+        var p = b.getAttribute('data-pain');
+        var i = ontoState.pains.indexOf(p);
+        if (i >= 0) { ontoState.pains.splice(i, 1); } else { ontoState.pains.push(p); }
+        renderPains(categories);
+      };
+    });
+  }
+
+  function splitList(id) {
+    return ($(id).value || '').split(',').map(function (s) { return s.trim(); }).filter(Boolean);
+  }
+
+  function runOntology() {
+    if (!state.projectId) {
+      // The ontology attaches to a project, so create a draft one first.
+      var name = ($('sai-adopt-name').value || '').trim();
+      if (!name) { say('Give the project a name first.', 'err'); return; }
+      api('/projects', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: name, adoption_mode: state.mode || 'GREENFIELD' })
+      }).then(function (b) { state.projectId = b.project.id; postOntology(); })
+        .catch(function (e) { say(String(e.message || e), 'err'); });
+      return;
+    }
+    postOntology();
+  }
+
+  function postOntology() {
+    var sel = $('sai-adopt-flexsys');
+    var sysName = (sel && sel._systems && sel._systems[sel.value | 0])
+      ? sel._systems[sel.value | 0].name : ($('sai-adopt-name').value || '').trim();
+    api('/projects/' + state.projectId + '/ontology', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: sysName,
+        pain_points: ontoState.pains,
+        inputs: splitList('sai-onto-inputs'),
+        desired_outputs: splitList('sai-onto-outputs'),
+        related_orgs: splitList('sai-onto-orgs')
+      })
+    }).then(function (b) { ontoState.derived = b.ontology; renderOntology(b.ontology); })
+      .catch(function (e) { say(String(e.message || e), 'err'); });
+  }
+
+  function renderOntology(o) {
+    var out = $('sai-onto-result');
+    var html = '';
+
+    if (o.summary) {
+      html += '<div style="font-size:12px;color:#e2e8f0;font-weight:700;margin-bottom:9px;">' + esc(o.summary) + '</div>';
+    }
+    if (o.placement) {
+      html += '<div style="background:rgba(0,0,0,.2);border-left:3px solid #22d3ee;border-radius:0 7px 7px 0;' +
+        'padding:8px 11px;margin-bottom:10px;font-size:11px;color:#94a3b8;"><b style="color:#67e8f9;">Where it sits:</b> ' +
+        esc(o.placement) + '</div>';
+    }
+
+    if (o.ai_tools && o.ai_tools.length) {
+      html += '<table style="width:100%;border-collapse:collapse;font-size:11px;">' +
+        '<tr style="text-align:left;color:#64748b;font-size:10px;text-transform:uppercase;">' +
+        '<th style="padding:5px 8px;">Build this</th><th style="padding:5px 8px;">Capability</th>' +
+        '<th style="padding:5px 8px;">Because</th><th style="padding:5px 8px;">Approval</th></tr>';
+      html += o.ai_tools.map(function (t) {
+        return '<tr><td style="padding:5px 8px;color:#e2e8f0;">' + esc(t.tool) + '</td>' +
+          '<td style="padding:5px 8px;color:#94a3b8;">' + esc(t.capability) + '</td>' +
+          '<td style="padding:5px 8px;color:#67e8f9;">' + esc(t.because.join(', ')) + '</td>' +
+          '<td style="padding:5px 8px;color:' + (t.human_approval_required ? '#fcd34d' : '#64748b') + ';">' +
+          (t.human_approval_required ? 'Required' : 'No') + '</td></tr>';
+      }).join('') + '</table>';
+    } else {
+      html += '<div style="font-size:12px;color:#fcd34d;">No tool proposed — pick at least one pain point.</div>';
+    }
+
+    if (o.missing && o.missing.length) {
+      html += '<div style="margin-top:9px;font-size:11px;color:#fcd34d;">Still missing: ' +
+        esc(o.missing.join(' · ')) + '</div>';
+    }
+    out.innerHTML = html;
+    show(out, true);
+  }
+
+  // Ask the server which Foundry setup the answers imply, and show why.
+  function checkFoundry() {
+    var body = {
+      name: ($('sai-adopt-name').value || '').trim() || 'Foundry project',
+      adoption_mode: 'GREENFIELD',
+      palantir_required: true,
+      data_sensitivity: $('sai-adopt-sens').value || '',
+      external_transfer_allowed: $('sai-foundry-transfer').checked,
+      sovereignty_requirements: '',
+      foundry_target: {
+        enrollment: ($('sai-foundry-enrollment').value || '').trim(),
+        ontology: ($('sai-foundry-ontology').value || '').trim(),
+        hosted_on: $('sai-foundry-host').value || ''
+      }
+    };
+    var chain = state.projectId
+      ? api('/projects/' + state.projectId, {
+          method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+      : api('/projects', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+          .then(function (b) { state.projectId = b.project.id; return b; });
+
+    chain.then(function () { return api('/projects/' + state.projectId + '/plan', { method: 'POST' }); })
+      .then(function (b) { renderFoundry(b.project.palantir_connection || {}); })
+      .catch(function (e) { say(String(e.message || e), 'err'); });
+  }
+
+  function renderFoundry(k) {
+    var out = $('sai-foundry-result');
+    if (!k.pattern_title) { out.innerHTML = ''; show(out, false); return; }
+    var html = '';
+
+    html += '<div style="border-radius:9px;padding:12px 14px;border:1px solid rgba(167,139,250,.45);' +
+      'background:rgba(124,58,237,.2);">' +
+      '<div style="font-size:14px;font-weight:800;color:#e2e8f0;">' + esc(k.pattern_title) + '</div>' +
+      '<div style="font-size:11px;color:#c4b5fd;margin-top:3px;">Chosen because ' + esc(k.pattern_reason) + '</div>' +
+      '<div style="font-size:12px;color:#e2e8f0;margin-top:9px;line-height:1.6;">' + esc(k.what_it_is) + '</div>' +
+      '<div style="font-size:11px;color:#6ee7b7;margin-top:7px;">' + esc(k.why_it_fits) + '</div>';
+
+    if ((k.you_get || []).length) {
+      html += '<div style="margin-top:9px;font-size:11px;color:#94a3b8;"><b style="color:#c4b5fd;">What you get:</b>' +
+        '<ul style="margin:4px 0 0 17px;padding:0;line-height:1.65;">' +
+        k.you_get.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</ul></div>';
+    }
+    if ((k.not_required || []).length) {
+      html += '<div style="margin-top:9px;font-size:11px;color:#6ee7b7;"><b>You do not need:</b>' +
+        '<ul style="margin:4px 0 0 17px;padding:0;line-height:1.65;">' +
+        k.not_required.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</ul></div>';
+    }
+    html += '</div>';
+
+    if ((k.how_to || []).length) {
+      html += '<div style="margin-top:11px;font-size:12px;font-weight:800;color:#e2e8f0;">How it works, step by step</div>';
+      html += k.how_to.map(function (s, i) {
+        return '<div style="display:flex;gap:10px;margin-top:7px;font-size:11px;">' +
+          '<span style="flex-shrink:0;width:19px;height:19px;border-radius:50%;background:rgba(139,92,246,.3);' +
+          'color:#c4b5fd;font-weight:900;display:flex;align-items:center;justify-content:center;">' + (i + 1) + '</span>' +
+          '<span style="flex:1;"><b style="color:#e2e8f0;">' + esc(s.step) + '</b> ' +
+          '<span style="color:#a78bfa;">— ' + esc(s.who) + '</span><br>' +
+          '<span style="color:#94a3b8;">' + esc(s.detail) + '</span></span></div>';
+      }).join('');
+    }
+
+    if ((k.foundry_prerequisites || []).length) {
+      html += '<div style="margin-top:11px;font-size:12px;font-weight:800;color:#e2e8f0;">Still to confirm</div>' +
+        k.foundry_prerequisites.map(function (p) {
+          return '<div style="display:flex;gap:9px;margin-top:6px;font-size:11px;">' +
+            '<span style="flex-shrink:0;color:#fcd34d;font-weight:800;">○</span>' +
+            '<span style="flex:1;"><b style="color:#e2e8f0;">' + esc(p.item) + '</b> ' +
+            '<span style="color:#64748b;">— ' + esc(p.owner) + '</span><br>' +
+            '<span style="color:#94a3b8;">' + esc(p.detail) + '</span></span></div>';
+        }).join('');
+    }
+
+    out.innerHTML = html;
+    show(out, true);
+  }
+
   function init() {
     fetch(API + '/meta').then(function (r) {
       if (!r.ok) throw new Error('disabled');
@@ -453,9 +1141,25 @@
       } else {
         au.innerHTML = '<span style="color:#64748b;">local access</span>';
       }
+      // The sub-bar shows Greenfield active on load, so the panel must agree
+      // rather than opening with nothing selected.
+      // Open on the overview: the sub-bar marks it active, so the panel must agree.
+      if (document.getElementById('subBar4') && !state.scenario) {
+        state.scenario = 'OVERVIEW';
+        state.mode = 'GREENFIELD';
+      }
       renderModes();
+      renderSources();
+      applyScenario();
       offerPrefill();
+      wireStageMenu();
       $('sai-adopt-run').onclick = run;
+      $('sai-onto-run').onclick = runOntology;
+      $('sai-foundry-check').onclick = checkFoundry;
+      // Pain vocabulary comes from the server so it stays identical to A-3.
+      fetch(API + '/pain-categories').then(function (r) { return r.json(); })
+        .then(function (b) { renderPains(b.categories || []); })
+        .catch(function () { /* section simply stays empty */ });
       $('sai-adopt-reset').onclick = function () {
         state.mode = ''; state.source = ''; state.projectId = '';
         show($('sai-adopt-source'), false); show($('sai-adopt-form'), false);
@@ -463,7 +1167,7 @@
         renderModes();
       };
     }).catch(function () {
-      // Feature flag off, or blueprint not registered: leave Stage 9 as it was.
+      // Feature flag off, or blueprint not registered: leave Stage 4 as it was.
     });
   }
 

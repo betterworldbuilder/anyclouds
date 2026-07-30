@@ -429,7 +429,7 @@
       position: absolute;
       top: calc(100% + 4px);
       left: 0;
-      min-width: 300px;
+      min-width: 340px;
       padding: 8px;
       flex-direction: column;
       gap: 6px;
@@ -455,6 +455,24 @@
       flex: none;
       font-size: 14px;
       text-align: left;
+    }
+    /* Path entries carry a subtitle. The base .stage-btn is nowrap + ellipsis,
+       which would clip it, so these opt out of truncation and wrap instead. */
+    .top-stage-dropdown-content .stage-btn.adopt-path,
+    .top-stage-dropdown-content .stage-btn[data-stage="sai_readiness"] {
+      white-space: normal;
+      overflow: visible;
+      text-overflow: clip;
+      line-height: 1.35;
+      padding: 9px 12px;
+    }
+    .top-stage-dropdown-content .stage-btn small {
+      display: block;
+      margin-top: 3px;
+      font-size: 11px;
+      font-weight: 600;
+      opacity: .8;
+      white-space: normal;
     }
     .top-stage-dropdown-section {
       margin: 3px 2px 0;
@@ -2753,10 +2771,34 @@ body.flex-skyline-mode .uat-s1-template-tab.active {
   <div class="top-stage-dropdown ai-now-dropdown">
     <button class="stage-btn ai-now-stage top-stage-dropdown-trigger" type="button" aria-haspopup="true">Stage 4<br><small>AI SWITCH &#9662;</small></button>
     <div class="top-stage-dropdown-content">
-      <button class="stage-btn green-roll-stage" data-stage="sai_readiness">AI Enhancement Readiness Assessment</button>
-      <button class="stage-btn green-roll-stage" data-stage="sai">Which FLEX Business System do you want to improve with AI?</button>
+      <div class="top-stage-dropdown-section">Start here</div>
+      <button class="stage-btn green-roll-stage adopt-path" data-stage="sai" data-scenario="OVERVIEW">📖 What is Stage 4?<br><small>goal, what it does, inputs and outputs — read this first</small></button>
+      <button class="stage-btn green-roll-stage" data-stage="sai_readiness">📋 AI Readiness Assessment<br><small>A-0 … A-9 business discovery — A-0 tells you which path you are on</small></button>
+      <div class="top-stage-dropdown-section">Then choose your path</div>
+      <button class="stage-btn green-roll-stage adopt-path" data-stage="sai" data-scenario="GREENFIELD">🌱 Greenfield<br><small>build new AI on FLEX — from a migrated FLEX app, GitHub, upload, notebook or LaunchPad</small></button>
+      <button class="stage-btn green-roll-stage adopt-path" data-stage="sai" data-scenario="BROWNFIELD">🔗 Brownfield<br><small>add AI to an existing app — the application stays the system of record</small></button>
+      <button class="stage-btn green-roll-stage adopt-path" data-stage="sai" data-scenario="GOLDENFIELD">🏆 Goldenfield<br><small>deploy a ready agent from AI 4 the People, YES AI CAN or a Palantir export</small></button>
+      <button class="stage-btn green-roll-stage adopt-path" data-stage="sai" data-scenario="PALANTIR_READY">🧩 Palantir-ready build<br><small>declare the ontology here, deploy on LaunchPad or Spot, hand Foundry the mapping</small></button>
     </div>
   </div>
+</div>
+
+<!-- ── Sub-tabs for Stage 4 — AI SWITCH ─────────────────
+     Three scenarios, one panel. The sections inside panel-sai show and hide
+     per scenario rather than each getting its own panel: the pipeline
+     (import → scan → assess → plan) is identical for all three, and three
+     copies of it would drift apart the way the two agent repos already have.
+     Shown only while an AI stage is open; sai_switch.js handles that.
+──────────────────────────────────────────────────── -->
+<div class="sub-bar" id="subBar4" style="display:none;">
+  <!-- Readiness leads: A-0 asks which path you are on, so the assessment is
+       what tells you which of the three scenarios applies. -->
+  <button class="sub-btn adopt-sub active" data-sub="sai" data-scenario="OVERVIEW">📖 What is Stage 4?</button>
+  <button class="sub-btn" data-sub="sai_readiness">📋 AI Readiness Assessment</button>
+  <button class="sub-btn adopt-sub" data-sub="sai" data-scenario="GREENFIELD">🌱 Greenfield</button>
+  <button class="sub-btn adopt-sub" data-sub="sai" data-scenario="BROWNFIELD">🔗 Brownfield</button>
+  <button class="sub-btn adopt-sub" data-sub="sai" data-scenario="GOLDENFIELD">🏆 Goldenfield</button>
+  <button class="sub-btn adopt-sub" data-sub="sai" data-scenario="PALANTIR_READY">🧩 Palantir-ready build</button>
 </div>
 
 <!-- ── Sub-tabs for Stage 1 ─────────────────────────── -->

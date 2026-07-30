@@ -122,7 +122,7 @@ except ImportError:
     from routes.monitoring_api import create_monitoring_blueprint
 app.register_blueprint(create_monitoring_blueprint(BASE_DIR))
 
-# ── Stage 9 — AI Adoption & Production Factory ──────────────────────────────
+# ── Stage 4 — AI Adoption & Production Factory ──────────────────────────────
 # Additive to the existing client-side Stage 9. With the flag off the blueprint
 # is never registered and Stage 9 behaves exactly as it did before.
 AI_ADOPTION_FACTORY_ENABLED = (
@@ -3570,7 +3570,7 @@ def opencenter_ui():
 @app.get("/ai-powerup")
 def ai_powerup_ui():
     # Standalone focused AI Power Up page — loads ONLY the AI UI (no dashboard chrome).
-    # Shares the _ai_powerup.html + _ai_powerup_js.html partials with Stage 9 (panel-sai).
+    # Shares the _ai_powerup.html + _ai_powerup_js.html partials with Stage 4 (panel-sai).
     return render_template("ai_powerup.html", cache_bust=_CACHE_BUST)
 
 

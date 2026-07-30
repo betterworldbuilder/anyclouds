@@ -23,11 +23,21 @@ ADOPTION_MODES = ("GREENFIELD", "BROWNFIELD", "EXISTING_POC")
 SOURCE_TYPES = (
     "NEW_PROJECT",
     "FLEX_BUSINESS_SYSTEM",
+    # A containerised workload already running on OpenCenter. Stronger evidence
+    # than a declared posture: it came from Kubernetes, so it demonstrably is
+    # containerised and orchestrated.
+    "OPENCENTER",
     "GITHUB",
     "UPLOAD",
     "NOTEBOOK",
     "LAUNCHPAD",
     "AI4PEOPLE",
+    # A Palantir export. Note what this is *not*: an AIP Agent cannot be
+    # exported and run outside Foundry — agents are published as functions and
+    # invoked through Foundry APIs. What can be imported is the ontology JSON,
+    # OSDK application source, and Marketplace product metadata. See
+    # docs/palantir-import.md.
+    "PALANTIR",
     "MANUAL",
 )
 
@@ -73,15 +83,37 @@ for _mode, _w in WEIGHTS.items():
     assert abs(sum(_w.values()) - 1.0) < 1e-9, f"weights for {_mode} must sum to 1.0"
     assert set(_w) == set(SCORE_CATEGORIES), f"weights for {_mode} must cover every category"
 
+# Brownfield adds a sixth category. Its defining promise — the application keeps
+# working when the AI is switched off — is worth as much as security here, so
+# the other weights are reduced to make room rather than the total inflated.
+BROWNFIELD_WEIGHTS = {
+    "value": 0.20,
+    "data": 0.15,
+    "security": 0.20,
+    "production": 0.15,
+    "operations": 0.10,
+    "integration": 0.20,
+}
+assert abs(sum(BROWNFIELD_WEIGHTS.values()) - 1.0) < 1e-9, "brownfield weights must sum to 1.0"
+
 RECOMMENDATIONS = (
+    # The only self-service, usage-based GPU option — where a Greenfield build
+    # should start, before anyone commits to a platform.
+    "Rackspace Spot",
     "AI LaunchPad",
     "FAIR Diagnostic / Ideate",
     "FAIR Incubate / Industrialize",
     "Private Cloud AI / AI Anywhere",
+    "UK Sovereign Private AI",
     "AI Business / Inference",
     "Enterprise AI Cloud",
     "FDE + Palantir",
 )
+
+# Where a workload may run, given its data. Spot is auction-priced shared
+# capacity that can be reclaimed, so it is a build/iterate target, never the
+# home for regulated data or an SLA-bound production endpoint.
+SPOT_EXCLUDED_SENSITIVITIES = ("HIGH", "REGULATED")
 
 # Mode-specific journeys rendered by the UI (spec section 15).
 JOURNEYS: Dict[str, List[str]] = {
@@ -180,6 +212,9 @@ def new_project(
         "deployment_plan": {},
         "palantir_mapping": {},
         "audit": [],
+        # Demo runs must be identifiable everywhere they surface, so a sample
+        # walkthrough can never be mistaken for a real customer assessment.
+        "is_demo": False,
         # Not in the spec. The stated objective is "first AI product in record
         # time", and nothing in the original document measured it.
         "created_at": ts,

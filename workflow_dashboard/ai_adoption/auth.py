@@ -63,7 +63,56 @@ def current_user() -> Optional[Dict[str, Any]]:
     return user if isinstance(user, dict) else None
 
 
+# ── Service-to-service credentials ──────────────────────────────────────────
+# GitHub OAuth identifies a human in a browser; it cannot authenticate YES AI
+# CAN or AI 4 the People submitting a bundle from a server. Those callers use a
+# named API key.
+#
+#   AI_ADOPTION_API_KEYS="yesaican:<secret>,ai4people:<secret>"
+#
+# Keys live only in the environment. They are never persisted, never logged, and
+# only the caller's *name* reaches the audit trail.
+
+
+def _service_keys() -> Dict[str, str]:
+    raw = _env("AI_ADOPTION_API_KEYS")
+    keys: Dict[str, str] = {}
+    for entry in raw.split(","):
+        entry = entry.strip()
+        if not entry or ":" not in entry:
+            continue
+        name, _, secret = entry.partition(":")
+        name, secret = name.strip(), secret.strip()
+        # A short key is almost certainly a placeholder; refusing it beats
+        # letting a weak credential guard an import endpoint.
+        if name and len(secret) >= 16:
+            keys[name] = secret
+    return keys
+
+
+def service_caller() -> Optional[str]:
+    """Return the calling service's name, or None.
+
+    Compared in constant time against every configured key so a timing
+    difference cannot reveal which prefix was correct.
+    """
+    presented = (request.headers.get("X-API-Key") or "").strip()
+    if not presented:
+        return None
+    for name, secret in _service_keys().items():
+        if secrets.compare_digest(presented, secret):
+            return name
+    return None
+
+
+def service_auth_configured() -> bool:
+    return bool(_service_keys())
+
+
 def _actor() -> str:
+    caller = service_caller()
+    if caller:
+        return f"service:{caller}"
     user = current_user()
     if user:
         return str(user.get("login") or "unknown")
@@ -232,6 +281,10 @@ def require_ai_auth(fn):
 
     @functools.wraps(fn)
     def wrapper(*args, **kwargs):
+        # A valid service key is checked first: it is the most explicit
+        # credential, and it is how YES AI CAN and AI 4 the People submit.
+        if service_caller():
+            return fn(*args, **kwargs)
         if current_user():
             return fn(*args, **kwargs)
         if allow_loopback() and _request_is_loopback():
