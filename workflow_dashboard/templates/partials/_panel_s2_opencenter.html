@@ -221,6 +221,39 @@
             if(button){button.disabled=false;button.textContent=old;}
           });
       };
+      /* Expand one of the two collapsed lab bands and bring it into view.
+         Both bands render collapsed, so a deep link that only reveals the
+         OpenCenter pane still leaves the learner staring at a closed
+         accordion they have to find and click. which: 'ocqs' (Quick Start)
+         or 'ocqp' (Advanced Training Lab). */
+      window.ocOpenLabBand = function(which,scroll){
+        var body=document.getElementById(which+'-inline-body');
+        var arrow=document.getElementById(which+'-inline-arrow');
+        if(!body) return false;
+        body.style.display='block';
+        if(arrow) arrow.textContent='▼';
+        if(scroll!==false){
+          var wrap=document.getElementById(which+'-outer-wrap')||body;
+          try{ wrap.scrollIntoView({behavior:'smooth',block:'start'}); }
+          catch(e){ wrap.scrollIntoView(); }
+        }
+        return true;
+      };
+      window.ocqsOpenQuickStart=function(){ return window.ocOpenLabBand('ocqs'); };
+
+      /* ?lab=quickstart | ?lab=advanced opens that band on arrival.
+         The pane is revealed by the ?only= router, which may run after
+         DOMContentLoaded, so retry briefly rather than fire once and miss. */
+      (function autoOpenLabBand(attempt){
+        var which={quickstart:'ocqs',advanced:'ocqp'}[
+          (new URLSearchParams(window.location.search).get('lab')||'').toLowerCase()];
+        if(!which) return;
+        var body=document.getElementById(which+'-inline-body');
+        if(body && body.offsetParent!==null){ window.ocOpenLabBand(which); return; }
+        if(attempt<10) setTimeout(function(){ autoOpenLabBand(attempt+1); },150);
+        else if(body) window.ocOpenLabBand(which);   // pane hidden; still expand it
+      })(0);
+
       window.ocManualTrainingLogin = function(role,button){
         var prefix=role==='Instructor' ? 'instructor' : 'student';
         var input=document.getElementById('ocqs-'+prefix+'-name');
@@ -241,7 +274,9 @@
           return response.json().then(function(data){return {ok:response.ok,data:data};});
         }).then(function(result){
           if(!result.ok) throw new Error(result.data.error||'could not create training session');
-          var url='/?only=s2opencenter';
+          // lab=quickstart lands the learner inside the expanded Quick Start
+          // guide, not on the overview with the band still closed.
+          var url='/?only=s2opencenter&lab=quickstart';
           if(labWindow && !labWindow.closed){
             if(status){status.textContent=result.data.role+' session created for '+result.data.learner+'. Opened in a new window.';status.style.color='#15803d';}
             labWindow.location=url;
