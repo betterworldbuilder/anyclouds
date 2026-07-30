@@ -960,7 +960,7 @@
             <label class="ocqs-label">Git Provider</label>
             <select class="ocqs-select" id="ocqs-gitprovider" onchange="ocqsUpdate()"><option value="github" selected>GitHub</option><option value="gitlab">GitLab</option><option value="other">Other HTTPS Git</option></select>
             <label class="ocqs-label" style="margin-top:8px;">GitOps Repository URL</label>
-            <input class="ocqs-input" id="ocqs-gitrepo" value="ssh://git@github.com/betterworldbuilder/iac-Gitops.git" placeholder="ssh://git@github.com/YOUR_USER/opencenter-my-cluster-gitops.git" oninput="ocqsUpdate();ocqsReqCheck()">
+            <input class="ocqs-input" id="ocqs-gitrepo" value="ssh://git@github.com/Sherlock2019/opencenter-my-cluster-gitops.git" placeholder="ssh://git@github.com/YOUR_USER/opencenter-my-cluster-gitops.git" oninput="ocqsUpdate();ocqsReqCheck()">
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px;">
               <div><label class="ocqs-label">Git Branch</label><input class="ocqs-input" id="ocqs-gitbranch" value="main" oninput="ocqsUpdate()"></div>
               <div><label class="ocqs-label">Git Auth Method</label><select class="ocqs-select" id="ocqs-gitauth" onchange="ocqsUpdate();ocqsReqCheck()"><option value="token">HTTPS token</option><option value="ssh" selected>SSH key (default) — uses the key OpenCenter generates for this cluster</option></select></div>
@@ -4628,7 +4628,7 @@ var c9b=g('ocqs-cmd-9b');
             <label class="ocqs-label">Git Provider</label>
             <select class="ocqs-select" id="ocqp-gitprovider" onchange="ocqpUpdate()"><option value="github" selected>GitHub</option><option value="gitlab">GitLab</option><option value="other">Other HTTPS Git</option></select>
             <label class="ocqs-label" style="margin-top:8px;">GitOps Repository URL</label>
-            <input class="ocqs-input" id="ocqp-gitrepo" value="ssh://git@github.com/betterworldbuilder/iac-Gitops.git" placeholder="ssh://git@github.com/YOUR_USER/opencenter-my-cluster-gitops.git" oninput="ocqpUpdate();ocqpReqCheck()">
+            <input class="ocqs-input" id="ocqp-gitrepo" value="ssh://git@github.com/Sherlock2019/opencenter-my-cluster-gitops.git" placeholder="ssh://git@github.com/YOUR_USER/opencenter-my-cluster-gitops.git" oninput="ocqpUpdate();ocqpReqCheck()">
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px;">
               <div><label class="ocqs-label">Git Branch</label><input class="ocqs-input" id="ocqp-gitbranch" value="main" oninput="ocqpUpdate()"></div>
               <div><label class="ocqs-label">Git Auth Method</label><select class="ocqs-select" id="ocqp-gitauth" onchange="ocqpUpdate();ocqpReqCheck()"><option value="token">HTTPS token</option><option value="ssh" selected>SSH key (default) — uses the key OpenCenter generates for this cluster</option></select></div>
