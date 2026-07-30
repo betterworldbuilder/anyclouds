@@ -116,7 +116,7 @@
         value=String(value).split('?')[0];
         return [
           '/api/opencenter/lab-session','/api/opencenter/cohort-review','/api/opencenter/lab-result','/api/opencenter/lab-feedback',
-          '/api/opencenter/lab-feedback-answer',
+          '/api/opencenter/lab-feedback-answer','/api/opencenter/training-log',
           '/api/opencenter/deploy-readiness','/api/opencenter/clusters','/api/opencenter/export-bundle',
           '/api/opencenter/restore-bundle','/api/openstack/quota-check',
           '/api/openstack/force-delete-security-group','/api/openstack/free-fips',
@@ -2548,6 +2548,36 @@ kubectl describe kustomization &lt;name&gt; -n flux-system</div>
               <div id="ocqs-cohort-feedback" style="display:flex;flex-direction:column;gap:8px;max-height:310px;overflow:auto;"><div style="font-size:12px;color:#64748b;">No feedback submitted yet.</div></div>
             </div>
           </div>
+
+          <!-- ── Training Logs: the durable record of the session ── -->
+          <div style="margin-top:18px;padding-top:16px;border-top:1px solid #ddd6fe;">
+            <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+              <div>
+                <div style="font-size:10px;font-weight:900;color:#7c3aed;text-transform:uppercase;letter-spacing:1.5px;">Training Logs</div>
+                <div style="font-size:12px;color:#475569;line-height:1.6;margin-top:4px;max-width:720px;">
+                  Every published result, suggestion, flag and Q&amp;A for this cohort, oldest first.
+                  Credential-shaped values are redacted before export.
+                </div>
+              </div>
+              <div id="ocqs-log-counts" style="font-size:11px;font-weight:900;color:#6d28d9;background:#fff;border:1px solid #c4b5fd;border-radius:999px;padding:6px 12px;white-space:nowrap;">No entries yet</div>
+            </div>
+
+            <div style="overflow-x:auto;background:#fff;border:1px solid #ddd6fe;border-radius:8px;margin-top:10px;">
+              <table style="width:100%;border-collapse:collapse;font-size:12px;color:#334155;">
+                <thead><tr style="background:#ede9fe;color:#5b21b6;text-align:left;">
+                  <th style="padding:9px;">Type</th><th style="padding:9px;">Learner</th><th style="padding:9px;">Role</th>
+                  <th style="padding:9px;">Stage</th><th style="padding:9px;">Entry</th><th style="padding:9px;">When</th>
+                </tr></thead>
+                <tbody id="ocqs-training-log"><tr><td colspan="6" style="padding:12px;color:#64748b;">No training log entries yet.</td></tr></tbody>
+              </table>
+            </div>
+
+            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px;">
+              <button type="button" onclick="ocqsExportTrainingLogCsv(this)" style="background:#7c3aed;color:#fff;border:0;border-radius:7px;padding:9px 16px;font-size:12px;font-weight:900;cursor:pointer;">⤓ Export training feedback CSV</button>
+              <button type="button" onclick="ocqsRefreshTrainingLog(this)" style="background:#fff;color:#6d28d9;border:1px solid #8b5cf6;border-radius:7px;padding:9px 14px;font-size:12px;font-weight:900;cursor:pointer;">Refresh training log</button>
+              <span id="ocqs-log-status" style="font-size:11px;color:#64748b;"></span>
+            </div>
+          </div>
         </div>
       </div>
       <script>
@@ -2662,9 +2692,88 @@ kubectl describe kustomization &lt;name&gt; -n flux-system</div>
         window.ocqsRefreshCohort=function(button){
           var old=button&&button.textContent;if(button){button.disabled=true;button.textContent='Refreshing...';}
           return fetch('/api/opencenter/cohort-review').then(function(r){return r.json().then(function(d){return {ok:r.ok,d:d};});})
-            .then(function(result){if(!result.ok) throw new Error(result.d.error||'review unavailable');renderCohort(result.d);return result.d;})
+            .then(function(result){
+              if(!result.ok) throw new Error(result.d.error||'review unavailable');
+              renderCohort(result.d);
+              // Publishing, feedback and answers all land here, so the log
+              // follows the review rather than needing its own triggers.
+              if(typeof window.ocqsRefreshTrainingLog==='function') window.ocqsRefreshTrainingLog(null);
+              return result.d;
+            })
             .catch(function(error){var s=document.getElementById('ocqs-result-status');if(s){s.textContent=error.message;s.style.color='#dc2626';}})
             .finally(function(){if(button){button.disabled=false;button.textContent=old;}});
+        };
+        function renderTrainingLog(data){
+          var body=document.getElementById('ocqs-training-log');
+          var counts=document.getElementById('ocqs-log-counts');
+          var rows=(data&&data.rows)||[];
+          if(counts){
+            var c=(data&&data.counts)||{};
+            counts.textContent=rows.length
+              ? rows.length+' entries · '+(c.results||0)+' results · '+(c.feedback||0)+' feedback'+
+                (c.unanswered?' · '+c.unanswered+' unanswered':'')
+              : 'No entries yet';
+          }
+          if(!body) return;
+          body.textContent='';
+          if(!rows.length){
+            var empty=document.createElement('tr'), cell=document.createElement('td');
+            cell.colSpan=6;cell.style.padding='12px';cell.style.color='#64748b';
+            cell.textContent='No training log entries yet.';
+            empty.appendChild(cell);body.appendChild(empty);
+            return;
+          }
+          var LABEL={improvement:'Improvement',not_working:'Not working',question:'Question'};
+          rows.forEach(function(row){
+            var tr=document.createElement('tr');
+            tr.style.borderTop='1px solid #ede9fe';
+            var type=row.record_type==='result' ? 'Result' : (LABEL[row.kind]||'Feedback');
+            var entry;
+            if(row.record_type==='result'){
+              entry=(row.organization||'')+'/'+(row.cluster||'')+' · '+
+                    (row.completed_checks||0)+'/'+(row.total_checks||14)+' checks · '+(row.status||'');
+            } else {
+              entry=row.message||'';
+              if(row.answer) entry+='\n↳ '+(row.answered_by||'Instructor')+': '+row.answer;
+            }
+            [type,row.learner||'',row.role||'',row.stage||'',entry,
+             row.created_at||row.updated_at||''].forEach(function(text,i){
+              var td=document.createElement('td');
+              td.style.cssText='padding:9px;vertical-align:top;'+
+                (i===4?'white-space:pre-wrap;max-width:420px;':'white-space:nowrap;');
+              td.textContent=text;
+              tr.appendChild(td);
+            });
+            body.appendChild(tr);
+          });
+        }
+        window.ocqsRefreshTrainingLog=function(button){
+          var old=button&&button.textContent;
+          if(button){button.disabled=true;button.textContent='Refreshing...';}
+          var status=document.getElementById('ocqs-log-status');
+          return fetch('/api/opencenter/training-log').then(function(r){return r.json().then(function(d){return {ok:r.ok,d:d};});})
+            .then(function(result){
+              if(!result.ok) throw new Error(result.d.error||'training log unavailable');
+              renderTrainingLog(result.d);
+              if(status){status.textContent='';}
+              return result.d;
+            })
+            .catch(function(error){ if(status){status.textContent=error.message;status.style.color='#dc2626';} })
+            .finally(function(){ if(button){button.disabled=false;button.textContent=old;} });
+        };
+        window.ocqsExportTrainingLogCsv=function(button){
+          var status=document.getElementById('ocqs-log-status');
+          /* A browser download cannot carry the X-OpenCenter-Lab-CSRF header, so
+             the token rides the query string - the same route the bundle export
+             already takes, and the guard accepts either form. */
+          return lab.ready.then(function(){
+            var token=(lab.data&&lab.data.csrf)||'';
+            if(!token) throw new Error('no active lab session');
+            window.open('/api/opencenter/training-log.csv?lab_token='+encodeURIComponent(token),'_blank');
+            if(status){status.textContent='CSV export started.';status.style.color='#15803d';}
+          }).catch(function(error){
+            if(status){status.textContent=error.message;status.style.color='#dc2626';}
+          });
         };
         window.ocqsAnswerQuestion=function(id,box,button){
           var answer=(box&&box.value||'').trim();

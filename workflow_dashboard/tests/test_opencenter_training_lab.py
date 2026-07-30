@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Concurrent dry run for the role-aware OpenCenter Quick Start sandbox."""
 
+import csv
 import io
 import os
 import shutil
@@ -325,6 +326,107 @@ class OpenCenterCohortQandA(unittest.TestCase):
         ).get_json()
         seen = {item["id"]: item for item in student_view["feedback"]}
         self.assertEqual(seen[asked["Zain"]]["answer"], "Answer for Zain.")
+
+
+class OpenCenterTrainingLogExport(unittest.TestCase):
+    """Training log rows and the CSV export learners hand to an instructor."""
+
+    @classmethod
+    def setUpClass(cls):
+        app.config.update(TESTING=True)
+
+    def _session(self, name, role):
+        client = app.test_client()
+        client.post(
+            "/api/opencenter/training-login", json={"name": name, "role": role}
+        )
+        token = client.get("/api/opencenter/lab-session").get_json()["csrf"]
+        return client, {"X-OpenCenter-Lab-CSRF": token}, token
+
+    def test_log_counts_results_feedback_and_open_questions(self):
+        student, headers, _ = self._session("Logger", "Student")
+        question = student.post(
+            "/api/opencenter/lab-feedback",
+            json={"kind": "question", "stage": "Stage 3", "message": "a real question"},
+            headers=headers,
+        ).get_json()["feedback"]["id"]
+        student.post(
+            "/api/opencenter/lab-result",
+            json={"org": "acme", "cluster": "lab1", "completed_checks": 7},
+            headers=headers,
+        )
+
+        log = student.get("/api/opencenter/training-log", headers=headers).get_json()
+        self.assertTrue(log["ok"])
+        self.assertGreaterEqual(log["counts"]["results"], 1)
+        self.assertGreaterEqual(log["counts"]["questions"], 1)
+        self.assertGreaterEqual(log["counts"]["unanswered"], 1)
+        self.assertEqual(
+            {row["record_type"] for row in log["rows"]}, {"result", "feedback"}
+        )
+
+        instructor, instructor_headers, _ = self._session("Marker", "Instructor")
+        instructor.post(
+            "/api/opencenter/lab-feedback-answer",
+            json={"id": question, "answer": "Answered for the log."},
+            headers=instructor_headers,
+        )
+        # Other tests in this module share the cohort store, so assert on this
+        # question rather than the cohort-wide unanswered count.
+        after = instructor.get(
+            "/api/opencenter/training-log", headers=instructor_headers
+        ).get_json()
+        answered = [
+            row
+            for row in after["rows"]
+            if row.get("answer") == "Answered for the log."
+        ]
+        self.assertEqual(len(answered), 1)
+        self.assertEqual(answered[0]["answered_by"], "Marker")
+        self.assertLess(after["counts"]["unanswered"], log["counts"]["unanswered"])
+
+    def test_csv_export_neutralizes_formulas_and_redacts_credentials(self):
+        student, headers, token = self._session("Exporter", "Student")
+        student.post(
+            "/api/opencenter/lab-feedback",
+            json={
+                "kind": "not_working",
+                "stage": "Stage 3",
+                "message": "=cmd|calc!A1 and password: hunter2 plus token=abcd1234",
+            },
+            headers=headers,
+        )
+
+        response = student.get(f"/api/opencenter/training-log.csv?lab_token={token}")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("text/csv", response.headers["Content-Type"])
+        self.assertIn("attachment", response.headers["Content-Disposition"])
+
+        body = response.get_data(as_text=True)
+        cells = [
+            cell
+            for row in csv.reader(io.StringIO(body))
+            for cell in row
+            if "cmd|calc" in cell
+        ]
+        self.assertTrue(cells, "the message should appear in the export")
+        self.assertTrue(
+            cells[0].startswith("'="),
+            f"spreadsheet formula was not neutralized: {cells[0]!r}",
+        )
+        self.assertNotIn("hunter2", body)
+        self.assertNotIn("abcd1234", body)
+        self.assertIn("[REDACTED]", body)
+
+    def test_both_log_routes_require_the_lab_token(self):
+        anonymous = app.test_client()
+        self.assertIn(
+            anonymous.get("/api/opencenter/training-log").status_code, (401, 403)
+        )
+        student, headers, _ = self._session("Guarded", "Student")
+        self.assertEqual(
+            student.get("/api/opencenter/training-log.csv").status_code, 403
+        )
 
 
 if __name__ == "__main__":

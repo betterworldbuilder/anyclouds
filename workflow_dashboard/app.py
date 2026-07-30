@@ -95,6 +95,8 @@ _OPENCENTER_LAB_PROTECTED_PATHS = {
     "/api/opencenter/lab-result",
     "/api/opencenter/lab-feedback",
     "/api/opencenter/lab-feedback-answer",
+    "/api/opencenter/training-log",
+    "/api/opencenter/training-log.csv",
     "/api/opencenter/deploy-readiness",
     "/api/opencenter/clusters",
     "/api/opencenter/export-bundle",
@@ -723,6 +725,124 @@ def opencenter_answer_lab_feedback():
         )
         _opencenter_save_cohort(context, value)
     return jsonify({"ok": True, "feedback": found})
+
+
+_OPENCENTER_LOG_FIELDS = (
+    "record_type", "cohort", "lab_id", "learner", "role",
+    "kind", "stage", "message", "answer", "answered_by",
+    "organization", "cluster", "provider",
+    "completed_checks", "total_checks", "status",
+    "created_at", "answered_at", "updated_at",
+)
+
+_OPENCENTER_SECRET_PATTERN = re.compile(
+    r"((?:password|passwd|secret|token|api[_-]?key|application_credential_secret)"
+    r"\s*[:=]\s*)\S+",
+    re.IGNORECASE,
+)
+
+
+def _opencenter_log_redact(value: Any) -> str:
+    """Strip credential-shaped material before it leaves the lab as a file."""
+    return _OPENCENTER_SECRET_PATTERN.sub(r"\1[REDACTED]", str(value or ""))
+
+
+def _opencenter_training_log_rows(context: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """Flatten a cohort's published results and feedback into log rows."""
+    with _OPENCENTER_COHORT_LOCK:
+        value = _opencenter_load_cohort(context)
+    cohort = context["identity"]["cohort"]
+    rows: List[Dict[str, Any]] = []
+    for item in value["results"].values():
+        rows.append(
+            {
+                "record_type": "result",
+                "cohort": cohort,
+                "lab_id": item.get("lab_id", ""),
+                "learner": item.get("learner", ""),
+                "role": item.get("role", ""),
+                "organization": item.get("organization", ""),
+                "cluster": item.get("cluster", ""),
+                "provider": item.get("provider", ""),
+                "completed_checks": item.get("completed_checks", ""),
+                "total_checks": item.get("total_checks", ""),
+                "status": item.get("status", ""),
+                "updated_at": item.get("updated_at", ""),
+            }
+        )
+    for item in value["feedback"]:
+        rows.append(
+            {
+                "record_type": "feedback",
+                "cohort": cohort,
+                "lab_id": item.get("lab_id", ""),
+                "learner": item.get("author", ""),
+                "role": item.get("author_role", ""),
+                "kind": item.get("kind", ""),
+                "stage": item.get("stage", ""),
+                "message": _opencenter_log_redact(item.get("message")),
+                "answer": _opencenter_log_redact(item.get("answer")),
+                "answered_by": item.get("answered_by", ""),
+                "created_at": item.get("created_at", ""),
+                "answered_at": item.get("answered_at", ""),
+            }
+        )
+    rows.sort(key=lambda row: str(row.get("created_at") or row.get("updated_at") or ""))
+    return rows
+
+
+@app.get("/api/opencenter/training-log")
+def opencenter_training_log():
+    context = _opencenter_lab_context(create=False)
+    assert context is not None
+    rows = _opencenter_training_log_rows(context)
+    return jsonify(
+        {
+            "ok": True,
+            "cohort": context["identity"]["cohort"],
+            "viewer_role": context["identity"]["role"],
+            "rows": rows,
+            "counts": {
+                "results": sum(1 for r in rows if r["record_type"] == "result"),
+                "feedback": sum(1 for r in rows if r["record_type"] == "feedback"),
+                "questions": sum(1 for r in rows if r.get("kind") == "question"),
+                "unanswered": sum(
+                    1
+                    for r in rows
+                    if r.get("kind") == "question" and not r.get("answer")
+                ),
+            },
+        }
+    )
+
+
+@app.get("/api/opencenter/training-log.csv")
+def opencenter_training_log_csv():
+    context = _opencenter_lab_context(create=False)
+    assert context is not None
+    try:
+        from workflow_dashboard.r6_scan_appraisal import _csv_cell
+    except Exception:
+        from r6_scan_appraisal import _csv_cell
+    rows = _opencenter_training_log_rows(context)
+    output = io.StringIO(newline="")
+    writer = csv.DictWriter(
+        output, fieldnames=list(_OPENCENTER_LOG_FIELDS), extrasaction="ignore"
+    )
+    writer.writeheader()
+    for row in rows:
+        writer.writerow({key: _csv_cell(row.get(key, "")) for key in _OPENCENTER_LOG_FIELDS})
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+    cohort_slug = re.sub(r"[^A-Za-z0-9]+", "-", str(context["identity"]["cohort"])).strip("-").lower()
+    filename = f"training-feedback-{cohort_slug or 'cohort'}-{stamp}.csv"
+    return Response(
+        output.getvalue(),
+        mimetype="text/csv",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Cache-Control": "no-store",
+        },
+    )
 
 
 @app.before_request
