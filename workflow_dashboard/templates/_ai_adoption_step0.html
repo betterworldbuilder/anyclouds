@@ -1,6 +1,6 @@
 <!-- ════════════════════════════════════════
-     STEP 0 — AI ADOPTION MODE  (Stage 4 AI Adoption & Production Factory)
-     Additive: everything below this block is the original Stage 4 flow.
+     STEP 0 — AI ADOPTION MODE  (AI SWITCH Stage — AI Adoption & Production Factory)
+     Additive: everything below this block is the original AI SWITCH Stage flow.
      Hides itself entirely when AI_ADOPTION_FACTORY_ENABLED is off.
 ═════════════════════════════════════════ -->
 <div id="sai-adopt-root" style="display:none;background:rgba(15,23,42,.6);border:1px solid rgba(139,92,246,.2);border-radius:12px;padding:22px;margin-bottom:20px;">
@@ -8,7 +8,7 @@
     <div style="background:#7c3aed;color:#fff;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:13px;flex-shrink:0;">0</div>
     <div style="flex:1;">
       <div id="sai-adopt-heading" style="font-size:15px;font-weight:800;color:#e2e8f0;">Select your AI adoption mode</div>
-      <div id="sai-adopt-scenario-hint" style="font-size:11px;color:#64748b;margin-top:2px;">Build new AI, add AI to an existing application, or deploy an agent you already have</div>
+      <div id="sai-adopt-scenario-hint" style="font-size:11px;color:#64748b;margin-top:2px;">Define new AI, add AI to an existing application, or prepare a validated agent for Palantir delivery</div>
     </div>
     <div id="sai-adopt-auth" style="font-size:11px;color:#64748b;"></div>
   </div>
@@ -20,14 +20,14 @@
 
   <div id="sai-adopt-modes" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin-bottom:18px;"></div>
 
-  <!-- ── Overview: read this first. Shown by the "What is Stage 4?" substage. ── -->
+  <!-- ── Overview: read this first. Shown by the "What is the AI SWITCH Stage?" substage. ── -->
   <div id="sai-adopt-overview" style="display:none;">
     <div style="background:rgba(0,0,0,.22);border:1px solid rgba(139,92,246,.28);border-radius:11px;padding:16px 18px;margin-bottom:14px;">
-      <div style="font-size:15px;font-weight:800;color:#e2e8f0;margin-bottom:4px;">What Stage 4 is for</div>
+      <div style="font-size:15px;font-weight:800;color:#e2e8f0;margin-bottom:4px;">What the AI SWITCH Stage is for</div>
       <div style="font-size:12px;color:#cbd5e1;line-height:1.65;">
-        Your workloads are on FLEX. Stage 4 turns a <b>business problem</b> into a
-        <b>governed AI workload in production</b> — and tells you honestly what is still missing,
-        rather than reporting a clean pass on things nobody checked.
+        The AI SWITCH Stage turns a <b>business problem</b> and its application context into a
+        <b>Palantir-ready implementation contract</b>. It tells Palantir and Rackspace what to build,
+        how it connects, and what is still missing—without claiming that anything has already been deployed.
       </div>
     </div>
 
@@ -40,7 +40,7 @@
           <th style="padding:7px 9px;border-bottom:1px solid rgba(139,92,246,.3);">You get</th>
         </tr>
         <tr><td style="padding:7px 9px;color:#e2e8f0;font-weight:700;">1 · Pick a path</td>
-            <td style="padding:7px 9px;color:#94a3b8;">Matches your situation to one of four routes</td>
+            <td style="padding:7px 9px;color:#94a3b8;">Matches your situation to one of three starting conditions</td>
             <td style="padding:7px 9px;color:#94a3b8;">Your situation</td>
             <td style="padding:7px 9px;color:#6ee7b7;">The right questions, not all of them</td></tr>
         <tr><td style="padding:7px 9px;color:#e2e8f0;font-weight:700;">2 · Import</td>
@@ -94,6 +94,28 @@
   <!-- source selector -->
   <div id="sai-adopt-source" style="display:none;border-top:1px solid rgba(139,92,246,.2);padding-top:16px;">
     <div style="font-size:13px;font-weight:800;color:#e2e8f0;margin-bottom:10px;" id="sai-adopt-source-title">Where should this begin?</div>
+    <div id="sai-palantir-build-intro" style="display:none;background:#f5f3ff;border:1px solid #c4b5fd;border-radius:10px;padding:12px 14px;margin-bottom:12px;color:#475569;">
+      <div style="font-size:12px;font-weight:900;color:#5b21b6;margin-bottom:4px;">Palantir build intake — how the system will be Palantirized</div>
+      <div style="font-size:11px;line-height:1.6;">
+        This does <b>not</b> create another Business Apps System. It references the system selected in the catalog below,
+        then adds the Palantir-specific build brief: business goal, data inputs, expected outputs, ownership, sensitivity,
+        ontology intent, Foundry runtime, and connection constraints.
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:8px;margin-top:9px;">
+        <div style="background:#fff;border:1px solid #ddd6fe;border-radius:8px;padding:8px 10px;font-size:10px;line-height:1.5;">
+          <b style="color:#5b21b6;">Migrated FLEX app</b><br>
+          <b>If you</b> already have the application in the Migration Log, <b>then this will help you</b> reuse its trusted system ID and component list in the Palantir build without entering them again.
+        </div>
+        <div style="background:#fff;border:1px solid #ddd6fe;border-radius:8px;padding:8px 10px;font-size:10px;line-height:1.5;">
+          <b style="color:#5b21b6;">Repo, ZIP, notebook, or bundle</b><br>
+          <b>If you</b> already have code, a notebook, or a packaged AI asset, <b>then this will help you</b> scan it safely without execution and identify its Foundry/AIP mappings, dependencies, and production gaps.
+        </div>
+        <div style="background:#fff;border:1px solid #ddd6fe;border-radius:8px;padding:8px 10px;font-size:10px;line-height:1.5;">
+          <b style="color:#5b21b6;">New AI project</b><br>
+          <b>If you</b> have a business problem but no implementation yet, <b>then this will help you</b> turn the desired inputs and outputs into a proposed Foundry ontology, AIP actions, runtime pattern, and delivery plan.
+        </div>
+      </div>
+    </div>
     <div id="sai-adopt-source-btns" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;"></div>
 
     <div id="sai-adopt-form" style="display:none;background:rgba(0,0,0,.18);border:1px solid rgba(139,92,246,.18);border-radius:10px;padding:14px;">
@@ -109,6 +131,15 @@
         </label>
         <label style="display:flex;flex-direction:column;gap:4px;font-size:10px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em;">Business owner
           <input id="sai-adopt-owner" type="text" placeholder="sponsor@customer.com" style="border:1px solid #475569;border-radius:7px;padding:8px;background:#0f172a;color:#e2e8f0;font-size:13px;">
+        </label>
+        <label style="display:flex;flex-direction:column;gap:4px;font-size:10px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em;">Data owner
+          <input id="sai-adopt-data-owner" type="text" placeholder="data.owner@customer.com" style="border:1px solid #475569;border-radius:7px;padding:8px;background:#0f172a;color:#e2e8f0;font-size:13px;">
+        </label>
+        <label style="display:flex;flex-direction:column;gap:4px;font-size:10px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em;">Data residency / sovereignty boundary
+          <input id="sai-adopt-residency" type="text" placeholder="e.g. UK only; data must remain in customer tenant" style="border:1px solid #475569;border-radius:7px;padding:8px;background:#0f172a;color:#e2e8f0;font-size:13px;">
+        </label>
+        <label style="display:flex;flex-direction:column;gap:4px;font-size:10px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em;">Business goal / measurable outcome
+          <input id="sai-adopt-goal" type="text" placeholder="e.g. reduce claims handling time by 30%" style="border:1px solid #475569;border-radius:7px;padding:8px;background:#0f172a;color:#e2e8f0;font-size:13px;">
         </label>
       </div>
 
@@ -212,13 +243,39 @@
     </div>
   </div>
 
-  <!-- ── Palantir-ready build: Foundry-shaped, without a Foundry export ── -->
+  <!-- ── Palantir-ready build specification and handoff ── -->
   <div id="sai-adopt-foundry" style="display:none;margin-top:16px;border-top:1px solid rgba(139,92,246,.2);padding-top:16px;">
-    <div style="font-size:13px;font-weight:800;color:#e2e8f0;margin-bottom:3px;">🧩 Foundry-ready, without a Foundry export</div>
+    <div style="font-size:13px;font-weight:800;color:#e2e8f0;margin-bottom:3px;">🧩 Palantir-Ready Build — runtime and connection decision</div>
+    <div style="background:#eef2ff;border:1px solid #a5b4fc;border-radius:9px;padding:10px 12px;margin:9px 0 12px;font-size:11px;color:#475569;line-height:1.6;">
+      <b style="color:#4338ca;">Final AI SWITCH stage.</b>
+      Your starting condition is <b id="sai-palantir-entry-path" style="color:#5b21b6;">Greenfield</b>.
+      The Business Apps System selector remains inside this stage and supplies the authoritative system ID and components.
+      This final stage adds the Foundry/AIP design, readiness and gap report, and delivery handoff.
+    </div>
     <div style="font-size:11px;color:#64748b;margin-bottom:12px;">
-      You do not need anything from Palantir to start. Declare the ontology below — business system, pain points,
-      inputs, outputs, related teams — and we produce the object, link and AIP tool mapping their Foundry team
-      implements, plus the connection kit for registering your FLEX-hosted runtime as an externally hosted model.
+      This stage prepares the specification and delivery handoff; it does not modify Foundry or deploy production.
+      Declare the ontology below — business system, pain points, inputs, outputs, and related teams — so the workflow
+      can generate the object/link/action mapping, AIP tool contracts, runtime pattern, readiness gaps, and connection
+      requirements the Palantir and Rackspace delivery teams will implement.
+    </div>
+
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:9px;margin-bottom:14px;">
+      <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:9px;padding:11px;">
+        <div style="font-size:11px;font-weight:900;color:#1d4ed8;">AI SWITCH prepares</div>
+        <div style="font-size:10px;color:#475569;line-height:1.6;margin-top:4px;">Intake, source scan, readiness score, proposed ontology/AIP mapping, runtime decision, gap register, and checksummed handoff.</div>
+      </div>
+      <div style="background:#f5f3ff;border:1px solid #ddd6fe;border-radius:9px;padding:11px;">
+        <div style="font-size:11px;font-weight:900;color:#6d28d9;">Palantir operates</div>
+        <div style="font-size:10px;color:#475569;line-height:1.6;margin-top:4px;">The approved Foundry ontology, datasets, AIP tools, actions, permissions, and governed workflows.</div>
+      </div>
+      <div style="background:#ecfdf5;border:1px solid #a7f3d0;border-radius:9px;padding:11px;">
+        <div style="font-size:11px;font-weight:900;color:#047857;">Rackspace implements and manages</div>
+        <div style="font-size:10px;color:#475569;line-height:1.6;margin-top:4px;">Integration, supporting runtime, connectivity, production-gap closure, activation support, and managed operations.</div>
+      </div>
+      <div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:9px;padding:11px;">
+        <div style="font-size:11px;font-weight:900;color:#c2410c;">Customer authorizes</div>
+        <div style="font-size:10px;color:#475569;line-height:1.6;margin-top:4px;">Data access, security, governance, ontology changes, action approvals, and production activation.</div>
+      </div>
     </div>
 
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px;">
@@ -284,13 +341,40 @@
   </div>
 
   <div id="sai-adopt-progress" style="display:none;margin-top:14px;background:rgba(6,182,212,.08);border:1px solid rgba(34,211,238,.25);border-radius:8px;padding:11px 14px;font-size:12px;color:#67e8f9;"></div>
-  <div id="sai-adopt-result" style="display:none;margin-top:16px;"></div>
+
+  <!-- Final Palantir stage outputs: generated by the same project assessment
+       and plan pipeline, never by a parallel business-system record. -->
+  <div id="sai-gap-report-stage" style="display:none;margin-top:16px;background:#f8fafc;border:1px solid #bfdbfe;border-radius:11px;padding:14px;">
+    <div style="font-size:14px;font-weight:900;color:#1d4ed8;">3A · Readiness and Gap Report</div>
+    <div style="font-size:11px;color:#475569;margin-top:4px;line-height:1.6;">
+      Scores the selected system, declared controls, source evidence, ontology, AIP actions, runtime constraints, and unresolved production decisions.
+      Anything not verified remains <b>NOT_CHECKED</b> and lowers confidence.
+    </div>
+    <div id="sai-gap-report-empty" style="margin-top:10px;background:#fff7ed;border:1px solid #fdba74;border-radius:8px;padding:9px 11px;font-size:11px;color:#9a3412;">
+      Complete the Palantir build brief and choose <b>Import, assess &amp; build Palantir plan</b> to generate this report.
+    </div>
+    <div id="sai-adopt-result" style="display:none;margin-top:14px;"></div>
+  </div>
+
+  <div id="sai-delivery-handoff-stage" style="display:none;margin-top:14px;background:#f0fdf4;border:1px solid #86efac;border-radius:11px;padding:14px;">
+    <div style="font-size:14px;font-weight:900;color:#047857;">3B · Delivery Plan and Handoff</div>
+    <div style="font-size:11px;color:#475569;margin-top:4px;line-height:1.6;">
+      Packages the selected system, Foundry ontology and AIP mapping, target runtime, connection contract, named gaps, unresolved decisions,
+      and delivery artifacts for Palantir and Rackspace implementation teams. This is a proposed handoff, not a live deployment.
+    </div>
+    <div id="sai-delivery-handoff-content" style="margin-top:10px;background:#ffffff;border:1px solid #bbf7d0;border-radius:8px;padding:10px 12px;font-size:11px;color:#475569;">
+      Generate the Palantir-ready plan to create the delivery handoff and verified export links.
+    </div>
+  </div>
 </div>
 
 <script>
 (function () {
   var API = '/ai-adoption';
-  var state = { scenario: '', mode: '', palantir: false, source: '', projectId: '', meta: null };
+  var state = {
+    scenario: '', mode: '', palantir: false, source: '', projectId: '', meta: null,
+    entryScenario: '', entryMode: ''
+  };
   var $ = function (id) { return document.getElementById(id); };
 
   // Four substages over three adoption modes. The enum stays GREENFIELD /
@@ -299,9 +383,9 @@
   // "Goldenfield" and "Palantir-ready" are presentation and presets, not new
   // contract values.
   var SCENARIOS = [
-    { id: 'OVERVIEW', mode: 'GREENFIELD', overview: true, icon: '📖', title: 'What is Stage 4?', tag: 'Read first',
+    { id: 'OVERVIEW', mode: 'GREENFIELD', overview: true, icon: '📖', title: 'What is the AI SWITCH Stage?', tag: 'Read first',
       blurb: 'What this stage is for, what it does, and what you get out.',
-      what: 'Stage 4 turns a business problem into a governed AI workload running in production — and tells you honestly what is still missing.',
+      what: 'The AI SWITCH Stage turns a business problem and its application context into a Palantir-ready implementation contract. Palantir and Rackspace use that contract to implement and operate the approved solution.',
       how: ['Pick the path that matches your situation',
             'Point us at what exists — an app, a repo, a bundle, or nothing yet',
             'We scan it without running it, and score what production needs',
@@ -311,64 +395,206 @@
     { id: 'GREENFIELD', mode: 'GREENFIELD', icon: '🌱', title: 'Greenfield', tag: 'Greenfield',
       blurb: 'You have no AI here yet. Build it.',
       what: 'You want AI you do not have yet. We start from your business problem and build something new.',
+      goal: 'Capture a complete new-AI brief tied to the exact Business Apps System that will use it, then pass that evidence to the final Palantir stage.',
+      inputs: [
+        'Selected Business Apps System and declared components',
+        'Business goal, pain points, current inputs, and expected outputs',
+        'Business owner, data owner, sensitivity, and residency boundary',
+        'Optional repository, notebook, bundle, or project files'
+      ],
+      does: [
+        'Defines the new capability before implementation',
+        'Scans any supplied project assets without executing them',
+        'Records the intended application and data context',
+        'Names missing evidence instead of assuming production readiness'
+      ],
+      outputs: [
+        'New-AI project brief and source inventory',
+        'Business-system context and component scope',
+        'Initial readiness evidence and unresolved decisions',
+        'Complete intake forwarded to Palantir-Ready Build'
+      ],
       how: ['Say which system you want to improve and what hurts about it',
             'Pick what the build starts from — a migrated FLEX app, a container on OpenCenter, a repo, or nothing at all',
-            'We score what is missing and produce a build plan',
-            'You get a costed plan and a handoff pack for the delivery team'],
-      good_for: 'A business problem with no software behind it yet.' },
+            'Declare owners, data rules, inputs, and expected outputs',
+            'Continue to Palantir-Ready Build; nothing is deployed from this path'],
+      good_for: 'A business problem with no AI implementation behind it yet.',
+      if_then: 'If you know the business outcome but no AI solution exists yet, then this stage helps you create a complete, system-specific build brief for Palantir.' },
 
     { id: 'BROWNFIELD', mode: 'BROWNFIELD', icon: '🔗', title: 'Brownfield', tag: 'Brownfield',
       blurb: 'You have a working app. Add AI beside it.',
       what: 'Your application keeps doing its job. We add an AI layer next to it that you can switch off again.',
+      goal: 'Capture how AI can connect to an existing application without replacing its system-of-record responsibilities, then pass a reversible integration contract to Palantir.',
+      inputs: [
+        'Selected running Business Apps System, components, APIs, and owner',
+        'Integration pattern, read/write scope, and activation level',
+        'Rollback, AI-off continuity, and API documentation evidence',
+        'Business goal, data ownership, sensitivity, and residency'
+      ],
+      does: [
+        'Defines where the AI layer attaches to the application',
+        'Separates read-only, approved-write, and automated actions',
+        'Checks whether the existing workflow survives with AI disabled',
+        'Treats missing rollback evidence as a production gap'
+      ],
+      outputs: [
+        'Reversible application integration contract',
+        'Proposed action and approval boundaries',
+        'Rollback and production-readiness gaps',
+        'Complete intake forwarded to Palantir-Ready Build'
+      ],
       how: ['Pick the application that is already running',
             'Say how the AI attaches — read-only, write with approval, or automated',
             'Confirm the app still works with the AI turned off, and that rollback was tested',
-            'We will not pass it as ready until rollback is proven'],
-      good_for: 'An app you cannot risk breaking.' },
+            'Continue to Palantir-Ready Build; nothing is deployed from this path'],
+      good_for: 'An app you cannot risk breaking.',
+      if_then: 'If a production application already works and must remain the system of record, then this stage helps you define a governed, reversible Palantir integration.' },
 
     { id: 'GOLDENFIELD', mode: 'EXISTING_POC', icon: '🏆', title: 'Goldenfield', tag: 'Ready agent',
       blurb: 'The agent already exists and works. Get it live.',
       what: 'Someone already built and validated this agent. No more proving it — we close the gaps that stop it going to production.',
+      goal: 'Attach a validated AI asset to the Business Apps System it serves, preserve its evidence, and identify what Palantir and Rackspace still need for production.',
+      inputs: [
+        'Selected Business Apps System and declared components',
+        'Validated agent, repository, notebook, bundle, or Foundry export',
+        'Evaluation, runtime, dependency, ownership, and data evidence',
+        'Target business goal, inputs, outputs, and operating constraints'
+      ],
+      does: [
+        'Imports and inventories the finished asset without executing it',
+        'Preserves manifest and evaluation evidence',
+        'Compares the asset with production and governance requirements',
+        'Identifies packaging, runtime, connection, and ownership gaps'
+      ],
+      outputs: [
+        'Validated asset and dependency inventory',
+        'Production gap and evidence register',
+        'Business-system attachment and runtime requirements',
+        'Complete intake forwarded to Palantir-Ready Build'
+      ],
       how: ['Bring the agent in from AI 4 the People, YES AI CAN, a repo, or a Palantir export',
             'We scan it without running it and list what production needs',
-            'Fix the gaps we name',
-            'It goes to the delivery team as a signed, checksummed bundle'],
-      good_for: 'A finished agent stuck in a lab.' },
+            'Attach it to the business system it will serve',
+            'Continue to Palantir-Ready Build; nothing is deployed from this path'],
+      good_for: 'A finished agent stuck in a lab.',
+      if_then: 'If the AI asset already works but is not production-integrated, then this stage helps you preserve its evidence and prepare it for governed Palantir implementation.' },
 
-    { id: 'PALANTIR_READY', mode: 'GREENFIELD', palantir: true, icon: '🧩', title: 'Palantir Foundry', tag: 'Foundry',
-      blurb: 'Run AI on Palantir Foundry, operated by Rackspace.',
-      what: 'You do not need anything from Palantir to start here. Describe the business problem and we turn it into the objects, relationships and AI tools Foundry works with — then we tell you where Foundry itself should run.',
-      how: ['Describe the business system and what hurts about it',
-            'Answer three things: who owns the data, where must it live, may it leave',
-            'We pick the right Foundry setup from those answers and show you why',
-            'You get the mapping, the plan, and who does each step next'],
-      good_for: 'Regulated or sovereign data that cannot move.' }
+    { id: 'PALANTIR_READY', mode: 'GREENFIELD', palantir: true, icon: '🧩', title: 'Palantir-Ready Build', tag: 'Final stage',
+      blurb: 'All starting conditions converge here for the Foundry/AIP design, gap report, and delivery handoff.',
+      what: 'This stage turns one business problem and its application context into an implementation-ready Palantir Foundry/AIP build specification. It does not install Foundry, change a live ontology, or deploy production workloads.',
+      goal: 'Give the Palantir and Rackspace delivery teams an agreed, evidence-backed design for what to build, how it connects to the application and data, where the runtime should operate, and which production decisions are still unresolved.',
+      inputs: [
+        'The selected Business Apps System, its components, or another project source',
+        'Business pain points, current inputs, desired outputs, and related teams',
+        'Data owner, sensitivity, residency boundary, and whether data may leave it',
+        'Optional repository, notebook, LaunchPad bundle, or Foundry export'
+      ],
+      does: [
+        'Imports and scans the chosen source without executing it',
+        'Translates the use case into ontology objects, properties, links, actions, and AIP tools',
+        'Chooses and explains the hosting/connection pattern from the sovereignty and transfer answers',
+        'Scores production readiness and assigns gaps, dependencies, decisions, and owners'
+      ],
+      outputs: [
+        'Foundry ontology and AIP tool/action mapping',
+        'Runtime hosting recommendation and Foundry-to-runtime connection contract',
+        'Target architecture, production-readiness findings, and unresolved decisions',
+        'Costed delivery plan and handoff report for Rackspace and Palantir teams'
+      ],
+      how: ['Select the business system or project that the Palantir-ready build serves',
+            'Describe the business pain, data entering the workflow, and the result it must produce',
+            'Declare data ownership, sensitivity, residency, and transfer constraints',
+            'Review the generated ontology, AIP tools, runtime pattern, gaps, and delivery plan'],
+      good_for: 'A use case that needs a governed Foundry/AIP design and delivery handoff before anyone builds or deploys it.',
+      if_then: 'If Greenfield, Brownfield, or Goldenfield has captured the project context, then this stage helps Palantir and Rackspace turn it into an implementation-ready Foundry/AIP contract.' }
   ];
 
-  // The four working paths as clickable cards, so the overview is a way in
-  // rather than a dead end.
+  // The three starting conditions are choices; Palantir is the final stage
+  // they converge into, not a fourth competing starting condition.
   function renderOverviewPaths() {
     var wrap = $('sai-overview-paths');
     if (!wrap) return;
-    wrap.innerHTML = SCENARIOS.filter(function (s) { return !s.overview; }).map(function (s) {
+    var starts = SCENARIOS.filter(function (s) {
+      return s.id === 'GREENFIELD' || s.id === 'BROWNFIELD' || s.id === 'GOLDENFIELD';
+    });
+    var palantir = scenarioById('PALANTIR_READY');
+    wrap.innerHTML = starts.map(function (s, index) {
       return '<div data-goto="' + s.id + '" style="cursor:pointer;border-radius:10px;padding:12px;' +
         'border:1px solid rgba(139,92,246,.28);background:rgba(15,23,42,.5);">' +
-        '<div style="font-size:13px;font-weight:800;color:#e2e8f0;">' + s.icon + ' ' + esc(s.title) + '</div>' +
+        '<div style="font-size:13px;font-weight:800;color:#e2e8f0;">2' + String.fromCharCode(65 + index) + ' · ' + s.icon + ' ' + esc(s.title) + '</div>' +
         '<div style="font-size:11px;color:#94a3b8;margin-top:4px;line-height:1.5;">' + esc(s.blurb) + '</div>' +
         '<div style="font-size:10px;color:#6ee7b7;margin-top:6px;">' + esc(s.good_for) + '</div>' +
-        '<div style="font-size:10px;color:#a78bfa;margin-top:6px;font-weight:800;">Start here →</div></div>';
-    }).join('');
+        '<div style="font-size:10px;color:#a78bfa;margin-top:6px;font-weight:800;">Choose this starting condition →</div></div>';
+    }).join('') +
+      '<div data-goto="PALANTIR_READY" style="cursor:pointer;grid-column:1/-1;border-radius:10px;padding:13px 15px;' +
+      'border:2px solid #7c3aed;background:linear-gradient(135deg,#f5f3ff,#eef2ff);">' +
+      '<div style="font-size:14px;font-weight:900;color:#5b21b6;">3 · ' + palantir.icon + ' ' + esc(palantir.title) + ' · Final stage</div>' +
+      '<div style="font-size:11px;color:#475569;margin-top:4px;line-height:1.6;">Greenfield, Brownfield, and Goldenfield all finish here. ' +
+      'The selected Business Apps System stays in the workflow while this stage adds the Foundry/AIP mapping, gap report, and delivery handoff.</div>' +
+      '<div style="font-size:10px;color:#5b21b6;margin-top:6px;font-weight:900;">Continue to the final Palantir stage →</div></div>';
     Array.prototype.forEach.call(wrap.children, function (card) {
       card.onclick = function () {
-        var sc = scenarioById(card.getAttribute('data-goto'));
-        state.scenario = sc.id; state.mode = sc.mode; state.palantir = !!sc.palantir; state.source = '';
-        renderModes(); renderSources(); applyScenario();
+        selectScenario(card.getAttribute('data-goto'));
       };
     });
   }
 
   function scenarioById(id) {
     return SCENARIOS.filter(function (s) { return s.id === id; })[0] || SCENARIOS[0];
+  }
+
+  function entryScenarioForMode(mode) {
+    if (mode === 'BROWNFIELD') return 'BROWNFIELD';
+    if (mode === 'EXISTING_POC') return 'GOLDENFIELD';
+    return 'GREENFIELD';
+  }
+
+  function selectScenario(id) {
+    var sc = scenarioById(id);
+    var previous = state.scenario;
+    var isEntry = id === 'GREENFIELD' || id === 'BROWNFIELD' || id === 'GOLDENFIELD';
+
+    if (isEntry) {
+      state.entryScenario = id;
+      state.entryMode = sc.mode;
+      state.mode = sc.mode;
+      state.palantir = false;
+      if (previous !== id) {
+        // A Migration Log selection is already an imported source. Preserve it
+        // when moving between starting conditions so no extra Import click is
+        // required; only an explicitly chosen repo/bundle is cleared.
+        state.source = state.engineSystem ? 'FLEX_BUSINESS_SYSTEM' : '';
+        state.projectId = '';
+        show($('sai-adopt-result'), false);
+        show($('sai-gap-report-empty'), true);
+        var handoff = $('sai-delivery-handoff-content');
+        if (handoff) handoff.textContent = 'Generate the Palantir-ready plan to create the delivery handoff and verified export links.';
+      }
+    } else if (id === 'PALANTIR_READY') {
+      if (!state.entryScenario) state.entryScenario = entryScenarioForMode(state.entryMode || state.mode);
+      if (!state.entryMode) state.entryMode = scenarioById(state.entryScenario).mode;
+      state.mode = state.entryMode;
+      state.palantir = true;
+      // Keep the chosen source and Business Apps System while converging into
+      // Palantir. This is one workflow, not a second import.
+    } else {
+      state.palantir = false;
+    }
+
+    state.scenario = id;
+    renderModes();
+    renderSources();
+    applyScenario();
+  }
+
+  function continueToPalantirFinal() {
+    selectScenario('PALANTIR_READY');
+    var bar = document.getElementById('subBar4');
+    if (bar) bar.style.display = '';
+    setTimeout(function () {
+      var root = $('sai-adopt-root');
+      if (root && root.scrollIntoView) root.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 50);
   }
 
   // Kept so existing code that reasons about adoption modes still works.
@@ -430,9 +656,16 @@
   }
 
   function applyPrefill(a) {
-    if (a.mode) { state.mode = a.mode; renderModes(); renderSources(); }
+    if (a.mode) {
+      state.entryMode = a.mode;
+      state.entryScenario = entryScenarioForMode(a.mode);
+      state.mode = a.mode;
+      renderModes();
+      renderSources();
+    }
     if (a.businessName && !$('sai-adopt-name').value) $('sai-adopt-name').value = a.businessName + ' AI';
     if (a.owner && !$('sai-adopt-owner').value) $('sai-adopt-owner').value = a.owner;
+    if (a.goal && !$('sai-adopt-goal').value) $('sai-adopt-goal').value = a.goal;
     state.prefilled = true;
     say('Using assessment ' + (a.id || '') + '. Its evidence is passed to the scorer and shown as the source.', 'ok');
   }
@@ -465,7 +698,96 @@
     });
   }
 
-  // The Stage 4 sub-bar is the scenario selector. Rendering the same three
+  function startPalantirBuild() {
+    var source = $('sai-adopt-source');
+    var form = $('sai-adopt-form');
+    if (!state.source) {
+      say('Choose the application, project, or bundle that will seed the Palantir-ready build.');
+      if (source && source.scrollIntoView) source.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+    if (form && form.scrollIntoView) form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    run();
+  }
+
+  function exportPalantirReport() {
+    if (state.projectId) {
+      window.location.href = API + '/projects/' + encodeURIComponent(state.projectId) + '/export?format=markdown';
+      return;
+    }
+    say('Generate the Palantir-ready build plan before exporting its integration report.');
+    var source = $('sai-adopt-source');
+    if (source && source.scrollIntoView) source.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+
+  function applyHeroCopy() {
+    var palantir = state.scenario === 'PALANTIR_READY';
+    var entryPath = state.scenario === 'GREENFIELD' ||
+                    state.scenario === 'BROWNFIELD' ||
+                    state.scenario === 'GOLDENFIELD';
+    var copy = palantir ? {
+      eyebrow: 'AI SWITCH Stage — Palantir Foundry & AIP Integration',
+      title: 'Prepare a business system for Palantir Foundry and AIP',
+      description: 'Select the migrated FLEX business system and its declared components, then define the business goal, data inputs, expected outputs, owners, sensitivity, residency, and runtime constraints. AI SWITCH produces the Foundry ontology mapping, AIP tool and action contracts, integration architecture, readiness gaps, hosting recommendation, and costed delivery handoff for the Palantir and Rackspace teams. This stage prepares the build; it does not modify live Foundry or deploy production workloads.',
+      scan: '🔍 Run Palantir Integration Scan',
+      plan: '🚀 Generate Palantir-Ready Build Plan',
+      exportLabel: '📄 Export Palantir Integration Report',
+      imported: 'FLEX Systems Imported',
+      ready: 'Palantir-Ready Systems',
+      quickwin: 'Foundry / AIP Build Candidates',
+      upsell: 'Est. Palantir Integration Potential',
+      systemTitle: 'Select a business system for Palantir integration',
+      systemDescription: 'Choose the exact Business Apps System from the Migration Log. Its components become the scope for the Foundry ontology, AIP actions, connection contract, readiness assessment, and delivery plan.'
+    } : {
+      eyebrow: 'AI SWITCH Stage — AI Adoption & Production Factory',
+      title: 'Build new AI, enhance an existing application, or industrialize an AI PoC',
+      description: 'Build new AI, enhance existing applications, or industrialize existing AI PoCs on FLEX, OpenCenter, and Palantir — then transition them to governed Rackspace operations. Pick an adoption mode below, point us at your project, and get a costed production plan with its gaps named honestly.',
+      scan: '🔍 Run AI Opportunity Scan',
+      plan: '🚀 Generate AI LaunchPad Plan',
+      exportLabel: '📄 Export AI Power Up Report',
+      imported: 'FLEX Systems Imported',
+      ready: 'AI-Ready Systems',
+      quickwin: 'Quick-Win LaunchPad Candidates',
+      upsell: 'Est. AI Upsell Potential',
+      systemTitle: 'Select a migrated FLEX Business System',
+      systemDescription: 'Choose the exact Business Apps System from the Migration Log. Its components will be carried into the AI assessment and production plan.'
+    };
+    var text = {
+      'sai-hero-eyebrow': copy.eyebrow,
+      'sai-hero-title': copy.title,
+      'sai-hero-description': copy.description,
+      'sai-hero-scan': copy.scan,
+      'sai-hero-plan': copy.plan,
+      'sai-hero-export': copy.exportLabel,
+      'sai-cnt-imported-label': copy.imported,
+      'sai-cnt-ready-label': copy.ready,
+      'sai-cnt-quickwin-label': copy.quickwin,
+      'sai-cnt-upsell-label': copy.upsell,
+      'sai-system-step-title': copy.systemTitle,
+      'sai-system-step-description': copy.systemDescription
+    };
+    Object.keys(text).forEach(function (id) {
+      var el = $(id);
+      if (el) el.textContent = text[id];
+    });
+    var plan = $('sai-hero-plan');
+    var report = $('sai-hero-export');
+    if (plan) {
+      if (palantir) {
+        plan.onclick = startPalantirBuild;
+      } else if (entryPath) {
+        plan.textContent = '🧩 Continue to final Palantir stage';
+        plan.onclick = continueToPalantirFinal;
+      } else {
+        plan.onclick = window.generateAILaunchPadPlan;
+      }
+    }
+    if (report) report.onclick = palantir ? exportPalantirReport : window.exportAIPowerUpMarkdown;
+    show($('sai-palantir-build-intro'), palantir);
+    show($('sai-palantir-system-intro'), palantir);
+  }
+
+  // The AI SWITCH Stage sub-bar is the scenario selector. Rendering the same three
   // choices again as cards inside the panel was pure duplication, so once a
   // scenario is active this collapses to a one-line confirmation of it.
   // The cards only appear as a fallback when the sub-bar is not in the DOM
@@ -476,6 +798,7 @@
 
     if (hasSubBar && state.scenario) {
       var m = scenarioById(state.scenario);
+      var entry = scenarioById(state.entryScenario || entryScenarioForMode(state.entryMode || state.mode));
       if (!m) { return; }
       wrap.style.display = 'block';
       wrap.innerHTML =
@@ -487,17 +810,55 @@
         '<span style="font-size:14px;font-weight:800;color:#e2e8f0;">' + esc(m.title) + '</span>' +
         '<span style="font-size:12px;color:#c4b5fd;flex:1;">' + esc(m.blurb) + '</span>' +
         '<span style="font-size:10px;color:#64748b;white-space:nowrap;">change above ↑</span></div>' +
+        (state.scenario === 'PALANTIR_READY'
+          ? '<div style="margin-top:9px;background:#eef2ff;border:1px solid #c7d2fe;border-radius:8px;padding:8px 10px;' +
+            'font-size:11px;color:#475569;"><b style="color:#4338ca;">Workflow:</b> ' +
+            esc(entry.title) + ' starting condition → <b>Palantir-Ready Build</b> final stage</div>'
+          : '') +
         // What it is.
         '<div style="margin-top:10px;font-size:12px;color:#e2e8f0;line-height:1.6;">' +
         '<b style="color:#c4b5fd;">What this is:</b> ' + esc(m.what) + '</div>' +
+        (m.goal
+          ? '<div style="margin-top:10px;padding:10px 12px;border-left:3px solid #7c3aed;border-radius:0 8px 8px 0;' +
+            'background:rgba(124,58,237,.08);font-size:11px;color:#475569;line-height:1.6;">' +
+            '<b style="color:#5b21b6;">Stage goal:</b> ' + esc(m.goal) + '</div>'
+          : '') +
+        (m.inputs && m.does && m.outputs
+          ? '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:10px;margin-top:11px;">' +
+            '<div style="border:1px solid #d8e2f0;border-radius:9px;padding:11px;background:#f8fafc;">' +
+            '<div style="font-size:11px;font-weight:800;color:#1d4ed8;margin-bottom:6px;">Inputs</div>' +
+            '<ul style="margin:0 0 0 16px;padding:0;font-size:10px;color:#475569;line-height:1.6;">' +
+            m.inputs.map(function (item) { return '<li>' + esc(item) + '</li>'; }).join('') +
+            '</ul></div>' +
+            '<div style="border:1px solid #d8e2f0;border-radius:9px;padding:11px;background:#f8fafc;">' +
+            '<div style="font-size:11px;font-weight:800;color:#7c3aed;margin-bottom:6px;">What the stage does</div>' +
+            '<ul style="margin:0 0 0 16px;padding:0;font-size:10px;color:#475569;line-height:1.6;">' +
+            m.does.map(function (item) { return '<li>' + esc(item) + '</li>'; }).join('') +
+            '</ul></div>' +
+            '<div style="border:1px solid #d8e2f0;border-radius:9px;padding:11px;background:#f8fafc;">' +
+            '<div style="font-size:11px;font-weight:800;color:#047857;margin-bottom:6px;">Outputs</div>' +
+            '<ul style="margin:0 0 0 16px;padding:0;font-size:10px;color:#475569;line-height:1.6;">' +
+            m.outputs.map(function (item) { return '<li>' + esc(item) + '</li>'; }).join('') +
+            '</ul></div></div>'
+          : '') +
         // How to, numbered.
         '<div style="margin-top:9px;font-size:11px;color:#94a3b8;">' +
-        '<b style="color:#c4b5fd;font-size:12px;">How it works:</b>' +
+        '<b style="color:#c4b5fd;font-size:12px;">' + (m.goal ? 'Build-stage flow:' : 'How it works:') + '</b>' +
         '<ol style="margin:5px 0 0 18px;padding:0;line-height:1.7;">' +
         m.how.map(function (h) { return '<li>' + esc(h) + '</li>'; }).join('') +
         '</ol></div>' +
         '<div style="margin-top:9px;font-size:11px;color:#6ee7b7;">' +
         '<b>Pick this when:</b> ' + esc(m.good_for) + '</div>' +
+        (m.if_then
+          ? '<div style="margin-top:10px;background:#ecfeff;border:1px solid #a5f3fc;border-radius:8px;padding:10px 12px;' +
+            'font-size:11px;color:#155e75;line-height:1.6;"><b>Use-case guide:</b> ' + esc(m.if_then) + '</div>'
+          : '') +
+        '<div style="margin-top:10px;background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;padding:10px 12px;' +
+        'font-size:11px;color:#9a3412;line-height:1.6;"><b>Deployment boundary:</b> ' +
+        (state.scenario === 'PALANTIR_READY'
+          ? 'AI SWITCH produces the proposed deployment contract and checksummed handoff. Palantir operates Foundry, Rackspace implements and manages the integration and supporting runtime, and the customer approves production activation.'
+          : 'This starting path collects and validates project context only. It sends that context to the final Palantir-Ready Build stage; it does not deploy the AI project.') +
+        '</div>' +
         '</div>';
       return;
     }
@@ -518,9 +879,7 @@
     }).join('');
     Array.prototype.forEach.call(wrap.children, function (card) {
       card.onclick = function () {
-        var sc = scenarioById(card.getAttribute('data-mode'));
-        state.scenario = sc.id; state.mode = sc.mode; state.palantir = !!sc.palantir;
-        renderModes(); renderSources(); applyScenario();
+        selectScenario(card.getAttribute('data-mode'));
       };
     });
   }
@@ -533,7 +892,7 @@
       GREENFIELD: 'Where should this new AI production platform begin?',
       BROWNFIELD: 'Which existing application are we adding AI to?',
       GOLDENFIELD: 'Where is the ready agent?',
-      PALANTIR_READY: 'What should the Foundry-ready runtime be built from?'
+      PALANTIR_READY: 'Which application, project, or bundle should seed the Palantir-ready build?'
     }[state.scenario] || 'Where should this begin?';
     var btns = $('sai-adopt-source-btns');
     btns.innerHTML = list.map(function (s) {
@@ -563,35 +922,141 @@
     data: 'Data Platform', custom: 'Custom'
   };
 
+  // One place that turns a Migration Log business system into AI-stage state.
+  // Step 1 calls this too, so the visible card selection and the production
+  // workflow always refer to the same application and components.
+  function adoptEngineSystem(sys) {
+    // Selecting a Migration Log card is the import choice. The workflow should
+    // open with that source already active instead of asking for a second click.
+    if (!state.source) state.source = 'FLEX_BUSINESS_SYSTEM';
+    var componentRecords = (sys.component_records || sys.components || sys.parts || []).map(function (c) {
+      return typeof c === 'string' ? { name: c } : Object.assign({}, c, {
+        name: c.name || c.component || ''
+      });
+    }).filter(function (c) { return c.name; });
+    var comps = componentRecords.map(function (c) { return c.name; });
+    var vmSource = sys.vms != null ? sys.vms : (sys.apps != null ? sys.apps : sys.servers);
+    var vmCount = Array.isArray(vmSource) ? vmSource.length : (parseInt(vmSource, 10) || 0);
+
+    state.engineSystem = {
+      id: sys.id || sys.name,
+      name: sys.name,
+      vms: vmCount || comps.length || 0,
+      sensitivity: String(sys.sensitivity || sys.confidentiality || '').toUpperCase(),
+      criticality: sys.criticality || '',
+      archetype: ARCHETYPES[String(sys.type || sys.archetype || '').toLowerCase()]
+                 || sys.type || sys.archetype || '',
+      components: comps,
+      component_records: componentRecords,
+      status: sys.migStatus || sys.status || 'MIGRATED',
+      region: sys.region || '',
+      wave: sys.wave || sys.migrationWave || '',
+      business_owner: sys.business_owner || sys.bowner || '',
+      data_owner: sys.data_owner || sys.downer || '',
+      sovereignty_requirements: sys.sovereignty_requirements || sys.residency || '',
+      containerised: !!(sys.containerised || sys.containerized || sys.container_image),
+      kubernetes: !!(sys.kubernetes || sys.k8s || sys.opencenter || sys.namespace),
+      health_endpoint: !!(sys.health_endpoint || sys.health),
+      api_published: !!(sys.api_published || sys.openapi || sys.api_spec)
+    };
+    state.isDemo = /demo/i.test(String(sys.name || ''));
+
+    // Prefill what the AI stages need, without overwriting anything typed.
+    var nameEl = $('sai-adopt-name');
+    if (nameEl && !nameEl.value) nameEl.value = sys.name + ' — AI';
+    var sensEl = $('sai-adopt-sens');
+    if (sensEl && !sensEl.value && state.engineSystem.sensitivity) {
+      sensEl.value = state.engineSystem.sensitivity;
+    }
+    var ownerEl = $('sai-adopt-owner');
+    var owner = sys.technical_owner || sys.towner || sys.business_owner || sys.bowner || '';
+    if (ownerEl && !ownerEl.value && owner) ownerEl.value = owner;
+    var dataOwnerEl = $('sai-adopt-data-owner');
+    if (dataOwnerEl && !dataOwnerEl.value && state.engineSystem.data_owner) {
+      dataOwnerEl.value = state.engineSystem.data_owner;
+    }
+    var residencyEl = $('sai-adopt-residency');
+    if (residencyEl && !residencyEl.value && state.engineSystem.sovereignty_requirements) {
+      residencyEl.value = state.engineSystem.sovereignty_requirements;
+    }
+    var posture = {
+      'sai-adopt-containerised': state.engineSystem.containerised,
+      'sai-adopt-k8s': state.engineSystem.kubernetes,
+      'sai-adopt-health': state.engineSystem.health_endpoint,
+      'sai-adopt-api': state.engineSystem.api_published
+    };
+    Object.keys(posture).forEach(function (id) {
+      var box = $(id);
+      if (box) box.checked = posture[id];
+    });
+
+    // The ontology step asks about one business system — name it from here.
+    var ontoTitle = $('sai-onto-system');
+    if (ontoTitle) ontoTitle.textContent = sys.name;
+
+    var detail = $('sai-adopt-flex-detail');
+    if (detail) {
+      var s = state.engineSystem;
+      detail.innerHTML =
+        '<div style="font-size:12px;font-weight:800;color:#000;">Selected: ' + esc(s.name) + '</div>' +
+        (s.archetype ? '<span style="display:inline-block;margin-top:5px;background:rgba(0,122,255,.12);color:#0040DD;border-radius:980px;padding:3px 10px;font-size:10px;font-weight:800;">' + esc(s.archetype) + '</span> ' : '') +
+        (s.criticality ? '<span style="display:inline-block;margin-top:5px;background:rgba(255,149,0,.14);color:#B25000;border-radius:980px;padding:3px 10px;font-size:10px;font-weight:800;">' + esc(s.criticality) + '</span>' : '') +
+        (s.components.length
+          ? '<div style="margin-top:7px;font-size:11px;color:rgba(60,60,67,.6);">Components the AI plan will target: ' +
+            s.components.map(function (c) {
+              return '<span style="display:inline-block;background:rgba(120,120,128,.12);border-radius:6px;padding:2px 7px;margin:2px 3px 2px 0;font-weight:600;">' + esc(c) + '</span>';
+            }).join('') + '</div>'
+          : '');
+      show(detail, true);
+    }
+    say('Using "' + sys.name + '" from the Migration Log.', 'ok');
+  }
+
   function fillFlexSystems() {
     var sel = $('sai-adopt-flexsys');
-    if (!sel || sel.options.length) return;
+    if (!sel) return;
+    var selectedId = state.engineSystem && state.engineSystem.id;
     var systems = [];
     var origin = '';
 
     // The business systems defined in the Migration Log stage are the richest
     // source in the tool: archetype, criticality and the component list that
-    // the UAT and cutover stages already work from. Read them first so Stage 4
+    // the UAT and cutover stages already work from. Read them first so AI SWITCH
     // judges the same systems, not a parallel list.
     try {
       var uat = localStorage.getItem('uatS1_systems');
       if (uat) {
         var rows = JSON.parse(uat) || [];
         systems = (Array.isArray(rows) ? rows : []).map(function (s) {
-          var comps = s.components || s.parts || [];
+          var componentRecords = (s.component_records || s.components || s.parts || []).map(function (c) {
+            return typeof c === 'string' ? { name: c } : Object.assign({}, c, {
+              name: c.name || c.component || ''
+            });
+          }).filter(function (c) { return c.name; });
+          var vmSource = s.vms != null ? s.vms : (s.apps != null ? s.apps : s.servers);
+          var vmCount = Array.isArray(vmSource) ? vmSource.length : (parseInt(vmSource, 10) || 0);
           return {
             id: s.id || s.name,
             name: s.name || s.system || s.label,
-            vms: (s.vms || comps.length || 0),
+            vms: vmCount || componentRecords.length || 0,
             sensitivity: (s.sensitivity || s.confidentiality || '').toUpperCase(),
             status: s.status || 'MIGRATED',
             // Carried through so the card can show what kind of system it is.
             archetype: ARCHETYPES[String(s.type || s.archetype || s.systemType || '').toLowerCase()]
                        || s.type || s.archetype || '',
             criticality: s.criticality || '',
-            components: comps.map(function (c) {
-              return typeof c === 'string' ? c : (c.name || c.component || '');
-            }).filter(Boolean)
+            components: componentRecords.map(function (c) { return c.name; }),
+            component_records: componentRecords,
+            region: s.region || '',
+            wave: s.wave || s.migrationWave || '',
+            towner: s.towner || s.technical_owner || '',
+            bowner: s.bowner || s.business_owner || '',
+            data_owner: s.data_owner || s.downer || '',
+            sovereignty_requirements: s.sovereignty_requirements || s.residency || '',
+            containerised: !!(s.containerised || s.containerized || s.container_image),
+            kubernetes: !!(s.kubernetes || s.k8s || s.opencenter || s.namespace),
+            health_endpoint: !!(s.health_endpoint || s.health),
+            api_published: !!(s.api_published || s.openapi || s.api_spec)
           };
         }).filter(function (s) { return s.name; });
         if (systems.length) origin = 'Migration Log business systems';
@@ -618,12 +1083,12 @@
       }
     } catch (e) { systems = []; }
 
-    // Then anything the existing Stage 4 flow imported.
+    // Then anything the existing AI SWITCH Stage flow imported.
     if (!systems.length) {
       try {
         var raw = localStorage.getItem('ospcFlex_stage9_aiPowerUp');
         if (raw) systems = (JSON.parse(raw) || {}).systems || [];
-        if (systems.length) origin = 'Stage 4 imported systems';
+        if (systems.length) origin = 'AI SWITCH Stage imported systems';
       } catch (e) { systems = []; }
     }
 
@@ -662,8 +1127,11 @@
       return '<option value="' + i + '">' + esc((s.is_demo ? 'DEMO — ' : '') + s.name) +
              ' — ' + esc(bits.join(' · ')) + '</option>';
     }).join('');
-    // Real systems first, so a real one is selected by default when present.
-    sel.value = '0';
+    // Preserve the system selected in Step 1 when the source form is refreshed.
+    var selectedIndex = systems.findIndex(function (s) {
+      return selectedId && String(s.id || s.name) === String(selectedId);
+    });
+    sel.value = String(selectedIndex >= 0 ? selectedIndex : 0);
     sel._systems = systems;
     sel.onchange = markDemo;
     markDemo();
@@ -677,6 +1145,7 @@
     var sys = (sel._systems || [])[sel.value | 0] || {};
     show(warn, !!sys.is_demo);
     state.isDemo = !!sys.is_demo;
+    if (sys.name) adoptEngineSystem(sys);
 
     // Show the components the Migration Log stage already defined, so the AI
     // layer is planned against the real shape of the system.
@@ -811,16 +1280,63 @@
     secs.push('<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;">' +
       '<a href="' + base + 'markdown" style="text-decoration:none;background:linear-gradient(135deg,#059669,#047857);border:1px solid #34d399;border-radius:8px;color:#fff;padding:9px 16px;font-size:12px;font-weight:700;">📄 Export Markdown report</a>' +
       '<a href="' + base + 'json" style="text-decoration:none;background:rgba(148,163,184,.14);border:1px solid #475569;border-radius:8px;color:#cbd5e1;padding:9px 16px;font-size:12px;font-weight:700;">📦 JSON</a>' +
-      '<a href="' + base + 'csv" style="text-decoration:none;background:rgba(148,163,184,.14);border:1px solid #475569;border-radius:8px;color:#cbd5e1;padding:9px 16px;font-size:12px;font-weight:700;">📊 CSV</a></div>');
+      '<a href="' + base + 'csv" style="text-decoration:none;background:rgba(148,163,184,.14);border:1px solid #475569;border-radius:8px;color:#cbd5e1;padding:9px 16px;font-size:12px;font-weight:700;">📊 CSV</a>' +
+      '<a href="' + base + 'zip" style="text-decoration:none;background:#4338ca;border:1px solid #818cf8;border-radius:8px;color:#fff;padding:9px 16px;font-size:12px;font-weight:700;">🗜 Checksummed Palantir handoff pack</a></div>');
 
     var out = $('sai-adopt-result');
     out.innerHTML = secs.join('');
+    show($('sai-gap-report-stage'), true);
+    show($('sai-gap-report-empty'), false);
     show(out, true);
+    renderDeliveryHandoff(p);
+  }
+
+  function renderDeliveryHandoff(p) {
+    var out = $('sai-delivery-handoff-content');
+    if (!out) return;
+    var a = p.assessment_result || {};
+    var arch = p.deployment_plan || {};
+    var pal = p.palantir_mapping || {};
+    var gaps = a.gaps || [];
+    var blocking = gaps.filter(function (g) {
+      return g.severity === 'CRITICAL' || g.severity === 'HIGH';
+    }).length;
+    var unresolved = arch.unresolved || [];
+    var tools = pal.aip_tools || [];
+    var entry = scenarioById(state.entryScenario || entryScenarioForMode(state.entryMode || state.mode));
+    var systemName = (state.engineSystem && state.engineSystem.name) || p.name || 'Selected Business Apps System';
+    var ready = blocking === 0 && unresolved.length === 0;
+    var base = API + '/projects/' + encodeURIComponent(p.id) + '/export?format=';
+
+    out.innerHTML =
+      '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:9px;margin-bottom:11px;">' +
+      tile('Starting condition', entry.title, '#7c3aed') +
+      tile('Business system', systemName, '#2563eb') +
+      tile('AIP tools/actions', tools.length, '#0891b2') +
+      tile('Open decisions', unresolved.length + blocking, ready ? '#059669' : '#d97706') +
+      '</div>' +
+      '<div style="border-left:4px solid ' + (ready ? '#22c55e' : '#f59e0b') + ';padding:9px 11px;' +
+      'background:' + (ready ? '#f0fdf4' : '#fffbeb') + ';border-radius:0 8px 8px 0;line-height:1.6;">' +
+      '<b style="color:' + (ready ? '#047857' : '#92400e') + ';">' +
+      (ready ? 'Ready for delivery review.' : 'Handoff generated with open work.') + '</b> ' +
+      (ready
+        ? 'The evidence pack is ready for Palantir and Rackspace implementation review.'
+        : 'The exports name every unresolved decision and high-severity gap; they are not silently treated as complete.') +
+      '</div>' +
+      '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:11px;">' +
+      '<a href="' + base + 'markdown" style="text-decoration:none;background:#047857;border:1px solid #059669;border-radius:8px;color:#fff;padding:9px 14px;font-size:12px;font-weight:800;">📄 Delivery handoff</a>' +
+      '<a href="' + base + 'json" style="text-decoration:none;background:#fff;border:1px solid #94a3b8;border-radius:8px;color:#334155;padding:9px 14px;font-size:12px;font-weight:800;">📦 Machine-readable JSON</a>' +
+      '<a href="' + base + 'csv" style="text-decoration:none;background:#fff;border:1px solid #94a3b8;border-radius:8px;color:#334155;padding:9px 14px;font-size:12px;font-weight:800;">📊 Gap register CSV</a>' +
+      '<a href="' + base + 'zip" style="text-decoration:none;background:#4338ca;border:1px solid #6366f1;border-radius:8px;color:#fff;padding:9px 14px;font-size:12px;font-weight:800;">🗜 Full Palantir handoff pack</a>' +
+      '</div>';
+    show($('sai-delivery-handoff-stage'), true);
   }
 
   function tile(label, value, color) {
+    var valueText = String(value == null ? '' : value);
+    var valueSize = valueText.length > 18 ? '13px' : (valueText.length > 10 ? '16px' : '26px');
     return '<div style="background:rgba(0,0,0,.22);border:1px solid rgba(139,92,246,.2);border-radius:10px;padding:13px;text-align:center;">' +
-      '<div style="font-size:26px;font-weight:900;color:' + color + ';">' + esc(value) + '</div>' +
+      '<div style="font-size:' + valueSize + ';font-weight:900;color:' + color + ';overflow-wrap:anywhere;">' + esc(valueText) + '</div>' +
       '<div style="font-size:10px;color:#64748b;font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-top:3px;">' + esc(label) + '</div></div>';
   }
   function panel(title, inner) {
@@ -836,19 +1352,49 @@
   function run() {
     var name = ($('sai-adopt-name').value || '').trim();
     if (!name) { say('Give the project a name first.', 'err'); return; }
+    var ontologyIntent = ontologyPayload();
+    var selectedData = null;
+    try {
+      selectedData = window.saiState && window.saiState.selectedData
+        ? JSON.parse(JSON.stringify(window.saiState.selectedData))
+        : null;
+    } catch (e) { selectedData = null; }
+    var system = state.engineSystem || {};
     var payload = {
       name: name, adoption_mode: state.mode,
-      source_type: state.source === 'FLEX_BUSINESS_SYSTEM' ? 'FLEX_BUSINESS_SYSTEM' : (state.source === 'GITHUB' ? 'GITHUB' : 'UPLOAD'),
+      source_type: state.source || 'NEW_PROJECT',
       data_sensitivity: $('sai-adopt-sens').value || '',
       business_owner: ($('sai-adopt-owner').value || '').trim(),
-      business_goal: (window.saiState && window.saiState.selectedGoal) || '',
+      data_owner: ($('sai-adopt-data-owner').value || '').trim(),
+      sovereignty_requirements: ($('sai-adopt-residency').value || '').trim(),
+      business_goal: ($('sai-adopt-goal').value || '').trim()
+        || (window.saiState && window.saiState.selectedGoal) || '',
+      business_system_id: system.id || '',
+      starting_condition: state.entryScenario || entryScenarioForMode(state.entryMode || state.mode),
+      project_context: {
+        workflow: (state.entryScenario || entryScenarioForMode(state.entryMode || state.mode)) + '_TO_PALANTIR_READY',
+        starting_condition: state.entryScenario || entryScenarioForMode(state.entryMode || state.mode),
+        source_kind: state.source || 'NEW_PROJECT',
+        business_system: {
+          id: system.id || '',
+          name: system.name || '',
+          archetype: system.archetype || '',
+          criticality: system.criticality || '',
+          status: system.status || '',
+          region: system.region || '',
+          wave: system.wave || '',
+          components: system.component_records || (system.components || []).map(function (c) { return { name: c }; })
+        },
+        selected_data: selectedData,
+        ontology_intent: ontologyIntent
+      },
       palantir_required: !!state.palantir,
       is_demo: !!state.isDemo
     };
     if (state.palantir) {
       // Declared intent, not a Foundry connection. Nothing here reaches Palantir.
-      payload.sovereignty_requirements = payload.sovereignty_requirements || '';
-      payload.target_environment = $('sai-foundry-host').value || '';
+      payload.external_transfer_allowed = $('sai-foundry-transfer').checked;
+      payload.preferred_environment = $('sai-foundry-host').value || '';
       payload.foundry_target = {
         enrollment: ($('sai-foundry-enrollment').value || '').trim(),
         ontology: ($('sai-foundry-ontology').value || '').trim(),
@@ -895,26 +1441,63 @@
           });
         }
         if (state.source === 'FLEX_BUSINESS_SYSTEM') {
-          var sel = $('sai-adopt-flexsys');
-          var sys = (sel._systems || [])[sel.value | 0] || {};
+          // The engine selection wins: it carries archetype, criticality and the
+          // real component list, which the legacy dropdown never had.
+          var sys = state.engineSystem;
+          if (!sys) {
+            var sel = $('sai-adopt-flexsys');
+            sys = (sel._systems || [])[sel.value | 0] || {};
+          }
           // Declared cloud-native posture. Only ticked boxes are sent, so an
           // unverified attribute stays NOT_CHECKED rather than defaulting false.
           sys = Object.assign({}, sys, {
             containerised: $('sai-adopt-containerised').checked,
             kubernetes: $('sai-adopt-k8s').checked,
             health_endpoint: $('sai-adopt-health').checked,
-            api_published: $('sai-adopt-api').checked
+            api_published: $('sai-adopt-api').checked,
+            // Carried so the server records the real shape of the application
+            // and the integration assessment has components to judge.
+            components: (sys.components || []),
+            component_records: (sys.component_records || []),
+            archetype: sys.archetype || '',
+            criticality: sys.criticality || ''
           });
           return api('/projects/' + state.projectId + '/import', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ kind: 'FLEX', system: sys })
           });
         }
+        if (state.source === 'OPENCENTER') {
+          return api('/projects/' + state.projectId + '/import', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              kind: 'OPENCENTER',
+              workload: {
+                name: system.name || name,
+                namespace: system.namespace || '',
+                region: system.region || '',
+                sensitivity: payload.data_sensitivity,
+                containerised: system.containerised,
+                kubernetes: system.kubernetes,
+                health_endpoint: system.health_endpoint
+              }
+            })
+          });
+        }
+        if (state.source === 'NEW_PROJECT' || state.source === 'MANUAL') {
+          // There is intentionally no source artifact for a new/manual brief.
+          // Its business context and ontology are still assessed and mapped.
+          return Promise.resolve({ ok: true });
+        }
         var f = $('sai-adopt-file').files[0];
         if (!f) throw new Error('Choose a file to upload.');
         var fd = new FormData();
         fd.append('file', f);
         return api('/projects/' + state.projectId + '/import', { method: 'POST', body: fd });
+      })
+      .then(function () {
+        say('Saving the business-system ontology and Palantir intent…');
+        return postOntology(true);
       })
       .then(function () { say('Assessing production gaps…'); return api('/projects/' + state.projectId + '/assess', { method: 'POST' }); })
       .then(function () { say('Building the plan…'); return api('/projects/' + state.projectId + '/plan', { method: 'POST' }); })
@@ -934,7 +1517,9 @@
     OVERVIEW:       { onto: false, flex: false, integration: false, bundle: false, foundry: false },
     GREENFIELD:     { onto: true,  flex: true,  integration: false, bundle: false, foundry: false },
     BROWNFIELD:     { onto: true,  flex: true,  integration: true,  bundle: false, foundry: false },
-    GOLDENFIELD:    { onto: false, flex: false, integration: false, bundle: true,  foundry: false },
+    // Goldenfield can also attach the ready agent to a Migration Log business
+    // system, so the plan knows which application it serves.
+    GOLDENFIELD:    { onto: false, flex: true,  integration: false, bundle: true,  foundry: false },
     // Ontology is the whole point here: it is what Foundry receives.
     PALANTIR_READY: { onto: true,  flex: true,  integration: false, bundle: false, foundry: true }
   };
@@ -942,6 +1527,14 @@
   function applyScenario() {
     var s = SECTIONS[state.scenario] || SECTIONS.GREENFIELD;
     var isOverview = state.scenario === 'OVERVIEW';
+    var isPalantir = state.scenario === 'PALANTIR_READY';
+    if (isPalantir) {
+      s = Object.assign({}, SECTIONS.PALANTIR_READY, {
+        integration: state.entryScenario === 'BROWNFIELD',
+        bundle: state.entryScenario === 'GOLDENFIELD'
+      });
+    }
+    applyHeroCopy();
 
     // The overview replaces the working form rather than sitting above it.
     show($('sai-adopt-overview'), isOverview);
@@ -953,6 +1546,8 @@
       show($('sai-adopt-integration'), false);
       show($('sai-adopt-bundle'), false);
       show($('sai-adopt-foundry'), false);
+      show($('sai-gap-report-stage'), false);
+      show($('sai-delivery-handoff-stage'), false);
       show($('sai-adopt-result'), false);
       return;
     }
@@ -962,6 +1557,29 @@
     show($('sai-adopt-onto'), s.onto && !!state.source);
     show($('sai-adopt-integration'), s.integration && !!state.source);
     show($('sai-adopt-bundle'), s.bundle && !!state.source);
+    show($('sai-gap-report-stage'), isPalantir);
+    show($('sai-delivery-handoff-stage'), isPalantir);
+    if (isPalantir) {
+      show($('sai-gap-report-empty'), !state.projectId);
+      show($('sai-adopt-result'), !!state.projectId);
+    }
+
+    var entry = scenarioById(state.entryScenario || entryScenarioForMode(state.entryMode || state.mode));
+    var entryLabel = $('sai-palantir-entry-path');
+    if (entryLabel) entryLabel.textContent = entry.title;
+
+    // The three conditions collect their own source and system context, then
+    // continue into Palantir. Only the final stage runs the Foundry/AIP plan.
+    var runBtn = $('sai-adopt-run');
+    if (runBtn) {
+      if (isPalantir) {
+        runBtn.textContent = '⚡ Import, assess & build Palantir plan';
+        runBtn.onclick = run;
+      } else {
+        runBtn.textContent = 'Continue to Palantir-Ready Build →';
+        runBtn.onclick = continueToPalantirFinal;
+      }
+    }
 
     // With the sub-bar present this section confirms a choice rather than
     // asking for one, so the heading must not say "select".
@@ -977,7 +1595,7 @@
         GREENFIELD: 'Nothing exists yet. Declare what should improve, then pick what seeds the build.',
         BROWNFIELD: 'The application stays the system of record. The AI layer must be separately deployable and reversible.',
         GOLDENFIELD: 'Already built and validated. Close its production gaps and send it to Flex Migration Hub.',
-        PALANTIR_READY: 'No Foundry export needed. Declare the ontology here; we deploy the runtime and hand Foundry the mapping.'
+        PALANTIR_READY: 'Define the goal, inputs, outputs, ontology, and runtime constraints; this stage produces the Foundry/AIP build specification and delivery handoff.'
       }[state.scenario] || '';
     }
 
@@ -988,7 +1606,7 @@
     });
   }
 
-  // Both the Stage 4 dropdown and the sub-bar carry data-adopt-mode, so one
+  // Both the AI SWITCH Stage dropdown and the sub-bar carry data-adopt-mode, so one
   // delegated handler serves both: the dropdown is how you arrive from another
   // stage, the sub-bar is how you move between scenarios once you are here.
   function wireStageMenu() {
@@ -997,14 +1615,7 @@
       if (!btn) return;
       var id = btn.getAttribute('data-scenario');
       if (!SCENARIOS.some(function (s) { return s.id === id; })) return;
-      var sc = scenarioById(id);
-      state.scenario = id;
-      state.mode = sc.mode;              // the enum the API sees
-      state.palantir = !!sc.palantir;    // preset, not a separate mode
-      state.source = '';
-      renderModes();
-      renderSources();
-      applyScenario();
+      selectScenario(id);
       var bar = document.getElementById('subBar4');
       if (bar) bar.style.display = '';
       // The panel is revealed by the stage router; wait a frame before scrolling.
@@ -1014,6 +1625,15 @@
       }, 120);
     }, true);
 
+    // The readiness sub-tab opens the existing A-0 … A-9 panel through the same
+    // live stage button used by the top dropdown.
+    document.addEventListener('click', function (evt) {
+      var btn = evt.target && evt.target.closest ? evt.target.closest('[data-ai-readiness]') : null;
+      if (!btn) return;
+      var route = document.querySelector('.stage-btn[data-stage="sai_readiness"]');
+      if (route) route.click();
+    }, true);
+
     // Show the sub-bar whenever an AI stage is opened, hide it elsewhere.
     document.addEventListener('click', function (evt) {
       var btn = evt.target && evt.target.closest ? evt.target.closest('[data-stage]') : null;
@@ -1021,6 +1641,11 @@
       var stage = btn.getAttribute('data-stage');
       var bar = document.getElementById('subBar4');
       if (bar) bar.style.display = (stage === 'sai' || stage === 'sai_readiness') ? '' : 'none';
+      if (stage === 'sai_readiness') {
+        Array.prototype.forEach.call(document.querySelectorAll('#subBar4 .sub-btn'), function (b) {
+          b.classList.toggle('active', b.hasAttribute('data-ai-readiness'));
+        });
+      }
     }, true);
   }
 
@@ -1050,6 +1675,20 @@
     return ($(id).value || '').split(',').map(function (s) { return s.trim(); }).filter(Boolean);
   }
 
+  function ontologyPayload() {
+    var sel = $('sai-adopt-flexsys');
+    var sysName = (state.engineSystem && state.engineSystem.name)
+      || ((sel && sel._systems && sel._systems[sel.value | 0]) ? sel._systems[sel.value | 0].name : '')
+      || ($('sai-adopt-name').value || '').trim();
+    return {
+      name: sysName,
+      pain_points: ontoState.pains.slice(),
+      inputs: splitList('sai-onto-inputs'),
+      desired_outputs: splitList('sai-onto-outputs'),
+      related_orgs: splitList('sai-onto-orgs')
+    };
+  }
+
   function runOntology() {
     if (!state.projectId) {
       // The ontology attaches to a project, so create a draft one first.
@@ -1065,21 +1704,23 @@
     postOntology();
   }
 
-  function postOntology() {
-    var sel = $('sai-adopt-flexsys');
-    var sysName = (sel && sel._systems && sel._systems[sel.value | 0])
-      ? sel._systems[sel.value | 0].name : ($('sai-adopt-name').value || '').trim();
-    api('/projects/' + state.projectId + '/ontology', {
+  function postOntology(silent) {
+    // The final run calls this automatically. The separate preview button still
+    // lets the user inspect the proposed tools before generating the full plan.
+    return api('/projects/' + state.projectId + '/ontology', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        name: sysName,
-        pain_points: ontoState.pains,
-        inputs: splitList('sai-onto-inputs'),
-        desired_outputs: splitList('sai-onto-outputs'),
-        related_orgs: splitList('sai-onto-orgs')
-      })
-    }).then(function (b) { ontoState.derived = b.ontology; renderOntology(b.ontology); })
-      .catch(function (e) { say(String(e.message || e), 'err'); });
+      body: JSON.stringify(ontologyPayload())
+    }).then(function (b) {
+      ontoState.derived = b.ontology;
+      renderOntology(b.ontology);
+      return b;
+    }).catch(function (e) {
+      if (!silent) {
+        say(String(e.message || e), 'err');
+        return null;
+      }
+      throw e;
+    });
   }
 
   function renderOntology(o) {
@@ -1224,21 +1865,35 @@
       applyScenario();
       offerPrefill();
       wireStageMenu();
-      $('sai-adopt-run').onclick = run;
       $('sai-onto-run').onclick = runOntology;
       $('sai-foundry-check').onclick = checkFoundry;
+      // Step 1 uses this to push its Migration Log card selection into the
+      // project import, ontology and plan-generation flow.
+      window.saiAdoptUseSystem = adoptEngineSystem;
+      if (window.saiState && window.saiState.selectedSystem) {
+        adoptEngineSystem(window.saiState.selectedSystem);
+      }
       // Pain vocabulary comes from the server so it stays identical to A-3.
       fetch(API + '/pain-categories').then(function (r) { return r.json(); })
         .then(function (b) { renderPains(b.categories || []); })
         .catch(function () { /* section simply stays empty */ });
       $('sai-adopt-reset').onclick = function () {
-        state.mode = ''; state.source = ''; state.projectId = '';
+        state.source = ''; state.projectId = ''; state.engineSystem = null;
+        state.mode = state.scenario === 'PALANTIR_READY'
+          ? (state.entryMode || 'GREENFIELD')
+          : scenarioById(state.scenario).mode;
         show($('sai-adopt-source'), false); show($('sai-adopt-form'), false);
-        show($('sai-adopt-result'), false); say('');
+        show($('sai-adopt-result'), false);
+        show($('sai-gap-report-empty'), true);
+        var handoff = $('sai-delivery-handoff-content');
+        if (handoff) handoff.textContent = 'Generate the Palantir-ready plan to create the delivery handoff and verified export links.';
+        say('');
         renderModes();
+        renderSources();
+        applyScenario();
       };
     }).catch(function () {
-      // Feature flag off, or blueprint not registered: leave Stage 4 as it was.
+      // Feature flag off, or blueprint not registered: leave AI SWITCH as it was.
     });
   }
 

@@ -1,0 +1,72 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: bank-db-credentials
+  namespace: mockbank-prod
+  labels: {app: bank-db}
+type: Opaque
+stringData:
+  POSTGRES_DB: mockbank
+  POSTGRES_USER: bank
+  POSTGRES_PASSWORD: mockbank-demo-pw   # demo only — production uses SOPS-encrypted secret
+  DATABASE_URL: postgresql://bank:mockbank-demo-pw@bank-db:5432/mockbank
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: bank-db-data
+  namespace: mockbank-prod
+  labels: {app: bank-db}
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests: {storage: 1Gi}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bank-db
+  namespace: mockbank-prod
+  labels: {app: bank-db, app.kubernetes.io/part-of: mockbank}
+spec:
+  replicas: 1
+  strategy: {type: Recreate}
+  selector:
+    matchLabels: {app: bank-db}
+  template:
+    metadata:
+      labels: {app: bank-db, app.kubernetes.io/part-of: mockbank}
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          envFrom:
+            - secretRef: {name: bank-db-credentials}
+          ports: [{containerPort: 5432}]
+          volumeMounts:
+            - {name: data, mountPath: /var/lib/postgresql/data, subPath: pgdata}
+          readinessProbe:
+            exec: {command: [sh, -c, "pg_isready -U bank -d mockbank"]}
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            exec: {command: [sh, -c, "pg_isready -U bank -d mockbank"]}
+            initialDelaySeconds: 20
+            periodSeconds: 15
+          resources:
+            requests: {cpu: 100m, memory: 128Mi}
+            limits: {cpu: 500m, memory: 512Mi}
+      volumes:
+        - name: data
+          persistentVolumeClaim: {claimName: bank-db-data}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: bank-db
+  namespace: mockbank-prod
+  labels: {app: bank-db}
+spec:
+  selector: {app: bank-db}
+  ports:
+    - {name: postgres, port: 5432, targetPort: 5432}

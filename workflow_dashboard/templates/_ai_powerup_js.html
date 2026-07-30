@@ -62,8 +62,109 @@ var SAI_GOV_ITEMS = [
 var saiState = {
   systems: [], selectedSystem: null, selectedGoal: null,
   selectedData: [], selectedSensitivity: 'low', selectedEnv: 'flex',
-  recommendation: null, launchPadPlan: null, govChecks: {}
+  selectedSystemId: '', recommendation: null, launchPadPlan: null, govChecks: {}
 };
+
+function saiEscape(value) {
+  return String(value == null ? '' : value).replace(/[&<>"']/g, function(ch) {
+    return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]);
+  });
+}
+
+function saiSystemKey(sys) {
+  return String((sys && (sys.id || sys.name)) || '');
+}
+
+function saiComponentName(component) {
+  if (typeof component === 'string') return component.trim();
+  if (!component || typeof component !== 'object') return '';
+  return String(component.name || component.component || component.role || '').trim();
+}
+
+function saiCount(value) {
+  if (Array.isArray(value)) return value.length;
+  if (value && typeof value === 'object') return Object.keys(value).length;
+  var count = parseInt(value, 10);
+  return isNaN(count) ? 0 : count;
+}
+
+function saiInferDataTypes(system, componentNames) {
+  var supplied = system.data || system.dataTypes || system.data_type || system.dataTypesAvailable;
+  var types = Array.isArray(supplied)
+    ? supplied.map(function(v) { return String(v).trim(); }).filter(Boolean)
+    : String(supplied || '').split(',').map(function(v) { return v.trim(); }).filter(Boolean);
+  var haystack = componentNames.join(' ').toLowerCase();
+  function add(label, pattern) {
+    if (pattern.test(haystack) && types.indexOf(label) < 0) types.push(label);
+  }
+  add('database', /database|\bdb\b|postgres|mysql|oracle|sql server|mongo/);
+  add('APIs', /\bapi\b|gateway|webhook|integration/);
+  add('documents', /document|file|knowledge|report|content/);
+  add('object storage', /object storage|swift|s3|blob/);
+  add('tickets', /ticket|case|support|claim/);
+  add('event streams', /queue|event|kafka|rabbit|stream/);
+  add('logs', /log|monitor|audit|observability/);
+  return types;
+}
+
+function saiNormalizeMigrationSystem(system, sourceLabel) {
+  system = system && typeof system === 'object' ? system : {};
+  var components = Array.isArray(system.components)
+    ? system.components.slice()
+    : (Array.isArray(system.parts) ? system.parts.slice() : []);
+  var componentNames = components.map(saiComponentName).filter(Boolean);
+  var vmSource = system.vms != null ? system.vms
+    : (system.vm_count != null ? system.vm_count
+    : (system.servers != null ? system.servers : system.apps));
+  var sensitivity = String(system.sensitivity || system.confidentiality || 'medium').toLowerCase();
+  if (['low','medium','high','regulated'].indexOf(sensitivity) < 0) sensitivity = 'medium';
+  var name = String(system.name || system.system || system.label || system.customer || 'Unknown Business System').trim();
+  var normalized = Object.assign({}, system, {
+    id: system.id || system.business_system_id || name,
+    name: name,
+    vms: saiCount(vmSource),
+    components: components,
+    componentNames: componentNames,
+    dataTypes: saiInferDataTypes(system, componentNames),
+    sensitivity: sensitivity,
+    migStatus: system.migStatus || 'Migrated',
+    sourceStatus: system.status || '',
+    sourceLabel: sourceLabel || 'Migration Log',
+    isMigrationLogSystem: sourceLabel === 'Migration Log'
+  });
+  normalized.data = normalized.dataTypes.join(',');
+  return normalized;
+}
+
+function saiReadMigrationLogSystems() {
+  try {
+    var raw = localStorage.getItem('uatS1_systems');
+    var rows = raw ? JSON.parse(raw) : [];
+    if (!Array.isArray(rows)) return [];
+    return rows.filter(function(row) { return row && (row.name || row.system || row.label); })
+      .map(function(row) { return saiNormalizeMigrationSystem(row, 'Migration Log'); });
+  } catch (e) {
+    return [];
+  }
+}
+
+function saiReadLegacyTrackerSystems() {
+  try {
+    var raw = localStorage.getItem('osflex_migration_tracker');
+    var parsed = raw ? JSON.parse(raw) : [];
+    var rows = Array.isArray(parsed)
+      ? parsed
+      : (parsed.systems || parsed.rows || parsed.servers || []);
+    return (Array.isArray(rows) ? rows : [])
+      .filter(function(row) {
+        var status = String(row.status || row.migStatus || '').toLowerCase();
+        return !status || status === 'migrated' || status === 'active' || status === 'complete';
+      })
+      .map(function(row) { return saiNormalizeMigrationSystem(row, 'Migration Tracker'); });
+  } catch (e) {
+    return [];
+  }
+}
 
 /* ─── INIT ───────────────────────────────────────────────────────────── */
 window.initStage9 = function() {
@@ -72,35 +173,65 @@ window.initStage9 = function() {
   renderDataTypes();
   renderSensitivityBtns();
   renderChecklist();
-  if (saiState.systems.length === 0) importMigratedSystemsForAI();
-  else renderSystemsGrid();
+  importMigratedSystemsForAI({ silent: true, preserveSelection: true });
+  if (!saiState.selectedSystem && saiState.systems.length) {
+    selectAISystem(saiState.systems[0]);
+  }
+  // The Migration Log editor is the default AI SWITCH Stage view. In the focused
+  // standalone page the editor is not present, so this gracefully keeps the
+  // already-imported rich cards visible instead.
+  saiUseMigrationLogSystems();
+  saiInstallMigrationLogSync();
 };
 
 /* ─── IMPORT SYSTEMS ──────────────────────────────────────────────────── */
-window.importMigratedSystemsForAI = function() {
+window.importMigratedSystemsForAI = function(options) {
+  options = options && typeof options === 'object' ? options : {};
   var msg = document.getElementById('sai-import-msg');
-  var fromTracker = [];
-  try {
-    var raw = localStorage.getItem('osflex_migration_tracker');
-    if (raw) {
-      var parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) fromTracker = parsed.filter(function(r){ return r.status === 'Migrated' || r.migStatus === 'Migrated'; });
-    }
-  } catch(e) {}
+  var selectedId = options.preserveSelection !== false
+    ? (saiState.selectedSystemId || saiSystemKey(saiState.selectedSystem))
+    : '';
+  var migrationSystems = saiReadMigrationLogSystems();
+  var trackerSystems = migrationSystems.length ? [] : saiReadLegacyTrackerSystems();
 
-  if (fromTracker.length > 0) {
-    saiState.systems = fromTracker.map(function(r) {
-      return { name: r.name || r.customer || 'Unknown', vms: r.vms || 1, data: 'documents,tickets', sensitivity: 'medium', migStatus: 'Migrated' };
-    });
-    if (msg) { msg.style.display='block'; msg.textContent = '✔ Loaded ' + saiState.systems.length + ' migrated systems from your Migration Tracker.'; }
+  if (migrationSystems.length) {
+    saiState.systems = migrationSystems;
+    if (msg) {
+      msg.style.display = 'block';
+      msg.textContent = 'Loaded ' + migrationSystems.length + ' Business Apps System' +
+        (migrationSystems.length === 1 ? '' : 's') +
+        ' from the Migration Log, including their declared components.';
+    }
+  } else if (trackerSystems.length) {
+    saiState.systems = trackerSystems;
+    if (msg) {
+      msg.style.display = 'block';
+      msg.textContent = 'Loaded ' + trackerSystems.length +
+        ' migrated system(s) from the legacy Migration Tracker. Add Business Apps Systems to the Migration Log to include component detail.';
+    }
   } else {
-    saiState.systems = SAI_DEMO_SYSTEMS.slice();
-    if (msg) { msg.style.display='block'; msg.textContent = 'ℹ No migrated systems found yet. Demo AI opportunities loaded. Complete Stage 1–Stage 4 first.'; }
+    saiState.systems = SAI_DEMO_SYSTEMS.map(function(system) {
+      return saiNormalizeMigrationSystem(Object.assign({}, system, { isDemo: true }), 'Demo');
+    });
+    if (msg) {
+      msg.style.display = 'block';
+      msg.textContent = 'No Business Apps Systems are in the Migration Log yet. Demo systems are shown and clearly labelled.';
+    }
+  }
+
+  var selected = selectedId
+    ? saiState.systems.filter(function(system) { return saiSystemKey(system) === selectedId; })[0]
+    : null;
+  saiState.selectedSystem = selected || null;
+  saiState.selectedSystemId = selected ? saiSystemKey(selected) : '';
+  if (selected && typeof window.saiAdoptUseSystem === 'function') {
+    window.saiAdoptUseSystem(selected);
   }
   renderSystemsGrid();
   renderOpportunityTable();
   renderUpsellTable();
   updateCounters();
+  saiDecorateMigrationLogSelection();
   saveStage9State();
 };
 
@@ -109,23 +240,172 @@ function renderSystemsGrid() {
   var el = document.getElementById('sai-systems-grid');
   if (!el) return;
   el.innerHTML = '';
+  if (!saiState.systems.length) {
+    el.innerHTML = '<div style="grid-column:1/-1;padding:18px;text-align:center;color:#64748b;">No Business Apps Systems found in the Migration Log.</div>';
+    return;
+  }
   saiState.systems.forEach(function(sys) {
-    var isSelected = saiState.selectedSystem && saiState.selectedSystem.name === sys.name;
+    var isSelected = saiState.selectedSystemId && saiState.selectedSystemId === saiSystemKey(sys);
+    var components = sys.componentNames || (sys.components || []).map(saiComponentName).filter(Boolean);
     var card = document.createElement('div');
-    card.style.cssText = 'background:' + (isSelected ? 'rgba(109,40,217,.25)' : 'rgba(30,41,59,.6)') + ';border:2px solid ' + (isSelected ? '#a78bfa' : 'rgba(255,255,255,.08)') + ';border-radius:10px;padding:14px;cursor:pointer;transition:border-color .15s;';
-    card.innerHTML = '<div style="font-size:14px;font-weight:800;color:#e2e8f0;margin-bottom:4px;">' + sys.name + '</div>'
-      + '<div style="font-size:10px;color:#64748b;">' + sys.vms + ' VMs &bull; ' + (sys.migStatus||'Migrated') + '</div>'
-      + '<div style="margin-top:6px;"><span style="background:rgba(52,211,153,.15);border:1px solid rgba(52,211,153,.3);border-radius:4px;padding:2px 6px;font-size:9px;color:#34d399;font-weight:700;">MIGRATED</span></div>';
+    card.className = 'sai-system-card';
+    card.setAttribute('role', 'button');
+    card.setAttribute('tabindex', '0');
+    card.setAttribute('aria-pressed', isSelected ? 'true' : 'false');
+    card.setAttribute('data-sai-system-id', saiSystemKey(sys));
+    card.setAttribute('aria-label', 'Use ' + sys.name + ' for the AI workflow');
+    card.style.cssText = 'border-radius:10px;padding:14px;cursor:pointer;transition:border-color .15s,box-shadow .15s,transform .15s;';
+    var badges = [];
+    if (sys.archetype) badges.push('<span style="background:#eff6ff;color:#1d4ed8;border-radius:999px;padding:2px 7px;font-size:9px;font-weight:800;">' + saiEscape(sys.archetype) + '</span>');
+    if (sys.criticality) badges.push('<span style="background:#fff7ed;color:#c2410c;border-radius:999px;padding:2px 7px;font-size:9px;font-weight:800;">' + saiEscape(sys.criticality) + '</span>');
+    badges.push('<span style="background:' + (sys.isDemo ? '#fff7ed' : '#dcfce7') + ';color:' + (sys.isDemo ? '#c2410c' : '#15803d') + ';border-radius:999px;padding:2px 7px;font-size:9px;font-weight:800;">' + (sys.isDemo ? 'DEMO' : saiEscape(sys.sourceLabel || 'MIGRATION LOG').toUpperCase()) + '</span>');
+    card.innerHTML =
+      '<div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start;">' +
+        '<div style="font-size:14px;font-weight:800;color:#172033;margin-bottom:4px;">' + saiEscape(sys.name) + '</div>' +
+        (isSelected ? '<span style="color:#007aff;font-size:10px;font-weight:900;white-space:nowrap;">&#10003; AI TARGET</span>' : '') +
+      '</div>' +
+      '<div style="font-size:10px;color:#64748b;">' + saiEscape(sys.vms || 0) + ' VMs &bull; ' +
+        components.length + ' components' + (sys.region ? ' &bull; ' + saiEscape(sys.region) : '') + '</div>' +
+      (components.length
+        ? '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:8px;">' +
+          components.slice(0, 6).map(function(name) {
+            return '<span style="background:#f1f5f9;color:#475569;border-radius:5px;padding:2px 6px;font-size:9px;font-weight:650;">' + saiEscape(name) + '</span>';
+          }).join('') +
+          (components.length > 6 ? '<span style="color:#64748b;font-size:9px;padding:2px;">+' + (components.length - 6) + ' more</span>' : '') +
+          '</div>'
+        : '<div style="margin-top:8px;color:#b45309;font-size:10px;">No components declared yet</div>') +
+      '<div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:9px;">' + badges.join('') + '</div>';
     card.onclick = function() { selectAISystem(sys); };
+    card.onkeydown = function(event) {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        selectAISystem(sys);
+      }
+    };
     el.appendChild(card);
   });
+  renderSelectedBusinessSystem();
 }
 
 /* ─── SELECT SYSTEM ───────────────────────────────────────────────────── */
 window.selectAISystem = function(sys) {
   saiState.selectedSystem = sys;
+  saiState.selectedSystemId = saiSystemKey(sys);
+  if (sys.sensitivity) saiState.selectedSensitivity = sys.sensitivity;
+  if (!saiState.selectedData.length && sys.dataTypes && sys.dataTypes.length) {
+    saiState.selectedData = sys.dataTypes.slice();
+  }
+  if (typeof window.saiAdoptUseSystem === 'function') window.saiAdoptUseSystem(sys);
   renderSystemsGrid();
+  renderDataTypes();
+  renderSensitivityBtns();
+  saiDecorateMigrationLogSelection();
+  saveStage9State();
 };
+
+function renderSelectedBusinessSystem() {
+  var el = document.getElementById('sai-selected-business-system');
+  if (!el) return;
+  var sys = saiState.selectedSystem;
+  if (!sys) {
+    el.style.display = 'none';
+    el.innerHTML = '';
+    return;
+  }
+  var components = sys.componentNames || (sys.components || []).map(saiComponentName).filter(Boolean);
+  el.innerHTML = '<div style="font-size:12px;font-weight:800;color:#172033;">AI workflow target: ' + saiEscape(sys.name) + '</div>' +
+    '<div style="font-size:10px;color:#64748b;margin-top:3px;">System ID: ' + saiEscape(saiSystemKey(sys)) +
+    ' &bull; ' + components.length + ' declared components will be sent to the AI assessment and production plan.</div>';
+  el.style.display = 'block';
+}
+
+function saiFindMigrationLogSystem(id) {
+  var systems = saiReadMigrationLogSystems();
+  return systems.filter(function(system) {
+    return saiSystemKey(system) === String(id || '');
+  })[0] || null;
+}
+
+function saiWireMigrationLogEngine() {
+  var host = document.getElementById('sai-fsm-uat-engine-host');
+  if (!host || host._saiSelectionWired) return;
+  host._saiSelectionWired = true;
+  host.addEventListener('click', function(event) {
+    if (event.target && event.target.closest && event.target.closest('button')) return;
+    var card = event.target && event.target.closest ? event.target.closest('[data-bz-card]') : null;
+    if (!card) return;
+    var system = saiFindMigrationLogSystem(card.getAttribute('data-bz-card'));
+    if (system) selectAISystem(system);
+  }, true);
+  host.addEventListener('keydown', function(event) {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    var card = event.target && event.target.closest ? event.target.closest('[data-bz-card]') : null;
+    if (!card) return;
+    var system = saiFindMigrationLogSystem(card.getAttribute('data-bz-card'));
+    if (system) {
+      event.preventDefault();
+      selectAISystem(system);
+    }
+  }, true);
+}
+
+function saiDecorateMigrationLogSelection() {
+  var host = document.getElementById('sai-fsm-uat-engine-host');
+  if (!host) return;
+  Array.prototype.forEach.call(host.querySelectorAll('[data-bz-card]'), function(card) {
+    var selected = card.getAttribute('data-bz-card') === saiState.selectedSystemId;
+    card.style.cursor = 'pointer';
+    card.style.borderColor = selected ? '#007aff' : '';
+    card.style.boxShadow = selected ? '0 0 0 3px rgba(0,122,255,.16)' : '';
+    card.setAttribute('aria-pressed', selected ? 'true' : 'false');
+    card.setAttribute('tabindex', '0');
+  });
+}
+
+window.saiUseMigrationLogSystems = function() {
+  importMigratedSystemsForAI({ preserveSelection: true });
+  var grid = document.getElementById('sai-systems-grid');
+  var host = document.getElementById('sai-fsm-uat-engine-host');
+  var hint = document.getElementById('sai-bizsys-hint');
+  var engine = document.getElementById('uatS1SystemsView');
+  if (engine && typeof window.saiMountBusinessSystems === 'function') {
+    window.saiMountBusinessSystems();
+    if (grid) grid.style.display = 'none';
+    if (host) host.style.display = 'block';
+    saiWireMigrationLogEngine();
+    saiDecorateMigrationLogSelection();
+    if (hint) hint.textContent = 'Select a system card to make it the AI target. Add or edit components here; the Migration Log, UAT and cutover views update together.';
+  } else {
+    if (grid) grid.style.display = 'grid';
+    if (host) host.style.display = 'none';
+    if (hint) hint.textContent = 'Business systems and components imported. Editing is available from the full Migration Log stage.';
+  }
+};
+
+window.saiUseSimpleSystemCards = function() {
+  var grid = document.getElementById('sai-systems-grid');
+  var host = document.getElementById('sai-fsm-uat-engine-host');
+  var hint = document.getElementById('sai-bizsys-hint');
+  if (typeof window.saiRestoreBusinessSystems === 'function') window.saiRestoreBusinessSystems();
+  if (host) host.style.display = 'none';
+  if (grid) grid.style.display = 'grid';
+  renderSystemsGrid();
+  if (hint) hint.textContent = 'Simple view of the same Migration Log systems. Select one to wire it to the AI workflow.';
+};
+
+function saiInstallMigrationLogSync() {
+  if (window._saiMigrationLogSyncInstalled) return;
+  window._saiMigrationLogSyncInstalled = true;
+  window.addEventListener('storage', function(event) {
+    if (event && event.key === 'uatS1_systems') {
+      importMigratedSystemsForAI({ silent: true, preserveSelection: true });
+    }
+  });
+  window.addEventListener('uatS1:businessSystemsChanged', function() {
+    importMigratedSystemsForAI({ silent: true, preserveSelection: true });
+    setTimeout(saiDecorateMigrationLogSelection, 0);
+  });
+}
 
 /* ─── RENDER GOAL CARDS ───────────────────────────────────────────────── */
 function renderAIGoals() {
@@ -180,6 +460,15 @@ function renderSensitivityBtns() {
 
 /* ─── RECOMMEND AI PATH ───────────────────────────────────────────────── */
 window.recommendAIPath = function() {
+  if (!saiState.selectedSystem) {
+    var msg = document.getElementById('sai-import-msg');
+    if (msg) {
+      msg.style.display = 'block';
+      msg.textContent = 'Select a Business Apps System from the Migration Log before generating an AI recommendation.';
+      msg.scrollIntoView({ behavior:'smooth', block:'nearest' });
+    }
+    return;
+  }
   var rec = recommendRackspaceAIService({
     system: saiState.selectedSystem,
     goal: saiState.selectedGoal,
@@ -405,7 +694,16 @@ function updateCounters() {
 
 /* ─── AI LAUNCHPAD PLAN ───────────────────────────────────────────────── */
 window.generateAILaunchPadPlan = function() {
-  var sys = saiState.selectedSystem || SAI_DEMO_SYSTEMS[0];
+  var sys = saiState.selectedSystem;
+  if (!sys) {
+    var msg = document.getElementById('sai-import-msg');
+    if (msg) {
+      msg.style.display = 'block';
+      msg.textContent = 'Select the Business Apps System that will receive the AI feature before generating a LaunchPad plan.';
+      msg.scrollIntoView({ behavior:'smooth', block:'nearest' });
+    }
+    return;
+  }
   var goalId = saiState.selectedGoal || 'rag';
   var goalObj = SAI_GOALS.filter(function(g){ return g.id === goalId; })[0] || { label:'Knowledge Search / RAG', hint:'AI chatbot over documents' };
 
@@ -502,7 +800,17 @@ window.exportAIPowerUpMarkdown = function() {
 
 /* ─── PERSISTENCE ─────────────────────────────────────────────────────── */
 window.saveStage9State = function() {
-  try { localStorage.setItem(SAI_KEY, JSON.stringify({ systems: saiState.systems, selectedGoal: saiState.selectedGoal, selectedData: saiState.selectedData, selectedSensitivity: saiState.selectedSensitivity, govChecks: saiState.govChecks, launchPadPlan: saiState.launchPadPlan })); } catch(e) {}
+  try {
+    localStorage.setItem(SAI_KEY, JSON.stringify({
+      systems: saiState.systems,
+      selectedSystemId: saiState.selectedSystemId || saiSystemKey(saiState.selectedSystem),
+      selectedGoal: saiState.selectedGoal,
+      selectedData: saiState.selectedData,
+      selectedSensitivity: saiState.selectedSensitivity,
+      govChecks: saiState.govChecks,
+      launchPadPlan: saiState.launchPadPlan
+    }));
+  } catch(e) {}
 };
 
 window.loadStage9State = function() {
@@ -511,6 +819,7 @@ window.loadStage9State = function() {
     if (!raw) return;
     var saved = JSON.parse(raw);
     if (saved.systems)            saiState.systems = saved.systems;
+    if (saved.selectedSystemId)   saiState.selectedSystemId = saved.selectedSystemId;
     if (saved.selectedGoal)       saiState.selectedGoal = saved.selectedGoal;
     if (saved.selectedData)       saiState.selectedData = saved.selectedData;
     if (saved.selectedSensitivity) saiState.selectedSensitivity = saved.selectedSensitivity;

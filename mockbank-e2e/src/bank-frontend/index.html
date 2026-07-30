@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>MockBank Mobile</title>
+<style>
+  body{margin:0;font-family:system-ui,sans-serif;background:#0f172a;color:#e2e8f0;display:flex;justify-content:center;}
+  .phone{width:380px;min-height:100vh;background:#1e293b;padding:20px;box-sizing:border-box;}
+  h1{font-size:20px;color:#38bdf8;margin:8px 0 16px;}
+  .card{background:#0f172a;border:1px solid #334155;border-radius:12px;padding:14px;margin-bottom:12px;}
+  .bal{font-size:22px;font-weight:800;color:#4ade80;}
+  .own{font-size:12px;color:#94a3b8;}
+  button{background:#0284c7;color:#fff;border:none;border-radius:8px;padding:10px 16px;font-weight:700;cursor:pointer;width:100%;}
+  input{width:100%;box-sizing:border-box;margin:4px 0;padding:8px;border-radius:6px;border:1px solid #334155;background:#0f172a;color:#e2e8f0;}
+  #msg{font-size:12px;margin-top:8px;min-height:16px;}
+</style>
+</head>
+<body>
+<div class="phone">
+  <h1>&#127974; MockBank Mobile</h1>
+  <div id="accounts">loading accounts…</div>
+  <div class="card">
+    <strong>Transfer</strong>
+    <input id="src" placeholder="from account (e.g. ACC-1001)">
+    <input id="dst" placeholder="to account (e.g. ACC-1002)">
+    <input id="amt" type="number" placeholder="amount">
+    <button onclick="doTransfer()">Send money</button>
+    <div id="msg"></div>
+  </div>
+</div>
+<script>
+const API = '/api';
+async function load(){
+  try{
+    const r = await fetch(API + '/accounts');
+    const accs = await r.json();
+    document.getElementById('accounts').innerHTML = accs.map(a =>
+      '<div class="card"><div class="own">' + a.id + ' — ' + a.owner + '</div>' +
+      '<div class="bal">$' + a.balance.toFixed(2) + '</div></div>').join('');
+  }catch(e){
+    document.getElementById('accounts').textContent = 'API unreachable: ' + e;
+  }
+}
+async function doTransfer(){
+  const body = {from: src.value, to: dst.value, amount: parseFloat(amt.value)};
+  const r = await fetch(API + '/transfer', {method:'POST',
+    headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
+  const d = await r.json();
+  document.getElementById('msg').textContent = r.ok ? ('✓ sent $' + d.transferred) : ('✗ ' + d.error);
+  load();
+}
+load();
+</script>
+</body>
+</html>

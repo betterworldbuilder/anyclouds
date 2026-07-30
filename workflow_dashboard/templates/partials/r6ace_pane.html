@@ -88,6 +88,24 @@
     </div>
   </div>
 
+  <!-- WHERE TO DEPLOY — platform selector (Kind local vs OpenStack/FLEX production) -->
+  <div id="r6p-deploy-bar" style="padding:16px 5%;background:#fff;border-bottom:2px solid #e2e8f0;">
+    <div style="font-size:10px;font-weight:800;color:#0369a1;text-transform:uppercase;letter-spacing:2px;margin-bottom:10px;">&#128205; Where to Deploy — choose the target platform for the whole pipeline</div>
+    <div style="display:flex;gap:12px;flex-wrap:wrap;">
+      <div class="r6p-method-card" id="r6p-dt-openstack" onclick="r6pSetDeployTarget('openstack')">
+        <div style="font-size:14px;font-weight:800;color:#0f172a;margin-bottom:4px;">&#9729;&#65039; OpenStack / FLEX — Production</div>
+        <div style="font-size:11px;color:#64748b;line-height:1.5;">Production OpenCenter cluster on OpenStack VMs (OpenTofu &rarr; Kubespray &rarr; FluxCD). Requires app credentials, network IDs and a real GitOps repository.</div>
+        <div style="margin-top:6px;"><span class="r6p-chip">opentofu</span><span class="r6p-chip">kubespray</span><span class="r6p-chip">openstack CLI</span><span class="r6p-chip">GitOps repo</span></div>
+      </div>
+      <div class="r6p-method-card" id="r6p-dt-kind" onclick="r6pSetDeployTarget('kind')">
+        <div style="font-size:14px;font-weight:800;color:#0f172a;margin-bottom:4px;">&#128051; Kind — Local Docker</div>
+        <div style="font-size:11px;color:#64748b;line-height:1.5;">Local test cluster in Docker via <code>opencenter cluster deploy --container-runtime docker</code> with a disposable local Gitea GitOps repo. No OpenStack credentials needed.</div>
+        <div style="margin-top:6px;"><span class="r6p-chip">docker</span><span class="r6p-chip">kind</span><span class="r6p-chip">flux</span><span class="r6p-chip">local gitea</span></div>
+      </div>
+    </div>
+    <div id="r6p-deploy-bar-note" style="font-size:12px;color:#334155;margin-top:10px;line-height:1.6;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 14px;"></div>
+  </div>
+
   <!-- R6 END-TO-END CONTAINERIZATION FLOW -->
   <section data-stage-output="r6-pipeline-flow" style="margin:14px 0;padding:16px;background:linear-gradient(135deg,#f8fbff,#eef6ff);border:1px solid #bfdbfe;border-radius:12px;box-shadow:0 4px 14px rgba(15,23,42,.06);">
     <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:12px;">
@@ -163,7 +181,7 @@
 </div>
 <link rel="stylesheet" href="/static/r6-scan-ui-v2.css?v=20260713a">
 <link rel="stylesheet" href="/static/r6-ios-light.css?v=20260714r6visible">
-<script src="/static/r6ace.js?v=20260714r6visible"></script>
+<script src="/static/r6ace.js?v=20260719mockbankdemo"></script>
 <script src="/static/r6-scan-ui-v2.js?v=20260713j"></script>
 <script>
 /* Hero buttons — were alert() placeholders; now real import/export/help. */
@@ -198,7 +216,7 @@ window.r6pHeroImport = function(){
   inp.click();
 };
 window.r6pHeroHelp = function(){
-  alert('APPS to Container Refactor Engine — flow:\n\n0. Preflight  — CLI tools, credentials, GitOps access\n1. Input      — pick the FLEX business system\n2. Discovery  — inspect VMs and services\n3. Snapshot   — capture app state (Smart Snapshot)\n4. Mapping    — components to containers\n5. Method     — choose capture/convert method\n6. Scan       — image and dependency scan\n7. Classify   — cloud-native readiness\n8. Readiness  — gates before build\n9. Build      — images + manifests\n10. GitOps    — Flux/Helm/Kustomize repo\n11. Bundle    — signed hand-off bundle\n12. OpenCenter — send to the OpenCenter platform\n\nUse Run Stage / Continue at the bottom, or Generate All.');
+  alert('APPS to Container Refactor Engine — flow:\n\nFirst pick WHERE TO DEPLOY (top of page): Kind (local Docker) or OpenStack/FLEX (production). Preflight tools, Stage 12 deploy commands and the OpenCenter hand-off all adapt to that choice.\n\n0. Preflight  — CLI tools, credentials, GitOps access\n1. Input      — pick the FLEX business system\n2. Discovery  — inspect VMs and services\n3. Snapshot   — capture app state (Smart Snapshot)\n4. Mapping    — components to containers\n5. Method     — choose capture/convert method\n6. Scan       — image and dependency scan\n7. Classify   — cloud-native readiness\n8. Readiness  — gates before build\n9. Build      — images + manifests\n10. GitOps    — Flux/Helm/Kustomize repo\n11. Bundle    — signed hand-off bundle\n12. OpenCenter — send to the OpenCenter platform\n\nUse Run Stage / Continue at the bottom, or Generate All.');
   if(typeof r6pGoTo==='function') r6pGoTo(0);
 };
 </script>

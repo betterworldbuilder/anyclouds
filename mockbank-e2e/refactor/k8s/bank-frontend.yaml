@@ -1,0 +1,37 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bank-frontend
+  namespace: mockbank-prod
+  labels: {app: bank-frontend, app.kubernetes.io/part-of: mockbank}
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: bank-frontend}
+  template:
+    metadata:
+      labels: {app: bank-frontend, app.kubernetes.io/part-of: mockbank}
+    spec:
+      containers:
+        - name: bank-frontend
+          image: mockbank/bank-frontend:2.0.0
+          imagePullPolicy: Never   # image is side-loaded into Kind, no registry pull
+          ports: [{containerPort: 80}]
+          readinessProbe:
+            httpGet: {path: /health, port: 80}
+            initialDelaySeconds: 2
+            periodSeconds: 5
+          resources:
+            requests: {cpu: 25m, memory: 32Mi}
+            limits: {cpu: 100m, memory: 128Mi}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: bank-frontend
+  namespace: mockbank-prod
+  labels: {app: bank-frontend}
+spec:
+  selector: {app: bank-frontend}
+  ports:
+    - {name: http, port: 80, targetPort: 80}

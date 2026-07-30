@@ -1,4 +1,4 @@
-"""Flask blueprint for Stage 4 AI Adoption.
+"""Flask blueprint for the AI SWITCH Stage.
 
 Six functional endpoints, not the thirty the specification listed: most of those
 operations are computed fields of a single project document rather than
@@ -21,7 +21,14 @@ from werkzeug.utils import secure_filename
 
 from . import assess as assess_mod
 from . import auth, generate, importers, ontology, palantir, scanner
-from .models import ADOPTION_MODES, SENSITIVITIES, SOURCE_TYPES, new_project, now_ms
+from .models import (
+    ADOPTION_MODES,
+    SENSITIVITIES,
+    SOURCE_TYPES,
+    make_component,
+    new_project,
+    now_ms,
+)
 from .store import ProjectStore
 
 MAX_UPLOAD_BYTES = importers.MAX_ARCHIVE_BYTES
@@ -95,7 +102,12 @@ def create_ai_adoption_blueprint(base_dir: Path) -> Blueprint:
                         "GITHUB", "UPLOAD", "NOTEBOOK", "LAUNCHPAD",
                     ],
                     "BROWNFIELD": ["FLEX_BUSINESS_SYSTEM", "OPENCENTER", "MANUAL", "GITHUB"],
-                    "EXISTING_POC": ["AI4PEOPLE", "LAUNCHPAD", "PALANTIR", "GITHUB", "UPLOAD", "NOTEBOOK"],
+                    # A ready agent still gets deployed *for* a business system,
+                    # so it can be attached to one from the Migration Log too.
+                    "EXISTING_POC": [
+                        "AI4PEOPLE", "LAUNCHPAD", "PALANTIR", "GITHUB",
+                        "UPLOAD", "NOTEBOOK", "FLEX_BUSINESS_SYSTEM", "OPENCENTER",
+                    ],
                 },
                 "auth": {
                     "configured": auth.is_configured(),
@@ -133,12 +145,19 @@ def create_ai_adoption_blueprint(base_dir: Path) -> Blueprint:
             "production_owner", "business_goal", "data_sensitivity", "preferred_environment",
             "sovereignty_requirements", "palantir_required", "department_id", "business_system_id",
             "estimated_value", "readiness_evidence", "integration", "foundry_target",
-            "is_demo",
+            "external_transfer_allowed", "data_location", "pii_present",
+            "starting_condition", "project_context", "is_demo",
         }
         overrides = {k: v for k, v in body.items() if k in allowed}
-        ev = overrides.get("readiness_evidence")
-        if ev is not None and not isinstance(ev, dict):
-            return _err("readiness_evidence must be an object")
+        for object_field in ("readiness_evidence", "integration", "foundry_target", "project_context"):
+            value = overrides.get(object_field)
+            if value is not None and not isinstance(value, dict):
+                return _err(f"{object_field} must be an object")
+        starting_condition = str(overrides.get("starting_condition") or "").upper()
+        if starting_condition and starting_condition not in ("GREENFIELD", "BROWNFIELD", "GOLDENFIELD"):
+            return _err("starting_condition must be GREENFIELD, BROWNFIELD or GOLDENFIELD")
+        if starting_condition:
+            overrides["starting_condition"] = starting_condition
         sens = str(overrides.get("data_sensitivity") or "").upper()
         if sens and sens not in SENSITIVITIES:
             return _err(f"data_sensitivity must be one of {list(SENSITIVITIES)}")
@@ -171,6 +190,7 @@ def create_ai_adoption_blueprint(base_dir: Path) -> Blueprint:
             # Must mirror the create allow-list, or a PATCH silently drops them.
             "integration", "foundry_target", "readiness_evidence",
             "external_transfer_allowed", "data_location", "pii_present",
+            "starting_condition", "project_context", "business_system_id", "preferred_environment",
         }
         for key, value in body.items():
             if key in editable:
@@ -178,6 +198,13 @@ def create_ai_adoption_blueprint(base_dir: Path) -> Blueprint:
                     value = str(value or "").upper()
                     if value and value not in SENSITIVITIES:
                         return _err(f"data_sensitivity must be one of {list(SENSITIVITIES)}")
+                if key in ("integration", "foundry_target", "readiness_evidence", "project_context"):
+                    if value is not None and not isinstance(value, dict):
+                        return _err(f"{key} must be an object")
+                if key == "starting_condition":
+                    value = str(value or "").upper()
+                    if value and value not in ("GREENFIELD", "BROWNFIELD", "GOLDENFIELD"):
+                        return _err("starting_condition must be GREENFIELD, BROWNFIELD or GOLDENFIELD")
                 project[key] = value
         store.audit(project, "project.update", _actor(), fields=sorted(set(body) & editable))
         store.save(project)
@@ -267,6 +294,28 @@ def create_ai_adoption_blueprint(base_dir: Path) -> Blueprint:
             project["source_commit"] = src.get("commit_sha", "")
             project["scan_result"] = scan
             project["components"] = scan.get("components", [])
+            # A declared business system has no source tree to scan, but its
+            # components are known from the Migration Log engine. Record them so
+            # the plan targets the real parts of the application instead of an
+            # empty component list.
+            declared = (src.get("declared") or {}) if isinstance(src, dict) else {}
+            component_records = declared.get("component_records") or [
+                {"name": name} for name in declared.get("components") or []
+            ]
+            for component in component_records:
+                name = str(component.get("name") or "").strip()
+                if not name:
+                    continue
+                project["components"].append(
+                    make_component(
+                        "APPLICATION",
+                        name,
+                        runtime=str(component.get("runtime") or ""),
+                        location=str(component.get("path") or component.get("source") or ""),
+                        source="migration-log business system",
+                        metadata_json=component,
+                    )
+                )
             project["status"] = "IMPORTED"
             project["imported_at"] = now_ms()
             project["artifacts"] = [
@@ -394,6 +443,7 @@ def create_ai_adoption_blueprint(base_dir: Path) -> Blueprint:
             project["palantir_connection"] = palantir.connection_kit(
                 project, scan, project.get("palantir_source") or {}
             )
+            project["palantir_handoff_manifest"] = generate.build_palantir_handoff_manifest(project)
         project["passport"] = generate.build_passport(
             project, scan, result,
             kind={"GREENFIELD": "AGENT", "BROWNFIELD": "APPLICATION", "EXISTING_POC": "POC"}.get(
@@ -537,6 +587,7 @@ def create_ai_adoption_blueprint(base_dir: Path) -> Blueprint:
                 project["palantir_connection"] = palantir.connection_kit(
                     project, scan, project.get("palantir_source") or {}
                 )
+                project["palantir_handoff_manifest"] = generate.build_palantir_handoff_manifest(project)
             project["passport"] = generate.build_passport(project, scan, result, kind="AGENT")
             project["journey"] = generate.build_journey(project, result)
             project["status"] = "PLANNED"

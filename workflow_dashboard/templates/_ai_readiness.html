@@ -1,43 +1,43 @@
 <style>
-#sai-readiness-page{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#f6f8fc;color:#172033;padding:24px 28px 34px;min-height:720px}
+#sai-readiness-page{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#f6f8fc;color:#172033;padding:24px 28px 34px;min-height:720px;font-size:15px;line-height:1.5}
 #sai-readiness-page *{box-sizing:border-box}
 .sai-r-mode{display:flex;gap:8px;align-items:center;margin:0 auto 14px;max-width:1400px}
 .sai-r-mode button{border:1px solid #cbd5e1;background:#fff;color:#475569;border-radius:9px;padding:9px 15px;font-weight:800;cursor:pointer}
 .sai-r-mode button.active{background:#172033;color:#fff;border-color:#172033}
 .sai-r-hero{max-width:1400px;margin:0 auto 18px;background:linear-gradient(135deg,#fff,#eff6ff 58%,#f0fdf4);border:1px solid #d8e2f0;border-radius:16px;padding:24px 28px;box-shadow:0 12px 30px rgba(15,23,42,.08)}
-.sai-r-kicker{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#2563eb;font-weight:900}
+.sai-r-kicker{font-size:12.5px;letter-spacing:.14em;text-transform:uppercase;color:#2563eb;font-weight:900}
 .sai-r-hero h2{margin:7px 0 7px;font-size:28px;color:#172033}
-.sai-r-hero p{margin:0;color:#64748b;max-width:900px;line-height:1.55}
+.sai-r-hero p{margin:0;color:#64748b;max-width:1050px;line-height:1.65;font-size:14px}
 .sai-r-layout{max-width:1400px;margin:auto;display:grid;grid-template-columns:minmax(0,1fr) 285px;gap:16px}
 .sai-r-main,.sai-r-summary,.sai-r-card{background:#fff;border:1px solid #d8e2f0;border-radius:12px;box-shadow:0 7px 20px rgba(15,23,42,.06)}
 .sai-r-main{padding:18px}
 .sai-r-progress{display:flex;gap:5px;overflow:auto;padding-bottom:15px;border-bottom:1px solid #e2e8f0}
-.sai-r-progress button{flex:1 0 86px;border:1px solid #dbe4f0;background:#f8fafc;border-radius:8px;padding:8px 6px;color:#64748b;font-size:10px;font-weight:800;cursor:pointer}
+.sai-r-progress button{flex:1 0 96px;border:1px solid #dbe4f0;background:#f8fafc;border-radius:8px;padding:9px 7px;color:#64748b;font-size:12px;font-weight:800;cursor:pointer}
 .sai-r-progress button.active{background:#dbeafe;border-color:#2563eb;color:#1d4ed8}
 .sai-r-progress button.done{background:#dcfce7;border-color:#86efac;color:#166534}
 .sai-r-step-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin:18px 0 14px}
 .sai-r-step-head h3{margin:0;color:#172033;font-size:20px}
-.sai-r-step-head p{margin:4px 0 0;color:#64748b;font-size:12px}
+.sai-r-step-head p{margin:4px 0 0;color:#64748b;font-size:14px}
 .sai-r-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:11px}
 .sai-r-field{display:flex;flex-direction:column;gap:5px}
 .sai-r-field.full{grid-column:1/-1}
-.sai-r-field label{font-size:10px;color:#475569;font-weight:900;text-transform:uppercase;letter-spacing:.05em}
-.sai-r-field input,.sai-r-field select,.sai-r-field textarea{width:100%;border:1px solid #cbd5e1;border-radius:8px;padding:9px 10px;background:#fff;color:#172033;font:inherit;font-size:13px}
+.sai-r-field label{font-size:12px;color:#475569;font-weight:900;text-transform:uppercase;letter-spacing:.05em}
+.sai-r-field input,.sai-r-field select,.sai-r-field textarea{width:100%;border:1px solid #cbd5e1;border-radius:8px;padding:10px 11px;background:#fff;color:#172033;font:inherit;font-size:14px}
 .sai-r-field textarea{min-height:76px;resize:vertical}
 .sai-r-card{padding:13px;margin-top:12px}
 .sai-r-card h4{margin:0 0 4px;color:#172033;font-size:14px}
-.sai-r-card p{margin:3px 0;color:#64748b;font-size:12px;line-height:1.45}
-.sai-r-chip{display:inline-block;border:1px solid #bfdbfe;background:#eff6ff;color:#1d4ed8;border-radius:99px;padding:4px 8px;font-size:10px;font-weight:800;margin:3px}
+.sai-r-card p{margin:3px 0;color:#64748b;font-size:13.5px;line-height:1.55}
+.sai-r-chip{display:inline-block;border:1px solid #bfdbfe;background:#eff6ff;color:#1d4ed8;border-radius:99px;padding:4px 8px;font-size:12px;font-weight:800;margin:3px}
 .sai-r-btn{border:1px solid #2563eb;background:#2563eb;color:#fff;border-radius:8px;padding:9px 13px;font-weight:800;cursor:pointer}
 .sai-r-btn.secondary{background:#fff;color:#2563eb}
 .sai-r-btn.green{background:#16a34a;border-color:#16a34a}
 .sai-r-actions{display:flex;justify-content:space-between;gap:8px;margin-top:18px;padding-top:14px;border-top:1px solid #e2e8f0}
 .sai-r-summary{padding:15px;height:max-content;position:sticky;top:12px}
 .sai-r-summary h3{margin:0 0 12px;font-size:15px;color:#172033}
-.sai-r-stat{display:flex;justify-content:space-between;border-bottom:1px solid #edf2f7;padding:8px 0;font-size:12px;color:#64748b}
+.sai-r-stat{display:flex;justify-content:space-between;border-bottom:1px solid #edf2f7;padding:9px 0;font-size:13.5px;color:#64748b}
 .sai-r-stat b{color:#172033}
-.sai-r-note{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px;margin-top:12px;font-size:11px;color:#64748b;line-height:1.45}
-.sai-r-empty{padding:18px;border:1px dashed #cbd5e1;border-radius:9px;text-align:center;color:#64748b;font-size:12px}
+.sai-r-note{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:11px;margin-top:12px;font-size:13px;color:#64748b;line-height:1.55}
+.sai-r-empty{padding:18px;border:1px dashed #cbd5e1;border-radius:9px;text-align:center;color:#64748b;font-size:13.5px}
 .sai-r-review{margin-top:14px}
 @media(max-width:900px){.sai-r-layout{grid-template-columns:1fr}.sai-r-summary{position:static}}
 </style>
@@ -46,7 +46,7 @@
   <div class="sai-r-hero">
     <div class="sai-r-kicker">AI SWITCH / BUSINESS DISCOVERY</div>
     <h2>AI Enhancement Readiness Assessment</h2>
-    <p>Tell us how your teams work, where the pain points are, and which business systems need the most help so we can identify the best AI path. We start with people and workflows, then connect recommendations to Rackspace AI services.</p>
+    <p>Tell us how your teams work, where the pain points are, and which Business Apps Systems need help. The assessment identifies Greenfield, Brownfield, or Goldenfield as the starting condition and carries the evidence into the final Palantir-Ready Build. It recommends a path; it does not deploy anything.</p>
   </div>
   <div class="sai-r-layout">
     <main class="sai-r-main">
@@ -72,7 +72,7 @@
 (function(){
   var KEY='osflex_ai_readiness_assessment_v1';
   var steps=[
-    ['A-0','Adoption Path','Are we building new AI, adding AI to an app, or productionizing a PoC?'],
+    ['A-0','Starting Condition','Are we defining new AI, adding AI to a working app, or preparing a validated AI asset?'],
     ['A-1','Departments','Business organization and context'],
     ['A-2','Business Ontology','Capabilities, processes, systems and data'],
     ['A-3','Human Work','Workflow, tasks and pain points'],
@@ -96,7 +96,7 @@
   function head(){var x=steps[st.step];return '<div class="sai-r-step-head"><div><h3>'+x[0]+' '+x[1]+'</h3><p>'+x[2]+'</p></div><span class="sai-r-chip">Structured evidence</span></div>';}
   function render(){if(!st.businessSystems.length)st.businessSystems=systems().map(function(x){return {id:x.id,name:x.name};});
     renderProgress();var el=document.getElementById('sai-r-step');if(!el)return;var html=head();
-    if(st.step===0)html+=modeCards()+'<div class="sai-r-note">This answer decides which questions matter and which Rackspace path we recommend. It carries into Stage 9, so you only answer it once.</div>';
+    if(st.step===0)html+=modeCards()+'<div class="sai-r-note"><b>If you are unsure where to begin, then this assessment helps you choose Greenfield, Brownfield, or Goldenfield.</b> Its structured evidence is reused by the final Palantir-Ready Build, so you only answer it once. AI SWITCH prepares the handoff; Palantir and Rackspace implement the approved deployment.</div>';
     if(st.step===1)html+='<div class="sai-r-grid">'+field('sai-r-business','Company / business name',st.businessName,true)+text('sai-r-context','Business context and objectives',st.context,true)+'</div><div class="sai-r-card"><h4>Add a department</h4><div class="sai-r-grid">'+field('sai-r-dept','Department name','')+field('sai-r-function','Business function','')+field('sai-r-owner','Owner','')+field('sai-r-kpi','Primary KPI','')+'</div><button class="sai-r-btn" style="margin-top:10px" onclick="saiReadinessAddDept()">Add department</button></div>'+listDepartments();
     if(st.step===2)html+='<div class="sai-r-grid">'+field('sai-r-capability','Business capability','')+field('sai-r-process','Business process','')+sel('sai-r-system','Existing Business System','',st.businessSystems.map(function(x){return x.name;}).concat(['Add later']))+text('sai-r-purpose','Business purpose and data flow','',true)+'</div><button class="sai-r-btn" style="margin-top:10px" onclick="saiReadinessAddOntology()">Link ontology item</button>'+listOntology();
     if(st.step===3)html+='<div class="sai-r-grid">'+sel('sai-r-wf-dept','Department','',st.departments.map(function(x){return x.name;}).concat(['Unassigned']))+sel('sai-r-wf-system','Business system','',st.businessSystems.map(function(x){return x.name;}).concat(['Unmapped']))+field('sai-r-task','Task / workflow name','')+sel('sai-r-pain','Pain point category','',['Manual data entry','Repeated lookup','Document reading','Approval delay','Email dependency','Spreadsheet dependency','Handoff delay','Duplicate work','Error-prone work','Knowledge search','Compliance burden'])+sel('sai-r-score','Pain score','3',['1','2','3','4','5'])+text('sai-r-task-notes','What takes the most time, effort or creates risk?','',true)+'</div><button class="sai-r-btn" style="margin-top:10px" onclick="saiReadinessAddWorkflow()">Add workflow evidence</button>'+listWorkflows();
@@ -109,7 +109,11 @@
     el.innerHTML=html;updateSummary();
   }
   /* Same three labels as the Stage 4 menu and Step 0 - one concept, one wording. */
-  var MODES=[['GREENFIELD','Build new AI on FLEX','Greenfield','Create a new governed AI platform - seeded from a migrated FLEX app, GitHub, an upload, a notebook or a LaunchPad PoC.'],['BROWNFIELD','Add AI to an existing app','Brownfield','Keep the application as the system of record; add a reversible AI layer beside it.'],['EXISTING_POC','Deploy a ready agent','Existing PoC','A validated agent from AI 4 the People or YES AI CAN, ready to be hardened for production.']];
+  var MODES=[
+    ['GREENFIELD','Define new AI for a business system','Greenfield','If the business outcome is known but no AI solution exists, this path captures the complete brief that will be transformed by the Palantir-Ready Build.'],
+    ['BROWNFIELD','Add AI beside an existing app','Brownfield','If a production application must remain the system of record, this path captures a reversible integration and approval contract for Palantir.'],
+    ['EXISTING_POC','Prepare a validated AI asset','Goldenfield','If an agent or PoC already works, this path preserves its evidence and identifies what Palantir and Rackspace still need for production.']
+  ];
   function modeCards(){return '<div class="sai-r-grid">'+MODES.map(function(m){var on=st.adoptionMode===m[0];return '<div class="sai-r-card" style="cursor:pointer;border:2px solid '+(on?'#2563eb':'#d8e2f0')+';background:'+(on?'#eff6ff':'#fff')+'" onclick="saiReadinessSetMode(\''+m[0]+'\')"><span class="sai-r-chip">'+esc(m[2])+'</span><h4>'+(on?'✓ ':'')+esc(m[1])+'</h4><p>'+esc(m[3])+'</p></div>';}).join('')+'</div>';}
   function listDepartments(){return st.departments.length?st.departments.map(function(x){return '<div class="sai-r-card"><h4>'+esc(x.name)+'</h4><p>'+esc(x.function||'Business function not yet recorded')+' - Owner: '+esc(x.owner||'Unassigned')+' - KPI: '+esc(x.kpi||'Not recorded')+'</p></div>';}).join(''):'<div class="sai-r-empty">Add the first department to begin the business organization structure.</div>';}
   function listOntology(){return st.ontologyNodes.length?st.ontologyNodes.map(function(x){return '<div class="sai-r-card"><h4>'+esc(x.capability||'Capability')+'</h4><p>'+esc(x.process||'Process')+' - '+esc(x.system||'System not linked')+'</p></div>';}).join(''):'<div class="sai-r-empty">No ontology links recorded yet.</div>';}

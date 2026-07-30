@@ -333,6 +333,109 @@ def build_palantir_mapping(project: Dict[str, Any], scan: Dict[str, Any]) -> Dic
     }
 
 
+def build_palantir_handoff_manifest(project: Dict[str, Any]) -> Dict[str, Any]:
+    """Create the machine-readable contract passed to Palantir and Rackspace.
+
+    This is deliberately an AI SWITCH schema, not a claim that arbitrary
+    Foundry resources can be imported without an authorized Foundry connection,
+    environment-specific identifiers, approvals, and delivery work.
+    """
+    context = project.get("project_context") or {}
+    ontology_result = project.get("business_ontology") or {}
+    ontology_spec = ontology_result.get("ontology") or {}
+    mapping = project.get("palantir_mapping") or {}
+    connection = project.get("palantir_connection") or {}
+    assessment = project.get("assessment_result") or {}
+    architecture = project.get("deployment_plan") or {}
+    business_system = context.get("business_system") or {}
+    gaps = assessment.get("gaps") or project.get("gaps") or []
+
+    return {
+        "format": "AI_SWITCH_PALANTIR_HANDOFF_V1",
+        "lifecycle_state": "PROPOSED",
+        "direct_ingestion_ready": False,
+        "requires_authorized_foundry_connection": True,
+        "purpose": (
+            "Implementation contract for Palantir Foundry/AIP and Rackspace delivery. "
+            "It is not proof that any live Foundry resource has been created or changed."
+        ),
+        "workflow": {
+            "starting_condition": project.get("starting_condition")
+            or context.get("starting_condition")
+            or project.get("adoption_mode"),
+            "converges_to": "PALANTIR_READY_BUILD",
+            "next_delivery_environment": "PALANTIR_FOUNDRY",
+        },
+        "project": {
+            "id": project.get("id"),
+            "name": project.get("name"),
+            "business_goal": project.get("business_goal"),
+            "source_type": project.get("source_type"),
+            "source_reference": project.get("source_reference"),
+            "business_system_id": project.get("business_system_id") or business_system.get("id"),
+            "business_system": business_system,
+        },
+        "data_governance": {
+            "business_owner": project.get("business_owner"),
+            "data_owner": project.get("data_owner"),
+            "sensitivity": project.get("data_sensitivity"),
+            "residency_or_sovereignty": project.get("sovereignty_requirements"),
+            "external_transfer_allowed": bool(project.get("external_transfer_allowed")),
+        },
+        "foundry_specification": {
+            "target": project.get("foundry_target") or {},
+            "ontology": ontology_spec,
+            "required_datasets": mapping.get("required_datasets") or [],
+            "objects": mapping.get("proposed_ontology_objects") or [],
+            "relationships": mapping.get("object_relationships") or [],
+            "aip_tools_and_actions": mapping.get("aip_tools") or [],
+            "approvals": mapping.get("approvals") or [],
+            "security_requirements": mapping.get("security_requirements") or [],
+        },
+        "runtime_and_connections": {
+            "target_architecture": architecture,
+            "connection_contract": connection,
+        },
+        "readiness": {
+            "score": assessment.get("readiness_score"),
+            "confidence": assessment.get("confidence"),
+            "gaps": gaps,
+            "dependencies": project.get("dependencies") or [],
+            "unresolved_decisions": (
+                (architecture.get("unresolved") or [])
+                + (mapping.get("open_questions") or [])
+            ),
+        },
+        "deployment_operating_model": {
+            "ai_switch": [
+                "Collect project and business-system context",
+                "Scan supplied assets without execution",
+                "Assess readiness and name gaps",
+                "Produce the proposed Foundry/AIP mapping and checksummed handoff",
+            ],
+            "palantir": [
+                "Host and operate the approved Foundry ontology and datasets",
+                "Operate approved AIP tools, actions, permissions, and workflows",
+            ],
+            "rackspace": [
+                "Implement the Foundry integration and supporting runtime",
+                "Provision connectivity and close production gaps",
+                "Support activation and provide managed operations",
+            ],
+            "customer": [
+                "Approve data access, security, governance, and ontology changes",
+                "Authorize AIP actions and production activation",
+            ],
+        },
+        "customer_approvals": [
+            {"decision": "Data access and residency approved", "status": "NOT_CHECKED"},
+            {"decision": "Ontology and action model approved", "status": "NOT_CHECKED"},
+            {"decision": "Security and permissions approved", "status": "NOT_CHECKED"},
+            {"decision": "Production activation approved", "status": "NOT_CHECKED"},
+        ],
+    }
+
+
 # ---------------------------------------------------------------- passport
 
 
@@ -465,6 +568,28 @@ def report_markdown(project: Dict[str, Any]) -> str:
     if project.get("time_to_plan_ms"):
         md.append(f"**Time from import to plan:** {round(project['time_to_plan_ms'] / 1000, 1)}s")
     md.append("")
+
+    if project.get("palantir_required") or project.get("palantir_handoff_manifest"):
+        md.append("## Palantir delivery operating model")
+        md.append("")
+        md.append(
+            "The workflow is **Greenfield / Brownfield / Goldenfield → "
+            "Palantir-Ready Build → Palantir Foundry**."
+        )
+        md.append("")
+        md.append("| Party | Responsibility |")
+        md.append("|---|---|")
+        md.append("| AI SWITCH | Collects context, scans evidence, assesses readiness, and produces the proposed mapping and handoff. |")
+        md.append("| Palantir | Hosts and operates the approved Foundry ontology, datasets, AIP tools, actions, permissions, and workflows. |")
+        md.append("| Rackspace | Implements the integration and supporting runtime, provisions connectivity, closes gaps, and provides managed operations. |")
+        md.append("| Customer | Approves data access, governance, security, ontology/action changes, and production activation. |")
+        md.append("")
+        md.append(
+            "**Direct-ingestion boundary:** this package is machine-readable, but it is not a native "
+            "one-click Foundry import. Live ingestion requires an authorized Foundry connection, "
+            "environment-specific identifiers, approvals, and implementation by the delivery teams."
+        )
+        md.append("")
 
     md.append("## Readiness")
     md.append("")
@@ -663,6 +788,10 @@ def build_handoff_pack(project: Dict[str, Any]) -> Dict[str, Any]:
         files["palantir-mapping.json"] = json.dumps(project["palantir_mapping"], indent=2)
     if project.get("palantir_connection"):
         files["palantir-connection-kit.json"] = json.dumps(project["palantir_connection"], indent=2)
+    if project.get("palantir_handoff_manifest"):
+        files["palantir-handoff-manifest.json"] = json.dumps(
+            project["palantir_handoff_manifest"], indent=2
+        )
     if project.get("passport"):
         files["passport.json"] = json.dumps(project["passport"], indent=2)
     if project.get("integration"):
@@ -685,6 +814,11 @@ def build_handoff_pack(project: Dict[str, Any]) -> Dict[str, Any]:
         f"- Production gaps: **{len(a.get('gaps') or [])}**",
         "",
         "Everything in this pack is **PROPOSED**. Nothing has been provisioned or deployed.",
+        "AI SWITCH prepares the deployment contract; Palantir operates Foundry; "
+        "Rackspace implements and manages the integration and supporting runtime; "
+        "the customer authorizes governance and production activation.",
+        "The machine-readable manifest is not a one-click native Foundry import. "
+        "Direct ingestion requires an authorized Foundry connection and environment-specific delivery work.",
         "",
         "## Still unanswered",
         "",

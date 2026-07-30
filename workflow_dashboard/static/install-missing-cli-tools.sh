@@ -131,6 +131,24 @@ install_kustomize() {
   rm -f /tmp/kustomize.tar.gz
 }
 
+install_docker() {
+  _sudo apt-get install -y docker.io
+  _sudo systemctl enable --now docker 2>/dev/null || _sudo service docker start || true
+  if [ -n "${SUDO_USER:-$USER}" ]; then
+    _sudo usermod -aG docker "${SUDO_USER:-$USER}" || true
+    echo "[NOTE] User ${SUDO_USER:-$USER} added to the docker group - re-login (or restart WSL) for it to take effect."
+  fi
+}
+
+install_kind() {
+  local ARCH
+  ARCH=$(dpkg --print-architecture 2>/dev/null || echo amd64)
+  curl -fsSLo /tmp/kind \
+    "https://github.com/kubernetes-sigs/kind/releases/latest/download/kind-linux-${ARCH}"
+  chmod +x /tmp/kind
+  _sudo mv /tmp/kind /usr/local/bin/kind
+}
+
 install_opencenter() {
   if has_cmd opencenter; then return 0; fi
   if [ -z "${OPENCENTER_INSTALL_URL:-}" ]; then
@@ -177,6 +195,8 @@ for tool in "${TOOLS[@]}"; do
     helm)       install_helm ;;
     yq)         install_yq ;;
     kustomize)  install_kustomize ;;
+    docker)     install_docker ;;
+    kind)       install_kind ;;
     opencenter) install_opencenter || { FAILED_TOOLS+=("$tool"); FAILED=1; continue; } ;;
     *)
       echo "Unknown tool: $tool"

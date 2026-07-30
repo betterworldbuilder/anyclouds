@@ -19,7 +19,7 @@
     #panel-sai td,
     #panel-sai [style*="color:#94a3b8"],
     #panel-sai [style*="color:#64748b"] {
-      color:#64748b !important;
+      color:#475569 !important;
     }
     #panel-sai [style*="background:rgba(15,23,42"],
     #panel-sai [style*="background:rgba(0,0,0"],
@@ -62,6 +62,17 @@
       box-shadow:0 10px 24px rgba(56,189,248,.16) !important;
       transform:translateY(-1px);
     }
+    #sai-systems-grid > .sai-system-card[aria-pressed="true"] {
+      border:2px solid #007aff !important;
+      box-shadow:0 0 0 3px rgba(0,122,255,.14),0 10px 24px rgba(15,23,42,.10) !important;
+      background:#f0f7ff !important;
+    }
+    #sai-fsm-uat-engine-host:empty {
+      display:none;
+    }
+    #sai-selected-business-system {
+      border-left:4px solid #007aff;
+    }
     #panel-sai select,
     #panel-sai input,
     #panel-sai textarea {
@@ -98,6 +109,55 @@
       border:1px solid #b23a3a !important;
       color:#b23a3a !important;
     }
+
+    /* Readable type scale for the complete AI SWITCH experience. The original
+       interface used 9–11px operational labels throughout, which becomes hard
+       to scan once the Palantir guidance and evidence are visible together. */
+    #panel-sai {
+      font-size:15px !important;
+      line-height:1.5 !important;
+    }
+    #panel-sai [style*="font-size:9px"] {
+      font-size:12px !important;
+    }
+    #panel-sai [style*="font-size:10px"] {
+      font-size:12.5px !important;
+    }
+    #panel-sai [style*="font-size:11px"],
+    #panel-sai [style*="font-size:11.5px"] {
+      font-size:13.5px !important;
+    }
+    #panel-sai [style*="font-size:12px"] {
+      font-size:14px !important;
+    }
+    #panel-sai [style*="font-size:13px"] {
+      font-size:14.5px !important;
+    }
+    #panel-sai p,
+    #panel-sai li,
+    #panel-sai td,
+    #panel-sai th,
+    #panel-sai label,
+    #panel-sai [style*="font-size:9px"],
+    #panel-sai [style*="font-size:10px"],
+    #panel-sai [style*="font-size:11px"],
+    #panel-sai [style*="font-size:11.5px"],
+    #panel-sai [style*="font-size:12px"],
+    #panel-sai [style*="font-size:13px"] {
+      line-height:1.5 !important;
+    }
+    #panel-sai button,
+    #panel-sai input,
+    #panel-sai select,
+    #panel-sai textarea {
+      font-size:14px !important;
+      line-height:1.35 !important;
+    }
+    #panel-sai input,
+    #panel-sai select,
+    #panel-sai textarea {
+      min-height:36px;
+    }
   </style>
   <div class="panel" id="panel-sai">
     <div id="sai-powerup-page" style="padding:20px 20px 40px;max-width:1400px;margin:0 auto;box-sizing:border-box;">
@@ -105,14 +165,14 @@
       <!-- ── HERO ── -->
       <div style="background:linear-gradient(135deg,rgba(109,40,217,.18),rgba(6,182,212,.12),rgba(16,185,129,.08));border:1px solid rgba(139,92,246,.35);border-radius:16px;padding:28px 32px;margin-bottom:24px;position:relative;overflow:hidden;">
         <div style="position:absolute;top:-60px;right:-60px;width:220px;height:220px;background:radial-gradient(circle,rgba(139,92,246,.18),transparent 70%);border-radius:50%;pointer-events:none;"></div>
-        <div style="font-size:11px;letter-spacing:3px;text-transform:uppercase;color:#a78bfa;font-weight:700;margin-bottom:8px;">Stage 4 — AI Adoption &amp; Production Factory</div>
-        <h2 style="margin:0 0 10px;color:#f0fdf4;font-size:26px;font-weight:800;">Build new AI, enhance an existing application, or industrialize an AI PoC</h2>
-        <p style="margin:0 0 22px;color:#94a3b8;max-width:860px;font-size:14px;line-height:1.6;">Build new AI, enhance existing applications, or industrialize existing AI PoCs on FLEX, OpenCenter, and Palantir — then transition them to governed Rackspace operations. Pick an adoption mode below, point us at your project, and get a costed production plan with its gaps named honestly.</p>
+        <div id="sai-hero-eyebrow" style="font-size:11px;letter-spacing:3px;text-transform:uppercase;color:#a78bfa;font-weight:700;margin-bottom:8px;">AI SWITCH Stage — AI Adoption &amp; Production Factory</div>
+        <h2 id="sai-hero-title" style="margin:0 0 10px;color:#f0fdf4;font-size:26px;font-weight:800;">Build new AI, enhance an existing application, or industrialize an AI PoC</h2>
+        <p id="sai-hero-description" style="margin:0 0 22px;color:#94a3b8;max-width:980px;font-size:14px;line-height:1.6;">Build new AI, enhance existing applications, or industrialize existing AI PoCs on FLEX, OpenCenter, and Palantir — then transition them to governed Rackspace operations. Pick an adoption mode below, point us at your project, and get a costed production plan with its gaps named honestly.</p>
         <div style="display:flex;flex-wrap:wrap;gap:10px;">
           <button onclick="importMigratedSystemsForAI()" style="background:linear-gradient(135deg,#7c3aed,#6d28d9);border:1px solid #a78bfa;border-radius:8px;color:#fff;padding:10px 18px;font-size:13px;font-weight:700;cursor:pointer;">📥 Import FLEX Business Systems</button>
-          <button onclick="runAIOpportunityScan()" style="background:linear-gradient(135deg,#0891b2,#0e7490);border:1px solid #22d3ee;border-radius:8px;color:#fff;padding:10px 18px;font-size:13px;font-weight:700;cursor:pointer;">🔍 Run AI Opportunity Scan</button>
-          <button onclick="generateAILaunchPadPlan()" style="background:linear-gradient(135deg,#059669,#047857);border:1px solid #34d399;border-radius:8px;color:#fff;padding:10px 18px;font-size:13px;font-weight:700;cursor:pointer;">🚀 Generate AI LaunchPad Plan</button>
-          <button onclick="exportAIPowerUpMarkdown()" style="background:rgba(245,158,11,.15);border:1px solid rgba(251,191,36,.5);border-radius:8px;color:#fbbf24;padding:10px 18px;font-size:13px;font-weight:700;cursor:pointer;">📄 Export AI Power Up Report</button>
+          <button id="sai-hero-scan" onclick="runAIOpportunityScan()" style="background:linear-gradient(135deg,#0891b2,#0e7490);border:1px solid #22d3ee;border-radius:8px;color:#fff;padding:10px 18px;font-size:13px;font-weight:700;cursor:pointer;">🔍 Run AI Opportunity Scan</button>
+          <button id="sai-hero-plan" onclick="generateAILaunchPadPlan()" style="background:linear-gradient(135deg,#059669,#047857);border:1px solid #34d399;border-radius:8px;color:#fff;padding:10px 18px;font-size:13px;font-weight:700;cursor:pointer;">🚀 Generate AI LaunchPad Plan</button>
+          <button id="sai-hero-export" onclick="exportAIPowerUpMarkdown()" style="background:rgba(245,158,11,.15);border:1px solid rgba(251,191,36,.5);border-radius:8px;color:#fbbf24;padding:10px 18px;font-size:13px;font-weight:700;cursor:pointer;">📄 Export AI Power Up Report</button>
         </div>
       </div>
 
@@ -120,19 +180,19 @@
       <div id="sai-counters" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin-bottom:24px;">
         <div style="background:rgba(109,40,217,.12);border:1px solid rgba(139,92,246,.3);border-radius:12px;padding:18px;text-align:center;">
           <div id="sai-cnt-imported" style="font-size:36px;font-weight:900;color:#a78bfa;">0</div>
-          <div style="font-size:11px;color:#7c3aed;font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-top:4px;">FLEX Systems Imported</div>
+          <div id="sai-cnt-imported-label" style="font-size:11px;color:#7c3aed;font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-top:4px;">FLEX Systems Imported</div>
         </div>
         <div style="background:rgba(6,182,212,.10);border:1px solid rgba(34,211,238,.3);border-radius:12px;padding:18px;text-align:center;">
           <div id="sai-cnt-ready" style="font-size:36px;font-weight:900;color:#22d3ee;">0</div>
-          <div style="font-size:11px;color:#0891b2;font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-top:4px;">AI-Ready Systems</div>
+          <div id="sai-cnt-ready-label" style="font-size:11px;color:#0891b2;font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-top:4px;">AI-Ready Systems</div>
         </div>
         <div style="background:rgba(16,185,129,.10);border:1px solid rgba(52,211,153,.3);border-radius:12px;padding:18px;text-align:center;">
           <div id="sai-cnt-quickwin" style="font-size:36px;font-weight:900;color:#34d399;">0</div>
-          <div style="font-size:11px;color:#059669;font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-top:4px;">Quick-Win LaunchPad Candidates</div>
+          <div id="sai-cnt-quickwin-label" style="font-size:11px;color:#059669;font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-top:4px;">Quick-Win LaunchPad Candidates</div>
         </div>
         <div style="background:rgba(245,158,11,.10);border:1px solid rgba(251,191,36,.3);border-radius:12px;padding:18px;text-align:center;">
           <div id="sai-cnt-upsell" style="font-size:36px;font-weight:900;color:#fbbf24;">$0</div>
-          <div style="font-size:11px;color:#d97706;font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-top:4px;">Est. AI Upsell Potential</div>
+          <div id="sai-cnt-upsell-label" style="font-size:11px;color:#d97706;font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-top:4px;">Est. AI Upsell Potential</div>
         </div>
       </div>
 
@@ -145,12 +205,62 @@
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
           <div style="background:#7c3aed;color:#fff;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:13px;flex-shrink:0;">1</div>
           <div>
-            <div style="font-size:15px;font-weight:800;color:#e2e8f0;">Select a migrated FLEX Business System</div>
-            <div style="font-size:11px;color:#64748b;margin-top:2px;">Import your migration tracker data or use the demo systems below</div>
+            <div id="sai-system-step-title" style="font-size:15px;font-weight:800;color:#e2e8f0;">Select a migrated FLEX Business System</div>
+            <div id="sai-system-step-description" style="font-size:11px;color:#64748b;margin-top:2px;">Choose the exact Business Apps System from the Migration Log. Its components will be carried into the AI assessment and production plan.</div>
+          </div>
+        </div>
+        <div id="sai-palantir-system-intro" style="display:none;background:#eff6ff;border:1px solid #93c5fd;border-radius:10px;padding:12px 14px;margin-bottom:14px;color:#475569;">
+          <div style="font-size:12px;font-weight:900;color:#1d4ed8;margin-bottom:4px;">Business-system catalog — what will be Palantirized</div>
+          <div style="font-size:11px;line-height:1.6;">
+            This is the authoritative Business Apps System record and component inventory shared by the Migration Log, UAT, and cutover.
+            Use it to select the target application, inspect its components, or correct the system once at the source.
+            The Palantir build intake above automatically receives that same system ID and component list; it adds integration requirements
+            and produces the Foundry/AIP plan without duplicating the business system.
+          </div>
+          <div style="margin-top:8px;padding-top:8px;border-top:1px solid #bfdbfe;font-size:10px;line-height:1.55;">
+            <b style="color:#1d4ed8;">How they complement each other:</b>
+            catalog below = <b>what</b> application and components are in scope;
+            build intake above = <b>why and how</b> they connect to Palantir.
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:8px;margin-top:9px;">
+            <div style="background:#fff;border:1px solid #bfdbfe;border-radius:8px;padding:8px 10px;font-size:10px;line-height:1.5;">
+              <b style="color:#1d4ed8;">Select an existing system</b><br>
+              <b>If you</b> already know which migrated application should be Palantirized, <b>then this will help you</b> make that exact system and its declared components the shared integration target.
+            </div>
+            <div style="background:#fff;border:1px solid #bfdbfe;border-radius:8px;padding:8px 10px;font-size:10px;line-height:1.5;">
+              <b style="color:#1d4ed8;">Correct the component scope</b><br>
+              <b>If you</b> find missing, outdated, or incorrect components, <b>then this will help you</b> fix them once in the source record and carry the correction into UAT, cutover, and the Palantir plan.
+            </div>
+            <div style="background:#fff;border:1px solid #bfdbfe;border-radius:8px;padding:8px 10px;font-size:10px;line-height:1.5;">
+              <b style="color:#1d4ed8;">Create a missing system</b><br>
+              <b>If you</b> cannot find the target application, <b>then this will help you</b> create it from a business-system template before defining its Palantir ontology and integration requirements.
+            </div>
           </div>
         </div>
         <div id="sai-import-msg" style="background:rgba(6,182,212,.08);border:1px solid rgba(34,211,238,.2);border-radius:8px;padding:10px 14px;font-size:12px;color:#67e8f9;margin-bottom:14px;display:none;"></div>
-        <div id="sai-systems-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;"></div>
+
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
+          <button type="button" onclick="saiUseMigrationLogSystems()"
+                  style="background:#007AFF;border:none;border-radius:980px;color:#fff;padding:8px 15px;font-size:11px;font-weight:700;cursor:pointer;">
+            ↻ Import &amp; edit business systems from Migration Log
+          </button>
+          <button type="button" onclick="saiUseSimpleSystemCards()"
+                  style="background:rgba(120,120,128,.12);border:none;border-radius:980px;color:#0040DD;padding:8px 14px;font-size:11px;font-weight:700;cursor:pointer;">
+            Simple card view
+          </button>
+          <span id="sai-bizsys-hint" style="font-size:11px;color:rgba(60,60,67,.6);">
+            The Migration Log is the source of truth for systems and components.
+          </span>
+        </div>
+
+        <!-- Fast selection view built directly from the shared uatS1_systems store. -->
+        <div id="sai-systems-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px;"></div>
+        <div id="sai-selected-business-system" style="display:none;background:#f8fbff;border:1px solid #bfdbfe;border-radius:10px;padding:11px 13px;margin-top:12px;"></div>
+
+        <!-- In the full dashboard this host receives the real Migration Log
+             editor. The standalone AI page keeps the rich card view because the
+             editor itself belongs to the Migration Log stage. -->
+        <div id="sai-fsm-uat-engine-host" style="display:none;margin-top:12px;"></div>
       </div>
 
       <!-- ════════════════════════════════════════

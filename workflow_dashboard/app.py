@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 import base64
 import csv
+import hashlib
 import io
 import ipaddress
 import json
 import os
 import re
 import select
+import secrets
 import shlex
 import shutil
 import signal
@@ -19,12 +21,21 @@ import time
 import urllib.request
 import urllib.error
 import urllib.parse
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 from uuid import uuid4
 
-from flask import Flask, Response, jsonify, render_template, request, send_from_directory, stream_with_context
+from flask import (
+    Flask,
+    Response,
+    jsonify,
+    render_template,
+    request,
+    send_from_directory,
+    session,
+    stream_with_context,
+)
 from werkzeug.utils import secure_filename
 import yaml as _yaml
 
@@ -50,7 +61,641 @@ SNAPSHOT_SCAN_CACHE_FILES = {
 }
 
 app = Flask(__name__, template_folder="templates", static_folder="static")
+if not app.secret_key:
+    app.secret_key = os.environ.get("FLASK_SECRET_KEY") or os.urandom(32)
+app.config.update(
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE="Lax",
+    SESSION_COOKIE_SECURE=os.environ.get("WORKFLOW_DASHBOARD_HTTPS", "0").strip().lower()
+    in {"1", "true", "yes"},
+)
 _CLOUDPRICE_CACHE: Dict[str, Tuple[float, float, str]] = {}
+
+
+# OpenCenter Quick Start is a shared training surface. Each signed learner gets
+# an isolated HOME and command process so learners cannot overwrite another
+# learner's blueprints, GitOps repository, credentials, logs, or active cluster.
+_OPENCENTER_SERVER_HOME = Path.home().resolve()
+_OPENCENTER_LAB_BASE = Path(
+    os.environ.get(
+        "OPENCENTER_TRAINING_LAB_ROOT",
+        str(Path(tempfile.gettempdir()) / "opencenter-training-labs"),
+    )
+).resolve()
+_OPENCENTER_LAB_BASE.mkdir(parents=True, exist_ok=True)
+try:
+    os.chmod(_OPENCENTER_LAB_BASE, 0o700)
+except OSError:
+    pass
+_OPENCENTER_LAB_SANDBOX = (
+    Path(__file__).resolve().parent / "scripts" / "opencenter_lab_sandbox.sh"
+)
+_OPENCENTER_LAB_PROTECTED_PATHS = {
+    "/api/opencenter/cohort-review",
+    "/api/opencenter/lab-result",
+    "/api/opencenter/lab-feedback",
+    "/api/opencenter/deploy-readiness",
+    "/api/opencenter/clusters",
+    "/api/opencenter/export-bundle",
+    "/api/opencenter/restore-bundle",
+    "/api/openstack/quota-check",
+    "/api/openstack/force-delete-security-group",
+    "/api/openstack/free-fips",
+    "/api/openstack/ensure-appcred",
+    "/api/openstack/networks",
+    "/api/openrc/patch-config",
+    "/api/openrc/read-config",
+    "/api/openrc/save-config",
+    "/api/openrc/edit-config",
+    "/api/stream/run-cmd",
+}
+_OPENCENTER_LAB_COMMAND_LOCK = threading.Lock()
+_OPENCENTER_LAB_RUNNING: Dict[str, subprocess.Popen] = {}
+_OPENCENTER_COHORT_LOCK = threading.Lock()
+_OPENCENTER_LAB_CAPACITY = threading.BoundedSemaphore(
+    max(1, int(os.environ.get("OPENCENTER_TRAINING_MAX_COMMANDS", "8")))
+)
+
+
+def _opencenter_lab_identity(create_local: bool = False) -> Optional[Dict[str, Any]]:
+    """Resolve the authenticated learner without using their name in a path."""
+    subject = str(request.environ.get("REMOTE_USER") or "").strip()
+    display = subject
+    source = "remote-user" if subject else ""
+
+    if not subject:
+        for key in ("sso_user", "sso_email", "user_email", "authenticated_user"):
+            value = session.get(key)
+            if isinstance(value, dict):
+                candidate = value.get("email") or value.get("username") or value.get("id")
+            else:
+                candidate = value
+            candidate = str(candidate or "").strip()
+            if candidate:
+                subject = candidate
+                display = candidate
+                source = "signed-session"
+                break
+
+    trust_headers = os.environ.get("OPENCENTER_TRUST_SSO_HEADERS", "0").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+    }
+    if not subject and trust_headers:
+        header_names = [
+            item.strip()
+            for item in os.environ.get(
+                "OPENCENTER_SSO_HEADERS",
+                "X-Auth-Request-Email,X-Forwarded-User,X-SSO-User",
+            ).split(",")
+            if item.strip()
+        ]
+        for header_name in header_names:
+            candidate = str(request.headers.get(header_name) or "").strip()
+            if candidate:
+                subject = candidate
+                display = str(
+                    request.headers.get("X-Auth-Request-Preferred-Username")
+                    or request.headers.get("X-Forwarded-Preferred-Username")
+                    or candidate
+                ).strip()
+                source = header_name
+                break
+
+    if not subject:
+        manual_name = re.sub(
+            r"[\x00-\x1f\x7f]",
+            "",
+            str(session.get("opencenter_manual_name") or ""),
+        ).strip()[:80]
+        manual_id = str(session.get("opencenter_manual_id") or "")
+        if manual_name and re.fullmatch(r"[a-f0-9]{24}", manual_id):
+            subject = f"manual:{manual_id}"
+            display = manual_name
+            source = "manual-training-login"
+
+    authenticated = bool(subject) and source != "manual-training-login"
+    if not subject:
+        allow_anonymous = os.environ.get(
+            "OPENCENTER_ALLOW_ANONYMOUS_LAB", "0"
+        ).strip().lower() in {"1", "true", "yes"}
+        if not allow_anonymous:
+            return None
+        local_id = str(session.get("opencenter_local_learner") or "")
+        if create_local and not re.fullmatch(r"[a-f0-9]{24}", local_id):
+            local_id = secrets.token_hex(12)
+            session["opencenter_local_learner"] = local_id
+        if not re.fullmatch(r"[a-f0-9]{24}", local_id):
+            return None
+        subject = f"local:{local_id}"
+        display = f"Local learner {local_id[:6]}"
+        source = "local-training-session"
+
+    subject = re.sub(r"[\x00-\x1f\x7f]", "", subject)[:512]
+    display = re.sub(r"[\x00-\x1f\x7f]", "", display)[:160] or "Signed-in learner"
+    identity_id = hashlib.sha256(subject.encode("utf-8")).hexdigest()[:24]
+    role_claim = ""
+    for key in ("sso_role", "user_role"):
+        candidate = session.get(key)
+        if candidate:
+            role_claim = str(candidate)
+            break
+    if source == "manual-training-login":
+        role_claim = str(session.get("opencenter_manual_role") or "Student")
+    cohort = str(session.get("training_cohort") or "").strip()
+    if trust_headers:
+        role_claim = str(
+            request.headers.get("X-SSO-Role")
+            or request.headers.get("X-Auth-Request-Groups")
+            or request.headers.get("X-Forwarded-Groups")
+            or role_claim
+        )
+        cohort = str(
+            request.headers.get("X-Training-Cohort")
+            or request.headers.get("X-SSO-Cohort")
+            or cohort
+        ).strip()
+    configured_instructors = {
+        item.strip().casefold()
+        for item in os.environ.get("OPENCENTER_TRAINING_INSTRUCTORS", "").split(",")
+        if item.strip()
+    }
+    instructor_claim = bool(
+        re.search(r"(?:^|[,;:\s])(instructor|trainer|teacher)(?:$|[,;:\s])", role_claim, re.I)
+    )
+    role = (
+        "Instructor"
+        if instructor_claim or subject.casefold() in configured_instructors
+        else "Student"
+    )
+    cohort = re.sub(r"[^A-Za-z0-9_. -]", "", cohort)[:80].strip()
+    if not cohort:
+        cohort = os.environ.get("OPENCENTER_TRAINING_DEFAULT_COHORT", "OpenCenter Quick Start")
+    cohort_id = hashlib.sha256(cohort.encode("utf-8")).hexdigest()[:20]
+    return {
+        "id": identity_id,
+        "display": display,
+        "authenticated": authenticated,
+        "source": source,
+        "role": role,
+        "cohort": cohort,
+        "cohort_id": cohort_id,
+    }
+
+
+def _opencenter_lab_context(create: bool = False) -> Optional[Dict[str, Any]]:
+    identity = _opencenter_lab_identity(create_local=create)
+    if not identity:
+        return None
+    lab_id = str(session.get("opencenter_lab_id") or "")
+    csrf = str(session.get("opencenter_lab_csrf") or "")
+    bound_identity = str(session.get("opencenter_lab_identity") or "")
+    if create and (
+        not re.fullmatch(r"[a-f0-9]{32}", lab_id)
+        or bound_identity != identity["id"]
+    ):
+        lab_id = secrets.token_hex(16)
+        csrf = secrets.token_urlsafe(32)
+        session["opencenter_lab_id"] = lab_id
+        session["opencenter_lab_csrf"] = csrf
+        session["opencenter_lab_identity"] = identity["id"]
+        bound_identity = identity["id"]
+        session.permanent = False
+    if (
+        not re.fullmatch(r"[a-f0-9]{32}", lab_id)
+        or not csrf
+        or bound_identity not in ("", identity["id"])
+    ):
+        return None
+    lab_root = (_OPENCENTER_LAB_BASE / identity["id"] / lab_id).resolve()
+    try:
+        lab_root.relative_to(_OPENCENTER_LAB_BASE)
+    except ValueError:
+        return None
+    home = lab_root / "home"
+    rootfs = lab_root / "rootfs"
+    for path in (lab_root, home, rootfs):
+        path.mkdir(parents=True, exist_ok=True)
+        try:
+            os.chmod(path, 0o700)
+        except OSError:
+            pass
+    try:
+        (lab_root / ".last_access").touch()
+    except OSError:
+        pass
+    return {
+        "id": lab_id,
+        "short_id": lab_id[:8],
+        "csrf": csrf,
+        "root": lab_root,
+        "home": home,
+        "rootfs": rootfs,
+        "identity": identity,
+    }
+
+
+def _opencenter_lab_home() -> Path:
+    context = _opencenter_lab_context(create=False)
+    if not context:
+        raise RuntimeError("OpenCenter training lab session is not initialized")
+    return context["home"]
+
+
+def _opencenter_lab_env(home: Path) -> Dict[str, str]:
+    server_local_bin = _OPENCENTER_SERVER_HOME / ".local" / "bin"
+    project_scripts = BASE_DIR / "scripts"
+    return {
+        "HOME": str(home),
+        "USER": "opencenter-learner",
+        "LOGNAME": "opencenter-learner",
+        "SHELL": "/bin/bash",
+        "LANG": os.environ.get("LANG", "C.UTF-8"),
+        "LC_ALL": os.environ.get("LC_ALL", ""),
+        "PATH": os.pathsep.join(
+            (
+                str(home / ".local" / "bin"),
+                str(server_local_bin),
+                str(project_scripts),
+                "/usr/local/bin",
+                "/usr/bin",
+                "/bin",
+            )
+        ),
+    }
+
+
+def _opencenter_lab_resolve_path(raw_path: str) -> Path:
+    """Resolve a UI path into this learner's OpenCenter workspace only."""
+    home = _opencenter_lab_home().resolve()
+    raw = str(raw_path or "").strip()
+    if not raw:
+        raise ValueError("path is required")
+    raw = raw.replace("${HOME}", str(home)).replace("$HOME", str(home))
+    if raw == "~":
+        raw = str(home)
+    elif raw.startswith("~/"):
+        raw = str(home / raw[2:])
+    candidate = Path(raw)
+    if candidate.is_absolute():
+        # Accept old dashboard paths, but remap them into the learner HOME.
+        try:
+            relative = candidate.resolve(strict=False).relative_to(_OPENCENTER_SERVER_HOME)
+            candidate = home / relative
+        except ValueError:
+            pass
+    else:
+        candidate = home / candidate
+    resolved = candidate.resolve(strict=False)
+    allowed = (home / ".config" / "opencenter").resolve()
+    try:
+        resolved.relative_to(allowed)
+    except ValueError as exc:
+        raise ValueError("path must stay inside this lab's OpenCenter configuration") from exc
+    return resolved
+
+
+def _opencenter_lab_validate_remote_url(value: str, label: str = "endpoint") -> str:
+    """Allow Rackspace Keystone/service endpoints or explicit training hosts."""
+    raw = str(value or "").strip()
+    parsed = urllib.parse.urlparse(raw)
+    if parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password:
+        raise ValueError(f"{label} must be an HTTPS URL without embedded credentials")
+    try:
+        port = parsed.port
+    except ValueError as exc:
+        raise ValueError(f"{label} has an invalid port") from exc
+    if port not in (None, 443):
+        raise ValueError(f"{label} must use HTTPS port 443")
+    hostname = parsed.hostname.lower().rstrip(".")
+    configured = {
+        item.strip().lower().rstrip(".")
+        for item in os.environ.get("OPENCENTER_TRAINING_ALLOWED_AUTH_HOSTS", "").split(",")
+        if item.strip()
+    }
+    rackspace = hostname.endswith(".rackspacecloud.com")
+    configured_match = any(
+        hostname == allowed or hostname.endswith("." + allowed) for allowed in configured
+    )
+    if not rackspace and not configured_match:
+        raise ValueError(
+            f"{label} host is not approved for this lab; configure "
+            "OPENCENTER_TRAINING_ALLOWED_AUTH_HOSTS for another training cloud"
+        )
+    return raw
+
+
+def _opencenter_lab_command_policy(command_id: str, command: str) -> Tuple[bool, str]:
+    """Bound the legacy tutorial command runner to documented lab operations."""
+    command_id = str(command_id or "").strip()
+    command = str(command or "").strip()
+    if not re.fullmatch(
+        r"(?:ocqs|ocqp|clf)-(?:cmd-[A-Za-z0-9_-]+|lab-[A-Za-z0-9_-]+)",
+        command_id,
+    ):
+        return False, "unknown OpenCenter lab operation"
+    if not command or len(command) > 30000 or "\x00" in command or "\r" in command:
+        return False, "invalid or oversized lab command"
+    lowered = command.lower()
+    if ".." in command:
+        return False, "parent-directory traversal is not allowed in lab commands"
+    if str(_OPENCENTER_LAB_BASE).lower() in lowered:
+        return False, "lab internals cannot be addressed by commands"
+    blocked_paths = re.search(
+        r"(?<![A-Za-z0-9_.-])/(?:boot|etc|proc|root|sys|var|home|usr|opt|mnt|tmp)(?:/|\b)",
+        command,
+    )
+    if blocked_paths and not command.startswith(str(_OPENCENTER_SERVER_HOME)):
+        return False, "host filesystem paths are not available inside the lab"
+    if re.search(r"(?<![:A-Za-z0-9_$~.-])/(?:\s|$)", command):
+        return False, "the host filesystem root is not available inside the lab"
+    blocked_tools = re.search(
+        r"(?:^|[;&|()\n]\s*|\b(?:command|env|xargs)\s+)"
+        r"(?:sudo|su|mount|umount|chroot|unshare|nsenter|systemctl|service|"
+        r"kill|pkill|killall|reboot|shutdown|poweroff|mkfs|fdisk|parted|dd|"
+        r"bash|dash|zsh|fish|sh|python\d*|perl|ruby|node|php|socat|nc|netcat)\b",
+        lowered,
+    )
+    if blocked_tools:
+        return False, "that host-level operation is not available in a shared training lab"
+    if re.search(r"\bdocker\s+(?:run|exec|cp|volume|system|context)\b", lowered):
+        return False, "direct Docker host access is disabled in the shared training lab"
+    if "curl " in lowered and not (
+        command_id.endswith(("pre-mise", "check-services"))
+        or command_id.startswith(("ocqs-lab-url", "ocqp-lab-url"))
+    ):
+        return False, "network downloads are limited to the documented prerequisite step"
+    required_markers = (
+        "opencenter",
+        "kubectl",
+        "git",
+        "flux",
+        "openstack",
+        "opentofu",
+        "mise",
+        "ssh-keygen",
+        "grep",
+        "curl",
+        "ls ",
+        "tail ",
+        "mkdir ",
+        "cp ",
+        "printf ",
+        "echo ",
+        "test ",
+    )
+    if not any(marker in lowered for marker in required_markers):
+        return False, "command is outside the OpenCenter training curriculum"
+    return True, ""
+
+
+@app.get("/api/opencenter/lab-session")
+def opencenter_lab_session():
+    context = _opencenter_lab_context(create=True)
+    if context is None:
+        return jsonify(
+            {
+                "ok": False,
+                "error": "Sign in with SSO or create a Student/Instructor session to start the lab",
+                "sso_required": True,
+            }
+        ), 401
+    return jsonify(
+        {
+            "ok": True,
+            "lab_id": context["short_id"],
+            "csrf": context["csrf"],
+            "suggested_org": f"lab-{context['short_id']}",
+            "suggested_cluster": f"first-cluster-{context['short_id']}",
+            "workspace": "$HOME/.config/opencenter",
+            "mode": "shared-training-sandbox",
+            "learner": context["identity"]["display"],
+            "sso_authenticated": context["identity"]["authenticated"],
+            "identity_source": context["identity"]["source"],
+            "role": context["identity"]["role"],
+            "cohort": context["identity"]["cohort"],
+        }
+    )
+
+
+@app.post("/api/opencenter/training-login")
+def opencenter_training_login():
+    body = request.get_json(force=True, silent=True) or {}
+    name = re.sub(
+        r"[\x00-\x1f\x7f]",
+        "",
+        str(body.get("name") or ""),
+    ).strip()[:80]
+    role = str(body.get("role") or "").strip().title()
+    if len(name) < 2:
+        return jsonify({"ok": False, "error": "enter a name with at least 2 characters"}), 400
+    if role not in {"Student", "Instructor"}:
+        return jsonify({"ok": False, "error": "role must be Student or Instructor"}), 400
+    current = _opencenter_lab_identity(create_local=False)
+    if current and current.get("authenticated"):
+        return jsonify({"ok": False, "error": "this browser is already identified by SSO"}), 409
+    session["opencenter_manual_name"] = name
+    session["opencenter_manual_role"] = role
+    session["opencenter_manual_id"] = secrets.token_hex(12)
+    session.pop("opencenter_local_learner", None)
+    session.pop("opencenter_lab_id", None)
+    session.pop("opencenter_lab_csrf", None)
+    session.pop("opencenter_lab_identity", None)
+    context = _opencenter_lab_context(create=True)
+    assert context is not None
+    return jsonify(
+        {
+            "ok": True,
+            "learner": context["identity"]["display"],
+            "role": context["identity"]["role"],
+            "lab_id": context["short_id"],
+            "cohort": context["identity"]["cohort"],
+        }
+    )
+
+
+@app.delete("/api/opencenter/lab-session")
+def reset_opencenter_lab_session():
+    context = _opencenter_lab_context(create=False)
+    if not context:
+        return jsonify({"ok": False, "error": "lab session is not initialized"}), 401
+    csrf = request.headers.get("X-OpenCenter-Lab-CSRF", "")
+    if not secrets.compare_digest(str(context["csrf"]), str(csrf)):
+        return jsonify({"ok": False, "error": "invalid lab session token"}), 403
+    with _OPENCENTER_LAB_COMMAND_LOCK:
+        process = _OPENCENTER_LAB_RUNNING.get(context["id"])
+    if process and process.poll() is None:
+        return jsonify({"ok": False, "error": "stop the running lab operation before reset"}), 409
+    root = context["root"].resolve()
+    try:
+        root.relative_to(_OPENCENTER_LAB_BASE)
+    except ValueError:
+        return jsonify({"ok": False, "error": "invalid lab workspace"}), 400
+    shutil.rmtree(root)
+    session.pop("opencenter_lab_id", None)
+    session.pop("opencenter_lab_csrf", None)
+    session.pop("opencenter_lab_identity", None)
+    return jsonify({"ok": True, "reset": True})
+
+
+def _opencenter_cohort_file(context: Dict[str, Any]) -> Path:
+    cohort_root = (
+        _OPENCENTER_LAB_BASE
+        / "_cohorts"
+        / str(context["identity"]["cohort_id"])
+    ).resolve()
+    cohort_root.relative_to(_OPENCENTER_LAB_BASE)
+    cohort_root.mkdir(parents=True, exist_ok=True)
+    try:
+        os.chmod(cohort_root, 0o700)
+    except OSError:
+        pass
+    return cohort_root / "review.json"
+
+
+def _opencenter_load_cohort(context: Dict[str, Any]) -> Dict[str, Any]:
+    path = _opencenter_cohort_file(context)
+    if not path.is_file():
+        return {"results": {}, "feedback": []}
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {"results": {}, "feedback": []}
+    if not isinstance(value, dict):
+        return {"results": {}, "feedback": []}
+    return {
+        "results": value.get("results") if isinstance(value.get("results"), dict) else {},
+        "feedback": value.get("feedback") if isinstance(value.get("feedback"), list) else [],
+    }
+
+
+def _opencenter_save_cohort(context: Dict[str, Any], value: Dict[str, Any]) -> None:
+    path = _opencenter_cohort_file(context)
+    temporary = path.with_name(f".{path.name}.{uuid4().hex}.tmp")
+    temporary.write_text(json.dumps(value, indent=2, sort_keys=True), encoding="utf-8")
+    os.chmod(temporary, 0o600)
+    os.replace(temporary, path)
+
+
+@app.get("/api/opencenter/cohort-review")
+def opencenter_cohort_review():
+    context = _opencenter_lab_context(create=False)
+    assert context is not None
+    with _OPENCENTER_COHORT_LOCK:
+        value = _opencenter_load_cohort(context)
+    results = sorted(
+        value["results"].values(),
+        key=lambda item: str(item.get("learner") or "").casefold(),
+    )
+    feedback = sorted(
+        value["feedback"],
+        key=lambda item: str(item.get("created_at") or ""),
+        reverse=True,
+    )
+    return jsonify(
+        {
+            "ok": True,
+            "cohort": context["identity"]["cohort"],
+            "viewer_role": context["identity"]["role"],
+            "results": results,
+            "feedback": feedback[:250],
+        }
+    )
+
+
+@app.post("/api/opencenter/lab-result")
+def opencenter_publish_lab_result():
+    context = _opencenter_lab_context(create=False)
+    assert context is not None
+    body = request.get_json(force=True, silent=True) or {}
+    org = str(body.get("org") or "").strip().lower()
+    cluster = str(body.get("cluster") or "").strip().lower()
+    if not re.fullmatch(r"[a-z0-9][a-z0-9-]{0,62}", org):
+        return jsonify({"ok": False, "error": "invalid organization"}), 400
+    if not re.fullmatch(r"[a-z0-9][a-z0-9-]{0,62}", cluster):
+        return jsonify({"ok": False, "error": "invalid cluster"}), 400
+    try:
+        completed = max(0, min(14, int(body.get("completed_checks") or 0)))
+    except (TypeError, ValueError):
+        completed = 0
+    reported_readiness = (
+        body.get("readiness") if isinstance(body.get("readiness"), dict) else {}
+    )
+    verified_readiness = _opencenter_lab_readiness(org, cluster)
+    safe_readiness = {
+        "validate_ok": bool(verified_readiness.get("validate_ok")),
+        "changeme_ok": bool(verified_readiness.get("changeme_ok")),
+        "pushed_ok": bool(verified_readiness.get("pushed_ok")),
+        "deployment_verified": bool(reported_readiness.get("deployment_verified")),
+    }
+    provider = str(body.get("provider") or "openstack").lower()
+    if provider not in {"openstack", "kind"}:
+        provider = "openstack"
+    result = {
+        "learner_id": context["identity"]["id"],
+        "learner": context["identity"]["display"],
+        "role": context["identity"]["role"],
+        "lab_id": context["short_id"],
+        "organization": org,
+        "cluster": cluster,
+        "provider": provider,
+        "completed_checks": completed,
+        "total_checks": 14,
+        "readiness": safe_readiness,
+        "status": "Completed" if completed == 14 and all(safe_readiness.values()) else "In progress",
+        "updated_at": datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
+    }
+    with _OPENCENTER_COHORT_LOCK:
+        value = _opencenter_load_cohort(context)
+        value["results"][context["identity"]["id"]] = result
+        _opencenter_save_cohort(context, value)
+    return jsonify({"ok": True, "result": result})
+
+
+@app.post("/api/opencenter/lab-feedback")
+def opencenter_submit_lab_feedback():
+    context = _opencenter_lab_context(create=False)
+    assert context is not None
+    body = request.get_json(force=True, silent=True) or {}
+    kind = str(body.get("kind") or "").strip().lower()
+    if kind not in {"improvement", "not_working"}:
+        return jsonify({"ok": False, "error": "choose improvement or not working"}), 400
+    message = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]", "", str(body.get("message") or "")).strip()
+    if len(message) < 5 or len(message) > 2000:
+        return jsonify({"ok": False, "error": "feedback must be 5 to 2000 characters"}), 400
+    stage = re.sub(r"[^A-Za-z0-9 ._/-]", "", str(body.get("stage") or "General"))[:80]
+    item = {
+        "id": uuid4().hex,
+        "kind": kind,
+        "stage": stage or "General",
+        "message": message,
+        "author": context["identity"]["display"],
+        "author_role": context["identity"]["role"],
+        "lab_id": context["short_id"],
+        "created_at": datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
+    }
+    with _OPENCENTER_COHORT_LOCK:
+        value = _opencenter_load_cohort(context)
+        value["feedback"].append(item)
+        value["feedback"] = value["feedback"][-500:]
+        _opencenter_save_cohort(context, value)
+    return jsonify({"ok": True, "feedback": item})
+
+
+@app.before_request
+def protect_opencenter_training_lab():
+    if request.path not in _OPENCENTER_LAB_PROTECTED_PATHS:
+        return None
+    context = _opencenter_lab_context(create=False)
+    if not context:
+        return jsonify({"ok": False, "error": "initialize an OpenCenter lab session first"}), 401
+    supplied = request.headers.get("X-OpenCenter-Lab-CSRF", "") or request.args.get(
+        "lab_token", ""
+    )
+    if not secrets.compare_digest(str(context["csrf"]), str(supplied)):
+        return jsonify({"ok": False, "error": "invalid OpenCenter lab session token"}), 403
+    return None
 
 
 def _snapshot_scan_cache_path(source: str) -> Path:
@@ -122,7 +767,7 @@ except ImportError:
     from routes.monitoring_api import create_monitoring_blueprint
 app.register_blueprint(create_monitoring_blueprint(BASE_DIR))
 
-# ── Stage 4 — AI Adoption & Production Factory ──────────────────────────────
+# ── AI SWITCH Stage — AI Adoption & Production Factory ─────────────────────
 # Additive to the existing client-side Stage 9. With the flag off the blueprint
 # is never registered and Stage 9 behaves exactly as it did before.
 AI_ADOPTION_FACTORY_ENABLED = (
@@ -3570,7 +4215,7 @@ def opencenter_ui():
 @app.get("/ai-powerup")
 def ai_powerup_ui():
     # Standalone focused AI Power Up page — loads ONLY the AI UI (no dashboard chrome).
-    # Shares the _ai_powerup.html + _ai_powerup_js.html partials with Stage 4 (panel-sai).
+    # Shares the _ai_powerup.html + _ai_powerup_js.html partials with AI SWITCH (panel-sai).
     return render_template("ai_powerup.html", cache_bust=_CACHE_BUST)
 
 
@@ -9517,6 +10162,8 @@ def stop_deploy():
         _deploy_job_append(job_id, "\n[STOPPED BY USER]\n")
         _deploy_job_finish(job_id, 130)
         return jsonify({"ok": True, "message": "Deployment process stopped."})
+    except ValueError as e:
+        return jsonify({"ok": False, "error": str(e)}), 400
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500
 
@@ -19672,6 +20319,8 @@ def agent1_run_deep_scan():
         return jsonify({"ok": True, "results": scan_results})
     except subprocess.TimeoutExpired:
         return jsonify({"ok": False, "error": "Deep scan timed out"}), 504
+    except ValueError as e:
+        return jsonify({"ok": False, "error": str(e)}), 400
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500
 
@@ -20929,12 +21578,16 @@ def _flex_project_session(org, cluster):
     """Token + regional endpoints from a cluster blueprint's app credential."""
     import requests as _rq
     import yaml as _yaml
-    home = os.path.expanduser("~")
-    bp = os.path.join(home, ".config", "opencenter", "clusters", "blueprints", org, cluster,
-                      f"{cluster}-config.yaml")
-    cfg = _yaml.safe_load(open(bp))
+    home = _opencenter_lab_home()
+    bp = home / ".config" / "opencenter" / "clusters" / "blueprints" / org / cluster / (
+        f"{cluster}-config.yaml"
+    )
+    with open(bp, encoding="utf-8") as config_file:
+        cfg = _yaml.safe_load(config_file)
     osc = cfg["opencenter"]["infrastructure"]["cloud"]["openstack"]
-    auth_url = (osc.get("auth_url") or "").rstrip("/")
+    auth_url = _opencenter_lab_validate_remote_url(
+        (osc.get("auth_url") or "").rstrip("/"), "Keystone endpoint"
+    )
     token_url = auth_url + ("/auth/tokens" if auth_url.endswith("/v3") else "/v3/auth/tokens")
     tr = _rq.post(token_url, json={"auth": {"identity": {"methods": ["application_credential"],
         "application_credential": {"id": osc.get("application_credential_id"),
@@ -20942,9 +21595,16 @@ def _flex_project_session(org, cluster):
     if tr.status_code not in (200, 201):
         raise RuntimeError(f"Keystone auth failed ({tr.status_code})")
     region = (osc.get("region") or "").upper()
-    eps = {svc["type"]: ep["url"].rstrip("/") for svc in tr.json()["token"]["catalog"]
-           for ep in svc.get("endpoints", [])
-           if ep.get("interface") == "public" and ep.get("region", "").upper() == region}
+    eps = {}
+    for svc in tr.json()["token"]["catalog"]:
+        for endpoint in svc.get("endpoints", []):
+            if (
+                endpoint.get("interface") == "public"
+                and endpoint.get("region", "").upper() == region
+            ):
+                eps[svc["type"]] = _opencenter_lab_validate_remote_url(
+                    endpoint["url"].rstrip("/"), f"{svc['type']} endpoint"
+                )
     return tr.headers.get("X-Subject-Token", ""), eps, osc
 
 
@@ -21125,15 +21785,25 @@ def opencenter_deploy_readiness():
     cluster = (body.get("cluster") or "").strip()
     if not _re.fullmatch(r"[a-z0-9][a-z0-9-]*", org) or not _re.fullmatch(r"[a-z0-9][a-z0-9-]*", cluster):
         return jsonify({"ok": False, "error": "invalid org/cluster"}), 400
-    home = os.path.expanduser("~")
-    repo = os.path.join(home, ".config", "opencenter", "clusters", "gitops", org)
-    overlay = os.path.join(repo, "applications", "overlays", cluster)
-    result = {"ok": True, "validate_ok": False, "changeme_ok": False, "pushed_ok": False, "detail": {}}
+    return jsonify(_opencenter_lab_readiness(org, cluster))
+
+
+def _opencenter_lab_readiness(org: str, cluster: str) -> Dict[str, Any]:
+    home = _opencenter_lab_home()
+    repo = home / ".config" / "opencenter" / "clusters" / "gitops" / org
+    overlay = repo / "applications" / "overlays" / cluster
+    result = {
+        "ok": False,
+        "validate_ok": False,
+        "changeme_ok": False,
+        "pushed_ok": False,
+        "detail": {},
+    }
 
     # 1. no CHANGEME anywhere in the cluster overlay (secrets are SOPS-encrypted, so
     #    any plaintext CHANGEME here would really ship to the cluster)
     hits = 0
-    for root, _dirs, files in os.walk(overlay):
+    for root, _dirs, files in os.walk(str(overlay)):
         for f in files:
             try:
                 with open(os.path.join(root, f), "r", errors="ignore") as fh:
@@ -21141,15 +21811,25 @@ def opencenter_deploy_readiness():
                         hits += 1
             except OSError:
                 pass
-    result["changeme_ok"] = os.path.isdir(overlay) and hits == 0
+    result["changeme_ok"] = overlay.is_dir() and hits == 0
     result["detail"]["changeme_hits"] = hits
 
     # 2. repo clean and nothing unpushed
     try:
-        st = subprocess.run(["git", "-C", repo, "status", "--porcelain"],
-                            capture_output=True, text=True, timeout=20)
-        ahead = subprocess.run(["git", "-C", repo, "rev-list", "--count", "@{u}..HEAD"],
-                               capture_output=True, text=True, timeout=20)
+        st = subprocess.run(
+            ["git", "-C", str(repo), "status", "--porcelain"],
+            capture_output=True,
+            text=True,
+            timeout=20,
+            env=_opencenter_lab_env(home),
+        )
+        ahead = subprocess.run(
+            ["git", "-C", str(repo), "rev-list", "--count", "@{u}..HEAD"],
+            capture_output=True,
+            text=True,
+            timeout=20,
+            env=_opencenter_lab_env(home),
+        )
         result["pushed_ok"] = (st.returncode == 0 and not st.stdout.strip()
                                and ahead.returncode == 0 and ahead.stdout.strip() == "0")
         result["detail"]["git_dirty"] = bool(st.stdout.strip())
@@ -21159,19 +21839,38 @@ def opencenter_deploy_readiness():
 
     # 3. offline validate via the CLI
     try:
-        cmd = ('export PATH="$HOME/.local/bin:$PATH"; '
-               "cat $HOME/.config/opencenter/clusters/secrets/*/*/age/keys/*.txt "
-               "> $HOME/.config/opencenter/.all-age-keys.txt 2>/dev/null; "
-               'export SOPS_AGE_KEY_FILE="$HOME/.config/opencenter/.all-age-keys.txt"; '
-               f"opencenter cluster validate {org}/{cluster}")
-        vr = subprocess.run(["bash", "-lc", cmd], capture_output=True, text=True,
-                            timeout=120, cwd=home)
+        env = _opencenter_lab_env(home)
+        keys = sorted(
+            (home / ".config" / "opencenter" / "clusters" / "secrets").glob(
+                "*/*/age/keys/*.txt"
+            )
+        )
+        if keys:
+            key_file = home / ".config" / "opencenter" / ".all-age-keys.txt"
+            key_file.parent.mkdir(parents=True, exist_ok=True)
+            key_file.write_text(
+                "".join(key.read_text(encoding="utf-8", errors="ignore") for key in keys),
+                encoding="utf-8",
+            )
+            os.chmod(key_file, 0o600)
+            env["SOPS_AGE_KEY_FILE"] = str(key_file)
+        vr = subprocess.run(
+            ["opencenter", "cluster", "validate", f"{org}/{cluster}"],
+            capture_output=True,
+            text=True,
+            timeout=120,
+            cwd=str(home),
+            env=env,
+        )
         result["validate_ok"] = vr.returncode == 0
         result["detail"]["validate_tail"] = (vr.stdout or vr.stderr)[-300:]
     except Exception as e:
         result["detail"]["validate_error"] = str(e)
 
-    return jsonify(result)
+    result["ok"] = bool(
+        result["validate_ok"] and result["changeme_ok"] and result["pushed_ok"]
+    )
+    return result
 
 
 @app.post("/api/openstack/ensure-appcred")
@@ -21188,6 +21887,10 @@ def openstack_ensure_appcred():
     auth_url = normalize_flex_auth_url(str(body.get("auth_url") or ""), region).rstrip("/")
     if not auth_url:
         return jsonify({"ok": False, "error": "missing auth_url"}), 400
+    try:
+        auth_url = _opencenter_lab_validate_remote_url(auth_url, "Keystone endpoint")
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
     token_url = auth_url + ("/auth/tokens" if auth_url.endswith("/v3") else "/v3/auth/tokens")
     user = {"name": body.get("username", ""), "password": body.get("password", ""),
             "domain": {"name": body.get("user_domain_name") or "Default"}}
@@ -21229,6 +21932,10 @@ def openstack_networks():
     auth_url = normalize_flex_auth_url(str(body.get("auth_url") or ""), region).rstrip("/")
     if not auth_url:
         return jsonify({"error": "missing auth_url"}), 400
+    try:
+        auth_url = _opencenter_lab_validate_remote_url(auth_url, "Keystone endpoint")
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
     # Keystone v3 token URL
     token_url = auth_url + ("/auth/tokens" if auth_url.endswith("/v3") else "/v3/auth/tokens")
 
@@ -21266,7 +21973,9 @@ def openstack_networks():
                 pick = ([e for e in eps if e.get("interface") == "public" and (not region or e.get("region") == region)]
                         or [e for e in eps if e.get("interface") == "public"])
                 if pick:
-                    neutron = pick[0]["url"].rstrip("/")
+                    neutron = _opencenter_lab_validate_remote_url(
+                        pick[0]["url"].rstrip("/"), "Neutron endpoint"
+                    )
                     break
         if not neutron:
             return jsonify({"error": "no Neutron endpoint in catalog"}), 502
@@ -24398,7 +25107,8 @@ def list_opencenter_clusters():
     if requested_org and not re.fullmatch(name_pattern, requested_org):
         return jsonify({"ok": False, "error": "Invalid organization name"}), 400
 
-    blueprint_root = Path.home() / ".config" / "opencenter" / "clusters" / "blueprints"
+    home = _opencenter_lab_home()
+    blueprint_root = home / ".config" / "opencenter" / "clusters" / "blueprints"
     pairs = []
     if blueprint_root.is_dir():
         for org_entry in sorted(blueprint_root.iterdir(), key=lambda entry: entry.name):
@@ -24412,7 +25122,7 @@ def list_opencenter_clusters():
 
     active_org = ""
     active_cluster = ""
-    active_path = Path.home() / ".config" / "opencenter" / "clusters" / ".active"
+    active_path = home / ".config" / "opencenter" / "clusters" / ".active"
     try:
         active_value = active_path.read_text(encoding="utf-8").strip().splitlines()[0]
         if "/" in active_value:
@@ -24446,32 +25156,75 @@ def list_opencenter_clusters():
 
 @app.get("/api/opencenter/export-bundle")
 def opencenter_export_bundle():
-    """Zip all deployment input files (config blueprint, secrets, tokens, .sops.yaml) for org/cluster."""
+    """Export a learner-safe handoff bundle without cloud or Git credentials."""
     import io as _io, zipfile as _zip
     from flask import send_file
-    org = re.sub(r"[^A-Za-z0-9_.-]", "", str(request.args.get("org") or ""))
-    cluster = re.sub(r"[^A-Za-z0-9_.-]", "", str(request.args.get("cluster") or ""))
-    if not org or not cluster:
+    org = str(request.args.get("org") or "").strip().lower()
+    cluster = str(request.args.get("cluster") or "").strip().lower()
+    name_pattern = r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?"
+    if not re.fullmatch(name_pattern, org) or not re.fullmatch(name_pattern, cluster):
         return jsonify({"ok": False, "error": "org and cluster required"}), 400
-    root = Path(os.path.expanduser("~")) / ".config" / "opencenter"
+    root = _opencenter_lab_home() / ".config" / "opencenter"
     targets = [
         root / "clusters" / "blueprints" / org / cluster,
-        root / "clusters" / "secrets" / org / cluster,
-        root / "tokens",
+        root / "clusters" / "gitops" / org,
     ]
-    sops = root / "clusters" / "gitops" / org / ".sops.yaml"
     buf = _io.BytesIO()
     count = 0
+
+    def scrub(value, key=""):
+        lowered = str(key).lower()
+        if any(marker in lowered for marker in ("password", "secret", "token", "private_key")):
+            return "REDACTED_FOR_TRAINING_EXPORT"
+        if isinstance(value, dict):
+            return {item_key: scrub(item_value, item_key) for item_key, item_value in value.items()}
+        if isinstance(value, list):
+            return [scrub(item, key) for item in value]
+        return value
+
     with _zip.ZipFile(buf, "w", _zip.ZIP_DEFLATED) as zf:
         for t in targets:
             if t.is_dir():
                 for f in sorted(t.rglob("*")):
-                    if f.is_file():
-                        zf.write(f, str(f.relative_to(root)))
-                        count += 1
-        if sops.is_file():
-            zf.write(sops, str(sops.relative_to(root)))
-            count += 1
+                    if (
+                        not f.is_file()
+                        or ".git" in f.parts
+                        or f.stat().st_size > 2 * 1024 * 1024
+                    ):
+                        continue
+                    archive_name = str(f.relative_to(root))
+                    if f.suffix.lower() in {".yaml", ".yml"}:
+                        try:
+                            parsed = _yaml.safe_load(f.read_text(encoding="utf-8"))
+                            rendered = _yaml.safe_dump(
+                                scrub(parsed), sort_keys=False, default_flow_style=False
+                            )
+                            zf.writestr(archive_name, rendered)
+                        except Exception:
+                            zf.writestr(
+                                archive_name,
+                                re.sub(
+                                    r"(?im)^(\s*[^#\n]*(?:password|secret|token|private_key)[^:]*:\s*).*$",
+                                    r"\1REDACTED_FOR_TRAINING_EXPORT",
+                                    f.read_text(encoding="utf-8", errors="replace"),
+                                ),
+                            )
+                    else:
+                        zf.write(f, archive_name)
+                    count += 1
+        zf.writestr(
+            "TRAINING-LAB-EXPORT.json",
+            json.dumps(
+                {
+                    "organization": org,
+                    "cluster": cluster,
+                    "credentials_included": False,
+                    "purpose": "OpenCenter training handoff; add credentials in the destination lab",
+                },
+                indent=2,
+            ),
+        )
+        count += 1
     if not count:
         return jsonify({"ok": False, "error": "no files found for %s/%s" % (org, cluster)}), 404
     buf.seek(0)
@@ -24482,101 +25235,203 @@ def opencenter_export_bundle():
 
 @app.post("/api/opencenter/restore-bundle")
 def opencenter_restore_bundle():
-    """Restore an exported bundle zip back under ~/.config/opencenter (paths validated)."""
+    """Restore a bounded training export into only this learner's lab workspace."""
     import io as _io, zipfile as _zip
     f = request.files.get("bundle")
     if not f:
         return jsonify({"ok": False, "error": "no bundle file uploaded"}), 400
-    root = Path(os.path.expanduser("~")) / ".config" / "opencenter"
+    max_upload = 10 * 1024 * 1024
+    payload = f.stream.read(max_upload + 1)
+    if len(payload) > max_upload:
+        return jsonify({"ok": False, "error": "training bundle exceeds 10 MB"}), 413
+    root = _opencenter_lab_home() / ".config" / "opencenter"
     try:
-        zf = _zip.ZipFile(_io.BytesIO(f.read()))
+        zf = _zip.ZipFile(_io.BytesIO(payload))
     except _zip.BadZipFile:
         return jsonify({"ok": False, "error": "not a valid zip"}), 400
+    members = [member for member in zf.infolist() if not member.is_dir()]
+    if len(members) > 200 or sum(member.file_size for member in members) > 25 * 1024 * 1024:
+        return jsonify({"ok": False, "error": "training bundle expands beyond safe limits"}), 413
     restored = []
-    for m in zf.infolist():
-        if m.is_dir():
-            continue
+    allowed_prefixes = ("clusters/blueprints/", "clusters/gitops/")
+    for m in members:
         name = m.filename.replace("\\", "/")
-        if name.startswith("/") or ".." in name.split("/"):
+        if (
+            name.startswith("/")
+            or ".." in name.split("/")
+            or not name.startswith(allowed_prefixes)
+            or "/.git/" in "/" + name
+        ):
             return jsonify({"ok": False, "error": "unsafe path in zip: %s" % name}), 400
-        dest = root / name
+        dest = (root / name).resolve()
+        try:
+            dest.relative_to(root.resolve())
+        except ValueError:
+            return jsonify({"ok": False, "error": "unsafe path in zip: %s" % name}), 400
         dest.parent.mkdir(parents=True, exist_ok=True)
-        with zf.open(m) as srcf, open(dest, "wb") as out:
-            out.write(srcf.read())
-        if name.startswith(("clusters/secrets/", "tokens/")):
-            try:
-                os.chmod(dest, 0o600)
-            except Exception:
-                pass
+        temp_dest = dest.with_suffix(dest.suffix + ".upload")
+        with zf.open(m) as srcf, open(temp_dest, "wb") as out:
+            shutil.copyfileobj(srcf, out, length=64 * 1024)
+        os.replace(temp_dest, dest)
         restored.append(name)
     return jsonify({"ok": True, "restored": len(restored), "files": restored[:50]})
 
 
-@app.route("/api/stream/run-cmd", methods=["GET"])
+@app.route("/api/stream/run-cmd-disabled", methods=["GET"])
+def legacy_stream_run_cmd_disabled():
+    return jsonify({"ok": False, "error": "legacy command streaming is disabled"}), 410
+
+
+
+@app.post("/api/stream/run-cmd")
 def stream_run_cmd():
-    import shlex as _shlex
-    cmd = request.args.get("cmd", "").strip()
+    body = request.get_json(force=True, silent=True) or {}
+    cmd = str(body.get("cmd") or "").strip()
+    command_id = str(body.get("command_id") or "").strip()
     if not cmd:
-        return jsonify({"error": "no cmd"}), 400
+        return jsonify({"ok": False, "error": "no cmd"}), 400
+    cmd = cmd.replace(str(_OPENCENTER_SERVER_HOME), "$HOME")
+    allowed, reason = _opencenter_lab_command_policy(command_id, cmd)
+    if not allowed:
+        return jsonify({"ok": False, "error": reason}), 403
+    context = _opencenter_lab_context(create=False)
+    assert context is not None
+    with _OPENCENTER_LAB_COMMAND_LOCK:
+        current = _OPENCENTER_LAB_RUNNING.get(context["id"])
+        if current and current.poll() is None:
+            return jsonify({"ok": False, "error": "this lab already has a running operation"}), 409
+    if not _OPENCENTER_LAB_CAPACITY.acquire(blocking=False):
+        return jsonify({"ok": False, "error": "training lab is at command capacity; retry shortly"}), 429
+
+    is_deploy = bool(re.search(r"\bopencenter\s+cluster\s+deploy\b", cmd))
+    if is_deploy:
+        pairs = re.findall(
+            r"\b([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)/"
+            r"([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)\b",
+            cmd,
+        )
+        if not pairs:
+            _OPENCENTER_LAB_CAPACITY.release()
+            return jsonify(
+                {"ok": False, "error": "deployment must name the organization/cluster"}
+            ), 400
+        readiness = _opencenter_lab_readiness(*pairs[-1])
+        if not readiness["ok"]:
+            _OPENCENTER_LAB_CAPACITY.release()
+            return jsonify(
+                {
+                    "ok": False,
+                    "error": "server readiness gate blocked deployment",
+                    "readiness": readiness,
+                }
+            ), 409
+
+    home = context["home"]
+    rootfs = context["rootfs"]
+    if not _OPENCENTER_LAB_SANDBOX.is_file():
+        _OPENCENTER_LAB_CAPACITY.release()
+        return jsonify({"ok": False, "error": "training sandbox helper is unavailable"}), 503
+    namespace_enabled = os.environ.get(
+        "OPENCENTER_TRAINING_NAMESPACE_SANDBOX", "0"
+    ).strip().lower() in {"1", "true", "yes"}
+    if namespace_enabled:
+        process_args = [
+            "/usr/bin/unshare",
+            "--user",
+            "--map-root-user",
+            "--mount",
+            "--pid",
+            "--fork",
+            str(_OPENCENTER_LAB_SANDBOX),
+            str(rootfs),
+            str(home),
+            str(_OPENCENTER_SERVER_HOME),
+            str(BASE_DIR / "scripts"),
+            cmd,
+        ]
+    else:
+        process_args = ["/bin/bash", "--noprofile", "--norc", "-lc", cmd]
+    try:
+        proc = subprocess.Popen(
+            process_args,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            bufsize=1,
+            stdin=subprocess.DEVNULL,
+            cwd=str(home),
+            env=_opencenter_lab_env(home),
+            start_new_session=True,
+        )
+    except Exception as exc:
+        _OPENCENTER_LAB_CAPACITY.release()
+        return jsonify({"ok": False, "error": f"could not start training operation: {exc}"}), 500
+    with _OPENCENTER_LAB_COMMAND_LOCK:
+        _OPENCENTER_LAB_RUNNING[context["id"]] = proc
+
+    timeout_seconds = max(
+        30,
+        int(
+            os.environ.get(
+                "OPENCENTER_TRAINING_DEPLOY_TIMEOUT_SECONDS"
+                if is_deploy
+                else "OPENCENTER_TRAINING_COMMAND_TIMEOUT_SECONDS",
+                "5400" if is_deploy else "600",
+            )
+        ),
+    )
+
+    def stop_timed_out_process():
+        if proc.poll() is None:
+            try:
+                os.killpg(proc.pid, signal.SIGTERM)
+            except OSError:
+                pass
+
+    timeout_timer = threading.Timer(timeout_seconds, stop_timed_out_process)
+    timeout_timer.daemon = True
+    timeout_timer.start()
+    secret_pattern = re.compile(
+        r"(?i)((?:password|secret|token|application_credential_secret)\s*[:=]\s*)\S+"
+    )
+
     def generate():
         try:
-            # Run as an interactive-login bash so ~/.bashrc, mise, and PATH
-            # (including ~/.local/bin) are available — matches a real terminal.
-            home = os.path.expanduser("~")
-            env = {**os.environ}
-            local_bin = os.path.join(home, ".local", "bin")
-            project_scripts = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "scripts")
-            env["PATH"] = local_bin + os.pathsep + project_scripts + os.pathsep + env.get("PATH", "")
-            # Ensure terraform symlink exists pointing to tofu (OpenTofu)
-            tofu_path = os.path.join(home, ".local", "share", "mise", "shims", "tofu")
-            if not os.path.exists(tofu_path):
-                import glob as _glob
-                found = _glob.glob(os.path.join(home, ".local", "share", "mise", "installs", "opentofu", "*", "tofu"))
-                if found:
-                    tofu_path = sorted(found)[-1]
-            terraform_link = os.path.join(local_bin, "terraform")
-            if os.path.exists(tofu_path) and not os.path.exists(terraform_link):
-                try:
-                    os.symlink(tofu_path, terraform_link)
-                except Exception:
-                    pass
-            # Auto-set SOPS_AGE_KEY_FILE if not set — scans known locations
-            sops_setup = (
-                # Combine every cluster age key into one identity file - SOPS_AGE_KEY_FILE
-                # supports multiple keys per file; picking just the first cluster key broke
-                # decryption for every other cluster.
-                'if [ -z "$SOPS_AGE_KEY_FILE" ]; then '
-                'cat $HOME/.config/opencenter/clusters/secrets/*/*/age/keys/*.txt '
-                '> $HOME/.config/opencenter/.all-age-keys.txt 2>/dev/null; '
-                '[ -s "$HOME/.config/opencenter/.all-age-keys.txt" ] && '
-                'export SOPS_AGE_KEY_FILE="$HOME/.config/opencenter/.all-age-keys.txt"; fi; '
-            )
-            wrapped = (
-                f'export PATH="{local_bin}:{project_scripts}:$PATH"; '
-                f'[ -f "$HOME/.bashrc" ] && source "$HOME/.bashrc" 2>/dev/null; '
-                f'command -v mise >/dev/null 2>&1 && eval "$(mise activate bash 2>/dev/null)"; '
-                f'{sops_setup}'
-                f'{cmd}'
-            )
-            proc = subprocess.Popen(
-                ["bash", "-lc", wrapped],
-                stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                text=True, bufsize=1, stdin=subprocess.DEVNULL,
-                cwd=home, env=env,
-            )
+            assert proc.stdout is not None
             for line in iter(proc.stdout.readline, ""):
                 if line:
-                    yield f"data: {line.rstrip()}\n\n"
+                    safe_line = secret_pattern.sub(r"\1[REDACTED]", line.rstrip())
+                    safe_line = re.sub(
+                        r"(?i)\b(Bearer|Basic)\s+[A-Za-z0-9._~+/=-]+",
+                        r"\1 [REDACTED]",
+                        safe_line,
+                    )
+                    yield f"data: {safe_line}\n\n"
             proc.wait()
             yield f"data: [EXIT {proc.returncode}]\n\n"
-        except Exception as e:
-            yield f"data: [ERROR] {e}\n\n"
-    from flask import stream_with_context
-    resp = Response(stream_with_context(generate()), mimetype="text/event-stream")
-    resp.headers["Cache-Control"] = "no-cache"
-    resp.headers["X-Accel-Buffering"] = "no"
-    return resp
+        except Exception as exc:
+            yield f"data: [ERROR] {exc}\n\n"
+        finally:
+            timeout_timer.cancel()
+            if proc.stdout is not None:
+                proc.stdout.close()
+            if proc.poll() is None:
+                try:
+                    os.killpg(proc.pid, signal.SIGTERM)
+                    proc.wait(timeout=5)
+                except Exception:
+                    try:
+                        os.killpg(proc.pid, signal.SIGKILL)
+                    except Exception:
+                        pass
+            with _OPENCENTER_LAB_COMMAND_LOCK:
+                _OPENCENTER_LAB_RUNNING.pop(context["id"], None)
+            _OPENCENTER_LAB_CAPACITY.release()
 
+    response = Response(stream_with_context(generate()), mimetype="text/event-stream")
+    response.headers["Cache-Control"] = "no-cache"
+    response.headers["X-Accel-Buffering"] = "no"
+    return response
 
 
 @app.post("/api/openrc/patch-config")
@@ -24594,6 +25449,7 @@ def patch_config_file():
         return jsonify({"ok": False, "error": "no path"}), 400
     try:
         import yaml
+        cfg_path = str(_opencenter_lab_resolve_path(cfg_path))
 
         def set_nested(root, dotted_path, value):
             cur = root
@@ -24835,8 +25691,11 @@ def patch_config_file():
             if name and set_nested(data, f"opencenter.services.{name}.enabled", True):
                 patched += 1
 
-        with open(cfg_path, "w", encoding="utf-8") as f:
+        temp_path = cfg_path + ".tmp"
+        with open(temp_path, "w", encoding="utf-8") as f:
             yaml.safe_dump(data, f, sort_keys=False, default_flow_style=False)
+        os.chmod(temp_path, 0o600)
+        os.replace(temp_path, cfg_path)
         return jsonify({
             "ok": True,
             "patched": patched,
@@ -24856,13 +25715,18 @@ def read_config_file():
     if not path:
         return jsonify({"ok": False, "error": "no path"}), 400
     try:
+        path = str(_opencenter_lab_resolve_path(path))
         if not os.path.exists(path):
             # Create empty file + dirs so the editor opens cleanly
             os.makedirs(os.path.dirname(path), exist_ok=True)
             open(path, "a").close()
             return jsonify({"ok": True, "content": "", "created": True})
+        if os.path.getsize(path) > 1024 * 1024:
+            return jsonify({"ok": False, "error": "config exceeds the 1 MB lab editor limit"}), 413
         with open(path, "r", encoding="utf-8", errors="replace") as f:
-            return jsonify({"ok": True, "content": f.read()})
+            return jsonify({"ok": True, "content": f.read(1024 * 1024 + 1)})
+    except ValueError as e:
+        return jsonify({"ok": False, "error": str(e)}), 400
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500
 
@@ -24875,48 +25739,36 @@ def save_config_file():
     if not path:
         return jsonify({"ok": False, "error": "no path"}), 400
     try:
+        path = str(_opencenter_lab_resolve_path(path))
+        content = str(body.get("content", ""))
+        if len(content.encode("utf-8")) > 1024 * 1024:
+            return jsonify({"ok": False, "error": "config exceeds the 1 MB lab editor limit"}), 413
+        if Path(path).suffix.lower() in {".yaml", ".yml"}:
+            loaded = _yaml.safe_load(content) if content.strip() else {}
+            if loaded is not None and not isinstance(loaded, dict):
+                return jsonify({"ok": False, "error": "config root must be a YAML mapping"}), 400
         os.makedirs(os.path.dirname(path), exist_ok=True)
-        with open(path, "w", encoding="utf-8") as f:
-            f.write(body.get("content", ""))
-        return jsonify({"ok": True, "bytes": len(body.get("content", ""))})
+        temp_path = path + ".tmp"
+        with open(temp_path, "w", encoding="utf-8") as f:
+            f.write(content)
+        os.chmod(temp_path, 0o600)
+        os.replace(temp_path, path)
+        return jsonify({"ok": True, "bytes": len(content.encode("utf-8"))})
+    except ValueError as e:
+        return jsonify({"ok": False, "error": str(e)}), 400
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500
 
 
 @app.post("/api/openrc/edit-config")
 def edit_config_nano():
-    """Open the given config file in nano inside a real Windows Terminal (WSL interop)."""
-    body = request.get_json(force=True, silent=True) or {}
-    path = (body.get("path") or "").strip()
-    if not path:
-        return jsonify({"ok": False, "error": "no path"}), 400
-    # Create the file (and parent dirs) if it doesn't exist yet so nano opens cleanly
-    try:
-        os.makedirs(os.path.dirname(path), exist_ok=True)
-        if not os.path.exists(path):
-            open(path, "a").close()
-    except Exception as e:
-        return jsonify({"ok": False, "error": f"cannot create file: {e}"}), 500
-    # Launch nano in a new Windows Terminal window via WSL->Windows interop.
-    # Resolve Windows executables by absolute path (they aren't always on PATH).
-    import glob as _glob
-    wt = next(iter(_glob.glob("/mnt/c/Users/*/AppData/Local/Microsoft/WindowsApps/wt.exe")), "wt.exe")
-    cmd_exe = "/mnt/c/Windows/System32/cmd.exe"
-    wsl_exe = "/mnt/c/Windows/System32/wsl.exe"
-    launchers = [
-        [wt, wsl_exe, "-e", "nano", path],
-        [cmd_exe, "/c", "start", "wt", "wsl", "nano", path],
-        [cmd_exe, "/c", "start", "wsl", "nano", path],
-    ]
-    last_err = ""
-    for cmd in launchers:
-        try:
-            subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            return jsonify({"ok": True, "launcher": cmd[0], "path": path})
-        except Exception as e:
-            last_err = str(e)
-            continue
-    return jsonify({"ok": False, "error": f"could not launch a terminal: {last_err}"}), 500
+    """Shared labs use only the browser's bounded inline editor."""
+    return jsonify(
+        {
+            "ok": False,
+            "error": "Use the inline lab editor. Server-side terminal windows are disabled in shared training.",
+        }
+    ), 409
 
 
 def _workflow_dashboard_restart_process():

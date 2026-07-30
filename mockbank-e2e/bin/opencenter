@@ -1,0 +1,240 @@
+#!/usr/bin/env bash
+# MOCK opencenter CLI shim — backs the dashboard's Kind deployment flow with real
+# kind / kubectl / flux / git. Implements only the subcommands the cloudmax
+# dashboard generates. Clearly labeled MOCK; not the real OpenCenter CLI.
+set -uo pipefail
+
+OC_HOME="${OPENCENTER_HOME:-$HOME/.config/opencenter}"
+BP_ROOT="$OC_HOME/clusters/blueprints"
+GITOPS_ROOT="$OC_HOME/clusters/gitops"
+GITEA_ROOT="$OC_HOME/mock-gitea"
+ACTIVE_FILE="$OC_HOME/active"
+
+say() { echo "$@"; }
+
+split_ref() {  # ORG/CLUSTER or CLUSTER (uses active org) -> sets ORG CLUSTER
+  local ref="${1:-}"
+  if [[ "$ref" == */* ]]; then ORG="${ref%%/*}"; CLUSTER="${ref##*/}"
+  elif [[ -n "$ref" ]]; then ORG="$(cut -d/ -f1 "$ACTIVE_FILE" 2>/dev/null || echo my-org)"; CLUSTER="$ref"
+  else ORG="$(cut -d/ -f1 "$ACTIVE_FILE" 2>/dev/null || echo my-org)"; CLUSTER="$(cut -d/ -f2 "$ACTIVE_FILE" 2>/dev/null || echo my-cluster)"; fi
+  CFG_DIR="$BP_ROOT/$ORG/$CLUSTER"
+  CFG="$CFG_DIR/$CLUSTER-config.yaml"
+  GIT_DIR_PATH="$GITOPS_ROOT/$ORG"
+}
+
+cmd="${1:-}"; shift || true
+
+case "$cmd" in
+  version)
+    say "opencenter version: 1.0.0-rc02-MOCK | Platform: linux/amd64"
+    say "[MOCK SHIM] backed by: kind $(kind --version 2>/dev/null | awk '{print $3}'), kubectl, flux, git"
+    ;;
+
+  local)
+    sub="${1:-}"; sub2="${2:-}"
+    if [[ "$sub" == "gitea" ]]; then
+      REPO="$GITEA_ROOT/test-repo.git"; TOKEN_FILE="$GITEA_ROOT/token.txt"
+      case "$sub2" in
+        up)
+          mkdir -p "$GITEA_ROOT"
+          [[ -d "$REPO" ]] || git init --bare -q "$REPO"
+          [[ -f "$TOKEN_FILE" ]] || { head -c 20 /dev/urandom | md5sum | cut -c1-32 > "$TOKEN_FILE"; chmod 600 "$TOKEN_FILE"; }
+          say "[MOCK] Local Gitea simulated with a bare git repository (no container needed)."
+          say "Running: true"
+          say "Bootstrap repo URL: file://$REPO"
+          say "User token present: yes ($TOKEN_FILE)"
+          ;;
+        status)
+          if [[ -d "$REPO" ]]; then
+            say "Running: true"
+            say "Bootstrap repo URL: file://$REPO"
+            say "User token present: yes ($TOKEN_FILE)"
+          else
+            say "Running: false"; exit 1
+          fi
+          ;;
+        destroy) rm -rf "$GITEA_ROOT"; say "[MOCK] local gitea destroyed" ;;
+        *) say "usage: opencenter local gitea up|status|destroy"; exit 2 ;;
+      esac
+    else
+      say "unknown local subcommand"; exit 2
+    fi
+    ;;
+
+  cluster)
+    sub="${1:-}"; shift || true
+    case "$sub" in
+      init)
+        NAME="${1:-my-cluster}"; shift || true
+        ORG="my-org"; TYPE="openstack"
+        while [[ $# -gt 0 ]]; do
+          case "$1" in
+            --org) ORG="$2"; shift 2 ;;
+            --type) TYPE="$2"; shift 2 ;;
+            *) shift ;;
+          esac
+        done
+        CFG_DIR="$BP_ROOT/$ORG/$NAME"; CFG="$CFG_DIR/$NAME-config.yaml"
+        mkdir -p "$CFG_DIR"
+        if [[ -f "$CFG" ]]; then
+          say "[MOCK] cluster config already exists: $CFG"
+        else
+          cat > "$CFG" <<EOF
+opencenter:
+  meta: {name: $NAME, organization: $ORG, env: dev}
+  cluster: {cluster_name: $NAME}
+  infrastructure: {provider: $TYPE}
+  gitops: {}
+EOF
+          # SOPS/SSH key generation simulated
+          mkdir -p "$OC_HOME/clusters/secrets/$ORG/$NAME/age" "$OC_HOME/clusters/secrets/$ORG/$NAME/ssh"
+          say "[MOCK] Initialized $TYPE cluster config: $CFG"
+          say "[MOCK] Generated SOPS Age + SSH keys (simulated)"
+        fi
+        ;;
+      use)
+        split_ref "${1:-}"
+        mkdir -p "$OC_HOME"; echo "$ORG/$CLUSTER" > "$ACTIVE_FILE"
+        say "[MOCK] Active cluster: $ORG/$CLUSTER"
+        ;;
+      set)
+        split_ref "${1:-}"; shift || true
+        [[ -f "$CFG" ]] || { say "[ERROR] no config for $ORG/$CLUSTER (run cluster init)"; exit 1; }
+        for kv in "$@"; do
+          key="${kv%%=*}"; val="${kv#*=}"
+          # store dotted keys as flat entries in a mock-settings block
+          grep -q "^# mock-settings" "$CFG" || echo "# mock-settings" >> "$CFG"
+          sed -i "\|^${key}:|d" "$CFG"
+          echo "${key}: ${val}" >> "$CFG"
+        done
+        say "[MOCK] updated $((${#@})) setting(s) in $CFG"
+        ;;
+      describe)
+        split_ref "${1:-}"
+        [[ -f "$CFG" ]] || { say "[ERROR] unknown cluster $ORG/$CLUSTER"; exit 1; }
+        say "org: $ORG"
+        say "cluster: $CLUSTER"
+        say "config_path: $CFG"
+        say "git_dir: $GIT_DIR_PATH"
+        grep -E "^opencenter\.|provider" "$CFG" | sed 's/^/  /' || true
+        ;;
+      list)
+        find "$BP_ROOT" -mindepth 2 -maxdepth 2 -type d 2>/dev/null | sed "s|$BP_ROOT/||" || true
+        ;;
+      validate)
+        split_ref "${1:-}"
+        [[ -f "$CFG" ]] || { say "[ERROR] unknown cluster $ORG/$CLUSTER"; exit 1; }
+        TYPE=$(awk -F': ' '/provider:/ {gsub(/[}\r ]/,"",$NF); print $NF; exit}' "$CFG")
+        say "[MOCK] Validating $ORG/$CLUSTER (type: $TYPE)"
+        FAIL=0
+        if [[ "$TYPE" == "kind" ]]; then
+          docker info >/dev/null 2>&1 && say "  check docker-daemon: PASS" || { say "  check docker-daemon: FAIL"; FAIL=1; }
+          command -v kind >/dev/null && say "  check kind-cli: PASS" || { say "  check kind-cli: FAIL"; FAIL=1; }
+          command -v flux >/dev/null && say "  check flux-cli: PASS" || { say "  check flux-cli: FAIL"; FAIL=1; }
+          grep -q "git_url" "$CFG" && say "  check gitops-wiring: PASS" || say "  check gitops-wiring: WARN (run opencenter cluster set ... git_url)"
+        else
+          say "  check openstack-credentials: SKIP (mock)"
+        fi
+        say "  check config-file: PASS"
+        [[ $FAIL -eq 0 ]] && { say "Validation successful"; say "Summary: passed"; } || { say "Summary: failed"; exit 1; }
+        ;;
+      generate)
+        split_ref "${1:-}"
+        [[ -f "$CFG" ]] || { say "[ERROR] unknown cluster $ORG/$CLUSTER"; exit 1; }
+        OVERLAY="$GIT_DIR_PATH/applications/overlays/$CLUSTER"
+        INFRA="$GIT_DIR_PATH/infrastructure/clusters/$CLUSTER"
+        mkdir -p "$OVERLAY/managed-services" "$INFRA"
+        # import R6 refactor manifests if the bundle is present
+        R6_SRC="${R6_BUNDLE_K8S:-/home/dzoan/cloudmax/mockbank-e2e/refactor/k8s}"
+        if [[ -d "$R6_SRC" ]]; then
+          mkdir -p "$OVERLAY/managed-services/mockbank"
+          cp "$R6_SRC"/*.yaml "$OVERLAY/managed-services/mockbank/"
+          say "[MOCK] Imported R6 bundle manifests into $OVERLAY/managed-services/mockbank"
+        fi
+        # flux-system placeholder + kustomization
+        mkdir -p "$OVERLAY/flux-system"
+        [[ -f "$OVERLAY/flux-system/kustomization.yaml" ]] || cat > "$OVERLAY/flux-system/kustomization.yaml" <<EOF
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources: []
+EOF
+        if [[ ! -d "$GIT_DIR_PATH/.git" ]]; then
+          git -C "$GIT_DIR_PATH" init -q -b main
+          git -C "$GIT_DIR_PATH" config user.email "opencenter-mock@local"
+          git -C "$GIT_DIR_PATH" config user.name "opencenter-mock"
+        fi
+        git -C "$GIT_DIR_PATH" add -A
+        git -C "$GIT_DIR_PATH" diff --cached --quiet || git -C "$GIT_DIR_PATH" commit -q -m "OpenCenter GitOps generation for $CLUSTER"
+        say "Generate complete | Manifests created: $(find "$OVERLAY" "$INFRA" -name '*.yaml' | wc -l)"
+        ;;
+      deploy)
+        REF=""; RUNTIME="docker"
+        while [[ $# -gt 0 ]]; do
+          case "$1" in
+            --container-runtime) RUNTIME="$2"; shift 2 ;;
+            --from-step|--step) shift 2 ;;
+            --restart|--yes|--break-lock|--force) shift ;;
+            *) REF="$1"; shift ;;
+          esac
+        done
+        split_ref "$REF"
+        [[ -f "$CFG" ]] || { say "[ERROR] unknown cluster $ORG/$CLUSTER"; exit 1; }
+        TYPE=$(awk -F': ' '/provider:/ {gsub(/[}\r ]/,"",$NF); print $NF; exit}' "$CFG")
+        [[ "$TYPE" == "kind" ]] || { say "[MOCK] only kind deploy is implemented in the shim"; exit 1; }
+        OVERLAY="$GIT_DIR_PATH/applications/overlays/$CLUSTER"
+        INFRA="$GIT_DIR_PATH/infrastructure/clusters/$CLUSTER"
+        say "[MOCK bootstrap 1/6] kind-create (runtime: $RUNTIME)"
+        if ! kind get clusters 2>/dev/null | grep -qx "$CLUSTER"; then
+          kind create cluster --name "$CLUSTER" --wait 120s || exit 1
+        else
+          say "  kind cluster '$CLUSTER' already exists - reusing"
+        fi
+        say "[MOCK bootstrap 2/6] kubeconfig-export"
+        mkdir -p "$INFRA"
+        kind get kubeconfig --name "$CLUSTER" > "$INFRA/kubeconfig.yaml"
+        export KUBECONFIG="$INFRA/kubeconfig.yaml"
+        say "  kubeconfig: $INFRA/kubeconfig.yaml"
+        say "[MOCK bootstrap 3/6] gitea-attach (push GitOps to local repo)"
+        REPO="$GITEA_ROOT/test-repo.git"
+        if [[ -d "$REPO" && -d "$GIT_DIR_PATH/.git" ]]; then
+          git -C "$GIT_DIR_PATH" remote get-url origin >/dev/null 2>&1 \
+            || git -C "$GIT_DIR_PATH" remote add origin "file://$REPO"
+          git -C "$GIT_DIR_PATH" push -q -u origin main 2>/dev/null && say "  pushed GitOps to file://$REPO" || say "  push skipped"
+        fi
+        say "[MOCK bootstrap 4/6] flux-bootstrap (real flux install)"
+        flux install --kubeconfig "$KUBECONFIG" >/dev/null 2>&1 && say "  flux controllers installed" || say "  [WARN] flux install failed (offline?)"
+        say "[MOCK bootstrap 5/6] side-load R6 container images"
+        if [[ -f "$OVERLAY/images.txt" ]]; then
+          while read -r img; do
+            [[ -n "$img" ]] && kind load docker-image "$img" --name "$CLUSTER" && say "  loaded $img"
+          done < "$OVERLAY/images.txt"
+        fi
+        say "[MOCK bootstrap 6/6] reconcile workloads (kubectl apply, standing in for Flux git sync)"
+        if [[ -d "$OVERLAY/managed-services/mockbank" ]]; then
+          kubectl --kubeconfig "$KUBECONFIG" apply -k "$OVERLAY/managed-services/mockbank"
+          kubectl --kubeconfig "$KUBECONFIG" -n mockbank-prod rollout status deploy/bank-api --timeout=180s
+          kubectl --kubeconfig "$KUBECONFIG" -n mockbank-prod rollout status deploy/bank-frontend --timeout=120s
+        fi
+        say "Deploy complete: $ORG/$CLUSTER (kind)"
+        ;;
+      destroy)
+        REF=""
+        while [[ $# -gt 0 ]]; do case "$1" in --force|--remove-files) shift ;; *) REF="$1"; shift ;; esac; done
+        split_ref "$REF"
+        kind delete cluster --name "$CLUSTER" 2>/dev/null || true
+        say "[MOCK] destroyed kind cluster $CLUSTER"
+        ;;
+      *) say "usage: opencenter cluster init|use|set|describe|list|validate|generate|deploy|destroy"; exit 2 ;;
+    esac
+    ;;
+
+  secrets)
+    say "[MOCK] secrets sync simulated (SOPS encryption skipped in shim)"
+    ;;
+
+  *)
+    say "opencenter (MOCK SHIM): unknown command '$cmd'"
+    say "supported: version | local gitea up/status/destroy | cluster init/use/set/describe/list/validate/generate/deploy/destroy | secrets sync"
+    exit 2
+    ;;
+esac

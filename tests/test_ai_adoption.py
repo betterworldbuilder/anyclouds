@@ -545,6 +545,93 @@ def test_pack_omits_the_bulky_scan_inventory(client):
     assert "scan_result.json" not in names
 
 
+def test_palantir_handoff_preserves_starting_path_system_and_governance(client):
+    context = {
+        "workflow": "BROWNFIELD_TO_PALANTIR_READY",
+        "starting_condition": "BROWNFIELD",
+        "source_kind": "FLEX_BUSINESS_SYSTEM",
+        "business_system": {
+            "id": "mockbank",
+            "name": "MockBank Mobile Banking",
+            "components": [{"name": "bank-api"}, {"name": "bank-db"}],
+        },
+        "ontology_intent": {
+            "pain_points": ["Approval delay"],
+            "inputs": ["claims"],
+            "desired_outputs": ["approved claim"],
+            "related_orgs": ["Finance"],
+        },
+    }
+    created = client.post("/ai-adoption/projects", json={
+        "name": "MockBank AI",
+        "adoption_mode": "BROWNFIELD",
+        "source_type": "FLEX_BUSINESS_SYSTEM",
+        "starting_condition": "BROWNFIELD",
+        "business_system_id": "mockbank",
+        "business_owner": "sponsor@customer.com",
+        "data_owner": "data.owner@customer.com",
+        "data_sensitivity": "HIGH",
+        "sovereignty_requirements": "UK only",
+        "external_transfer_allowed": False,
+        "project_context": context,
+        "palantir_required": True,
+    })
+    assert created.status_code == 201
+    project = created.get_json()["project"]
+    assert project["project_context"]["business_system"]["components"][0]["name"] == "bank-api"
+    assert project["data_owner"] == "data.owner@customer.com"
+    pid = project["id"]
+
+    client.post(f"/ai-adoption/projects/{pid}/ontology", json={
+        "name": "MockBank Mobile Banking",
+        "pain_points": ["Approval delay"],
+        "inputs": ["claims"],
+        "desired_outputs": ["approved claim"],
+        "related_orgs": ["Finance"],
+    })
+    client.post(f"/ai-adoption/projects/{pid}/assess")
+    planned = client.post(f"/ai-adoption/projects/{pid}/plan").get_json()["project"]
+    manifest = planned["palantir_handoff_manifest"]
+
+    assert manifest["format"] == "AI_SWITCH_PALANTIR_HANDOFF_V1"
+    assert manifest["workflow"]["starting_condition"] == "BROWNFIELD"
+    assert manifest["project"]["business_system"]["name"] == "MockBank Mobile Banking"
+    assert manifest["data_governance"]["residency_or_sovereignty"] == "UK only"
+    assert manifest["direct_ingestion_ready"] is False
+    assert manifest["requires_authorized_foundry_connection"] is True
+    assert set(manifest["deployment_operating_model"]) == {
+        "ai_switch", "palantir", "rackspace", "customer",
+    }
+    assert all(x["status"] == "NOT_CHECKED" for x in manifest["customer_approvals"])
+
+
+def test_palantir_zip_contains_machine_readable_manifest_and_operating_model(client):
+    created = client.post("/ai-adoption/projects", json={
+        "name": "Claims AI",
+        "adoption_mode": "GREENFIELD",
+        "starting_condition": "GREENFIELD",
+        "palantir_required": True,
+        "project_context": {
+            "business_system": {"id": "claims", "name": "Claims System", "components": []},
+        },
+    })
+    pid = created.get_json()["project"]["id"]
+    client.post(f"/ai-adoption/projects/{pid}/assess")
+    client.post(f"/ai-adoption/projects/{pid}/plan")
+
+    response = client.get(f"/ai-adoption/projects/{pid}/export?format=zip")
+    with zipfile.ZipFile(io.BytesIO(response.data)) as zf:
+        manifest_name = next(n for n in zf.namelist() if n.endswith("palantir-handoff-manifest.json"))
+        manifest = json.loads(zf.read(manifest_name))
+        cover = zf.read(next(n for n in zf.namelist() if n.endswith("HANDOFF.md"))).decode()
+        report = zf.read(next(n for n in zf.namelist() if n.endswith("README.md"))).decode()
+
+    assert manifest["direct_ingestion_ready"] is False
+    assert "Palantir operates Foundry" in cover
+    assert "Rackspace implements and manages" in cover
+    assert "Direct-ingestion boundary" in report
+
+
 def test_unknown_export_format_is_rejected(client):
     pid = _planned_project(client, with_ontology=False)
     r = client.get(f"/ai-adoption/projects/{pid}/export?format=tar")
@@ -1347,6 +1434,99 @@ def test_greenfield_can_start_from_a_migrated_flex_app(client):
     sources = client.get("/ai-adoption/meta").get_json()["sources_by_mode"]
     assert "FLEX_BUSINESS_SYSTEM" in sources["GREENFIELD"]
     assert "FLEX_BUSINESS_SYSTEM" in sources["BROWNFIELD"]
+
+
+def test_every_scenario_can_use_a_migration_log_business_system(client):
+    """Greenfield, Brownfield and Goldenfield all deploy for some application,
+    so all three can attach one defined in the Migration Log."""
+    sources = client.get("/ai-adoption/meta").get_json()["sources_by_mode"]
+    for mode in ("GREENFIELD", "BROWNFIELD", "EXISTING_POC"):
+        assert "FLEX_BUSINESS_SYSTEM" in sources[mode], mode
+        assert "OPENCENTER" in sources[mode], mode
+
+
+def test_declared_components_become_project_components(client):
+    """A business system has no source tree, but its components are known from
+    the Migration Log engine and must reach the plan."""
+    r = client.post("/ai-adoption/projects", json={
+        "name": "Portal AI", "adoption_mode": "BROWNFIELD", "data_sensitivity": "MEDIUM"})
+    pid = r.get_json()["project"]["id"]
+    r = client.post(f"/ai-adoption/projects/{pid}/import", json={
+        "kind": "FLEX",
+        "system": {
+            "id": "mockbank", "name": "MockBank Mobile Banking", "vms": 3,
+            "sensitivity": "MEDIUM", "archetype": "Banking", "criticality": "Critical",
+            "components": ["bank-frontend", "bank-api", "bank-db"],
+            "containerised": True, "kubernetes": True,
+        }})
+    assert r.status_code == 200
+    p = r.get_json()["project"]
+
+    declared = p["import_source"]["declared"]
+    assert declared["components"] == ["bank-frontend", "bank-api", "bank-db"]
+    assert declared["archetype"] == "Banking"
+    assert declared["criticality"] == "Critical"
+    # And they land as real component records the plan can target.
+    names = [c["name"] for c in p["components"]]
+    assert "bank-api" in names
+    assert all(c["source"] == "migration-log business system"
+               for c in p["components"] if c["name"] in declared["components"])
+
+
+def test_migration_log_component_records_keep_runtime_and_location(client):
+    """The browser store uses component objects, not just names. Importing one
+    must not stringify the object or discard the fields the AI plan needs."""
+    r = client.post("/ai-adoption/projects", json={
+        "name": "Payments AI", "adoption_mode": "GREENFIELD",
+        "data_sensitivity": "HIGH",
+    })
+    pid = r.get_json()["project"]["id"]
+    r = client.post(f"/ai-adoption/projects/{pid}/import", json={
+        "kind": "FLEX",
+        "system": {
+            "id": "payments", "name": "Payments Platform",
+            "vms": [{"id": "vm-1"}, {"id": "vm-2"}],
+            "archetype": "api", "criticality": "Critical",
+            "components": [
+                {
+                    "name": "payments-api", "type": "API Server",
+                    "runtime": "Python / gunicorn", "src": "http://10.0.0.8:8000",
+                    "path": "/opt/payments",
+                },
+                {"name": "payments-db", "type": "Database", "runtime": "PostgreSQL"},
+            ],
+        },
+    })
+    assert r.status_code == 200
+    project = r.get_json()["project"]
+    declared = project["import_source"]["declared"]
+    assert declared["vms"] == 2
+    assert declared["components"] == ["payments-api", "payments-db"]
+    api = next(c for c in project["components"] if c["name"] == "payments-api")
+    assert api["runtime"] == "Python / gunicorn"
+    assert api["location"] == "/opt/payments"
+    assert api["metadata_json"]["source"] == "http://10.0.0.8:8000"
+
+
+def test_business_system_components_raise_confidence(client):
+    """The measurable point of importing from the Migration Log."""
+    def build(system):
+        r = client.post("/ai-adoption/projects", json={
+            "name": "X", "adoption_mode": "BROWNFIELD", "data_sensitivity": "MEDIUM",
+            "business_owner": "b@x.com", "data_owner": "d@x.com",
+            "production_owner": "p@x.com", "business_goal": "g"})
+        pid = r.get_json()["project"]["id"]
+        client.post(f"/ai-adoption/projects/{pid}/import", json={"kind": "FLEX", "system": system})
+        return client.post(f"/ai-adoption/projects/{pid}/assess").get_json()["project"]["assessment_result"]
+
+    flat = build({"id": "a", "name": "Customer Portal", "vms": 4})
+    rich = build({"id": "b", "name": "MockBank", "vms": 3, "archetype": "Banking",
+                  "criticality": "Critical", "components": ["fe", "api", "db"],
+                  "containerised": True, "kubernetes": True,
+                  "health_endpoint": True, "api_published": True})
+
+    assert rich["confidence"] > flat["confidence"]
+    assert rich["breakdown"]["production"]["checked"] > flat["breakdown"]["production"]["checked"]
 
 
 def test_ready_agent_path_leads_with_ai4people(client):

@@ -327,6 +327,56 @@ def import_flex_system(system: Dict[str, Any]) -> Dict[str, Any]:
     """
     name = str(system.get("name") or "Business System").strip()
 
+    raw_components = system.get("components") or system.get("parts") or []
+    if not isinstance(raw_components, list):
+        raw_components = []
+    component_records = []
+    for component in raw_components:
+        if isinstance(component, dict):
+            component_name = str(
+                component.get("name")
+                or component.get("component")
+                or component.get("role")
+                or ""
+            ).strip()
+            if not component_name:
+                continue
+            component_records.append(
+                {
+                    "name": component_name,
+                    "type": str(component.get("type") or component.get("role") or "").strip(),
+                    "runtime": str(component.get("runtime") or component.get("product") or "").strip(),
+                    "source": str(
+                        component.get("src")
+                        or component.get("source")
+                        or component.get("source_url")
+                        or ""
+                    ).strip(),
+                    "target": str(
+                        component.get("tgt")
+                        or component.get("target")
+                        or component.get("target_url")
+                        or ""
+                    ).strip(),
+                    "path": str(component.get("path") or "").strip(),
+                }
+            )
+        else:
+            component_name = str(component).strip()
+            if component_name:
+                component_records.append({"name": component_name})
+
+    vm_source = system.get("vms")
+    if vm_source is None:
+        vm_source = system.get("apps")
+    if isinstance(vm_source, (list, tuple, dict)):
+        vm_count = len(vm_source)
+    else:
+        try:
+            vm_count = int(vm_source or 0)
+        except (TypeError, ValueError):
+            vm_count = 0
+
     def _flag(*keys: str) -> bool:
         for key in keys:
             if bool(system.get(key)):
@@ -356,10 +406,20 @@ def import_flex_system(system: Dict[str, Any]) -> Dict[str, Any]:
         "warnings": [],
         "credential_reference": "",
         "declared": {
-            "vms": system.get("vms") or system.get("apps") or 0,
+            "vms": vm_count,
             "data_types": system.get("dataTypes") or system.get("data_type") or [],
             "sensitivity": (system.get("sensitivity") or "").upper(),
             "status": system.get("status") or "MIGRATED",
+            # From the Migration Log business-system engine. These are the parts
+            # an AI layer will actually integrate with, so they are recorded as
+            # components rather than collapsed into a VM count.
+            "archetype": str(system.get("archetype") or "").strip(),
+            "criticality": str(system.get("criticality") or "").strip(),
+            "components": [record["name"] for record in component_records],
+            "component_records": component_records,
+            "region": str(system.get("region") or "").strip(),
+            "wave": str(system.get("wave") or system.get("migrationWave") or "").strip(),
+            "risk": str(system.get("risk") or "").strip(),
         },
         "posture": posture,
     }

@@ -1,0 +1,21 @@
+{
+  "sourcePlatform": "flex",
+  "conversionEngine": "APPS_to_Container_Refactor_Engine",
+  "captureMethod": "SMART_SNAPSHOT_CAPTURE",
+  "cloudNativeStatus": "CLOUD_NATIVE_READY",
+  "businessSystem": "MockBank Mobile Banking",
+  "businessSystemId": "bs-mockbank-001",
+  "deployTarget": "kind",
+  "targetCluster": "mockbank-org/mockbank",
+  "namespace": "mockbank-prod",
+  "workloads": [
+    {"name": "bank-api", "kind": "Deployment", "image": "mockbank/bank-api:1.0.0", "targetForm": "CONTAINERIZED"},
+    {"name": "bank-frontend", "kind": "Deployment", "image": "mockbank/bank-frontend:1.0.0", "targetForm": "CONTAINERIZED"}
+  ],
+  "externalServices": [
+    {"name": "bank-db", "type": "ExternalDB", "note": "sqlite embedded for mock; production would externalize to operator-managed PostgreSQL"}
+  ],
+  "keptOnFlexVm": [],
+  "warnings": [],
+  "blockers": []
+}

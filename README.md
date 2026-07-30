@@ -106,11 +106,11 @@ Flex Migration Hub is a browser-based control room for OSPC to FLEX migration. I
 
 ## ✨ Latest Features
 
-### Stage 4 — AI Adoption & Production Factory
+### AI SWITCH Stage — AI Adoption & Production Factory
 
-Stage 4 now imports a real AI project, scans it without executing it, scores its
+The AI SWITCH Stage now imports a real AI project, scans it without executing it, scores its
 production gaps honestly, and emits a handoff Rackspace operations can act on.
-The original Stage 4 AI Power Up flow is unchanged and remains the default
+The original AI SWITCH Stage flow is unchanged and remains the default
 Brownfield path.
 
 **Three adoption modes**
@@ -140,7 +140,7 @@ project that could not be scanned reads as unverified, never as a clean pass.
 The formula is printed in the UI and in every export.
 
 **A-0 Adoption Path** was added to the AI Enhancement Readiness Assessment
-(now A-0 … A-9). Completing that assessment can prefill Stage 4 and credit the
+(now A-0 … A-9). Completing that assessment can prefill AI SWITCH and credit the
 `value` controls it genuinely evidences — each credited control is stamped with
 its source assessment id. It can never satisfy a security, production or
 operations control; those require code.
@@ -160,7 +160,7 @@ must authenticate. Configure with:
 
 | Env var | Purpose |
 |---|---|
-| `AI_ADOPTION_FACTORY_ENABLED` | `0` disables the whole feature; Stage 4 reverts to its previous behaviour |
+| `AI_ADOPTION_FACTORY_ENABLED` | `0` disables the whole feature; AI SWITCH reverts to its previous behaviour |
 | `AI_ADOPTION_GITHUB_CLIENT_ID` / `_SECRET` | OAuth app credentials |
 | `AI_ADOPTION_ALLOWED_LOGINS` / `_ORG` | Optional allow-lists |
 | `AI_ADOPTION_ALLOW_LOOPBACK` | `0` to require auth even locally |

@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: mockbank-prod
+  labels:
+    app.kubernetes.io/part-of: mockbank
+    r6.opencenter.dev/source: flex-refactor-engine

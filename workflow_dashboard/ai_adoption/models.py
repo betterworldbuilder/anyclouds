@@ -188,8 +188,14 @@ def new_project(
         "production_owner": "",
         "department_id": "",
         "business_system_id": "",
+        # The user-facing intake path (GREENFIELD, BROWNFIELD, or GOLDENFIELD)
+        # is preserved when all three converge into the final Palantir stage.
+        "starting_condition": "",
+        "project_context": {},
         "business_goal": "",
         "data_sensitivity": "",
+        "data_location": "",
+        "external_transfer_allowed": False,
         "preferred_environment": "FLEX (Rackspace OpenStack)",
         "sovereignty_requirements": "",
         "target_platform": "",

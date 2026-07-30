@@ -2,6 +2,12 @@
 var R6P={current:0,status:{},bs:null,components:[],captureMethod:'smart',compatConfirmed:false,yaml:'',bundle:null,artifacts:{},preflight:{},continueBlocked:true,captureRun:null,creds:{cloud:{status:'not_configured',authUrl:'',region:'',credId:'',projectId:''},ssh:{user:'ubuntu',keyPath:'~/.ssh/id_rsa',knownHostsFile:'./data/ssh/known_hosts'},registry:{type:'dockerhub',url:'docker.io',project:'dzoan/flex-apps',user:'dzoan',password:''},opencenter:{status:'not_configured',clusterRef:'rackspace-flex/flex-prod-k8s',gitDir:''},gitops:{status:'not_configured',localPath:'',branch:'main',method:'existing'}}};
 var R6_SCAN_UI_VERSIONS=[{id:'scan-ui-v1',label:'Scan UI v1'}];
 R6P.scanUiVersion='scan-ui-v1';try{localStorage.setItem('r6p_scan_ui_version','scan-ui-v1');}catch(e){}
+/* ── Where to Deploy: 'openstack' (FLEX/OpenStack production) or 'kind' (local Docker test cluster) ──
+   Persisted in localStorage 'r6ace_deploy_target' and propagated into the handoff bundle
+   (deployTarget) so the OpenCenter stage (ocqs/ocqp bands) adopts the same provider. */
+R6P.deployTarget=(function(){try{var t=localStorage.getItem('r6ace_deploy_target');return (t==='kind'||t==='openstack')?t:'openstack';}catch(e){return 'openstack';}})();
+window.r6pToolReq=function(t){return !!t.req&&(!t.target||t.target===R6P.deployTarget);};
+window.r6pDeployTargetLabel=function(){return R6P.deployTarget==='kind'?'Kind — Local Docker':'OpenStack / FLEX — Production';};
 /* Device-type badges for Stage 13 UAT rows - mirrors Stage 4's Component Test Lab
    (panel-s5c) classification/icon language so a component reads the same way
    (e.g. a Web/Mobile/Frontend component always shows the 📱 Mobile UI badge)
@@ -39,7 +45,9 @@ var R6P_TOOLS=[
   {name:'jq',         req:true,  note:'JSON parsing',            manual:false},
   {name:'kubectl',    req:true,  note:'Cluster validation',      manual:false},
   {name:'flux',       req:true,  note:'Flux reconcile',          manual:false},
-  {name:'openstack',  req:true,  note:'Cloud API / token test',  manual:false},
+  {name:'openstack',  req:true,  note:'Cloud API / token test',  manual:false, target:'openstack'},
+  {name:'docker',     req:true,  note:'Kind cluster runtime',    manual:false, target:'kind'},
+  {name:'kind',       req:true,  note:'Local Kubernetes-in-Docker cluster', manual:false, target:'kind'},
   {name:'opencenter', req:true,  note:'Cluster metadata',        manual:true},
   {name:'helm',       req:false, note:'Helm chart validation',   manual:false},
   {name:'yq',         req:false, note:'YAML processing',         manual:false},
@@ -267,6 +275,59 @@ window.r6pRestoreScanRun=function(){
   if(typeof r6pFetchLatestScanRunFromServer==='function')r6pFetchLatestScanRunFromServer();
   return id;
 };
+/* ── Demo seed: MockBank Mobile Banking ──
+   Preloads Stage 1 with the mock banking system used by the mockbank-e2e test
+   (frontend + API + PostgreSQL on one "VM"). Seeded once per browser: if the user
+   deletes it, the r6p_mockbank_demo_seeded flag prevents it from coming back;
+   re-import via the hero Import button or clear the flag to restore it. */
+var R6P_MOCKBANK_DEMO={
+  id:'bs-mockbank-demo',
+  name:'MockBank Mobile Banking (Demo)',
+  type:'Mobile Banking System',
+  criticality:'High',
+  migrationWave:1,
+  region:'local',
+  source:'r6-demo-seed',
+  description:'3-tier demo banking system from the mockbank-e2e test: nginx mobile web frontend, Flask/gunicorn API, PostgreSQL database. Target flow: refactor to containers, deploy on Kind via OpenCenter.',
+  vms:[{id:'vm-mockbank-01',name:'mockbank-vm-01',ip:'127.0.0.1',os:'Ubuntu 24.04',flavor:'2vCPU/4GB',role:'all-in-one app VM'}],
+  volumes:[{name:'pgdata',mount:'/var/lib/postgresql/data',sizeGb:1,attachedTo:'mockbank-vm-01',purpose:'PostgreSQL data'}],
+  networks:[{name:'app-net',cidr:'10.0.10.0/24',purpose:'frontend/api/db traffic'}],
+  dependencies:[
+    {consumer:'bank-frontend',provider:'bank-api',protocol:'http',port:8000,auth:'none',tls:false,note:'nginx /api reverse proxy'},
+    {consumer:'bank-api',provider:'bank-db',protocol:'postgresql',port:5432,auth:'password',tls:false,note:'DATABASE_URL from secret'}
+  ],
+  components:[
+    {name:'bank-frontend',type:'Web Frontend',role:'frontend',tgt:'127.0.0.1',vmId:'vm-mockbank-01',
+     path:'/opt/bank-frontend',port:80,runtime:'nginx (static mobile UI + /api proxy)',
+     startCommand:"nginx -g 'daemon off;'",persistentPath:'None - stateless',
+     image:'mockbank/bank-frontend:2.0.0'},
+    {name:'bank-api',type:'API Server',role:'api',tgt:'127.0.0.1',vmId:'vm-mockbank-01',
+     path:'/opt/bank-api',port:8000,runtime:'python3 Flask + gunicorn',
+     startCommand:'gunicorn -b 0.0.0.0:8000 --workers 2 app:app',persistentPath:'None - stateless',
+     image:'mockbank/bank-api:2.0.0'},
+    {name:'bank-db',type:'Database',role:'database',tgt:'127.0.0.1',vmId:'vm-mockbank-01',
+     path:'/var/lib/postgresql/data',port:5432,runtime:'PostgreSQL 16',
+     persistentPath:'/var/lib/postgresql/data',
+     note:'Stateful - externalize: in-cluster postgres Deployment + PVC (demo) or operator-managed DB (production)'}
+  ]
+};
+(function r6pSeedMockBankDemo(){
+  try{
+    var systems=[];
+    try{systems=JSON.parse(localStorage.getItem('uatS1_systems')||'[]')||[];}catch(e){systems=[];}
+    var exists=systems.some(function(s){return s&&s.id===R6P_MOCKBANK_DEMO.id;});
+    var seededBefore=localStorage.getItem('r6p_mockbank_demo_seeded')==='1';
+    if(!exists&&!seededBefore){
+      systems.push(R6P_MOCKBANK_DEMO);
+      localStorage.setItem('uatS1_systems',JSON.stringify(systems));
+      localStorage.setItem('r6p_mockbank_demo_seeded','1');
+      /* auto-select the demo when nothing else is remembered */
+      if(!localStorage.getItem(R6P_SELECTED_BS_KEY)){
+        localStorage.setItem(R6P_SELECTED_BS_KEY,R6P_MOCKBANK_DEMO.id);
+      }
+    }
+  }catch(e){}
+})();
 window.r6pSyncSelectedBusinessSystem=function(force){
   var raw='[]';
   try{raw=localStorage.getItem('uatS1_systems')||'[]';}catch(e){}
@@ -1505,7 +1566,10 @@ window.r6pContent=function(n){
     +'<div><div style="color:#64748b;font-size:10px;font-weight:700;text-transform:uppercase;margin-bottom:2px;">External Services</div><div style="font-weight:700;color:#0f172a;">'+extSvcs+'</div></div>'
     +'<div><div style="color:#64748b;font-size:10px;font-weight:700;text-transform:uppercase;margin-bottom:2px;">Warnings</div><div style="font-weight:700;color:'+(warns?'#d97706':'#16a34a')+';">'+warns+'</div></div>'
     +'<div><div style="color:#64748b;font-size:10px;font-weight:700;text-transform:uppercase;margin-bottom:2px;">Import Status</div><div id="r6p-s12-status" style="font-weight:700;color:'+(R6P._bundleValidated?'#16a34a':'#d97706')+'">'+(R6P._bundleValidated?'Ready for Import':'Pending Validation')+'</div></div>'
+    +'<div><div style="color:#64748b;font-size:10px;font-weight:700;text-transform:uppercase;margin-bottom:2px;">Deployment Target</div><div style="font-weight:700;color:'+(R6P.deployTarget==='kind'?'#0e7490':'#1d4ed8')+';">'+(R6P.deployTarget==='kind'?'&#128051; KIND — Local Docker':'&#9729;&#65039; OpenStack / FLEX Production')+'</div></div>'
     +'</div></div>'
+
+    +r6pPlatformDeployBox()
 
     +validation
 
@@ -2451,6 +2515,7 @@ window.r6pGenBundle=function(){
     cloudNativeStatus:isC?'COMPATIBILITY_CONTAINER_ONLY':'CLOUD_NATIVE_READY',
     businessSystem:bsName,
     businessSystemId:R6P.bs&&R6P.bs.id||'',
+    deployTarget:R6P.deployTarget||'openstack',
     targetCluster:R6P.creds.opencenter.clusterRef||'rackspace-flex/flex-prod-k8s',
     namespace:bsSlug+'-prod',
     workloads:workloads,
@@ -2472,6 +2537,7 @@ window.r6pGenBundle=function(){
     businessSystemId:R6P.bs&&R6P.bs.id||'',
     customerName:'',
     sourcePlatform:'flex',
+    deployTarget:R6P.deployTarget||'openstack',
     captureMethod:manifest.captureMethod,
     cloudNativeStatus:manifest.cloudNativeStatus,
     targetCluster:manifest.targetCluster,
@@ -2544,6 +2610,7 @@ window.r6pSendToOC=function(){
   if(!R6P._bundleValidated&&!r6pValidateBundle()){return;}
   var out=R6P.bundle;
   out.status='ready_for_opencenter_import';
+  out.deployTarget=R6P.deployTarget||'openstack';
   localStorage.setItem('appsContainerRefactorOutput',JSON.stringify(out));
   localStorage.setItem('r6OpenCenterHandoffBundle',JSON.stringify(out.manifest||out));
   /* Notify OpenCenter stage */
@@ -2557,7 +2624,7 @@ window.r6pSendToOC=function(){
   /* Flash success message */
   var banner=document.createElement('div');
   banner.style.cssText='position:fixed;top:70px;right:20px;z-index:9999;background:#16a34a;color:#fff;padding:14px 20px;border-radius:8px;font-size:13px;font-weight:700;max-width:380px;box-shadow:0 4px 20px rgba(0,0,0,.2);';
-  banner.textContent='Apps Container Refactor output sent to OpenCenter Import stage. Review the package, validate the bundle, then import through OpenCenter.';
+  banner.textContent='Apps Container Refactor output sent to OpenCenter Import stage (target: '+r6pDeployTargetLabel()+'). The OpenCenter stage provider has been switched to match. Review the package, validate the bundle, then import through OpenCenter.';
   document.body.appendChild(banner);
   setTimeout(function(){banner.style.opacity='0';banner.style.transition='opacity .5s';setTimeout(function(){banner.parentNode&&banner.parentNode.removeChild(banner);},500);},5000);
   r6pMarkDone(12);
@@ -2570,6 +2637,7 @@ window.r6pSendToOC=function(){
    if Step 9 was run in Manual mode - it regenerates the bundle from current state first. */
 window.r6pAutoDeployToOpenCenter=function(){
   var st=document.getElementById('r6p-auto-deploy-status');
+  if(R6P.deployTarget==='kind'){if(st){st.textContent='Where to Deploy is set to Kind (local). Use the Kind Local Deployment commands above — the production GitOps auto-push is only for the OpenStack / FLEX target.';st.style.color='#d97706';}return;}
   if(!R6P.components||!R6P.components.length){if(st){st.textContent='Select a Business System in Step 1 first.';st.style.color='#dc2626';}return;}
   var clusterRef=(R6P.creds.opencenter.clusterRef||'rackspace-flex/flex-prod-k8s').split('/');
   var org=clusterRef[0]||'rackspace-flex',cluster=clusterRef[1]||'flex-prod-k8s';
@@ -2646,9 +2714,14 @@ window.r6pStage0=function(){
     if(s==='missing'&&!t.manual)btn='<button onclick="r6pShowInstallConfirm([\''+t.name+'\'])" style="background:#0369a1;color:#fff;border:none;border-radius:4px;padding:3px 10px;font-size:10px;font-weight:700;cursor:pointer;">Install</button>';
     else if(s==='missing'&&t.manual)btn='<button onclick="r6pShowOcSetup()" style="background:#7c3aed;color:#fff;border:none;border-radius:4px;padding:3px 10px;font-size:10px;font-weight:700;cursor:pointer;">Configure Path</button>';
     else if(s==='ok')btn='<span style="color:#16a34a;font-size:11px;font-weight:700;">OK</span>';
-    return '<tr id="r6p-tr-'+t.name+'">'
+    var _isReq=r6pToolReq(t);
+    var _offTarget=!!t.target&&t.target!==R6P.deployTarget;
+    var _reqBadge=_offTarget
+      ?'<span style="background:#f1f5f9;color:#94a3b8;padding:2px 8px;border-radius:999px;font-size:10px;font-weight:700;">Not needed ('+t.target+' target only)</span>'
+      :'<span style="background:'+(_isReq?'#fee2e2':'#fef3c7')+';color:'+(_isReq?'#dc2626':'#d97706')+';padding:2px 8px;border-radius:999px;font-size:10px;font-weight:700;">'+(_isReq?'Required':'Recommended')+'</span>';
+    return '<tr id="r6p-tr-'+t.name+'"'+(_offTarget?' style="opacity:.55;"':'')+'>'
       +'<td style="font-weight:700;font-size:12px;">'+t.name+'</td>'
-      +'<td><span style="background:'+(t.req?'#fee2e2':'#fef3c7')+';color:'+(t.req?'#dc2626':'#d97706')+';padding:2px 8px;border-radius:999px;font-size:10px;font-weight:700;">'+(t.req?'Required':'Recommended')+'</span></td>'
+      +'<td>'+_reqBadge+'</td>'
       +'<td><span id="r6p-st-'+t.name+'" style="background:'+sbg+';color:'+sfg+';padding:2px 8px;border-radius:999px;font-size:10px;font-weight:700;">'+stxt+'</span></td>'
       +'<td id="r6p-ver-'+t.name+'" style="font-size:11px;color:#475569;font-family:monospace;">'+ver+'</td>'
       +'<td id="r6p-btn-'+t.name+'">'+btn+'</td>'
@@ -2831,7 +2904,7 @@ window.r6pStage0=function(){
 window.r6pRunPreflight=function(done){
   var out=document.getElementById('r6p-preflight-out');if(out)out.style.display='block';
   R6P_TOOLS.forEach(function(t){r6pSetToolStatus(t.name,'checking','—');});
-  var cmd='for t in git curl jq kubectl flux openstack helm yq kustomize opencenter; do '
+  var cmd='for t in git curl jq kubectl flux openstack docker kind helm yq kustomize opencenter; do '
     +'if command -v "$t" >/dev/null 2>&1; then v=$(timeout 2 "$t" --version 2>/dev/null | head -1 | tr -d "\\n"); [ -z "$v" ] && v="installed"; echo "OK:$t:$v"; '
     +'else echo "MISSING:$t"; fi; done';
   var url='/api/stream/run-cmd?cmd='+encodeURIComponent(cmd);
@@ -2850,7 +2923,7 @@ window.r6pRunPreflight=function(done){
     });
     if(out&&reason){out.textContent+=(buf?'\n':'')+'[WARN] '+reason+'\n';}
     r6pCheckContinue();
-    if(typeof done==='function')done({ok:R6P_TOOLS.every(function(t){return !t.req||R6P.preflight[t.name]==='ok';}),reason:reason||''});
+    if(typeof done==='function')done({ok:R6P_TOOLS.every(function(t){return !r6pToolReq(t)||R6P.preflight[t.name]==='ok';}),reason:reason||''});
   };
   var watchdog=setTimeout(function(){finish('preflight timed out - marked unresolved tools as missing')},8000);
   es.onmessage=function(e){
@@ -2887,7 +2960,7 @@ window.r6pSetToolStatus=function(name,status,ver){
 };
 
 window.r6pCheckContinue=function(){
-  var requiredMissing=R6P_TOOLS.filter(function(t){return t.req&&R6P.preflight[t.name]==='missing';});
+  var requiredMissing=R6P_TOOLS.filter(function(t){return r6pToolReq(t)&&R6P.preflight[t.name]==='missing';});
   var btn=document.getElementById('r6p-s0-continue');
   if(!btn)return;
   if(requiredMissing.length===0){
@@ -2901,8 +2974,80 @@ window.r6pCheckContinue=function(){
   }
 };
 
+/* ── Where to Deploy: selector logic ── */
+window.r6pApplyDeployTargetUI=function(){
+  var isKind=R6P.deployTarget==='kind';
+  var k=document.getElementById('r6p-dt-kind'),o=document.getElementById('r6p-dt-openstack');
+  if(k){k.classList[isKind?'add':'remove']('selected');}
+  if(o){o.classList[isKind?'remove':'add']('selected');}
+  var note=document.getElementById('r6p-deploy-bar-note');
+  if(note){note.innerHTML=isKind
+    ?'&#128051; <strong>Kind (local Docker):</strong> the pipeline deploys into a local Kind cluster bootstrapped by <code>opencenter cluster deploy --container-runtime docker</code>, with GitOps served by a disposable local Gitea (<code>opencenter local gitea up</code>). OpenStack credentials are <strong>not required</strong>. Docs: docs.opencenter.dev &rarr; operations/create-kind-cluster.'
+    :'&#9729;&#65039; <strong>OpenStack / FLEX production:</strong> the pipeline deploys into a production OpenCenter cluster on OpenStack (OpenTofu &rarr; Kubespray &rarr; FluxCD). Requires OpenStack application credentials, network IDs and a real GitOps repository. Docs: docs.opencenter.dev &rarr; operations/create-openstack-cluster.';}
+  /* Re-render preflight (stage 0) and deploy (stage 12) bodies so tool requirements and commands match the target */
+  ['0','12'].forEach(function(n){
+    var b=document.getElementById('r6p-body-'+n);
+    if(b){var inner=b.querySelector('.r6p-stage-body-inner');if(inner&&typeof r6pContent==='function'){try{inner.innerHTML=r6pContent(parseInt(n,10));}catch(e){}}}
+  });
+  if(typeof r6pCheckContinue==='function')r6pCheckContinue();
+};
+window.r6pSetDeployTarget=function(t,opts){
+  t=(t==='kind')?'kind':'openstack';
+  R6P.deployTarget=t;
+  try{localStorage.setItem('r6ace_deploy_target',t);}catch(e){}
+  /* Keep the OpenCenter stage provider selects (Quickstart + Real Production bands) in sync */
+  if(!opts||!opts.noSync){
+    ['ocqs','ocqp'].forEach(function(p){
+      var sel=document.getElementById(p+'-provider');
+      if(sel&&sel.value!==t){sel.value=t;}
+      try{var st=JSON.parse(localStorage.getItem(p+'_state')||'{}');st.provider=t;localStorage.setItem(p+'_state',JSON.stringify(st));}catch(e){}
+    });
+    try{if(typeof ocqsUpdate==='function')ocqsUpdate();}catch(e){}
+    try{if(typeof ocqpUpdate==='function')ocqpUpdate();}catch(e){}
+  }
+  if(R6P.bundle){R6P.bundle.deployTarget=t;if(R6P.bundle.manifest)R6P.bundle.manifest.deployTarget=t;}
+  r6pApplyDeployTargetUI();
+};
+setTimeout(function(){if(document.getElementById('r6p-deploy-bar'))r6pApplyDeployTargetUI();},600);
+
+/* Platform-specific bootstrap commands shown in Stage 12 (sourced from the OpenCenter CLI docs) */
+window.r6pPlatformDeployBox=function(){
+  var clusterRef=(R6P.creds.opencenter.clusterRef||'rackspace-flex/flex-prod-k8s').split('/');
+  var org=clusterRef[0]||'my-org',cluster=clusterRef[1]||'my-cluster';
+  if(R6P.deployTarget==='kind'){
+    var kcmd='# Kind local deployment (docs.opencenter.dev -> operations/create-kind-cluster)\n'
+      +'opencenter local gitea up\n'
+      +'opencenter local gitea status\n'
+      +'opencenter cluster init '+cluster+' --org '+org+' --type kind || true\n'
+      +'GITEA_REPO_URL=$(opencenter local gitea status 2>/dev/null | grep "Bootstrap repo URL:" | awk \'{print $NF}\')\n'
+      +'GITEA_TOKEN_PATH=$(opencenter local gitea status 2>/dev/null | grep "User token present:" | sed \'s/.*(\\(.*\\))/\\1/\')\n'
+      +'test -n "$GITEA_REPO_URL" || { echo "[BLOCKED] Local Gitea not running - run opencenter local gitea up first" >&2; exit 41; }\n'
+      +'opencenter cluster set '+org+'/'+cluster+' opencenter.gitops.repository.url="$GITEA_REPO_URL" opencenter.gitops.auth.token.token_file="$GITEA_TOKEN_PATH" opencenter.gitops.auth.token.provider=gitea\n'
+      +'opencenter cluster validate '+org+'/'+cluster+'\n'
+      +'opencenter cluster generate '+org+'/'+cluster+' --force\n'
+      +'opencenter cluster deploy '+org+'/'+cluster+' --container-runtime docker';
+    return '<div style="background:#ecfeff;border:2px solid #67e8f9;border-radius:10px;padding:14px;margin-bottom:16px;">'
+      +'<div style="font-size:13px;font-weight:800;color:#0e7490;margin-bottom:6px;">&#128051; Kind Local Deployment (Where to Deploy: Kind)</div>'
+      +'<p style="font-size:12px;color:#155e75;margin:0 0 10px;line-height:1.6;">This bundle targets a <strong>local Kind cluster</strong>. GitOps runs through the disposable local Gitea instance &mdash; no external Git remote and no OpenStack credentials are needed. After deploy, verify with <code>kubectl get nodes</code> and <code>flux get kustomizations -n flux-system</code>.</p>'
+      +r6pCmd('12-kind-deploy',kcmd)
+      +'<div style="font-size:11px;color:#0e7490;">Verify: <code>export KUBECONFIG=$(opencenter cluster describe '+org+'/'+cluster+' 2>/dev/null | grep "git_dir:" | awk \'{print $2}\')/infrastructure/clusters/'+cluster+'/kubeconfig.yaml && kubectl get nodes</code></div>'
+      +'</div>';
+  }
+  var ocmd='# OpenStack production deployment (docs.opencenter.dev -> operations/create-openstack-cluster)\n'
+    +'opencenter cluster validate '+org+'/'+cluster+'\n'
+    +'opencenter cluster generate '+org+'/'+cluster+'\n'
+    +'opencenter secrets sync '+org+'/'+cluster+'\n'
+    +'# bootstrap phases: openstack-preflight -> opentofu-init -> opentofu-apply -> normalize-kubeconfig -> install-network-plugin\n'
+    +'opencenter cluster deploy '+org+'/'+cluster;
+  return '<div style="background:#eff6ff;border:2px solid #93c5fd;border-radius:10px;padding:14px;margin-bottom:16px;">'
+    +'<div style="font-size:13px;font-weight:800;color:#1d4ed8;margin-bottom:6px;">&#9729;&#65039; OpenStack Production Deployment (Where to Deploy: OpenStack / FLEX)</div>'
+    +'<p style="font-size:12px;color:#1e40af;margin:0 0 10px;line-height:1.6;">This bundle targets the <strong>production OpenCenter cluster on OpenStack</strong>. Ensure credentials, network IDs and the GitOps repository are configured in the Real Production OpenCenter panel before deploying.</p>'
+    +r6pCmd('12-openstack-deploy',ocmd)
+    +'</div>';
+};
+
 window.r6pS0Continue=function(){
-  if(R6P.continueBlocked){alert('Install all required tools first.\n\nMissing: '+R6P_TOOLS.filter(function(t){return t.req&&R6P.preflight[t.name]==='missing';}).map(function(t){return t.name;}).join(', '));return;}
+  if(R6P.continueBlocked){alert('Install all required tools first.\n\nMissing: '+R6P_TOOLS.filter(function(t){return r6pToolReq(t)&&R6P.preflight[t.name]==='missing';}).map(function(t){return t.name;}).join(', '));return;}
   r6pGoTo(1);
 };
 
@@ -2912,8 +3057,8 @@ window.r6pShowInstallConfirm=function(mode){
   var tools=[];
   if(Array.isArray(mode)){tools=mode;}
   else if(mode==='missing')tools=R6P_TOOLS.filter(function(t){return !t.manual&&R6P.preflight[t.name]==='missing';}).map(function(t){return t.name;});
-  else if(mode==='required')tools=R6P_TOOLS.filter(function(t){return t.req&&!t.manual&&R6P.preflight[t.name]==='missing';}).map(function(t){return t.name;});
-  else if(mode==='recommended')tools=R6P_TOOLS.filter(function(t){return !t.req&&!t.manual&&R6P.preflight[t.name]==='missing';}).map(function(t){return t.name;});
+  else if(mode==='required')tools=R6P_TOOLS.filter(function(t){return r6pToolReq(t)&&!t.manual&&R6P.preflight[t.name]==='missing';}).map(function(t){return t.name;});
+  else if(mode==='recommended')tools=R6P_TOOLS.filter(function(t){return !r6pToolReq(t)&&!t.manual&&R6P.preflight[t.name]==='missing';}).map(function(t){return t.name;});
   if(!tools.length){alert('No installable tools to install. Run Preflight first.');return;}
   _r6pInstallToolList=tools;
   var modal=document.getElementById('r6p-install-modal');
@@ -2943,7 +3088,7 @@ window.r6pDoInstall=function(){
   var out=document.getElementById('r6p-preflight-out');
   if(out){out.style.display='block';out.textContent='Installing: '+_r6pInstallToolList.join(' ')+'\n';}
 
-  var scriptPath='/home/dzoan/OSPC2FLEX/osflex-deployer-fullmig-5.0.0420current/workflow_dashboard/static/install-missing-cli-tools.sh';
+  var scriptPath='/home/dzoan/cloudmax/workflow_dashboard/static/install-missing-cli-tools.sh';
   /* Write password to a locked temp file — never in the process list */
   var passEsc=pass.replace(/'/g,"'\\''");
   var tmpFile='/tmp/.r6p_sp_'+Date.now();
@@ -3929,6 +4074,15 @@ window.openCenterImportFromR6=function(){
   var pkgContents=data.packageContents||{};
   var isCompat=captureMethod==='FULL_SNAPSHOT_COMPATIBILITY_CONTAINER';
   var isBlocked=blockers>0||cloudStatus==='BLOCKED';
+  /* Adopt the R6 "Where to Deploy" choice: switch both OpenCenter bands (Quickstart ocqs + Real Production ocqp) to the same provider */
+  var deployTarget=(data.deployTarget==='kind')?'kind':'openstack';
+  ['ocqs','ocqp'].forEach(function(p){
+    var sel=document.getElementById(p+'-provider');
+    if(sel&&sel.value!==deployTarget){sel.value=deployTarget;}
+    try{var stx=JSON.parse(localStorage.getItem(p+'_state')||'{}');stx.provider=deployTarget;localStorage.setItem(p+'_state',JSON.stringify(stx));}catch(e){}
+  });
+  try{if(typeof ocqsUpdate==='function')ocqsUpdate();}catch(e){}
+  try{if(typeof ocqpUpdate==='function')ocqpUpdate();}catch(e){}
 
   /* Update status badge on Step 2 card */
   var st2=document.getElementById('clf-st-2');
@@ -3971,6 +4125,7 @@ window.openCenterImportFromR6=function(){
     +'<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;font-size:12px;">'
     +'<div><div style="color:#64748b;font-size:10px;font-weight:700;text-transform:uppercase;margin-bottom:2px;">Business System</div><div style="font-weight:700;color:#0f172a;">'+bsName+'</div></div>'
     +'<div><div style="color:#64748b;font-size:10px;font-weight:700;text-transform:uppercase;margin-bottom:2px;">Source Platform</div><div style="font-weight:700;color:#0369a1;">FLEX</div></div>'
+    +'<div><div style="color:#64748b;font-size:10px;font-weight:700;text-transform:uppercase;margin-bottom:2px;">Deploy Target</div><div style="font-weight:700;color:'+(deployTarget==='kind'?'#0e7490':'#1d4ed8')+';">'+(deployTarget==='kind'?'&#128051; Kind — Local Docker':'&#9729;&#65039; OpenStack / FLEX')+'</div></div>'
     +'<div><div style="color:#64748b;font-size:10px;font-weight:700;text-transform:uppercase;margin-bottom:2px;">Capture Method</div><div style="font-weight:700;color:'+(isCompat?'#7c3aed':'#16a34a')+';">'+(isCompat?'Full Snapshot':'Smart Snapshot')+'</div></div>'
     +'<div><div style="color:#64748b;font-size:10px;font-weight:700;text-transform:uppercase;margin-bottom:2px;">Cloud-Native Status</div><div style="font-weight:700;color:'+(isCompat?'#7c3aed':'#16a34a')+';">'+cloudStatus.replace(/_/g,' ')+'</div></div>'
     +'<div><div style="color:#64748b;font-size:10px;font-weight:700;text-transform:uppercase;margin-bottom:2px;">Target Cluster</div><div style="font-weight:700;color:#0f172a;font-size:11px;">'+cluster+'</div></div>'

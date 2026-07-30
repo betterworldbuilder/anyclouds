@@ -1,4 +1,4 @@
-# Stage 4 — AI Adoption & Production Factory: Implementation Plan
+# AI SWITCH Stage — AI Adoption & Production Factory: Implementation Plan
 
 Status: implemented (phase 1). Feature flag `AI_ADOPTION_FACTORY_ENABLED`.
 
@@ -7,9 +7,9 @@ Status: implemented (phase 1). Feature flag `AI_ADOPTION_FACTORY_ENABLED`.
 | Concern | Finding |
 |---|---|
 | Entry point | `workflow_dashboard/app.py` (~25k lines, single module) |
-| Stage 4 today | `templates/_ai_powerup.html` + `templates/_ai_powerup_js.html`, 100% client-side |
-| Stage 4 state | `localStorage['ospcFlex_stage9_aiPowerUp']`, seeded from `osflex_migration_tracker` |
-| Stage 4 backend | One route, `GET /ai-powerup` — renders a template. No models, no scoring. |
+| AI SWITCH today | `templates/_ai_powerup.html` + `templates/_ai_powerup_js.html`, 100% client-side |
+| AI SWITCH state | `localStorage['ospcFlex_stage9_aiPowerUp']`, seeded from `osflex_migration_tracker` |
+| AI SWITCH backend | One route, `GET /ai-powerup` — renders a template. No models, no scoring. |
 | A1–A9 assessment | `templates/_ai_readiness.html`, stage id `sai_readiness` |
 | Persistence | JSON files on disk, atomic `tmp` + `os.replace` (see `app.py:_save_snapshot_scan_cache`) |
 | ORM / database | **None** |
@@ -78,6 +78,6 @@ workflow_dashboard/ai_adoption/
 ## 5. Backward compatibility
 
 - No existing persisted field renamed or removed.
-- Existing Stage 4 localStorage flow untouched; new work is additive.
+- Existing AI SWITCH localStorage flow untouched; new work is additive.
 - With `AI_ADOPTION_FACTORY_ENABLED=0` the blueprint is not registered and
-  Stage 4 behaves exactly as before.
+  AI SWITCH behaves exactly as before.

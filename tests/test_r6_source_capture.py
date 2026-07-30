@@ -201,7 +201,7 @@ def test_stage9_has_separate_snapshot_and_container_actions():
     assert "r6pGenRealDockerfiles(false)" in script
     assert "Build VM Snapshots first. Container build uses the snapshot lineage" in script
     assert "snapshotOnly:snapshotOnly" in script
-    assert "id="r6p-stage9a-log"" in script
+    assert 'id="r6p-stage9a-log"' in script
     assert "r6pSetStage9SnapshotLog" in script
     assert "r6pCopyStage9SnapshotLog" in script
 
