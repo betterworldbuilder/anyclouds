@@ -850,6 +850,149 @@
               <tr><td><strong>Docker / Kind</strong></td><td>local test cluster</td><td><span class="ocqs-badge-opt">Optional</span></td></tr>
             </tbody>
           </table>
+        <!-- Prerequisites -->
+        <details class="ocqs-card" id="ocqs-prereq">
+          <summary style="display:flex;align-items:center;gap:8px;cursor:pointer;list-style:none;user-select:none;">
+            <span class="ocqs-step-num" style="background:#6366f1;">&#10003;</span>
+            <h3 style="margin:0;">Prerequisites</h3>
+            <span style="margin-left:auto;font-size:10px;font-weight:800;color:#6366f1;text-transform:uppercase;letter-spacing:.7px;">Show / hide setup checks</span>
+          </summary>
+          <div style="margin-top:12px;">
+          <p>Before starting, ensure you have all of the following:</p>
+
+          <p style="font-size:12px;font-weight:700;color:#0369a1;margin-bottom:4px;">1 — Mise (tool version manager &amp; task runner)</p>
+          <div class="ocqs-cmd" id="ocqs-cmd-pre-mise"># Linux
+curl https://mise.run | sh
+echo 'eval "$($HOME/.local/bin/mise activate bash)"' >> ~/.bashrc
+source ~/.bashrc
+mise --version</div>
+          <div style="display:flex;gap:6px;margin:6px 0;">
+            <button class="ocqs-btn ocqs-btn-copy" onclick="ocqsCopyCmd('ocqs-cmd-pre-mise','')">&#128203; Copy</button>
+            <button id="ocqs-run-pre-mise" onclick="ocLabExplainUnrunnable('ocqs-out-pre-mise','This installer pipes a script fetched from the internet straight to a shell (curl | sh). The shared lab does not execute that for everyone&#8217;s safety - copy the command above and run it once on the lab host itself. Re-running letsmove.sh also installs mise automatically on a fresh host.')" title="Piped-script installers do not run inside the shared lab - copy and run this on the host" style="background:#3f2b0f;color:#fbbf24;border:1px solid #92400e;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;">&#9888; Run on the host</button><button onclick="ocqsCopyOut('ocqs-out-pre-mise',this)" style="background:#334155;color:#cbd5e1;border:1px solid #475569;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#128203; Copy Output</button>
+          </div>
+          <div id="ocqs-out-pre-mise" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#00ff41;white-space:pre-wrap;max-height:180px;overflow-y:auto;margin-bottom:10px;">$ waiting...</div>
+
+          <p style="font-size:12px;font-weight:700;color:#0369a1;margin-bottom:4px;">2 — Git (version control)</p>
+          <div class="ocqs-cmd" id="ocqs-cmd-pre-git">git --version
+# Should show: git version 2.x or higher</div>
+          <div style="display:flex;gap:6px;margin:6px 0;">
+            <button class="ocqs-btn ocqs-btn-copy" onclick="ocqsCopyCmd('ocqs-cmd-pre-git','')">&#128203; Copy</button>
+            <button id="ocqs-run-pre-git" onclick="ocqsRunCmd('ocqs-cmd-pre-git','ocqs-out-pre-git','ocqs-run-pre-git')" style="background:#1e3a5f;color:#7dd3fc;border:1px solid #334155;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;">&#9654; Run</button><button onclick="ocqsCopyOut('ocqs-out-pre-git',this)" style="background:#334155;color:#cbd5e1;border:1px solid #475569;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#128203; Copy Output</button>
+          </div>
+          <div id="ocqs-out-pre-git" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#00ff41;white-space:pre-wrap;max-height:120px;overflow-y:auto;margin-bottom:10px;">$ waiting...
+</div>
+
+          <p style="font-size:12px;font-weight:700;color:#0369a1;margin-bottom:4px;">3 — SSH Key (for cluster access)</p>
+          <div class="ocqs-cmd" id="ocqs-cmd-pre-ssh"># Generate if you don't have one
+ssh-keygen -t ed25519 -C "your-email@example.com"
+cat ~/.ssh/id_ed25519.pub</div>
+          <div style="display:flex;gap:6px;margin:6px 0;">
+            <button class="ocqs-btn ocqs-btn-copy" onclick="ocqsCopyCmd('ocqs-cmd-pre-ssh','')">&#128203; Copy</button>
+            <button id="ocqs-run-pre-ssh" onclick="ocqsRunCmd('ocqs-cmd-pre-ssh','ocqs-out-pre-ssh','ocqs-run-pre-ssh')" style="background:#1e3a5f;color:#7dd3fc;border:1px solid #334155;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;">&#9654; Run</button><button onclick="ocqsCopyOut('ocqs-out-pre-ssh',this)" style="background:#334155;color:#cbd5e1;border:1px solid #475569;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#128203; Copy Output</button>
+          </div>
+          <div id="ocqs-out-pre-ssh" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#00ff41;white-space:pre-wrap;max-height:120px;overflow-y:auto;margin-bottom:10px;">$ waiting...
+</div>
+
+          <p style="font-size:12px;font-weight:700;color:#0369a1;margin-bottom:4px;">4 — Infrastructure access (choose one)</p>
+          <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px;font-size:12px;line-height:1.8;">
+            <div>&#9679; <strong>OpenStack</strong> cloud credentials — recommended for production (FLEX IAD3)</div>
+            <div>&#9679; <strong>Kind</strong> — local development, needs Docker: <code>sudo apt install -y docker.io</code></div>
+            <div>&#9679; <strong>VMware vSphere</strong> — with pre-provisioned VMs</div>
+            <div>&#9679; <strong>AWS</strong> credentials — experimental</div>
+          </div>
+
+          <p style="font-size:12px;font-weight:700;color:#0369a1;margin:14px 0 4px;">5 — Create your own GitOps repo (optional)</p>
+          <div style="font-size:11px;color:#64748b;margin-bottom:8px;">Signs in to GitHub in your own browser tab — no token is ever typed into this form — creates a private repo for you, and registers this cluster's own key on it as a deploy key automatically. Skip this if you're using the shared lab repo already filled in below.</div>
+          <label class="ocqs-label">Repo name</label>
+          <input class="ocqs-input" id="ocqs-owngitops-name" placeholder="opencenter-gitops" oninput="ocqsUpdate()">
+
+          <p style="font-size:11px;color:#334155;margin:10px 0 4px;"><strong>Step A — Sign in to GitHub</strong></p>
+          <div class="ocqs-cmd" id="ocqs-cmd-owngitops-auth">gh auth login --hostname github.com --git-protocol ssh --web
+gh auth status --hostname github.com</div>
+          <div style="display:flex;gap:6px;margin:6px 0;">
+            <button class="ocqs-btn ocqs-btn-copy" onclick="ocqsCopyCmd('ocqs-cmd-owngitops-auth','')">&#128203; Copy</button>
+            <button id="ocqs-run-owngitops-auth" onclick="ocqsAuthenticateGitHub()" style="background:#1e3a5f;color:#7dd3fc;border:1px solid #334155;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;">&#9654; Run — watch below for your one-time code</button>
+          </div>
+          <div id="ocqs-out-owngitops-auth" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#00ff41;white-space:pre-wrap;max-height:180px;overflow-y:auto;margin-bottom:6px;">$ waiting...</div>
+          <div style="font-size:11px;color:#b45309;margin-bottom:10px;">&#9888; A one-time code and a github.com/login/device link will appear above. Open that link in any browser tab and enter the code — this stays running until you finish there.</div>
+
+          <p style="font-size:11px;color:#334155;margin:10px 0 4px;"><strong>Step B — Create the repo &amp; register this cluster's key</strong></p>
+          <div class="ocqs-cmd" id="ocqs-cmd-owngitops-create"># enter a repo name above, then Run</div>
+          <div style="display:flex;gap:6px;margin:6px 0;">
+            <button class="ocqs-btn ocqs-btn-copy" onclick="ocqsCopyCmd('ocqs-cmd-owngitops-create','')">&#128203; Copy</button>
+            <button id="ocqs-run-owngitops-create" onclick="ocqsCreateOwnGitOpsRepo()" style="background:#15803d;color:#fff;border:none;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;">&#9654; Create repo + register key</button>
+          </div>
+          <div id="ocqs-out-owngitops-create" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#00ff41;white-space:pre-wrap;max-height:180px;overflow-y:auto;margin-bottom:6px;">$ waiting...</div>
+          <div id="ocqs-owngitops-status" style="font-size:11px;color:#64748b;margin-bottom:10px;"></div>
+          </div>
+        </details>
+
+        <!-- Step 1 -->
+        <div class="ocqs-card" id="ocqs-step-1">
+          <div style="font-size:9px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:2px;margin-bottom:4px;">STAGE 1</div>
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+            <span class="ocqs-step-num">1</span>
+            <h3 style="margin:0;">Install OpenCenter CLI</h3>
+            <span class="ocqs-status ocqs-s-idle" id="ocqs-st-1">Not Started</span>
+          </div>
+          <p>OpenCenter CLI initializes cluster configuration, validates readiness, generates the GitOps repository, and deploys the Kubernetes platform.</p>
+          <p style="font-size:12px;color:#64748b;"><strong>Recommended — Clone &amp; build:</strong></p>
+          <div class="ocqs-cmd" id="ocqs-cmd-1rec"># Idempotent install - skips finished steps, never prompts (no hang)
+export GIT_TERMINAL_PROMPT=0 MISE_YES=1
+if [ -x openCenter-cli/bin/opencenter ]; then
+  echo "OpenCenter CLI already built - skipping clone and build"
+else
+  [ -d openCenter-cli/.git ] || git clone --depth 1 https://github.com/opencenter-cloud/openCenter-cli.git
+  cd openCenter-cli
+  mise trust
+  mise install
+  mise run build
+  cd ..
+fi
+
+# Verify installation
+./openCenter-cli/bin/opencenter version</div>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:6px;">
+            <button class="ocqs-btn ocqs-btn-copy" onclick="ocqsCopyCmd('ocqs-cmd-1rec','ocqs-st-1')">&#128203; Copy</button><button id="ocqs-run-1rec" onclick="ocqsRunCmd('ocqs-cmd-1rec','ocqs-out-1rec','ocqs-run-1rec')" style="background:#1e3a5f;color:#7dd3fc;border:1px solid #334155;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#9654; Run</button><button onclick="ocqsCopyOut('ocqs-out-1rec',this)" style="background:#334155;color:#cbd5e1;border:1px solid #475569;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#128203; Copy Output</button>
+          </div>
+          <div id="ocqs-out-1rec" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#00ff41;white-space:pre-wrap;word-break:break-all;max-height:240px;overflow-y:auto;margin-top:6px;margin-bottom:10px;">$ waiting...
+          </div>
+          <p style="font-size:11px;color:#64748b;">You should see version information including git commit and build date.</p>
+          <p style="font-size:12px;color:#64748b;margin-top:10px;"><strong>Alternative — GitHub release binary download:</strong></p>
+          <div class="ocqs-cmd" id="ocqs-cmd-1b">sudo apt update && sudo apt install -y curl jq ca-certificates
+
+REPO="opencenter-cloud/openCenter-cli"
+TAG="1.0.0-rc02"
+
+ASSET_URL=$(curl -s "https://api.github.com/repos/${REPO}/releases/tags/${TAG}" \
+  | jq -r '.assets[]
+    | select(.name | test("linux"; "i"))
+    | select(.name | test("amd64|x86_64"; "i"))
+    | select(.name | test("sha|sig|sbom|json|txt"; "i") | not)
+    | .browser_download_url' \
+  | head -n 1)
+
+echo "Downloading: $ASSET_URL"
+curl -fL -o /tmp/opencenter "$ASSET_URL"
+chmod +x /tmp/opencenter && /tmp/opencenter version
+sudo mv /tmp/opencenter /usr/local/bin/opencenter
+opencenter version</div>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;">
+            <button class="ocqs-btn ocqs-btn-copy" onclick="ocqsCopyCmd('ocqs-cmd-1b','ocqs-st-1')">📋 Copy</button><button id="ocqs-run-1b" onclick="ocLabExplainUnrunnable('ocqs-out-1b','This alternative needs sudo (system package install, writing to /usr/local/bin), which the shared lab does not grant - each learner has an isolated directory, not root on a real machine. Use the Recommended clone &amp; build method above, or copy this command and run it in your own terminal.')" title="This method needs sudo/root - not available in the shared lab" style="background:#3f2b0f;color:#fbbf24;border:1px solid #92400e;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#9888; Run in your own terminal</button><button onclick="ocqsCopyOut('ocqs-out-1b',this)" style="background:#334155;color:#cbd5e1;border:1px solid #475569;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#128203; Copy Output</button>
+          </div>
+<div id="ocqs-out-1b" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#00ff41;white-space:pre-wrap;word-break:break-all;max-height:240px;overflow-y:auto;margin-top:6px;">$ waiting for command...
+</div>
+          <p style="font-size:12px;color:#64748b;"><strong>Verify:</strong></p>
+          <div class="ocqs-cmd">./bin/opencenter version
+# or if installed globally:
+opencenter version
+opencenter --help
+opencenter cluster --help</div>
+          <div class="ocqs-info-box"><strong>Expected:</strong> opencenter version: 1.0.0-rc02 | Platform: linux/amd64<br>
+          <strong>mise build tip:</strong> <code>mise trust</code> must run inside the cloned repo dir. If <code>mise run build</code> fails, check the .mise.toml in the repo for required tool versions.<br>
+          <strong>Local test with Kind:</strong> Set provider to <code>kind</code> in Step 2 — no OpenStack credentials required. Needs Docker: <code>sudo apt install -y docker.io &amp;&amp; sudo usermod -aG docker $USER</code> then re-login. Kind cluster spins up in ~2 min with <code>opencenter cluster deploy</code>.</div>
+        </div>
+
           <div id="ocqs-step-B" style="margin-top:14px;border:2px solid #bae6fd;border-radius:10px;padding:14px;background:#f8fbff;">
             <div style="font-size:12px;font-weight:800;color:#0369a1;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">B. Credentials &amp; Inputs</div>
           <!-- Where to Deploy — platform chooser (kept in sync with the R6 refactor stage) -->
@@ -1845,149 +1988,6 @@
         }).catch(function(e){reset();if(st){st.textContent='✗ '+e;st.style.color='#dc2626';}});
       };
     </script>
-        <!-- Prerequisites -->
-        <details class="ocqs-card" id="ocqs-prereq">
-          <summary style="display:flex;align-items:center;gap:8px;cursor:pointer;list-style:none;user-select:none;">
-            <span class="ocqs-step-num" style="background:#6366f1;">&#10003;</span>
-            <h3 style="margin:0;">Prerequisites</h3>
-            <span style="margin-left:auto;font-size:10px;font-weight:800;color:#6366f1;text-transform:uppercase;letter-spacing:.7px;">Show / hide setup checks</span>
-          </summary>
-          <div style="margin-top:12px;">
-          <p>Before starting, ensure you have all of the following:</p>
-
-          <p style="font-size:12px;font-weight:700;color:#0369a1;margin-bottom:4px;">1 — Mise (tool version manager &amp; task runner)</p>
-          <div class="ocqs-cmd" id="ocqs-cmd-pre-mise"># Linux
-curl https://mise.run | sh
-echo 'eval "$($HOME/.local/bin/mise activate bash)"' >> ~/.bashrc
-source ~/.bashrc
-mise --version</div>
-          <div style="display:flex;gap:6px;margin:6px 0;">
-            <button class="ocqs-btn ocqs-btn-copy" onclick="ocqsCopyCmd('ocqs-cmd-pre-mise','')">&#128203; Copy</button>
-            <button id="ocqs-run-pre-mise" onclick="ocLabExplainUnrunnable('ocqs-out-pre-mise','This installer pipes a script fetched from the internet straight to a shell (curl | sh). The shared lab does not execute that for everyone&#8217;s safety - copy the command above and run it once on the lab host itself. Re-running letsmove.sh also installs mise automatically on a fresh host.')" title="Piped-script installers do not run inside the shared lab - copy and run this on the host" style="background:#3f2b0f;color:#fbbf24;border:1px solid #92400e;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;">&#9888; Run on the host</button><button onclick="ocqsCopyOut('ocqs-out-pre-mise',this)" style="background:#334155;color:#cbd5e1;border:1px solid #475569;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#128203; Copy Output</button>
-          </div>
-          <div id="ocqs-out-pre-mise" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#00ff41;white-space:pre-wrap;max-height:180px;overflow-y:auto;margin-bottom:10px;">$ waiting...</div>
-
-          <p style="font-size:12px;font-weight:700;color:#0369a1;margin-bottom:4px;">2 — Git (version control)</p>
-          <div class="ocqs-cmd" id="ocqs-cmd-pre-git">git --version
-# Should show: git version 2.x or higher</div>
-          <div style="display:flex;gap:6px;margin:6px 0;">
-            <button class="ocqs-btn ocqs-btn-copy" onclick="ocqsCopyCmd('ocqs-cmd-pre-git','')">&#128203; Copy</button>
-            <button id="ocqs-run-pre-git" onclick="ocqsRunCmd('ocqs-cmd-pre-git','ocqs-out-pre-git','ocqs-run-pre-git')" style="background:#1e3a5f;color:#7dd3fc;border:1px solid #334155;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;">&#9654; Run</button><button onclick="ocqsCopyOut('ocqs-out-pre-git',this)" style="background:#334155;color:#cbd5e1;border:1px solid #475569;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#128203; Copy Output</button>
-          </div>
-          <div id="ocqs-out-pre-git" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#00ff41;white-space:pre-wrap;max-height:120px;overflow-y:auto;margin-bottom:10px;">$ waiting...
-</div>
-
-          <p style="font-size:12px;font-weight:700;color:#0369a1;margin-bottom:4px;">3 — SSH Key (for cluster access)</p>
-          <div class="ocqs-cmd" id="ocqs-cmd-pre-ssh"># Generate if you don't have one
-ssh-keygen -t ed25519 -C "your-email@example.com"
-cat ~/.ssh/id_ed25519.pub</div>
-          <div style="display:flex;gap:6px;margin:6px 0;">
-            <button class="ocqs-btn ocqs-btn-copy" onclick="ocqsCopyCmd('ocqs-cmd-pre-ssh','')">&#128203; Copy</button>
-            <button id="ocqs-run-pre-ssh" onclick="ocqsRunCmd('ocqs-cmd-pre-ssh','ocqs-out-pre-ssh','ocqs-run-pre-ssh')" style="background:#1e3a5f;color:#7dd3fc;border:1px solid #334155;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;">&#9654; Run</button><button onclick="ocqsCopyOut('ocqs-out-pre-ssh',this)" style="background:#334155;color:#cbd5e1;border:1px solid #475569;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#128203; Copy Output</button>
-          </div>
-          <div id="ocqs-out-pre-ssh" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#00ff41;white-space:pre-wrap;max-height:120px;overflow-y:auto;margin-bottom:10px;">$ waiting...
-</div>
-
-          <p style="font-size:12px;font-weight:700;color:#0369a1;margin-bottom:4px;">4 — Infrastructure access (choose one)</p>
-          <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px;font-size:12px;line-height:1.8;">
-            <div>&#9679; <strong>OpenStack</strong> cloud credentials — recommended for production (FLEX IAD3)</div>
-            <div>&#9679; <strong>Kind</strong> — local development, needs Docker: <code>sudo apt install -y docker.io</code></div>
-            <div>&#9679; <strong>VMware vSphere</strong> — with pre-provisioned VMs</div>
-            <div>&#9679; <strong>AWS</strong> credentials — experimental</div>
-          </div>
-
-          <p style="font-size:12px;font-weight:700;color:#0369a1;margin:14px 0 4px;">5 — Create your own GitOps repo (optional)</p>
-          <div style="font-size:11px;color:#64748b;margin-bottom:8px;">Signs in to GitHub in your own browser tab — no token is ever typed into this form — creates a private repo for you, and registers this cluster's own key on it as a deploy key automatically. Skip this if you're using the shared lab repo already filled in below.</div>
-          <label class="ocqs-label">Repo name</label>
-          <input class="ocqs-input" id="ocqs-owngitops-name" placeholder="opencenter-gitops" oninput="ocqsUpdate()">
-
-          <p style="font-size:11px;color:#334155;margin:10px 0 4px;"><strong>Step A — Sign in to GitHub</strong></p>
-          <div class="ocqs-cmd" id="ocqs-cmd-owngitops-auth">gh auth login --hostname github.com --git-protocol ssh --web
-gh auth status --hostname github.com</div>
-          <div style="display:flex;gap:6px;margin:6px 0;">
-            <button class="ocqs-btn ocqs-btn-copy" onclick="ocqsCopyCmd('ocqs-cmd-owngitops-auth','')">&#128203; Copy</button>
-            <button id="ocqs-run-owngitops-auth" onclick="ocqsAuthenticateGitHub()" style="background:#1e3a5f;color:#7dd3fc;border:1px solid #334155;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;">&#9654; Run — watch below for your one-time code</button>
-          </div>
-          <div id="ocqs-out-owngitops-auth" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#00ff41;white-space:pre-wrap;max-height:180px;overflow-y:auto;margin-bottom:6px;">$ waiting...</div>
-          <div style="font-size:11px;color:#b45309;margin-bottom:10px;">&#9888; A one-time code and a github.com/login/device link will appear above. Open that link in any browser tab and enter the code — this stays running until you finish there.</div>
-
-          <p style="font-size:11px;color:#334155;margin:10px 0 4px;"><strong>Step B — Create the repo &amp; register this cluster's key</strong></p>
-          <div class="ocqs-cmd" id="ocqs-cmd-owngitops-create"># enter a repo name above, then Run</div>
-          <div style="display:flex;gap:6px;margin:6px 0;">
-            <button class="ocqs-btn ocqs-btn-copy" onclick="ocqsCopyCmd('ocqs-cmd-owngitops-create','')">&#128203; Copy</button>
-            <button id="ocqs-run-owngitops-create" onclick="ocqsCreateOwnGitOpsRepo()" style="background:#15803d;color:#fff;border:none;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;">&#9654; Create repo + register key</button>
-          </div>
-          <div id="ocqs-out-owngitops-create" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#00ff41;white-space:pre-wrap;max-height:180px;overflow-y:auto;margin-bottom:6px;">$ waiting...</div>
-          <div id="ocqs-owngitops-status" style="font-size:11px;color:#64748b;margin-bottom:10px;"></div>
-          </div>
-        </details>
-
-        <!-- Step 1 -->
-        <div class="ocqs-card" id="ocqs-step-1">
-          <div style="font-size:9px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:2px;margin-bottom:4px;">STAGE 1</div>
-          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
-            <span class="ocqs-step-num">1</span>
-            <h3 style="margin:0;">Install OpenCenter CLI</h3>
-            <span class="ocqs-status ocqs-s-idle" id="ocqs-st-1">Not Started</span>
-          </div>
-          <p>OpenCenter CLI initializes cluster configuration, validates readiness, generates the GitOps repository, and deploys the Kubernetes platform.</p>
-          <p style="font-size:12px;color:#64748b;"><strong>Recommended — Clone &amp; build:</strong></p>
-          <div class="ocqs-cmd" id="ocqs-cmd-1rec"># Idempotent install - skips finished steps, never prompts (no hang)
-export GIT_TERMINAL_PROMPT=0 MISE_YES=1
-if [ -x openCenter-cli/bin/opencenter ]; then
-  echo "OpenCenter CLI already built - skipping clone and build"
-else
-  [ -d openCenter-cli/.git ] || git clone --depth 1 https://github.com/opencenter-cloud/openCenter-cli.git
-  cd openCenter-cli
-  mise trust
-  mise install
-  mise run build
-  cd ..
-fi
-
-# Verify installation
-./openCenter-cli/bin/opencenter version</div>
-          <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:6px;">
-            <button class="ocqs-btn ocqs-btn-copy" onclick="ocqsCopyCmd('ocqs-cmd-1rec','ocqs-st-1')">&#128203; Copy</button><button id="ocqs-run-1rec" onclick="ocqsRunCmd('ocqs-cmd-1rec','ocqs-out-1rec','ocqs-run-1rec')" style="background:#1e3a5f;color:#7dd3fc;border:1px solid #334155;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#9654; Run</button><button onclick="ocqsCopyOut('ocqs-out-1rec',this)" style="background:#334155;color:#cbd5e1;border:1px solid #475569;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#128203; Copy Output</button>
-          </div>
-          <div id="ocqs-out-1rec" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#00ff41;white-space:pre-wrap;word-break:break-all;max-height:240px;overflow-y:auto;margin-top:6px;margin-bottom:10px;">$ waiting...
-          </div>
-          <p style="font-size:11px;color:#64748b;">You should see version information including git commit and build date.</p>
-          <p style="font-size:12px;color:#64748b;margin-top:10px;"><strong>Alternative — GitHub release binary download:</strong></p>
-          <div class="ocqs-cmd" id="ocqs-cmd-1b">sudo apt update && sudo apt install -y curl jq ca-certificates
-
-REPO="opencenter-cloud/openCenter-cli"
-TAG="1.0.0-rc02"
-
-ASSET_URL=$(curl -s "https://api.github.com/repos/${REPO}/releases/tags/${TAG}" \
-  | jq -r '.assets[]
-    | select(.name | test("linux"; "i"))
-    | select(.name | test("amd64|x86_64"; "i"))
-    | select(.name | test("sha|sig|sbom|json|txt"; "i") | not)
-    | .browser_download_url' \
-  | head -n 1)
-
-echo "Downloading: $ASSET_URL"
-curl -fL -o /tmp/opencenter "$ASSET_URL"
-chmod +x /tmp/opencenter && /tmp/opencenter version
-sudo mv /tmp/opencenter /usr/local/bin/opencenter
-opencenter version</div>
-          <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;">
-            <button class="ocqs-btn ocqs-btn-copy" onclick="ocqsCopyCmd('ocqs-cmd-1b','ocqs-st-1')">📋 Copy</button><button id="ocqs-run-1b" onclick="ocLabExplainUnrunnable('ocqs-out-1b','This alternative needs sudo (system package install, writing to /usr/local/bin), which the shared lab does not grant - each learner has an isolated directory, not root on a real machine. Use the Recommended clone &amp; build method above, or copy this command and run it in your own terminal.')" title="This method needs sudo/root - not available in the shared lab" style="background:#3f2b0f;color:#fbbf24;border:1px solid #92400e;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#9888; Run in your own terminal</button><button onclick="ocqsCopyOut('ocqs-out-1b',this)" style="background:#334155;color:#cbd5e1;border:1px solid #475569;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#128203; Copy Output</button>
-          </div>
-<div id="ocqs-out-1b" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#00ff41;white-space:pre-wrap;word-break:break-all;max-height:240px;overflow-y:auto;margin-top:6px;">$ waiting for command...
-</div>
-          <p style="font-size:12px;color:#64748b;"><strong>Verify:</strong></p>
-          <div class="ocqs-cmd">./bin/opencenter version
-# or if installed globally:
-opencenter version
-opencenter --help
-opencenter cluster --help</div>
-          <div class="ocqs-info-box"><strong>Expected:</strong> opencenter version: 1.0.0-rc02 | Platform: linux/amd64<br>
-          <strong>mise build tip:</strong> <code>mise trust</code> must run inside the cloned repo dir. If <code>mise run build</code> fails, check the .mise.toml in the repo for required tool versions.<br>
-          <strong>Local test with Kind:</strong> Set provider to <code>kind</code> in Step 2 — no OpenStack credentials required. Needs Docker: <code>sudo apt install -y docker.io &amp;&amp; sudo usermod -aG docker $USER</code> then re-login. Kind cluster spins up in ~2 min with <code>opencenter cluster deploy</code>.</div>
-        </div>
-
         <!-- Step 2 -->
         <div class="ocqs-card" id="ocqs-step-2">
           <div style="font-size:9px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:2px;margin-bottom:4px;">STAGE 2</div>
@@ -3037,16 +3037,43 @@ kubectl describe kustomization &lt;name&gt; -n flux-system</div>
         };
         window.ocqsExportTrainingLogCsv=function(button){
           var status=document.getElementById('ocqs-log-status');
-          /* A browser download cannot carry the X-OpenCenter-Lab-CSRF header, so
-             the token rides the query string - the same route the bundle export
-             already takes, and the guard accepts either form. */
+          var old=button&&button.textContent;
+          if(button){button.disabled=true;button.textContent='Exporting...';}
+          /* lab.ready is a fetch promise, so by the time it resolves the click
+             gesture has expired and popup blockers silently kill window.open().
+             Stream the CSV instead and save it through a temporary anchor, which
+             needs no gesture. The token rides the header, so it stays out of the
+             URL, browser history and the server access log. */
           return lab.ready.then(function(){
             var token=(lab.data&&lab.data.csrf)||'';
             if(!token) throw new Error('no active lab session');
-            window.open('/api/opencenter/training-log.csv?lab_token='+encodeURIComponent(token),'_blank');
-            if(status){status.textContent='CSV export started.';status.style.color='#15803d';}
+            return fetch('/api/opencenter/training-log.csv',{
+              headers:{'X-OpenCenter-Lab-CSRF':token}
+            }).then(function(r){
+              if(!r.ok){
+                return r.json().catch(function(){return {};}).then(function(d){
+                  throw new Error(d.error||('export failed with HTTP '+r.status));
+                });
+              }
+              var name='training-feedback.csv';
+              var match=/filename="?([^"]+)"?/.exec(r.headers.get('Content-Disposition')||'');
+              if(match) name=match[1];
+              return r.blob().then(function(blob){ return {blob:blob,name:name}; });
+            }).then(function(file){
+              if(!file.blob.size) throw new Error('the training log is empty');
+              var url=URL.createObjectURL(file.blob);
+              var a=document.createElement('a');
+              a.href=url; a.download=file.name; a.style.display='none';
+              document.body.appendChild(a);
+              a.click();
+              a.remove();
+              setTimeout(function(){ URL.revokeObjectURL(url); },60000);
+              if(status){status.textContent='Downloaded '+file.name;status.style.color='#15803d';}
+            });
           }).catch(function(error){
             if(status){status.textContent=error.message;status.style.color='#dc2626';}
+          }).finally(function(){
+            if(button){button.disabled=false;button.textContent=old;}
           });
         };
         window.ocqsAnswerQuestion=function(id,box,button){
@@ -3196,6 +3223,7 @@ kubectl describe kustomization &lt;name&gt; -n flux-system</div>
           <button class="oct-mini" onclick="var t=document.getElementById('ocqs-term');if(t)t.innerHTML='';">Clear</button>
           <button class="oct-mini" onclick="if(window.jarvisStop)jarvisStop();" title="Stop the voice-over immediately" style="background:#7c2d12;color:#fff;border-color:#7c2d12;">&#128263; Mute</button>
           <button class="oct-mini" onclick="document.getElementById('ocqs-term-float').classList.toggle('oct-min');this.textContent=this.textContent==='&#8722;'?'&#9634;':'&#8722;';">&#8722;</button>
+          <button class="oct-mini" onclick="octHideTerminal('ocqs')" title="Hide the terminal - a Show terminal chip appears bottom-right" style="background:#7f1d1d;color:#fff;border-color:#991b1b;">&#10005; Hide</button>
         </div>
         <div class="oct-term-body" style="display:flex;flex-direction:column;flex:1;min-height:0;">
         <div class="oct-track" id="ocqs-term-track"></div>
@@ -4564,6 +4592,149 @@ var c9b=g('ocqs-cmd-9b');
               <tr><td><strong>Docker / Kind</strong></td><td>local test cluster</td><td><span class="ocqs-badge-opt">Optional</span></td></tr>
             </tbody>
           </table>
+        <!-- Prerequisites -->
+        <details class="ocqs-card" id="ocqp-prereq">
+          <summary style="display:flex;align-items:center;gap:8px;cursor:pointer;list-style:none;user-select:none;">
+            <span class="ocqs-step-num" style="background:#6366f1;">&#10003;</span>
+            <h3 style="margin:0;">Prerequisites</h3>
+            <span style="margin-left:auto;font-size:10px;font-weight:800;color:#6366f1;text-transform:uppercase;letter-spacing:.7px;">Show / hide setup checks</span>
+          </summary>
+          <div style="margin-top:12px;">
+          <p>Before starting, ensure you have all of the following:</p>
+
+          <p style="font-size:12px;font-weight:700;color:#0369a1;margin-bottom:4px;">1 — Mise (tool version manager &amp; task runner)</p>
+          <div class="ocqs-cmd" id="ocqp-cmd-pre-mise"># Linux
+curl https://mise.run | sh
+echo 'eval "$($HOME/.local/bin/mise activate bash)"' >> ~/.bashrc
+source ~/.bashrc
+mise --version</div>
+          <div style="display:flex;gap:6px;margin:6px 0;">
+            <button class="ocqs-btn ocqs-btn-copy" onclick="ocqpCopyCmd('ocqp-cmd-pre-mise','')">&#128203; Copy</button>
+            <button id="ocqp-run-pre-mise" onclick="ocLabExplainUnrunnable('ocqp-out-pre-mise','This installer pipes a script fetched from the internet straight to a shell (curl | sh). The shared lab does not execute that for everyone&#8217;s safety - copy the command above and run it once on the lab host itself. Re-running letsmove.sh also installs mise automatically on a fresh host.')" title="Piped-script installers do not run inside the shared lab - copy and run this on the host" style="background:#3f2b0f;color:#fbbf24;border:1px solid #92400e;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;">&#9888; Run on the host</button><button onclick="ocqpCopyOut('ocqp-out-pre-mise',this)" style="background:#334155;color:#cbd5e1;border:1px solid #475569;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#128203; Copy Output</button>
+          </div>
+          <div id="ocqp-out-pre-mise" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#00ff41;white-space:pre-wrap;max-height:180px;overflow-y:auto;margin-bottom:10px;">$ waiting...</div>
+
+          <p style="font-size:12px;font-weight:700;color:#0369a1;margin-bottom:4px;">2 — Git (version control)</p>
+          <div class="ocqs-cmd" id="ocqp-cmd-pre-git">git --version
+# Should show: git version 2.x or higher</div>
+          <div style="display:flex;gap:6px;margin:6px 0;">
+            <button class="ocqs-btn ocqs-btn-copy" onclick="ocqpCopyCmd('ocqp-cmd-pre-git','')">&#128203; Copy</button>
+            <button id="ocqp-run-pre-git" onclick="ocqpRunCmd('ocqp-cmd-pre-git','ocqp-out-pre-git','ocqp-run-pre-git')" style="background:#1e3a5f;color:#7dd3fc;border:1px solid #334155;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;">&#9654; Run</button><button onclick="ocqpCopyOut('ocqp-out-pre-git',this)" style="background:#334155;color:#cbd5e1;border:1px solid #475569;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#128203; Copy Output</button>
+          </div>
+          <div id="ocqp-out-pre-git" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#00ff41;white-space:pre-wrap;max-height:120px;overflow-y:auto;margin-bottom:10px;">$ waiting...
+</div>
+
+          <p style="font-size:12px;font-weight:700;color:#0369a1;margin-bottom:4px;">3 — SSH Key (for cluster access)</p>
+          <div class="ocqs-cmd" id="ocqp-cmd-pre-ssh"># Generate if you don't have one
+ssh-keygen -t ed25519 -C "your-email@example.com"
+cat ~/.ssh/id_ed25519.pub</div>
+          <div style="display:flex;gap:6px;margin:6px 0;">
+            <button class="ocqs-btn ocqs-btn-copy" onclick="ocqpCopyCmd('ocqp-cmd-pre-ssh','')">&#128203; Copy</button>
+            <button id="ocqp-run-pre-ssh" onclick="ocqpRunCmd('ocqp-cmd-pre-ssh','ocqp-out-pre-ssh','ocqp-run-pre-ssh')" style="background:#1e3a5f;color:#7dd3fc;border:1px solid #334155;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;">&#9654; Run</button><button onclick="ocqpCopyOut('ocqp-out-pre-ssh',this)" style="background:#334155;color:#cbd5e1;border:1px solid #475569;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#128203; Copy Output</button>
+          </div>
+          <div id="ocqp-out-pre-ssh" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#00ff41;white-space:pre-wrap;max-height:120px;overflow-y:auto;margin-bottom:10px;">$ waiting...
+</div>
+
+          <p style="font-size:12px;font-weight:700;color:#0369a1;margin-bottom:4px;">4 — Infrastructure access (choose one)</p>
+          <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px;font-size:12px;line-height:1.8;">
+            <div>&#9679; <strong>OpenStack</strong> cloud credentials — recommended for production (FLEX IAD3)</div>
+            <div>&#9679; <strong>Kind</strong> — local development, needs Docker: <code>sudo apt install -y docker.io</code></div>
+            <div>&#9679; <strong>VMware vSphere</strong> — with pre-provisioned VMs</div>
+            <div>&#9679; <strong>AWS</strong> credentials — experimental</div>
+          </div>
+
+          <p style="font-size:12px;font-weight:700;color:#0369a1;margin:14px 0 4px;">5 — Create your own GitOps repo (optional)</p>
+          <div style="font-size:11px;color:#64748b;margin-bottom:8px;">Signs in to GitHub in your own browser tab — no token is ever typed into this form — creates a private repo for you, and registers this cluster's own key on it as a deploy key automatically. Skip this if you're using the shared lab repo already filled in below.</div>
+          <label class="ocqs-label">Repo name</label>
+          <input class="ocqs-input" id="ocqp-owngitops-name" placeholder="opencenter-gitops" oninput="ocqpUpdate()">
+
+          <p style="font-size:11px;color:#334155;margin:10px 0 4px;"><strong>Step A — Sign in to GitHub</strong></p>
+          <div class="ocqs-cmd" id="ocqp-cmd-owngitops-auth">gh auth login --hostname github.com --git-protocol ssh --web
+gh auth status --hostname github.com</div>
+          <div style="display:flex;gap:6px;margin:6px 0;">
+            <button class="ocqs-btn ocqs-btn-copy" onclick="ocqpCopyCmd('ocqp-cmd-owngitops-auth','')">&#128203; Copy</button>
+            <button id="ocqp-run-owngitops-auth" onclick="ocqpAuthenticateGitHub()" style="background:#1e3a5f;color:#7dd3fc;border:1px solid #334155;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;">&#9654; Run — watch below for your one-time code</button>
+          </div>
+          <div id="ocqp-out-owngitops-auth" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#00ff41;white-space:pre-wrap;max-height:180px;overflow-y:auto;margin-bottom:6px;">$ waiting...</div>
+          <div style="font-size:11px;color:#b45309;margin-bottom:10px;">&#9888; A one-time code and a github.com/login/device link will appear above. Open that link in any browser tab and enter the code — this stays running until you finish there.</div>
+
+          <p style="font-size:11px;color:#334155;margin:10px 0 4px;"><strong>Step B — Create the repo &amp; register this cluster's key</strong></p>
+          <div class="ocqs-cmd" id="ocqp-cmd-owngitops-create"># enter a repo name above, then Run</div>
+          <div style="display:flex;gap:6px;margin:6px 0;">
+            <button class="ocqs-btn ocqs-btn-copy" onclick="ocqpCopyCmd('ocqp-cmd-owngitops-create','')">&#128203; Copy</button>
+            <button id="ocqp-run-owngitops-create" onclick="ocqpCreateOwnGitOpsRepo()" style="background:#15803d;color:#fff;border:none;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;">&#9654; Create repo + register key</button>
+          </div>
+          <div id="ocqp-out-owngitops-create" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#00ff41;white-space:pre-wrap;max-height:180px;overflow-y:auto;margin-bottom:6px;">$ waiting...</div>
+          <div id="ocqp-owngitops-status" style="font-size:11px;color:#64748b;margin-bottom:10px;"></div>
+          </div>
+        </details>
+
+        <!-- Step 1 -->
+        <div class="ocqs-card" id="ocqp-step-1">
+          <div style="font-size:9px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:2px;margin-bottom:4px;">STAGE 1</div>
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+            <span class="ocqs-step-num">1</span>
+            <h3 style="margin:0;">Install OpenCenter CLI</h3>
+            <span class="ocqs-status ocqs-s-idle" id="ocqp-st-1">Not Started</span>
+          </div>
+          <p>OpenCenter CLI initializes cluster configuration, validates readiness, generates the GitOps repository, and deploys the Kubernetes platform.</p>
+          <p style="font-size:12px;color:#64748b;"><strong>Recommended — Clone &amp; build:</strong></p>
+          <div class="ocqs-cmd" id="ocqp-cmd-1rec"># Idempotent install - skips finished steps, never prompts (no hang)
+export GIT_TERMINAL_PROMPT=0 MISE_YES=1
+if [ -x openCenter-cli/bin/opencenter ]; then
+  echo "OpenCenter CLI already built - skipping clone and build"
+else
+  [ -d openCenter-cli/.git ] || git clone --depth 1 https://github.com/opencenter-cloud/openCenter-cli.git
+  cd openCenter-cli
+  mise trust
+  mise install
+  mise run build
+  cd ..
+fi
+
+# Verify installation
+./openCenter-cli/bin/opencenter version</div>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:6px;">
+            <button class="ocqs-btn ocqs-btn-copy" onclick="ocqpCopyCmd('ocqp-cmd-1rec','ocqp-st-1')">&#128203; Copy</button><button id="ocqp-run-1rec" onclick="ocqpRunCmd('ocqp-cmd-1rec','ocqp-out-1rec','ocqp-run-1rec')" style="background:#1e3a5f;color:#7dd3fc;border:1px solid #334155;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#9654; Run</button><button onclick="ocqpCopyOut('ocqp-out-1rec',this)" style="background:#334155;color:#cbd5e1;border:1px solid #475569;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#128203; Copy Output</button>
+          </div>
+          <div id="ocqp-out-1rec" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#00ff41;white-space:pre-wrap;word-break:break-all;max-height:240px;overflow-y:auto;margin-top:6px;margin-bottom:10px;">$ waiting...
+          </div>
+          <p style="font-size:11px;color:#64748b;">You should see version information including git commit and build date.</p>
+          <p style="font-size:12px;color:#64748b;margin-top:10px;"><strong>Alternative — GitHub release binary download:</strong></p>
+          <div class="ocqs-cmd" id="ocqp-cmd-1b">sudo apt update && sudo apt install -y curl jq ca-certificates
+
+REPO="opencenter-cloud/openCenter-cli"
+TAG="1.0.0-rc02"
+
+ASSET_URL=$(curl -s "https://api.github.com/repos/${REPO}/releases/tags/${TAG}" \
+  | jq -r '.assets[]
+    | select(.name | test("linux"; "i"))
+    | select(.name | test("amd64|x86_64"; "i"))
+    | select(.name | test("sha|sig|sbom|json|txt"; "i") | not)
+    | .browser_download_url' \
+  | head -n 1)
+
+echo "Downloading: $ASSET_URL"
+curl -fL -o /tmp/opencenter "$ASSET_URL"
+chmod +x /tmp/opencenter && /tmp/opencenter version
+sudo mv /tmp/opencenter /usr/local/bin/opencenter
+opencenter version</div>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;">
+            <button class="ocqs-btn ocqs-btn-copy" onclick="ocqpCopyCmd('ocqp-cmd-1b','ocqp-st-1')">📋 Copy</button><button id="ocqp-run-1b" onclick="ocLabExplainUnrunnable('ocqp-out-1b','This alternative needs sudo (system package install, writing to /usr/local/bin), which the shared lab does not grant - each learner has an isolated directory, not root on a real machine. Use the Recommended clone &amp; build method above, or copy this command and run it in your own terminal.')" title="This method needs sudo/root - not available in the shared lab" style="background:#3f2b0f;color:#fbbf24;border:1px solid #92400e;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#9888; Run in your own terminal</button><button onclick="ocqpCopyOut('ocqp-out-1b',this)" style="background:#334155;color:#cbd5e1;border:1px solid #475569;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#128203; Copy Output</button>
+          </div>
+<div id="ocqp-out-1b" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#00ff41;white-space:pre-wrap;word-break:break-all;max-height:240px;overflow-y:auto;margin-top:6px;">$ waiting for command...
+</div>
+          <p style="font-size:12px;color:#64748b;"><strong>Verify:</strong></p>
+          <div class="ocqs-cmd">./bin/opencenter version
+# or if installed globally:
+opencenter version
+opencenter --help
+opencenter cluster --help</div>
+          <div class="ocqs-info-box"><strong>Expected:</strong> opencenter version: 1.0.0-rc02 | Platform: linux/amd64<br>
+          <strong>mise build tip:</strong> <code>mise trust</code> must run inside the cloned repo dir. If <code>mise run build</code> fails, check the .mise.toml in the repo for required tool versions.<br>
+          <strong>Local test with Kind:</strong> Set provider to <code>kind</code> in Step 2 — no OpenStack credentials required. Needs Docker: <code>sudo apt install -y docker.io &amp;&amp; sudo usermod -aG docker $USER</code> then re-login. Kind cluster spins up in ~2 min with <code>opencenter cluster deploy</code>.</div>
+        </div>
+
           <div id="ocqp-step-B" style="margin-top:14px;border:2px solid #bae6fd;border-radius:10px;padding:14px;background:#f8fbff;">
             <div style="font-size:12px;font-weight:800;color:#0369a1;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">B. Credentials &amp; Inputs</div>
           <!-- Where to Deploy — platform chooser (kept in sync with the R6 refactor stage) -->
@@ -5510,149 +5681,6 @@ var c9b=g('ocqs-cmd-9b');
         }).catch(function(e){reset();if(st){st.textContent='✗ '+e;st.style.color='#dc2626';}});
       };
     </script>
-        <!-- Prerequisites -->
-        <details class="ocqs-card" id="ocqp-prereq">
-          <summary style="display:flex;align-items:center;gap:8px;cursor:pointer;list-style:none;user-select:none;">
-            <span class="ocqs-step-num" style="background:#6366f1;">&#10003;</span>
-            <h3 style="margin:0;">Prerequisites</h3>
-            <span style="margin-left:auto;font-size:10px;font-weight:800;color:#6366f1;text-transform:uppercase;letter-spacing:.7px;">Show / hide setup checks</span>
-          </summary>
-          <div style="margin-top:12px;">
-          <p>Before starting, ensure you have all of the following:</p>
-
-          <p style="font-size:12px;font-weight:700;color:#0369a1;margin-bottom:4px;">1 — Mise (tool version manager &amp; task runner)</p>
-          <div class="ocqs-cmd" id="ocqp-cmd-pre-mise"># Linux
-curl https://mise.run | sh
-echo 'eval "$($HOME/.local/bin/mise activate bash)"' >> ~/.bashrc
-source ~/.bashrc
-mise --version</div>
-          <div style="display:flex;gap:6px;margin:6px 0;">
-            <button class="ocqs-btn ocqs-btn-copy" onclick="ocqpCopyCmd('ocqp-cmd-pre-mise','')">&#128203; Copy</button>
-            <button id="ocqp-run-pre-mise" onclick="ocLabExplainUnrunnable('ocqp-out-pre-mise','This installer pipes a script fetched from the internet straight to a shell (curl | sh). The shared lab does not execute that for everyone&#8217;s safety - copy the command above and run it once on the lab host itself. Re-running letsmove.sh also installs mise automatically on a fresh host.')" title="Piped-script installers do not run inside the shared lab - copy and run this on the host" style="background:#3f2b0f;color:#fbbf24;border:1px solid #92400e;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;">&#9888; Run on the host</button><button onclick="ocqpCopyOut('ocqp-out-pre-mise',this)" style="background:#334155;color:#cbd5e1;border:1px solid #475569;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#128203; Copy Output</button>
-          </div>
-          <div id="ocqp-out-pre-mise" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#00ff41;white-space:pre-wrap;max-height:180px;overflow-y:auto;margin-bottom:10px;">$ waiting...</div>
-
-          <p style="font-size:12px;font-weight:700;color:#0369a1;margin-bottom:4px;">2 — Git (version control)</p>
-          <div class="ocqs-cmd" id="ocqp-cmd-pre-git">git --version
-# Should show: git version 2.x or higher</div>
-          <div style="display:flex;gap:6px;margin:6px 0;">
-            <button class="ocqs-btn ocqs-btn-copy" onclick="ocqpCopyCmd('ocqp-cmd-pre-git','')">&#128203; Copy</button>
-            <button id="ocqp-run-pre-git" onclick="ocqpRunCmd('ocqp-cmd-pre-git','ocqp-out-pre-git','ocqp-run-pre-git')" style="background:#1e3a5f;color:#7dd3fc;border:1px solid #334155;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;">&#9654; Run</button><button onclick="ocqpCopyOut('ocqp-out-pre-git',this)" style="background:#334155;color:#cbd5e1;border:1px solid #475569;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#128203; Copy Output</button>
-          </div>
-          <div id="ocqp-out-pre-git" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#00ff41;white-space:pre-wrap;max-height:120px;overflow-y:auto;margin-bottom:10px;">$ waiting...
-</div>
-
-          <p style="font-size:12px;font-weight:700;color:#0369a1;margin-bottom:4px;">3 — SSH Key (for cluster access)</p>
-          <div class="ocqs-cmd" id="ocqp-cmd-pre-ssh"># Generate if you don't have one
-ssh-keygen -t ed25519 -C "your-email@example.com"
-cat ~/.ssh/id_ed25519.pub</div>
-          <div style="display:flex;gap:6px;margin:6px 0;">
-            <button class="ocqs-btn ocqs-btn-copy" onclick="ocqpCopyCmd('ocqp-cmd-pre-ssh','')">&#128203; Copy</button>
-            <button id="ocqp-run-pre-ssh" onclick="ocqpRunCmd('ocqp-cmd-pre-ssh','ocqp-out-pre-ssh','ocqp-run-pre-ssh')" style="background:#1e3a5f;color:#7dd3fc;border:1px solid #334155;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;">&#9654; Run</button><button onclick="ocqpCopyOut('ocqp-out-pre-ssh',this)" style="background:#334155;color:#cbd5e1;border:1px solid #475569;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#128203; Copy Output</button>
-          </div>
-          <div id="ocqp-out-pre-ssh" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#00ff41;white-space:pre-wrap;max-height:120px;overflow-y:auto;margin-bottom:10px;">$ waiting...
-</div>
-
-          <p style="font-size:12px;font-weight:700;color:#0369a1;margin-bottom:4px;">4 — Infrastructure access (choose one)</p>
-          <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px;font-size:12px;line-height:1.8;">
-            <div>&#9679; <strong>OpenStack</strong> cloud credentials — recommended for production (FLEX IAD3)</div>
-            <div>&#9679; <strong>Kind</strong> — local development, needs Docker: <code>sudo apt install -y docker.io</code></div>
-            <div>&#9679; <strong>VMware vSphere</strong> — with pre-provisioned VMs</div>
-            <div>&#9679; <strong>AWS</strong> credentials — experimental</div>
-          </div>
-
-          <p style="font-size:12px;font-weight:700;color:#0369a1;margin:14px 0 4px;">5 — Create your own GitOps repo (optional)</p>
-          <div style="font-size:11px;color:#64748b;margin-bottom:8px;">Signs in to GitHub in your own browser tab — no token is ever typed into this form — creates a private repo for you, and registers this cluster's own key on it as a deploy key automatically. Skip this if you're using the shared lab repo already filled in below.</div>
-          <label class="ocqs-label">Repo name</label>
-          <input class="ocqs-input" id="ocqp-owngitops-name" placeholder="opencenter-gitops" oninput="ocqpUpdate()">
-
-          <p style="font-size:11px;color:#334155;margin:10px 0 4px;"><strong>Step A — Sign in to GitHub</strong></p>
-          <div class="ocqs-cmd" id="ocqp-cmd-owngitops-auth">gh auth login --hostname github.com --git-protocol ssh --web
-gh auth status --hostname github.com</div>
-          <div style="display:flex;gap:6px;margin:6px 0;">
-            <button class="ocqs-btn ocqs-btn-copy" onclick="ocqpCopyCmd('ocqp-cmd-owngitops-auth','')">&#128203; Copy</button>
-            <button id="ocqp-run-owngitops-auth" onclick="ocqpAuthenticateGitHub()" style="background:#1e3a5f;color:#7dd3fc;border:1px solid #334155;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;">&#9654; Run — watch below for your one-time code</button>
-          </div>
-          <div id="ocqp-out-owngitops-auth" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#00ff41;white-space:pre-wrap;max-height:180px;overflow-y:auto;margin-bottom:6px;">$ waiting...</div>
-          <div style="font-size:11px;color:#b45309;margin-bottom:10px;">&#9888; A one-time code and a github.com/login/device link will appear above. Open that link in any browser tab and enter the code — this stays running until you finish there.</div>
-
-          <p style="font-size:11px;color:#334155;margin:10px 0 4px;"><strong>Step B — Create the repo &amp; register this cluster's key</strong></p>
-          <div class="ocqs-cmd" id="ocqp-cmd-owngitops-create"># enter a repo name above, then Run</div>
-          <div style="display:flex;gap:6px;margin:6px 0;">
-            <button class="ocqs-btn ocqs-btn-copy" onclick="ocqpCopyCmd('ocqp-cmd-owngitops-create','')">&#128203; Copy</button>
-            <button id="ocqp-run-owngitops-create" onclick="ocqpCreateOwnGitOpsRepo()" style="background:#15803d;color:#fff;border:none;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;">&#9654; Create repo + register key</button>
-          </div>
-          <div id="ocqp-out-owngitops-create" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#00ff41;white-space:pre-wrap;max-height:180px;overflow-y:auto;margin-bottom:6px;">$ waiting...</div>
-          <div id="ocqp-owngitops-status" style="font-size:11px;color:#64748b;margin-bottom:10px;"></div>
-          </div>
-        </details>
-
-        <!-- Step 1 -->
-        <div class="ocqs-card" id="ocqp-step-1">
-          <div style="font-size:9px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:2px;margin-bottom:4px;">STAGE 1</div>
-          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
-            <span class="ocqs-step-num">1</span>
-            <h3 style="margin:0;">Install OpenCenter CLI</h3>
-            <span class="ocqs-status ocqs-s-idle" id="ocqp-st-1">Not Started</span>
-          </div>
-          <p>OpenCenter CLI initializes cluster configuration, validates readiness, generates the GitOps repository, and deploys the Kubernetes platform.</p>
-          <p style="font-size:12px;color:#64748b;"><strong>Recommended — Clone &amp; build:</strong></p>
-          <div class="ocqs-cmd" id="ocqp-cmd-1rec"># Idempotent install - skips finished steps, never prompts (no hang)
-export GIT_TERMINAL_PROMPT=0 MISE_YES=1
-if [ -x openCenter-cli/bin/opencenter ]; then
-  echo "OpenCenter CLI already built - skipping clone and build"
-else
-  [ -d openCenter-cli/.git ] || git clone --depth 1 https://github.com/opencenter-cloud/openCenter-cli.git
-  cd openCenter-cli
-  mise trust
-  mise install
-  mise run build
-  cd ..
-fi
-
-# Verify installation
-./openCenter-cli/bin/opencenter version</div>
-          <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:6px;">
-            <button class="ocqs-btn ocqs-btn-copy" onclick="ocqpCopyCmd('ocqp-cmd-1rec','ocqp-st-1')">&#128203; Copy</button><button id="ocqp-run-1rec" onclick="ocqpRunCmd('ocqp-cmd-1rec','ocqp-out-1rec','ocqp-run-1rec')" style="background:#1e3a5f;color:#7dd3fc;border:1px solid #334155;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#9654; Run</button><button onclick="ocqpCopyOut('ocqp-out-1rec',this)" style="background:#334155;color:#cbd5e1;border:1px solid #475569;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#128203; Copy Output</button>
-          </div>
-          <div id="ocqp-out-1rec" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#00ff41;white-space:pre-wrap;word-break:break-all;max-height:240px;overflow-y:auto;margin-top:6px;margin-bottom:10px;">$ waiting...
-          </div>
-          <p style="font-size:11px;color:#64748b;">You should see version information including git commit and build date.</p>
-          <p style="font-size:12px;color:#64748b;margin-top:10px;"><strong>Alternative — GitHub release binary download:</strong></p>
-          <div class="ocqs-cmd" id="ocqp-cmd-1b">sudo apt update && sudo apt install -y curl jq ca-certificates
-
-REPO="opencenter-cloud/openCenter-cli"
-TAG="1.0.0-rc02"
-
-ASSET_URL=$(curl -s "https://api.github.com/repos/${REPO}/releases/tags/${TAG}" \
-  | jq -r '.assets[]
-    | select(.name | test("linux"; "i"))
-    | select(.name | test("amd64|x86_64"; "i"))
-    | select(.name | test("sha|sig|sbom|json|txt"; "i") | not)
-    | .browser_download_url' \
-  | head -n 1)
-
-echo "Downloading: $ASSET_URL"
-curl -fL -o /tmp/opencenter "$ASSET_URL"
-chmod +x /tmp/opencenter && /tmp/opencenter version
-sudo mv /tmp/opencenter /usr/local/bin/opencenter
-opencenter version</div>
-          <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;">
-            <button class="ocqs-btn ocqs-btn-copy" onclick="ocqpCopyCmd('ocqp-cmd-1b','ocqp-st-1')">📋 Copy</button><button id="ocqp-run-1b" onclick="ocLabExplainUnrunnable('ocqp-out-1b','This alternative needs sudo (system package install, writing to /usr/local/bin), which the shared lab does not grant - each learner has an isolated directory, not root on a real machine. Use the Recommended clone &amp; build method above, or copy this command and run it in your own terminal.')" title="This method needs sudo/root - not available in the shared lab" style="background:#3f2b0f;color:#fbbf24;border:1px solid #92400e;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#9888; Run in your own terminal</button><button onclick="ocqpCopyOut('ocqp-out-1b',this)" style="background:#334155;color:#cbd5e1;border:1px solid #475569;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#128203; Copy Output</button>
-          </div>
-<div id="ocqp-out-1b" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#00ff41;white-space:pre-wrap;word-break:break-all;max-height:240px;overflow-y:auto;margin-top:6px;">$ waiting for command...
-</div>
-          <p style="font-size:12px;color:#64748b;"><strong>Verify:</strong></p>
-          <div class="ocqs-cmd">./bin/opencenter version
-# or if installed globally:
-opencenter version
-opencenter --help
-opencenter cluster --help</div>
-          <div class="ocqs-info-box"><strong>Expected:</strong> opencenter version: 1.0.0-rc02 | Platform: linux/amd64<br>
-          <strong>mise build tip:</strong> <code>mise trust</code> must run inside the cloned repo dir. If <code>mise run build</code> fails, check the .mise.toml in the repo for required tool versions.<br>
-          <strong>Local test with Kind:</strong> Set provider to <code>kind</code> in Step 2 — no OpenStack credentials required. Needs Docker: <code>sudo apt install -y docker.io &amp;&amp; sudo usermod -aG docker $USER</code> then re-login. Kind cluster spins up in ~2 min with <code>opencenter cluster deploy</code>.</div>
-        </div>
-
         <!-- Step 2 -->
         <div class="ocqs-card" id="ocqp-step-2">
           <div style="font-size:9px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:2px;margin-bottom:4px;">STAGE 2</div>
@@ -6637,6 +6665,7 @@ kubectl describe kustomization &lt;name&gt; -n flux-system</div>
           <button class="oct-mini" onclick="var t=document.getElementById('ocqp-term');if(t)t.innerHTML='';">Clear</button>
           <button class="oct-mini" onclick="if(window.jarvisStop)jarvisStop();" title="Stop the voice-over immediately" style="background:#7c2d12;color:#fff;border-color:#7c2d12;">&#128263; Mute</button>
           <button class="oct-mini" onclick="document.getElementById('ocqp-term-float').classList.toggle('oct-min');this.textContent=this.textContent==='&#8722;'?'&#9634;':'&#8722;';">&#8722;</button>
+          <button class="oct-mini" onclick="octHideTerminal('ocqp')" title="Hide the terminal - a Show terminal chip appears bottom-right" style="background:#7f1d1d;color:#fff;border-color:#991b1b;">&#10005; Hide</button>
         </div>
         <div class="oct-term-body" style="display:flex;flex-direction:column;flex:1;min-height:0;">
         <div class="oct-track" id="ocqp-term-track"></div>
@@ -8819,6 +8848,200 @@ mise run build
         setupCollapsibleStages('ocqs');
         setupCollapsibleStages('ocqp');
       });
+    })();
+    </script>
+
+    <!-- OpenRC import: shared by the ocqs and ocqp Cloud Credentials panels. -->
+    <script>
+    (function(){
+      // Parse an OpenRC / clouds.sh export file into a plain {VAR: value} map.
+      // Quote-aware on purpose: an API key containing '#' is legal, and stripping
+      // comments before honouring quotes would silently truncate it mid-secret.
+      window.ocqsParseOpenRCText = function(text){
+        var vars = {}, literal = {};
+        String(text == null ? '' : text).split(/\r?\n/).forEach(function(raw){
+          var line = String(raw).trim();
+          if (!line || line.charAt(0) === '#') return;
+          var m = line.match(/^(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*([\s\S]*)$/);
+          if (!m) return;
+          var key = m[1], rest = m[2].trim(), val = '';
+          var q = rest.charAt(0);
+          if (q === '"' || q === "'"){
+            var end = -1;
+            for (var i = 1; i < rest.length; i++){
+              var c = rest.charAt(i);
+              if (c === '\\' && q === '"'){ i++; continue; }
+              if (c === q){ end = i; break; }
+            }
+            val = end === -1 ? rest.slice(1) : rest.slice(1, end);
+            // An escaped \$ is a literal '$' and must survive the expansion pass
+            // below, so park it on a sentinel and restore it afterwards.
+            if (q === '"') val = val.replace(/\\(["$`\\])/g, function(_, c){
+              return c === '$' ? '\u0000DLR\u0000' : c;
+            });
+            // Single quotes suppress expansion in a shell; a password of
+            // 'p$ssword' must survive verbatim rather than lose '$ssword'.
+            if (q === "'") literal[key] = true;
+          } else {
+            // Unquoted: '#' only opens a comment at a word boundary.
+            val = rest.replace(/(^|\s)#[\s\S]*$/, '').trim();
+          }
+          vars[key] = val;
+        });
+        // Expand $VAR / ${VAR}. Two passes cover the usual one-level chains;
+        // anything still unresolved becomes '' exactly as a shell would leave it.
+        for (var pass = 0; pass < 2; pass++){
+          Object.keys(vars).forEach(function(k){
+            if (literal[k]) return;
+            vars[k] = vars[k].replace(/\$\{([A-Za-z_][A-Za-z0-9_]*)\}|\$([A-Za-z_][A-Za-z0-9_]*)/g,
+              function(_, a, b){ var n = a || b; return vars[n] == null ? '' : vars[n]; });
+          });
+        }
+        // Put escaped dollars back now that expansion is done.
+        Object.keys(vars).forEach(function(k){
+          vars[k] = vars[k].split('\u0000DLR\u0000').join('$');
+        });
+        var authType = String(vars.OS_AUTH_TYPE || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+        var isAppCred = authType === 'v3applicationcredential' || !!vars.OS_APPLICATION_CREDENTIAL_ID;
+        var apiVer = String(vars.OS_IDENTITY_API_VERSION || '');
+        var isV2 = !isAppCred && (apiVer === '2' || apiVer === '2.0');
+        return { vars: vars, isAppCred: isAppCred, isV2: isV2 };
+      };
+
+      // Populate one panel's credential fields. prefix is 'ocqs' or 'ocqp'.
+      window.ocqsImportOpenRCInto = function(prefix, input){
+        var file = input && input.files && input.files[0];
+        var nameEl = document.getElementById(prefix + '-openrc-filename');
+        var statEl = document.getElementById(prefix + '-openrc-status');
+        var say = function(msg, color){
+          if (statEl){ statEl.textContent = msg; statEl.style.color = color; }
+        };
+        if (!file){ say('', ''); return; }
+        if (nameEl){ nameEl.textContent = file.name; nameEl.style.fontStyle = 'normal'; }
+        say('reading...', '#0369a1');
+
+        var reader = new FileReader();
+        reader.onerror = function(){ say('✗ could not read file', '#dc2626'); };
+        reader.onload = function(e){
+          var parsed, v;
+          try {
+            parsed = window.ocqsParseOpenRCText(e.target.result);
+            v = parsed.vars;
+          } catch (err){ say('✗ parse failed: ' + err.message, '#dc2626'); return; }
+
+          if (!Object.keys(v).length){
+            say('✗ no OS_* variables found — is this an OpenRC file?', '#dc2626');
+            return;
+          }
+
+          var filled = [], missing = [];
+          var set = function(id, val, label){
+            var el = document.getElementById(prefix + '-' + id);
+            if (!el) return;
+            if (val == null || val === ''){ if (label) missing.push(label); return; }
+            el.value = val;
+            el.dispatchEvent(new Event('input'));
+            if (label) filled.push(label);
+          };
+
+          // Auth type first: it decides which field group is visible.
+          var sel = document.getElementById(prefix + '-authtype');
+          if (sel){
+            sel.value = parsed.isAppCred ? 'v3applicationcredential' : 'password';
+            var toggle = window[prefix + 'ToggleAuthType'];
+            if (typeof toggle === 'function') toggle();
+          }
+
+          set('authurl', v.OS_AUTH_URL, 'auth URL');
+
+          // Region is a fixed dropdown; an OpenRC from another region must not be
+          // dropped on the floor, so add the option rather than ignore it.
+          var region = String(v.OS_REGION_NAME || '').trim().toUpperCase();
+          var regEl = document.getElementById(prefix + '-region');
+          if (region && regEl){
+            var found = false;
+            for (var i = 0; i < regEl.options.length; i++){
+              if (String(regEl.options[i].value).toUpperCase() === region){ regEl.selectedIndex = i; found = true; break; }
+            }
+            if (!found){
+              var opt = document.createElement('option');
+              opt.value = region; opt.textContent = region;
+              regEl.appendChild(opt); regEl.value = region;
+            }
+            regEl.dispatchEvent(new Event('change'));
+            filled.push('region');
+          } else if (!region){ missing.push('region'); }
+
+          // An application credential is already project-scoped, so a missing
+          // project ID is normal there and must not raise a warning.
+          set('projectid', v.OS_PROJECT_ID || v.OS_TENANT_ID,
+              parsed.isAppCred ? null : 'project ID');
+
+          if (parsed.isAppCred){
+            set('credid', v.OS_APPLICATION_CREDENTIAL_ID, 'credential ID');
+            set('credsec', v.OS_APPLICATION_CREDENTIAL_SECRET, 'credential secret');
+          } else {
+            set('username', v.OS_USERNAME, 'username');
+            set('password', v.OS_PASSWORD, 'password');
+            set('userdomain', v.OS_USER_DOMAIN_NAME || v.OS_USER_DOMAIN_ID || v.OS_PROJECT_DOMAIN_NAME, 'user domain');
+            set('projdomain', v.OS_PROJECT_DOMAIN_NAME || v.OS_PROJECT_DOMAIN_ID || v.OS_USER_DOMAIN_NAME, 'project domain');
+          }
+
+          ['Update', 'ReqCheck', 'Persist', 'Save'].forEach(function(fn){
+            var f = window[prefix + fn];
+            if (typeof f === 'function'){ try { f(); } catch (err){} }
+          });
+
+          var kind = parsed.isAppCred ? 'Application Credential'
+                                      : (parsed.isV2 ? 'v2 Password' : 'v3 Password');
+          if (missing.length){
+            // Most common cause: the file ends with `read -sr OS_PASSWORD_INPUT`,
+            // which prompts interactively and so carries no secret at all.
+            say('⚠ ' + kind + ' — filled ' + filled.length +
+                ' field(s); enter manually: ' + missing.join(', '), '#d97706');
+          } else {
+            say('✓ ' + kind + ' — all ' + filled.length + ' field(s) populated', '#15803d');
+          }
+        };
+        reader.readAsText(file);
+      };
+
+      window.ocqsParseOpenRC = function(input){ return window.ocqsImportOpenRCInto('ocqs', input); };
+      window.ocqpParseOpenRC = function(input){ return window.ocqsImportOpenRCInto('ocqp', input); };
+
+      // Hide the floating output terminal. The terminal covers the bottom-right
+      // of the page, and the only other way back was a "Show / Hide" button far
+      // up the page, so leave a fixed restore chip behind rather than a dead end.
+      window.octHideTerminal = function(prefix){
+        var term = document.getElementById(prefix + '-term-float');
+        if (!term) return;
+        term.style.display = 'none';
+
+        var chipId = prefix + '-term-restore';
+        var chip = document.getElementById(chipId);
+        if (!chip){
+          chip = document.createElement('button');
+          chip.id = chipId;
+          chip.type = 'button';
+          chip.innerHTML = '&#128421; Show terminal';
+          chip.title = 'Reopen the OpenCenter output terminal';
+          chip.style.cssText = 'position:fixed;right:16px;bottom:16px;z-index:9999;' +
+            'background:#0f172a;color:#e2e8f0;border:1px solid #334155;border-radius:999px;' +
+            'padding:8px 16px;font-size:12px;font-weight:800;cursor:pointer;' +
+            'box-shadow:0 4px 14px rgba(0,0,0,.35);';
+          chip.onclick = function(){ window.octShowTerminal(prefix); };
+          document.body.appendChild(chip);
+        }
+        chip.style.display = '';
+      };
+
+      window.octShowTerminal = function(prefix){
+        var term = document.getElementById(prefix + '-term-float');
+        // The wrapper is a flex column; restoring to 'block' would break its layout.
+        if (term) term.style.display = 'flex';
+        var chip = document.getElementById(prefix + '-term-restore');
+        if (chip) chip.style.display = 'none';
+      };
     })();
     </script>
 
