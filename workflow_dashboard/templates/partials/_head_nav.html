@@ -438,23 +438,28 @@
     #mfbBoard .mfb-col-last,
     body.flex-skyline-mode #mfbBoard .mfb-col-last { border-right: none !important; }
 
-    /* Caption, in the plain condensed caps a real board uses. */
-    #mfbBoard .mfb-cap,
-    body.flex-skyline-mode #mfbBoard .mfb-cap {
+    /* Caption — big and white, like a real departures board.
+       The `html body.flex-skyline-mode #mfbBoard #ledCounterBar` chain is not
+       decoration: the skyline theme sets
+       `#ledCounterBar > div > div:first-child { color:#a33e3e !important }`,
+       which outranks a plain `#mfbBoard .mfb-cap` and was rendering every
+       caption brick-red. */
+    html #mfbBoard #ledCounterBar .mfb-cap,
+    html body.flex-skyline-mode #mfbBoard #ledCounterBar .mfb-cap {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif !important;
-      font-size: 10px !important; font-weight: 700 !important;
-      letter-spacing: .18em !important; text-transform: uppercase !important;
-      color: #d8d8d8 !important; text-shadow: none !important;
-      margin-bottom: 3px !important; line-height: 1.3;
+      font-size: 15px !important; font-weight: 800 !important;
+      letter-spacing: .12em !important; text-transform: uppercase !important;
+      color: #ffffff !important; text-shadow: none !important;
+      margin-bottom: 4px !important; line-height: 1.25;
     }
     /* Subtext: what the number actually counts, in plain language. */
-    #mfbBoard .mfb-sub,
-    body.flex-skyline-mode #mfbBoard .mfb-sub {
+    html #mfbBoard #ledCounterBar .mfb-sub,
+    html body.flex-skyline-mode #mfbBoard #ledCounterBar .mfb-sub {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif !important;
-      font-size: 9px !important; font-weight: 500 !important;
-      letter-spacing: .07em !important; text-transform: none !important;
-      color: #7d7d7d !important; text-shadow: none !important;
-      margin-bottom: 8px !important; line-height: 1.35;
+      font-size: 11px !important; font-weight: 500 !important;
+      letter-spacing: .04em !important; text-transform: none !important;
+      color: #b4b4b4 !important; text-shadow: none !important;
+      margin-bottom: 9px !important; line-height: 1.35;
       /* Reserve two lines so every column's digits sit on the same baseline
          however long its subtext is. */
       min-height: 2.7em; display: flex; align-items: center;
@@ -504,42 +509,14 @@
       border-right: 1px solid #232323 !important;
     }
 
-    /* ══ Stage bar: two bands, one column per stage ══════════════════════════
-       #stageBar is a grid whose cells already give every tab its equal width,
-       76px height and hover/active styling. So the two bands are produced by
-       explicit row placement rather than by wrapper elements — wrapping the
-       buttons would make them grandchildren and silently kill ~81 rules that
-       address them as direct children (`width:100%` of the cell being the one
-       that stacked them).
-
-       20 tracks is the common multiple: band 1 has 4 tabs at 5 tracks each,
-       band 2 has 5 tabs at 4 tracks each, so both fill the width exactly.
-
-       Selectors lead with `html` purely for specificity: the rules they replace
-       are `!important` and live further up, so an equal-specificity override
-       would lose. */
+    /* ══ Stage bar ═══════════════════════════════════════════════════════════
+       Original single-row grid, untouched apart from the track count: the bar
+       was built for 8 items and now carries 9 (the Training & Tutorials tab was
+       added), so 8 tracks pushed the last one onto a second row. Nine tracks
+       keeps every tab on one line at its original size and styling. */
     html #stageBar.stage-bar,
     html body.flex-skyline-mode #stageBar.stage-bar {
-      grid-template-columns: repeat(20, minmax(0, 1fr)) !important;
-      grid-auto-rows: 76px !important;
-      row-gap: 6px !important;
-    }
-    /* Band 1 — orientation: 4 × 5 tracks */
-    html #stageBar > .stage-btn[data-stage="s_why"],
-    html #stageBar > .stage-btn[data-stage="s_fb"],
-    html #stageBar > .stage-btn[data-stage="s_tour"],
-    html #stageBar > .stage-btn[data-stage="s_train"] {
-      grid-row: 1 !important;
-      grid-column: span 5 !important;
-    }
-    /* Band 2 — the migration journey: 5 × 4 tracks.
-       Both dropdowns (Stage 3, AI SWITCH) are .top-stage-dropdown. */
-    html #stageBar > .stage-btn[data-stage="s0"],
-    html #stageBar > .stage-btn[data-stage="s1"],
-    html #stageBar > .stage-btn[data-stage="s2"],
-    html #stageBar > .top-stage-dropdown {
-      grid-row: 2 !important;
-      grid-column: span 4 !important;
+      grid-template-columns: repeat(9, minmax(0, 1fr)) !important;
     }
     /* Training & Tutorials — violet, so it reads as its own thing next to the
        indigo Quick Tour and the cyan/green mission stages. Deliberately carries
@@ -2981,20 +2958,20 @@ body.flex-skyline-mode .uat-s1-template-tab.active {
 
   <!-- Migration Departures (queued) -->
   <div class="mfb-col">
-    <div class="mfb-cap">&#9992; Migration Departures</div>
-    <div class="mfb-sub">To be migrated</div>
+    <div class="mfb-cap">&#9992; Departures</div>
+    <div class="mfb-sub">Ready for FLEX migration</div>
     <div id="ledToBeMigrated" class="mfb-count">--</div>
   </div>
   <!-- In Migration Flights (ready / in flight) -->
   <div class="mfb-col">
-    <div class="mfb-cap">&#9992; In Migration Flights</div>
-    <div class="mfb-sub">Ready for migration</div>
+    <div class="mfb-cap">&#9992; In Flights</div>
+    <div class="mfb-sub">Being migrated</div>
     <div id="ledReady" class="mfb-count">--</div>
   </div>
   <!-- Arrivals — landed on FLEX -->
   <div class="mfb-col">
     <div class="mfb-cap">&#9992; Arrivals</div>
-    <div class="mfb-sub">Successfully landed on FLEX</div>
+    <div class="mfb-sub">Landed on FLEX</div>
     <div id="ledSuccess" class="mfb-count">--</div>
   </div>
   <!-- In Transit to OpenCenter Gate.
