@@ -344,8 +344,7 @@
                   if (table) html += '<h3>' + title + '</h3>' + table.outerHTML;
                 });
               }
-              html += '
-</body></html>';
+              html += '\n</body></html>';
               const blob = new Blob([html], {type:'application/vnd.ms-excel;charset=utf-8;'});
               const url = URL.createObjectURL(blob);
               const a = document.createElement('a');
