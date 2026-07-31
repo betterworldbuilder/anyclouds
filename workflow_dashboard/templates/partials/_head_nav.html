@@ -31,6 +31,7 @@
   </script>
   <style>
     html.only-focus-mode header,
+    html.only-focus-mode #mfbBoard,
     html.only-focus-mode #ledCounterBar,
     html.only-focus-mode #stageBar,
     html.only-focus-mode #subBar1,
@@ -334,6 +335,229 @@
       box-shadow: 0 0 10px rgba(99,102,241,0.4) !important;
     }
     .stage-tour-btn:hover { background: linear-gradient(135deg, rgba(79,70,229,0.9), rgba(99,102,241,0.8)) !important; box-shadow: 0 0 18px rgba(99,102,241,.8) !important; }
+    /* ── Identity button in the LED bar. Carries its own !important because the
+       skyline theme repaints unlisted buttons #a33e3e; .oc-auth-btn is on that
+       rule's exclusion list, this is belt-and-braces. ── */
+    .oc-auth-btn {
+      display: flex !important; align-items: center; gap: 9px;
+      width: 100%; padding: 9px 14px !important; cursor: pointer;
+      border: 1px solid #1f4d2a !important; border-radius: 8px !important;
+      background: linear-gradient(135deg, #06210e, #0a3318) !important;
+      color: #00ff41 !important; text-align: left;
+      font-family: "Share Tech Mono", "Courier New", monospace !important;
+      box-shadow: inset 0 0 12px rgba(0,255,65,.10) !important;
+      text-shadow: 0 0 6px rgba(0,255,65,.55) !important;
+      transition: background .15s, box-shadow .15s;
+    }
+    .oc-auth-btn:hover {
+      background: linear-gradient(135deg, #0a3318, #0f4a22) !important;
+      box-shadow: 0 0 14px rgba(0,255,65,.28), inset 0 0 12px rgba(0,255,65,.16) !important;
+    }
+    .oc-auth-btn .oc-auth-ico { font-size: 17px; line-height: 1; flex: none; }
+    .oc-auth-btn .oc-auth-txt { display: flex; flex-direction: column; min-width: 0; }
+    .oc-auth-btn #ocAuthLine1 {
+      font-size: 12.5px; font-weight: 700; letter-spacing: .5px;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .oc-auth-btn #ocAuthLine2 {
+      font-size: 9px; letter-spacing: 1.4px; text-transform: uppercase;
+      color: #2a7a3a !important; text-shadow: none !important;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    /* Signed in: switch the tube from green to the palette blue. */
+    .oc-auth-btn.is-in {
+      border-color: #0A4FA8 !important;
+      background: linear-gradient(135deg, #061a33, #0a2b52) !important;
+      color: #5AA9FF !important;
+      box-shadow: inset 0 0 12px rgba(10,124,255,.14) !important;
+      text-shadow: 0 0 6px rgba(90,169,255,.5) !important;
+    }
+    .oc-auth-btn.is-in:hover {
+      background: linear-gradient(135deg, #0a2b52, #0f3a6b) !important;
+      box-shadow: 0 0 14px rgba(10,124,255,.3), inset 0 0 12px rgba(10,124,255,.18) !important;
+    }
+    .oc-auth-btn.is-in #ocAuthLine2 { color: #3d7ec4 !important; }
+    body.flex-skyline-mode .oc-auth-btn {
+      background: #ffffff !important; border: 1px solid #d1d5db !important;
+      color: #1f2937 !important; text-shadow: none !important; box-shadow: none !important;
+    }
+    body.flex-skyline-mode .oc-auth-btn.is-in { color: #0A4FA8 !important; border-color: #0A7CFF !important; }
+    body.flex-skyline-mode .oc-auth-btn #ocAuthLine2 { color: #6b7280 !important; }
+
+    /* ══ Migration board — airport split-flap departures display ═════════════
+       Every rule is written against `#mfbBoard …` or `#ledCounterBar.mfb-*`,
+       which outranks the skyline overrides above that repaint the counter bar
+       white. The board stays black in both themes on purpose: a departures
+       board that turns white is not a departures board. */
+    #mfbBoard, body.flex-skyline-mode #mfbBoard {
+      background: #0a0a0a !important;
+      border-bottom: 3px solid #1c1c1c !important;
+      box-shadow: inset 0 -14px 26px rgba(0,0,0,.55) !important;
+      flex-shrink: 0;
+    }
+    #mfbBoard .mfb-head {
+      display: flex; align-items: center; justify-content: center; gap: 14px;
+      padding: 7px 16px 3px; background: #0a0a0a;
+    }
+    #mfbBoard .mfb-title {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif !important;
+      font-size: 15px; font-weight: 900; letter-spacing: .34em; text-transform: uppercase;
+      color: #f4f4f4 !important; text-shadow: none !important;
+    }
+    #mfbBoard .mfb-plane { font-size: 15px; color: #f4f4f4; line-height: 1; }
+    #mfbBoard .mfb-plane-r { transform: scaleX(-1); }
+
+    /* The counter row itself: black slats, thin gutters between columns. */
+    #mfbBoard #ledCounterBar,
+    body.flex-skyline-mode #mfbBoard #ledCounterBar {
+      background: #0a0a0a !important;
+      border-top: 1px solid #1c1c1c !important;
+      border-bottom: none !important;
+      padding: 2px 16px 12px !important;
+      box-shadow: none !important;
+    }
+    #mfbBoard #ledCounterBar > div,
+    body.flex-skyline-mode #mfbBoard #ledCounterBar > div {
+      background: #0a0a0a !important;
+      border: none !important;
+      border-right: 1px solid #232323 !important;
+    }
+    #mfbBoard #ledCounterBar > div:last-child,
+    body.flex-skyline-mode #mfbBoard #ledCounterBar > div:last-child {
+      border-right: none !important;
+    }
+    /* One column per journey stage. */
+    #mfbBoard .mfb-col,
+    body.flex-skyline-mode #mfbBoard .mfb-col {
+      flex: 1 1 0; min-width: 0;
+      display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
+      text-align: center; padding: 10px 10px 4px;
+      background: #0a0a0a !important; border: none !important;
+      border-right: 1px solid #232323 !important;
+    }
+    #mfbBoard .mfb-col-last,
+    body.flex-skyline-mode #mfbBoard .mfb-col-last { border-right: none !important; }
+
+    /* Caption, in the plain condensed caps a real board uses. */
+    #mfbBoard .mfb-cap,
+    body.flex-skyline-mode #mfbBoard .mfb-cap {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif !important;
+      font-size: 10px !important; font-weight: 700 !important;
+      letter-spacing: .18em !important; text-transform: uppercase !important;
+      color: #d8d8d8 !important; text-shadow: none !important;
+      margin-bottom: 3px !important; line-height: 1.3;
+    }
+    /* Subtext: what the number actually counts, in plain language. */
+    #mfbBoard .mfb-sub,
+    body.flex-skyline-mode #mfbBoard .mfb-sub {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif !important;
+      font-size: 9px !important; font-weight: 500 !important;
+      letter-spacing: .07em !important; text-transform: none !important;
+      color: #7d7d7d !important; text-shadow: none !important;
+      margin-bottom: 8px !important; line-height: 1.35;
+      /* Reserve two lines so every column's digits sit on the same baseline
+         however long its subtext is. */
+      min-height: 2.7em; display: flex; align-items: center;
+    }
+    /* Digit rows. letter-spacing is cleared: spacing now comes from the flap
+       gap, and leaving it would offset every character inside its own tile. */
+    #mfbBoard .mfb-count,
+    body.flex-skyline-mode #mfbBoard .mfb-count {
+      margin-top: auto;
+      display: flex !important; justify-content: center; gap: 5px;
+      color: transparent !important; text-shadow: none !important;
+      letter-spacing: 0 !important; font-size: 0 !important;
+      font-family: 'Share Tech Mono', 'Courier New', monospace;
+    }
+    /* One flap per character. The 50% seam and the darker lower half are what
+       read as a physical split-flap tile. */
+    #mfbBoard .mfb-flap {
+      position: relative; display: inline-flex; align-items: center; justify-content: center;
+      min-width: 34px; padding: 5px 4px 6px; border-radius: 3px;
+      font-family: "Share Tech Mono", "Courier New", monospace !important;
+      font-size: 38px !important; font-weight: 700; line-height: 1;
+      color: #ffffff !important; text-shadow: 0 1px 0 rgba(0,0,0,.9) !important;
+      background: linear-gradient(180deg, #333 0%, #2a2a2a 49.6%, #171717 50.4%, #101010 100%);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.10), 0 1px 2px rgba(0,0,0,.7);
+    }
+    /* The hinge line across the middle of the tile. */
+    #mfbBoard .mfb-flap::after {
+      content: ""; position: absolute; left: 0; right: 0; top: 50%;
+      height: 1px; background: rgba(0,0,0,.85);
+      box-shadow: 0 1px 0 rgba(255,255,255,.06);
+    }
+    /* A flap briefly flips when its character changes. */
+    @keyframes mfbFlip {
+      0%   { transform: perspective(220px) rotateX(0deg);   filter: brightness(1); }
+      45%  { transform: perspective(220px) rotateX(-84deg); filter: brightness(.55); }
+      55%  { transform: perspective(220px) rotateX(84deg);  filter: brightness(.55); }
+      100% { transform: perspective(220px) rotateX(0deg);   filter: brightness(1); }
+    }
+    #mfbBoard .mfb-flap.is-flipping { animation: mfbFlip .34s ease-in-out; }
+    @media (prefers-reduced-motion: reduce) {
+      #mfbBoard .mfb-flap.is-flipping { animation: none; }
+    }
+    /* The sign-in cell sits on the same board, so it loses its green tube edge. */
+    #mfbBoard #ocAuthCell,
+    body.flex-skyline-mode #mfbBoard #ocAuthCell {
+      background: #0a0a0a !important; border: none !important;
+      border-right: 1px solid #232323 !important;
+    }
+
+    /* ══ Stage bar: two bands, one column per stage ══════════════════════════
+       #stageBar is a grid whose cells already give every tab its equal width,
+       76px height and hover/active styling. So the two bands are produced by
+       explicit row placement rather than by wrapper elements — wrapping the
+       buttons would make them grandchildren and silently kill ~81 rules that
+       address them as direct children (`width:100%` of the cell being the one
+       that stacked them).
+
+       20 tracks is the common multiple: band 1 has 4 tabs at 5 tracks each,
+       band 2 has 5 tabs at 4 tracks each, so both fill the width exactly.
+
+       Selectors lead with `html` purely for specificity: the rules they replace
+       are `!important` and live further up, so an equal-specificity override
+       would lose. */
+    html #stageBar.stage-bar,
+    html body.flex-skyline-mode #stageBar.stage-bar {
+      grid-template-columns: repeat(20, minmax(0, 1fr)) !important;
+      grid-auto-rows: 76px !important;
+      row-gap: 6px !important;
+    }
+    /* Band 1 — orientation: 4 × 5 tracks */
+    html #stageBar > .stage-btn[data-stage="s_why"],
+    html #stageBar > .stage-btn[data-stage="s_fb"],
+    html #stageBar > .stage-btn[data-stage="s_tour"],
+    html #stageBar > .stage-btn[data-stage="s_train"] {
+      grid-row: 1 !important;
+      grid-column: span 5 !important;
+    }
+    /* Band 2 — the migration journey: 5 × 4 tracks.
+       Both dropdowns (Stage 3, AI SWITCH) are .top-stage-dropdown. */
+    html #stageBar > .stage-btn[data-stage="s0"],
+    html #stageBar > .stage-btn[data-stage="s1"],
+    html #stageBar > .stage-btn[data-stage="s2"],
+    html #stageBar > .top-stage-dropdown {
+      grid-row: 2 !important;
+      grid-column: span 4 !important;
+    }
+    /* Training & Tutorials — violet, so it reads as its own thing next to the
+       indigo Quick Tour and the cyan/green mission stages. Deliberately carries
+       neither .sky-top-stage nor .green-roll-stage: both of those are re-applied
+       as inline !important styles by applySkyTopStages()/applyStageGreenRoll()
+       and would overwrite this rule at runtime. */
+    .stage-train-btn {
+      flex: 1 1 0; min-width: 0; border: 2px solid #a78bfa !important;
+      background: linear-gradient(135deg, rgba(76,29,149,0.85), rgba(124,58,237,0.75)) !important;
+      color: #ede9fe !important; border-radius: 8px;
+      padding: 10px 10px; cursor: pointer; font-weight: 700; font-size: 14px;
+      text-align: center; white-space: nowrap; overflow: hidden;
+      text-overflow: ellipsis; transition: background .15s, box-shadow .15s;
+      line-height: 1.4;
+      box-shadow: 0 0 10px rgba(167,139,250,0.4), inset 0 0 10px rgba(167,139,250,0.18) !important;
+      text-shadow: 0 0 8px rgba(237,233,254,0.55);
+    }
+    .stage-train-btn:hover { background: linear-gradient(135deg, rgba(109,40,217,0.95), rgba(167,139,250,0.85)) !important; box-shadow: 0 0 18px rgba(167,139,250,.8) !important; }
     .stage-tracker-btn {
       flex: 1 1 0; min-width: 0; border: 2px solid #00f3ff !important;
       background: rgba(0, 24, 70, 0.7) !important; color: #fff; border-radius: 8px;
@@ -1447,7 +1671,7 @@
       box-shadow: none !important;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif !important;
     }
-body.flex-skyline-mode button:not(#top-theme-trigger):not(.global-theme-option):not(.stage-btn):not(.stage-tracker-btn):not(.stage-tour-btn):not(.sub-btn):not(.sub-btn-dropdown):not(.top-stage-dropdown-trigger):not(.uat-s1-template-tab):not(.oc-card):not(.oc-arrow),
+body.flex-skyline-mode button:not(#top-theme-trigger):not(.global-theme-option):not(.stage-btn):not(.stage-tracker-btn):not(.stage-tour-btn):not(.sub-btn):not(.sub-btn-dropdown):not(.top-stage-dropdown-trigger):not(.uat-s1-template-tab):not(.oc-card):not(.oc-arrow):not(.trn-node):not(.trn-go):not(.oc-auth-btn),
     body.flex-skyline-mode .gov-btn,
     body.flex-skyline-mode .uat-btn {
       background: #a33e3e !important;
@@ -2725,44 +2949,83 @@ body.flex-skyline-mode .uat-s1-template-tab.active {
 </header>
 
 <!-- ══ LED Migration Counter Dashboard ══ -->
+<!-- ── Migration board: airport split-flap departures display ──────────────
+     The counters keep their original ids (#ledToBeMigrated / #ledReady /
+     #ledSuccess) and their existing textContent updates; mfbRender() in
+     _closing_scripts.html re-renders each character into a flap tile whenever
+     the text changes, so no counter code had to be touched. -->
+<div id="mfbBoard" class="mfb-board"{% if request.args.get('only') %} style="display:none"{% endif %}>
 <div id="ledCounterBar" style="
   {% if request.args.get('only') %}display:none;{% else %}display:flex;{% endif %} gap:0; padding:6px 16px; background:#000;
   border-bottom:1px solid rgba(0,255,65,0.15);
   justify-content:center; align-items:stretch; flex-shrink:0;
 ">
-  <!-- To Be Migrated -->
-  <div style="flex:1; text-align:center; padding:10px 8px; border:1px solid #0a1a0a; border-right:none; background:#000;">
-    <div style="font-size:10px; text-transform:uppercase; letter-spacing:2px; color:#2a5a2a; margin-bottom:6px; font-weight:600;">To Be Migrated</div>
-    <div id="ledToBeMigrated" style="
-      font-family:'Share Tech Mono','Courier New',monospace; font-size:42px; font-weight:700;
-      color:#00ff41; letter-spacing:5px;
-      text-shadow: 0 0 7px #00ff41, 0 0 15px #00ff41, 0 0 30px rgba(0,255,65,0.4), 0 0 50px rgba(0,255,65,0.2);
-    ">--</div>
+  <!-- ── Identity / sign-in ───────────────────────────────────────────────
+       Populated by ocAuthRefresh() in _closing_scripts.html from
+       GET /api/auth/whoami. The app never renders a password field: the
+       Microsoft handshake (password + Authenticator MFA) happens at the
+       identity-aware proxy in front of this service, which passes the result
+       through the X-Auth-Request-* headers the backend already trusts. -->
+  <!-- Hidden by default; Ctrl+Shift+L toggles it and the choice is remembered
+       (localStorage "ocAuthBtnVisible"). ocAuthApplyVisibility() owns the
+       display value, so the inline `none` here is only the pre-JS state. -->
+  <div id="ocAuthCell" style="flex:0 0 auto; min-width:210px; display:none; align-items:center; justify-content:center; padding:8px 12px; border:1px solid #0a1a0a; border-right:none; background:#000;">
+    <button id="ocAuthBtn" class="oc-auth-btn" type="button" onclick="ocAuthClick()" title="Sign in with your company account">
+      <span id="ocAuthIcon" class="oc-auth-ico">&#128274;</span>
+      <span class="oc-auth-txt">
+        <span id="ocAuthLine1">Sign in</span>
+        <span id="ocAuthLine2">Company SSO</span>
+      </span>
+    </button>
   </div>
-  <!-- Ready for Migration -->
-  <div style="flex:1; text-align:center; padding:10px 8px; border:1px solid #0a1a0a; border-right:none; background:#000;">
-    <div style="font-size:10px; text-transform:uppercase; letter-spacing:2px; color:#2a5a2a; margin-bottom:6px; font-weight:600;">Ready for Migration</div>
-    <div id="ledReady" style="
-      font-family:'Share Tech Mono','Courier New',monospace; font-size:42px; font-weight:700;
-      color:#00ff41; letter-spacing:5px;
-      text-shadow: 0 0 7px #00ff41, 0 0 15px #00ff41, 0 0 30px rgba(0,255,65,0.4), 0 0 50px rgba(0,255,65,0.2);
-    ">--</div>
+
+  <!-- Migration Departures (queued) -->
+  <div class="mfb-col">
+    <div class="mfb-cap">&#9992; Migration Departures</div>
+    <div class="mfb-sub">To be migrated</div>
+    <div id="ledToBeMigrated" class="mfb-count">--</div>
   </div>
-  <!-- Successfully Migrated -->
-  <div style="flex:1; text-align:center; padding:10px 8px; border:1px solid #0a1a0a; background:#000;">
-    <div style="font-size:10px; text-transform:uppercase; letter-spacing:2px; color:#2a5a2a; margin-bottom:6px; font-weight:600;">Successfully Migrated</div>
-    <div id="ledSuccess" style="
-      font-family:'Share Tech Mono','Courier New',monospace; font-size:42px; font-weight:700;
-      color:#00ff41; letter-spacing:5px;
-      text-shadow: 0 0 7px #00ff41, 0 0 15px #00ff41, 0 0 30px rgba(0,255,65,0.4), 0 0 50px rgba(0,255,65,0.2);
-    ">--</div>
+  <!-- In Migration Flights (ready / in flight) -->
+  <div class="mfb-col">
+    <div class="mfb-cap">&#9992; In Migration Flights</div>
+    <div class="mfb-sub">Ready for migration</div>
+    <div id="ledReady" class="mfb-count">--</div>
+  </div>
+  <!-- Arrivals — landed on FLEX -->
+  <div class="mfb-col">
+    <div class="mfb-cap">&#9992; Arrivals</div>
+    <div class="mfb-sub">Successfully landed on FLEX</div>
+    <div id="ledSuccess" class="mfb-count">--</div>
+  </div>
+  <!-- In Transit to OpenCenter Gate.
+       NOT WIRED YET: no counter code sets #ledOpenCenter, so it stays "--"
+       rather than showing a number nobody computed. -->
+  <div class="mfb-col">
+    <div class="mfb-cap">&#9992; In Transit to OpenCenter Gate</div>
+    <div class="mfb-sub">Current OpenCenter deployment</div>
+    <div id="ledOpenCenter" class="mfb-count">--</div>
+  </div>
+  <!-- In Transit to RAX Palantir. Also not wired — see #ledOpenCenter above. -->
+  <div class="mfb-col mfb-col-last">
+    <div class="mfb-cap">&#9992; In Transit to RAX Palantir</div>
+    <div class="mfb-sub">Projects ready for RAX AI Palantir Foundry</div>
+    <div id="ledPalantir" class="mfb-count">--</div>
   </div>
 </div>
+</div><!-- /#mfbBoard -->
 <!-- ── Mission stage buttons ─────────────────────────── -->
+<!-- Two bands, one column per stage. The buttons stay DIRECT children of
+     #stageBar - roughly 81 rules address them as such - and the two rows come
+     from grid-row placement in the stylesheet, not from wrapper elements.
+     Band 1: orientation. Band 2: the migration journey. -->
 <div class="stage-bar" id="stageBar"{% if request.args.get('only') %} style="display:none"{% endif %}>
+  <!-- Row 1 — orientation -->
   <button class="stage-btn stage-promo-btn sky-top-stage active" data-stage="s_why">Why Who What When to<br>Move to FLEX</button>
   <button class="stage-btn sky-top-stage" data-stage="s_fb">&#128172; Improvement<br>Feedbacks</button>
   <button class="stage-btn stage-tour-btn sky-top-stage" data-stage="s_tour">🎓 Quick Tour</button>
+  <button class="stage-btn stage-train-btn" data-stage="s_train">📚 Training<br><small>&amp; Tutorials</small></button>
+
+  <!-- Row 2 — the migration journey: Migration Log through the AI SWITCH stage -->
   <button class="stage-btn stage-tracker-btn green-roll-stage" data-stage="s0">📋 Migration Log</button>
   <button class="stage-btn green-roll-stage" data-stage="s1">Stage 1<br><small>Discovery &amp; Assessment</small></button>
   <button class="stage-btn green-roll-stage" style="--green-roll-delay:.9s" data-stage="s2">Stage 2<br><small>Migration HUB</small></button>

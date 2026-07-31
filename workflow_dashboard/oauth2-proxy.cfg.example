@@ -1,0 +1,74 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# oauth2-proxy — Microsoft Entra ID (Azure AD) for the osflex dashboard.
+#
+#   cp oauth2-proxy.cfg.example oauth2-proxy.cfg     # then fill the <…> values
+#   chmod 600 oauth2-proxy.cfg                       # it holds a client secret
+#   oauth2-proxy --config /path/to/oauth2-proxy.cfg
+#
+# Never commit the filled-in copy. Add it to .gitignore.
+# Full runbook, including the Entra app registration: docs/SSO_MICROSOFT_ENTRA.md
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ── Identity provider ────────────────────────────────────────────────────────
+# The v2.0 issuer is required. Using the v1 endpoint makes oauth2-proxy fail
+# discovery with a confusing "issuer did not match" error.
+provider        = "oidc"
+oidc_issuer_url = "https://login.microsoftonline.com/<TENANT_ID>/v2.0"
+
+client_id     = "<APPLICATION_CLIENT_ID>"
+client_secret = "<CLIENT_SECRET_VALUE>"
+
+# Must byte-for-byte match the Redirect URI registered in Entra, including the
+# scheme, port and trailing path. This is the single most common failure.
+redirect_url = "https://<PUBLIC_HOSTNAME>:5002/oauth2/callback"
+
+scope = "openid email profile"
+
+# ── Listener ─────────────────────────────────────────────────────────────────
+# Localhost only: nginx is the only thing that should reach it.
+http_address  = "127.0.0.1:4180"
+reverse_proxy = true
+
+# ── Who is allowed in ────────────────────────────────────────────────────────
+# Restrict to the company domain. "*" would let any Microsoft account in,
+# including personal ones, if the app registration is multi-tenant.
+email_domains = ["rackspace.com"]
+
+# Optional, tighter: only members of specific Entra groups. Requires the groups
+# claim to be enabled on the app registration (see the runbook).
+# allowed_groups = ["<GROUP_OBJECT_ID>"]
+
+# ── Session cookie ───────────────────────────────────────────────────────────
+# Generate with:  openssl rand -base64 32 | tr -- '+/' '-_'
+cookie_secret   = "<32_BYTE_BASE64_SECRET>"
+cookie_secure   = true        # HTTPS only — leave true
+cookie_httponly = true
+cookie_samesite = "lax"
+cookie_expire   = "8h"
+cookie_refresh  = "1h"
+
+# ── What gets handed to Flask ────────────────────────────────────────────────
+# set_xauthrequest is what populates the X-Auth-Request-* response headers on
+# /oauth2/auth, which osflex_nginx_sso.conf captures and forwards. Without it
+# the app sees no identity and every user falls back to anonymous.
+set_xauthrequest = true
+
+# The dashboard has no use for the raw tokens and should not receive them:
+# anything it never holds cannot leak from it.
+pass_access_token         = false
+pass_authorization_header = false
+pass_basic_auth           = false
+
+# Skip oauth2-proxy's own "Sign in with…" interstitial and go straight to
+# Microsoft — the dashboard's button is already the sign-in affordance.
+skip_provider_button = true
+
+# Let the launcher's readiness probe through unauthenticated.
+skip_auth_routes = ["GET=/healthz"]
+
+# ── Notes ────────────────────────────────────────────────────────────────────
+# * MFA / Microsoft Authenticator is NOT configured here. It is an Entra
+#   Conditional Access policy on the tenant. Nothing in this file or in the
+#   dashboard implements or bypasses it.
+# * The user's password is never seen by oauth2-proxy either — it only ever
+#   handles the authorization code and the resulting token.

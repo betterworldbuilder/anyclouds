@@ -30,6 +30,7 @@ from flask import (
     Flask,
     Response,
     jsonify,
+    redirect,
     render_template,
     request,
     send_from_directory,
@@ -529,6 +530,165 @@ def _opencenter_inject_kubectl_timeout(command: str) -> str:
         pos = match.end()
     out.append(command[pos:])
     return "".join(out)
+
+
+def _count_opencenter_clusters():
+    """Cluster blueprints on this deployer host.
+
+    Same definition and same directory shape as /api/monitoring/clusters: a
+    cluster counts once it has a rendered `<name>-config.yaml`, which is what
+    `opencenter cluster configure` produces. Counting blueprints rather than
+    live clusters is deliberate — the board reports what is in transit to the
+    OpenCenter gate, and reaching a blueprint is the point at which a workload
+    is committed to that path.
+    """
+    root = Path.home() / ".config" / "opencenter" / "clusters" / "blueprints"
+    if not root.is_dir():
+        return 0
+    seen = 0
+    try:
+        for org_dir in root.iterdir():
+            if not org_dir.is_dir():
+                continue
+            for cluster_dir in org_dir.iterdir():
+                if not cluster_dir.is_dir():
+                    continue
+                if (cluster_dir / ("%s-config.yaml" % cluster_dir.name)).is_file():
+                    seen += 1
+    except OSError:
+        return 0
+    return seen
+
+
+# A project is "ready for Foundry" once a plan exists for it. DRAFT/IMPORTED/
+# ASSESSED are earlier steps and ARCHIVED is withdrawn, so none of those count.
+_PALANTIR_READY_STATUSES = {"PLANNED", "HANDED_OFF"}
+
+
+def _count_palantir_ready_projects():
+    """AI SWITCH projects that have reached the Palantir/Foundry plan stage."""
+    try:
+        try:
+            from workflow_dashboard.ai_adoption.store import ProjectStore
+        except ImportError:
+            from ai_adoption.store import ProjectStore
+        rows = ProjectStore(BASE_DIR).list()
+    except Exception:
+        return 0
+    return sum(
+        1 for r in rows
+        if str((r or {}).get("status") or "").upper() in _PALANTIR_READY_STATUSES
+    )
+
+
+@app.get("/api/board/counters")
+def board_counters():
+    """Live figures for the two right-hand columns of the departures board.
+
+    Returned separately from the migration counters, which the front end already
+    computes from the tracker table. Errors degrade to null rather than 0 so the
+    board can keep showing "--" instead of asserting a count it did not make.
+    """
+    try:
+        opencenter = _count_opencenter_clusters()
+    except Exception:
+        opencenter = None
+    try:
+        palantir = _count_palantir_ready_projects()
+    except Exception:
+        palantir = None
+    return jsonify({
+        "ok": True,
+        "opencenter": opencenter,
+        "palantir": palantir,
+        "palantir_statuses": sorted(_PALANTIR_READY_STATUSES),
+    })
+
+
+def _sso_login_url():
+    """Where the Sign in button sends the browser.
+
+    Deliberately configuration-driven rather than an embedded OIDC client: in
+    every supported deployment the Microsoft Entra handshake happens *in front*
+    of this app (oauth2-proxy / an IdP-aware ingress), which then presents the
+    identity through the headers _opencenter_lab_identity() already trusts. That
+    keeps the password, the MFA prompt and the tokens entirely out of this
+    process - it never sees a credential and has nothing to leak.
+    """
+    return str(os.environ.get("OPENCENTER_SSO_LOGIN_URL", "") or "").strip()
+
+
+def _sso_logout_url():
+    return str(os.environ.get("OPENCENTER_SSO_LOGOUT_URL", "") or "").strip()
+
+
+@app.get("/api/auth/whoami")
+def auth_whoami():
+    """Read-only identity for the header button.
+
+    Unlike /api/opencenter/lab-session this never provisions a lab workspace, so
+    it is safe to call on every page load.
+    """
+    identity = _opencenter_lab_identity(create_local=False)
+    login_url = _sso_login_url()
+    if not identity:
+        return jsonify(
+            {
+                "ok": True,
+                "signed_in": False,
+                "sso_configured": bool(login_url),
+                "login_url": login_url,
+            }
+        )
+    return jsonify(
+        {
+            "ok": True,
+            "signed_in": True,
+            "authenticated": identity["authenticated"],
+            "display": identity["display"],
+            "role": identity["role"],
+            "cohort": identity["cohort"],
+            "source": identity["source"],
+            "sso_configured": bool(login_url),
+            "login_url": login_url,
+            "logout_url": _sso_logout_url(),
+        }
+    )
+
+
+@app.get("/api/auth/login")
+def auth_login():
+    """Hand off to the configured identity provider.
+
+    Returns 501 rather than improvising a login form when nothing is configured:
+    a password box that is not wired to Entra would train people to type their
+    company credentials into an unauthenticated page, which is precisely the
+    habit an SSO rollout exists to prevent.
+    """
+    target = _sso_login_url()
+    if not target:
+        return jsonify(
+            {
+                "ok": False,
+                "error": "Single sign-on is not configured on this deployment.",
+                "hint": "Set OPENCENTER_SSO_LOGIN_URL and OPENCENTER_TRUST_SSO_HEADERS=1 "
+                        "once the identity-aware proxy is in front of this app.",
+            }
+        ), 501
+    return redirect(target)
+
+
+@app.post("/api/auth/logout")
+def auth_logout():
+    """Clear the local session. The IdP session is ended by the proxy's own
+    sign-out URL, which the caller follows next if one is configured."""
+    for key in (
+        "sso_user", "sso_email", "user_email", "authenticated_user",
+        "sso_role", "user_role", "training_cohort",
+        "opencenter_manual_name", "opencenter_manual_id", "opencenter_manual_role",
+    ):
+        session.pop(key, None)
+    return jsonify({"ok": True, "logout_url": _sso_logout_url()})
 
 
 @app.get("/api/opencenter/lab-session")

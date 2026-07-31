@@ -29,6 +29,26 @@ Flask renders combined.html
 |---|---|---|---|---|
 | `_panel_why.html` | 914 | Why Move to FLEX | `panel-s_why` | FLEX value proposition — WHO / WHAT / WHEN / WHY sections |
 | `_panel_tour.html` | 432 | Quick Tour | `panel-s_tour` | Interactive 3D tour / mission control animation |
+| `_panel_training.html` | 380 | Training &amp; Tutorials | `panel-s_train` | Dedicated home for every OpenCenter training programme — learning-path diagram, index cards, shared `.lab-*` CSS, relocation target |
+| `_lab_kafka.html` | 900 | *(included by `_panel_training.html`)* | `ockl-outer-wrap` | OpenCenter Kafka Training Lab — 9 hands-on missions, 4–5 hours (Strimzi/KRaft cluster, topics, groups, failure recovery, metrics, ACLs, teardown) |
+| `_lab_ai_uniphore.html` | 560 | *(included by `_panel_training.html`)* | `ocai-outer-wrap` | Enterprise AI &amp; Uniphore Specialist Lab — 9 missions, 5–6 hours (GPU pools, model serving, event-driven inference, RAG, PII/Kyverno guardrails, cost). **Mockup:** all vendor specifics are `<uniphore-*>` placeholders |
+| `_lab_template.html` | 240 | *(included by `_panel_training.html`)* | `ocnew-outer-wrap` | Copy-ready skeleton for new labs — 5-step recipe + live design-system reference. **Keep it rendered last.** |
+
+**Learning path.** Boot Camp → Advanced → Kafka Event Backbone → branch into Certification (Track A) and
+Enterprise AI &amp; Uniphore (Track B). The diagram at the top of `_panel_training.html` is the source of truth;
+add a `.trn-node` there when a new programme joins the path.
+
+**Adding a lab.** Copy `_lab_template.html`, replace its 4 `ocnew` ids with a unique prefix, set the three
+`--lab-accent*` variables, add the `{% raw %}{% include %}{% endraw %}` above the template's, and add an index
+card. Do not add a `<style>` block — the `.lab-*` system is defined once in `_panel_training.html`.
+
+**Training &amp; Tutorials relocation.** The Boot Camp (`ocqs-`), Advanced (`ocqp-`) and Certification (`ocqc-`)
+bands physically live in `_panel_s2_opencenter.html`. `activateStage('s_train')` in `_closing_scripts.html`
+moves them into `#train-labs-mount` and moves them back to `#oc-labs-home-anchor` when any other stage opens
+— the same single-live-copy pattern used for `co-adv-dash` and the Stage 4C mounts. **Do not duplicate these
+bands into the training panel:** each carries thousands of lines whose scripts resolve their own element ids
+via `getElementById`, so a second static copy would break both placements. `_lab_kafka.html` is new markup and
+therefore renders directly in the training panel with no move.
 
 ---
 

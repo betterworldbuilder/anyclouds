@@ -6509,6 +6509,228 @@ ${certContent}
     } catch(e) { console.error('syncBizSystemsToTracker', e); alert('Sync failed: ' + e.message); }
   }
 
+  /* ── Migration board: split-flap rendering ───────────────────────────────
+     The counters are updated elsewhere with a plain
+     `el.textContent = String(n).padStart(2,'0')`. Rather than change every one
+     of those call sites, this watches the three counter elements and re-splits
+     whatever text lands into one .mfb-flap tile per character, flipping only
+     the tiles whose character actually changed. */
+  (function() {
+    // ledOpenCenter and ledPalantir have no counter code feeding them yet, so
+    // they render "--" as flaps. Listed here so they pick up the tile styling
+    // and will animate the moment something starts setting their textContent.
+    var IDS = ['ledToBeMigrated', 'ledReady', 'ledSuccess',
+               'ledOpenCenter', 'ledPalantir'];
+
+    function mfbRender(el) {
+      if (!el) return;
+      // textContent of the rendered form is the concatenation of the tiles, so
+      // comparing against it is what stops the observer re-entering forever.
+      var txt = (el.textContent || '').replace(/\s+/g, '');
+      if (el.dataset.mfbText === txt) return;
+      var prev = el.dataset.mfbText || '';
+      el.dataset.mfbText = txt;
+
+      var frag = document.createDocumentFragment();
+      for (var i = 0; i < txt.length; i++) {
+        var flap = document.createElement('span');
+        flap.className = 'mfb-flap';
+        flap.textContent = txt.charAt(i);
+        if (prev && prev.charAt(i) !== txt.charAt(i)) {
+          flap.classList.add('is-flipping');
+          (function(node) {
+            setTimeout(function() { node.classList.remove('is-flipping'); }, 400);
+          })(flap);
+        }
+        frag.appendChild(flap);
+      }
+      el.textContent = '';
+      el.appendChild(frag);
+      // Re-assert after the DOM write, since clearing textContent above would
+      // otherwise leave the guard holding a stale value.
+      el.dataset.mfbText = txt;
+    }
+
+    function mfbInit() {
+      IDS.forEach(function(id) {
+        var el = document.getElementById(id);
+        if (!el || el.dataset.mfbBound === '1') return;
+        el.dataset.mfbBound = '1';
+        mfbRender(el);
+        try {
+          new MutationObserver(function() { mfbRender(el); })
+            .observe(el, { childList: true, characterData: true, subtree: true });
+        } catch (e) { /* no MutationObserver: tiles still render once */ }
+      });
+    }
+
+    /* The two right-hand columns come from the backend rather than the tracker
+       table: OpenCenter cluster blueprints, and AI SWITCH projects that reached
+       the Foundry plan. A null (the endpoint could not read a source) leaves
+       "--" in place — the board should not claim a count it did not make. */
+    function mfbLoadBoardCounters() {
+      fetch('/api/board/counters', { credentials: 'same-origin' })
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+          if (!d || !d.ok) return;
+          var map = { ledOpenCenter: d.opencenter, ledPalantir: d.palantir };
+          Object.keys(map).forEach(function(id) {
+            var el = document.getElementById(id);
+            if (!el) return;
+            var v = map[id];
+            if (v === null || v === undefined) return;
+            el.textContent = String(v).padStart(2, '0');   // observer re-flaps it
+          });
+        })
+        .catch(function() { /* leave "--" */ });
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', function() {
+        mfbInit(); mfbLoadBoardCounters();
+      });
+    } else {
+      mfbInit();
+      mfbLoadBoardCounters();
+    }
+    // Same 60s cadence the rest of the header uses; cheap (two directory walks).
+    setInterval(mfbLoadBoardCounters, 60000);
+    window.mfbRefresh = mfbInit;
+    window.mfbLoadBoardCounters = mfbLoadBoardCounters;
+  })();
+
+  /* ── Identity button in the LED bar ──────────────────────────────────────
+     Reflects whatever /api/auth/whoami reports. There is no password field
+     anywhere in this app by design: the Microsoft Entra handshake (company
+     email, password, Authenticator MFA) happens at the identity-aware proxy in
+     front of the service, which forwards the result through the
+     X-Auth-Request-* headers the backend already trusts. Until that proxy is
+     configured the button says so rather than pretending to be a login. */
+  window.ocAuthState = null;
+
+  function ocAuthRender(s) {
+    var btn = document.getElementById('ocAuthBtn');
+    var l1 = document.getElementById('ocAuthLine1');
+    var l2 = document.getElementById('ocAuthLine2');
+    var ico = document.getElementById('ocAuthIcon');
+    if (!btn || !l1 || !l2) return;
+    if (s && s.signed_in) {
+      btn.classList.add('is-in');
+      l1.textContent = s.display || 'Signed in';
+      l2.textContent = (s.authenticated ? (s.role || 'User') : 'Local session')
+        + (s.cohort ? ' · ' + s.cohort : '');
+      if (ico) ico.textContent = s.authenticated ? '✅' : '\u{1F464}';
+      btn.title = s.authenticated
+        ? ('Signed in as ' + (s.display || '') + ' via ' + (s.source || 'SSO') + ' — click to sign out')
+        : 'Local training session (not company SSO) — click to sign out';
+    } else {
+      btn.classList.remove('is-in');
+      l1.textContent = 'Sign in';
+      l2.textContent = s && s.sso_configured ? 'Company SSO' : 'SSO not configured';
+      if (ico) ico.textContent = '\u{1F512}';
+      btn.title = s && s.sso_configured
+        ? 'Sign in with your company Microsoft account'
+        : 'Single sign-on is not configured on this deployment yet';
+    }
+  }
+
+  window.ocAuthRefresh = function() {
+    return fetch('/api/auth/whoami', { credentials: 'same-origin' })
+      .then(function(r) { return r.json(); })
+      .then(function(s) { window.ocAuthState = s; ocAuthRender(s); return s; })
+      .catch(function() { ocAuthRender(null); });
+  };
+
+  window.ocAuthClick = function() {
+    var s = window.ocAuthState;
+    if (s && s.signed_in) {
+      if (!confirm('Sign out of this dashboard?')) return;
+      fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' })
+        .then(function(r) { return r.json(); })
+        .then(function(res) {
+          if (res && res.logout_url) { window.location.href = res.logout_url; return; }
+          window.ocAuthRefresh();
+        })
+        .catch(function() { window.ocAuthRefresh(); });
+      return;
+    }
+    if (s && s.sso_configured && s.login_url) { window.location.href = '/api/auth/login'; return; }
+    alert(
+      'Company single sign-on is not configured on this deployment yet.\n\n' +
+      'It needs an identity-aware proxy (for example oauth2-proxy) in front of ' +
+      'this dashboard, registered against the company Microsoft Entra tenant. ' +
+      'Password and Authenticator prompts are handled entirely by Microsoft — ' +
+      'this dashboard never sees your credentials.\n\n' +
+      'In the meantime, the OpenCenter Boot Camp lab under Training & Tutorials ' +
+      'has its own Student/Instructor session for training use.'
+    );
+  };
+
+  /* ── Visibility: hidden by default, Ctrl+Shift+L toggles, choice persists ──
+     SSO is not configured on most deployments yet, so a permanent "Sign in"
+     control in the header would be noise. The toggle keeps it one chord away
+     for anyone piloting it. */
+  var OC_AUTH_VIS_KEY = 'ocAuthBtnVisible';
+
+  function ocAuthIsVisible() {
+    try { return localStorage.getItem(OC_AUTH_VIS_KEY) === '1'; } catch (e) { return false; }
+  }
+
+  function ocAuthApplyVisibility() {
+    var cell = document.getElementById('ocAuthCell');
+    if (!cell) return false;
+    var on = ocAuthIsVisible();
+    cell.style.display = on ? 'flex' : 'none';
+    return on;
+  }
+
+  window.ocAuthToggleVisibility = function() {
+    var next = !ocAuthIsVisible();
+    try { localStorage.setItem(OC_AUTH_VIS_KEY, next ? '1' : '0'); } catch (e) {}
+    ocAuthApplyVisibility();
+    if (next) window.ocAuthRefresh();
+    ocAuthToast(next ? 'SSO login button shown' : 'SSO login button hidden');
+    return next;
+  };
+
+  function ocAuthToast(msg) {
+    var el = document.getElementById('ocAuthToast');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'ocAuthToast';
+      el.style.cssText =
+        'position:fixed;left:50%;bottom:26px;transform:translateX(-50%);z-index:99999;' +
+        'padding:9px 18px;border-radius:980px;font:600 12.5px/1.2 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;' +
+        'background:rgba(15,23,42,.94);color:#fff;box-shadow:0 8px 24px rgba(0,0,0,.3);' +
+        'opacity:0;transition:opacity .18s ease;pointer-events:none;';
+      document.body.appendChild(el);
+    }
+    el.textContent = msg + '  ·  Ctrl+Shift+L';
+    requestAnimationFrame(function(){ el.style.opacity = '1'; });
+    clearTimeout(el._t);
+    el._t = setTimeout(function(){ el.style.opacity = '0'; }, 1800);
+  }
+
+  document.addEventListener('keydown', function(e) {
+    // e.code so the chord still fires on non-QWERTY layouts, where e.key for
+    // this physical key may not be "l".
+    if (!e.ctrlKey || !e.shiftKey || e.altKey || e.metaKey) return;
+    if (e.code !== 'KeyL' && String(e.key).toLowerCase() !== 'l') return;
+    var t = e.target;
+    if (t && (t.isContentEditable ||
+              /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName || ''))) return;
+    e.preventDefault();
+    window.ocAuthToggleVisibility();
+  });
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function(){
+      if (ocAuthApplyVisibility()) window.ocAuthRefresh();
+    });
+  } else {
+    setTimeout(function(){ if (ocAuthApplyVisibility()) window.ocAuthRefresh(); }, 0);
+  }
+
   function activateStage(stageId) {
     if (stageId === 's0') loadMigWaitingList();
     if (!window.__activatingStageFromUrl) {
@@ -6634,6 +6856,34 @@ ${certContent}
       var movedSide = document.querySelector('.lcv-uat-mount .uat-live-side--source');
       if (uatBenchHome && movedSide) uatBenchHome.insertBefore(movedSide, uatBenchHome.firstChild);
     }
+    // Training & Tutorials (s_train): host the three OpenCenter lab bands.
+    // Same single-live-copy pattern as co-adv-dash and the s5c relocations above —
+    // the bands are moved, never copied, so every ocqs-/ocqp-/ocqc- element id and
+    // its already-run init script keeps resolving to exactly one node. A static
+    // duplicate would give each of those ids two matches and break both placements.
+    (function() {
+      // Learning-path order: Boot Camp, Advanced, Kafka, then the two branches.
+      var labIds = ['ocqs-outer-wrap', 'ocqp-outer-wrap', 'ockl-outer-wrap',
+                    'ocqc-outer-wrap', 'ocai-outer-wrap'];
+      var mount  = document.getElementById('train-labs-mount');
+      var anchor = document.getElementById('oc-labs-home-anchor');
+      if (stageId === 's_train') {
+        if (!mount) return;
+        labIds.forEach(function(id) {
+          var el = document.getElementById(id);
+          if (el && el.parentNode !== mount) mount.appendChild(el);
+        });
+        var empty = document.getElementById('train-labs-empty');
+        if (empty) empty.style.display = mount.children.length ? 'none' : 'block';
+      } else if (anchor && anchor.parentNode) {
+        // Re-inserted before the anchor in list order, so they return to the
+        // OpenCenter overview in their original reading order.
+        labIds.forEach(function(id) {
+          var el = document.getElementById(id);
+          if (el && el.parentNode !== anchor.parentNode) anchor.parentNode.insertBefore(el, anchor);
+        });
+      }
+    })();
     requestAnimationFrame(syncVisibleIframeHeights);
   if (stageId === 's7a') { try { s7aRefreshAll(); } catch(e) {} }
   }

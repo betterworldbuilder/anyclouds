@@ -1,0 +1,683 @@
+  <!-- ══════════════════════════════════════════════════════════════════════
+       Enterprise AI & Uniphore Specialist Lab — MOCKUP.
+
+       Built from _lab_template.html: uses the shared .lab-* design system, no
+       stylesheet of its own. Prefix: ocai-
+
+       Terminal branch of the learning path, parallel to Certification:
+         Boot Camp -> Advanced -> Kafka Event Backbone -> {Certification, this}
+
+       STATUS: curriculum mockup for review. The OpenCenter/Kubernetes/FLEX
+       mechanics are real; every Uniphore-specific name, endpoint, connector and
+       licence term is a PLACEHOLDER and must be confirmed against Uniphore's own
+       documentation and the Rackspace partnership terms before this is taught.
+       Placeholders are marked <uniphore-*> so they are impossible to miss.
+  ═══════════════════════════════════════════════════════════════════════ -->
+  <div id="ocai-outer-wrap" data-lab-band
+       style="--lab-accent:#5856D6;--lab-accent-dark:#3B37A0;--lab-accent-soft:#EEEEFB;
+              margin-bottom:18px;border:2px solid #9391E8;border-radius:12px;overflow:hidden;
+              box-shadow:0 2px 8px rgba(88,86,214,.22);">
+    <div id="ocai-inline-toggle" onclick="(function(){var b=document.getElementById('ocai-inline-body');var a=document.getElementById('ocai-inline-arrow');var open=b.style.display!=='none';b.style.display=open?'none':'block';a.textContent=open?'▶':'▼';})()" style="display:flex;align-items:center;justify-content:space-between;padding:14px 20px;background:linear-gradient(135deg,#3B37A0,#5856D6,#9391E8);cursor:pointer;user-select:none;">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <span style="font-size:20px;">🧠</span>
+        <div>
+          <div style="font-size:15px;font-weight:800;color:#fff;">Enterprise AI &amp; Uniphore Specialist Lab</div>
+          <div style="font-size:12px;color:#E6E6FA;margin-top:2px;">Specialist track · 9 missions · 5–6 hours · Run governed enterprise AI on the OpenCenter platform</div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;">
+        <span style="font-size:10px;font-weight:800;letter-spacing:1px;background:#fbbf24;color:#422006;padding:3px 10px;border-radius:999px;">MOCKUP</span>
+        <span id="ocai-inline-arrow" style="color:#fff;font-size:16px;font-weight:900;">▶</span>
+      </div>
+    </div>
+    <div id="ocai-inline-body" style="display:none;background:#f0f4f8;padding:0;">
+
+    <div class="lab">
+
+      <div class="lab-note nx" style="margin-top:0;">
+        <b class="h">Mockup — read before using</b>
+        The OpenCenter, Kubernetes and FLEX mechanics below are real and runnable. Every <b>Uniphore-specific</b>
+        name, endpoint, connector, image and licence term is a placeholder written as
+        <code>&lt;uniphore-*&gt;</code>. Confirm each one against Uniphore's own documentation and the Rackspace
+        partnership terms before this becomes delivered training. Nothing here should be quoted to a customer
+        as a Uniphore capability.
+      </div>
+
+      <div class="lab-hero">
+        <div class="lab-kick">Specialist track &middot; terminal branch of the OpenCenter path</div>
+        <h3>&#129504; Enterprise AI on a Governed Platform</h3>
+        <div class="lab-tag">The city has a nervous system. Now it gets a brain &mdash; and rules about what the brain may know.</div>
+        <div class="lab-flow">
+          Boot Camp built the city, Advanced made it safe to operate, and the Kafka lab gave it a nervous
+          system. This lab puts <b style="color:#fff;">enterprise AI on top of that platform</b>: GPU capacity
+          on FLEX, a model-serving layer, inference driven by real events rather than batch jobs, a retrieval
+          layer over the customer's own records, and the governance that makes it
+          <b style="color:#fff;">defensible in a regulated account</b>.
+        </div>
+      </div>
+
+      <div class="lab-card">
+        <div class="lab-h">Why this lab sits after Kafka, not before it</div>
+        <p style="margin:0;font-size:13px;">An AI service that can only be called by an API sees a snapshot.
+          An AI service subscribed to an event stream sees <b>causality</b> &mdash; what happened, in what order,
+          and what changed &mdash; and can act on it as it happens. Every mission here assumes the event
+          backbone from the Kafka lab already exists. If it does not, build that first; this lab will not
+          work standing alone.</p>
+        <div class="lab-note nr"><b class="h">The honest version</b>
+          Most "AI platform" failures are not model failures. They are missing data plumbing, absent
+          governance, and no way to measure whether the thing helped. Missions 4, 7 and 8 exist because those
+          are what actually sink enterprise AI projects.</div>
+      </div>
+
+      <div class="lab-card">
+        <div class="lab-h">What you will build</div>
+        <div class="lab-grid">
+          <ul class="t" style="margin:0;">
+            <li>A dedicated GPU/AI worker pool on FLEX</li>
+            <li>A model-serving deployment with health and autoscaling</li>
+            <li>An inference request/response topic pair on Kafka</li>
+            <li>A consumer turning business events into inference calls</li>
+            <li>A retrieval (RAG) layer over customer records</li>
+          </ul>
+          <ul class="t" style="margin:0;">
+            <li>A <code>&lt;uniphore-connector&gt;</code> integration point</li>
+            <li>PII redaction before anything leaves the cluster</li>
+            <li>Kyverno policy blocking ungoverned AI workloads</li>
+            <li>Token, latency and cost dashboards</li>
+            <li>A model-quality feedback loop on its own topic</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="lab-card">
+        <div class="lab-h">Duration</div>
+        <table class="lab-tbl">
+          <thead><tr><th style="width:340px">Section</th><th>Estimated time</th></tr></thead>
+          <tbody>
+            <tr><td>Platform preflight for AI</td><td>25 minutes</td></tr>
+            <tr><td>GPU and AI worker pools</td><td>40 minutes</td></tr>
+            <tr><td>Model serving layer</td><td>45 minutes</td></tr>
+            <tr><td>Event-driven inference on Kafka</td><td>45 minutes</td></tr>
+            <tr><td>Uniphore platform integration</td><td>45 minutes</td></tr>
+            <tr><td>Retrieval and the knowledge layer</td><td>40 minutes</td></tr>
+            <tr><td>Governance, PII and guardrails</td><td>45 minutes</td></tr>
+            <tr><td>Observability, quality and cost</td><td>35 minutes</td></tr>
+            <tr><td>Cleanup and assessment</td><td>25 minutes</td></tr>
+            <tr><td><b>Total</b></td><td><b>5&ndash;6 hours</b></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="lab-card">
+        <div class="lab-h">Prerequisites</div>
+        <div class="lab-grid">
+          <ul class="t" style="margin:0;">
+            <li><b>OpenCenter Boot Camp</b> completed</li>
+            <li><b>Advanced OpenCenter</b> Modules 7 (secrets) and 8 (worker pools)</li>
+            <li><b>Kafka Event Backbone lab</b> completed &mdash; a working cluster and topic</li>
+            <li>Keycloak and Kyverno running on the cluster</li>
+          </ul>
+          <ul class="t" style="margin:0;">
+            <li>GPU-capable FLEX flavors available in the region, <b>and quota for them</b></li>
+            <li>Prometheus/Grafana from Module 9</li>
+            <li><code>&lt;uniphore-tenant&gt;</code> credentials, if doing Mission 5 for real</li>
+            <li><code>opencenter</code>, <code>kubectl</code>, <code>git</code>, <code>flux</code>, <code>helm</code></li>
+          </ul>
+        </div>
+        <div class="lab-note nw"><b class="h">Check GPU quota before you book the room</b>
+          GPU flavors are the most commonly unavailable resource in a FLEX region and the most commonly
+          exhausted quota. Run Mission 1 Task 1.2 a week before you deliver this lab, not on the morning.</div>
+      </div>
+
+      <div class="lab-card">
+        <div class="lab-h">Lab variables</div>
+<pre class="lab-pre">cat &gt; ai-lab.env &lt;&lt;'EOF'
+export LAB_ORG="my-company"
+export LAB_CLUSTER="prod-cluster"
+
+export AI_NAMESPACE="ai-platform"
+export AI_MODEL_NAME="assist-model"
+export KAFKA_NAMESPACE="kafka-lab"
+export KAFKA_CLUSTER="city-stream"
+
+<span class="c"># Inference event topics - the contract between business apps and the model</span>
+export AI_TOPIC_IN="ai-inference-requests"
+export AI_TOPIC_OUT="ai-inference-results"
+export AI_TOPIC_FEEDBACK="ai-quality-feedback"
+
+<span class="c"># PLACEHOLDER - confirm against Uniphore documentation before use</span>
+export UNIPHORE_ENDPOINT="&lt;uniphore-api-endpoint&gt;"
+export UNIPHORE_TENANT="&lt;uniphore-tenant-id&gt;"
+EOF
+
+source ai-lab.env
+opencenter cluster use "$LAB_ORG/$LAB_CLUSTER"</pre>
+      </div>
+
+      <!-- ══════════ PART 1 ══════════ -->
+      <div class="lab-lvl"><span class="n">Part 1 &middot; Give the brain somewhere to live</span>
+        <span>Missions 1&ndash;3</span><span class="b">&#127959;&#65039; Capacity, then serving</span></div>
+
+      <details class="lab-m" open><summary><span class="lab-num">1</span><span class="lab-t">Platform Preflight for AI</span>
+        <span class="lab-meta"><span class="lab-pill time">25 min</span><span class="lab-pill tool">opencenter</span><span class="lab-pill tool">openstack</span><span class="lab-pill tool">kubectl</span></span>
+        <span class="lab-s">Check the city can actually power a brain before promising one.</span></summary>
+        <div class="lab-body">
+          <div class="lab-note nm" style="margin-top:8px;"><b class="h">Why</b>
+            AI workloads fail preflight more often than any other kind: no GPU flavor in the region, no quota,
+            no storage for model weights, no event backbone to feed them. Find that out now.</div>
+
+          <div class="lab-step">Task 1.1 &mdash; Confirm the platform baseline</div>
+<pre class="lab-pre">opencenter cluster describe "$LAB_ORG/$LAB_CLUSTER"
+kubectl get nodes -o wide
+flux get kustomizations -A</pre>
+
+          <div class="lab-step">Task 1.2 &mdash; Confirm GPU capacity exists <i>and</i> is available to you</div>
+<pre class="lab-pre"><span class="c"># Does the region offer GPU flavors at all?</span>
+openstack flavor list --long | grep -iE 'gpu|a100|l40|h100'
+
+<span class="c"># Do you have quota to actually boot them?</span>
+openstack quota show
+openstack limits show --absolute</pre>
+          <div class="lab-note nx"><b class="h">Gate</b>
+            No GPU flavor, or zero quota, means Mission 2 cannot run. Either raise the quota request now, or
+            switch the lab to CPU-only serving (Mission 3 notes how) &mdash; but say so up front rather than
+            discovering it live.</div>
+
+          <div class="lab-step">Task 1.3 &mdash; Confirm the event backbone is alive</div>
+<pre class="lab-pre">kubectl -n "$KAFKA_NAMESPACE" get kafka,kafkatopic
+kubectl -n "$KAFKA_NAMESPACE" get pods</pre>
+
+          <div class="lab-step">Task 1.4 &mdash; Confirm identity, policy and observability</div>
+<pre class="lab-pre">kubectl get pods -n keycloak
+kubectl get pods -n kyverno
+kubectl get pods -n observability
+kubectl get storageclass</pre>
+
+          <div class="lab-step">Checkpoint</div>
+          <table class="lab-tbl">
+            <thead><tr><th style="width:340px">Check</th><th>Result</th></tr></thead>
+            <tbody>
+              <tr><td>Cluster healthy, Flux reconciled</td><td>Pass / Fail</td></tr>
+              <tr><td>GPU flavor available in region</td><td>Pass / Fail</td></tr>
+              <tr><td>GPU quota greater than zero</td><td>Pass / Fail</td></tr>
+              <tr><td>Kafka cluster and topic ready</td><td>Pass / Fail</td></tr>
+              <tr><td>Keycloak, Kyverno, Prometheus running</td><td>Pass / Fail</td></tr>
+              <tr><td>Storage class for model weights</td><td>Pass / Fail</td></tr>
+            </tbody>
+          </table>
+
+          <div class="lab-note nc"><b class="h">Mission complete when</b>
+            <ul><li>Every check passes, or a documented substitution is agreed (CPU-only serving).</li>
+            <li>You can state the GPU quota number, not just that "we have GPUs".</li></ul></div>
+        </div>
+      </details>
+
+      <details class="lab-m"><summary><span class="lab-num">2</span><span class="lab-t">GPU and AI Worker Pools</span>
+        <span class="lab-meta"><span class="lab-pill time">40 min</span><span class="lab-pill tool">opencenter</span><span class="lab-pill tool">opentofu</span></span>
+        <span class="lab-s">A dedicated district for expensive machines, fenced so nothing else squats on them.</span></summary>
+        <div class="lab-body">
+          <div class="lab-note nm" style="margin-top:8px;"><b class="h">The metaphor</b>
+            GPU nodes are the most expensive buildings in the city. They get their own district, with a gate
+            that only AI workloads can pass &mdash; otherwise a batch job schedules onto a GPU node and you pay
+            premium rates for a cron script.</div>
+
+          <div class="lab-step">Task 2.1 &mdash; Add the pool to the blueprint</div>
+          <p style="margin:0 0 6px;font-size:13px;">Module 8 of the Advanced lab covers this pattern. Add
+            under <code>additional_server_pools</code> via <code>opencenter cluster edit</code>:</p>
+<pre class="lab-pre y">additional_server_pools:
+  - name: ai-gpu-pool
+    count: 2
+    flavor: "&lt;gpu-flavor-from-task-1.2&gt;"
+    labels:
+      workload-class: ai-inference
+      accelerator: gpu
+    taints:
+      - key: workload-class
+        value: ai-inference
+        effect: NoSchedule</pre>
+
+          <div class="lab-step">Task 2.2 &mdash; Validate, render, deploy</div>
+<pre class="lab-pre">opencenter cluster validate "$LAB_CLUSTER" --validation online
+opencenter cluster generate "$LAB_CLUSTER" --render-only --force
+
+git -C "$GITOPS_DIR" add . &amp;&amp; git -C "$GITOPS_DIR" commit -m "Add AI GPU worker pool"
+git -C "$GITOPS_DIR" push
+
+opencenter cluster deploy "$LAB_CLUSTER" --from-step opentofu-apply</pre>
+
+          <div class="lab-step">Task 2.3 &mdash; Confirm the district exists and is fenced</div>
+<pre class="lab-pre">kubectl get nodes -l workload-class=ai-inference
+kubectl describe node -l workload-class=ai-inference | grep -A3 Taints
+
+<span class="c"># The device plugin must expose the GPUs as a schedulable resource</span>
+kubectl get nodes -o custom-columns='NAME:.metadata.name,GPU:.status.allocatable.nvidia\.com/gpu'</pre>
+          <div class="lab-note nw"><b class="h">Nodes are not enough</b>
+            A GPU node with no device plugin reports zero allocatable GPUs and your pods stay
+            <code>Pending</code> forever with no obvious reason. If the column above is empty, the GPU operator
+            or device plugin is missing &mdash; confirm which your OpenCenter release installs.</div>
+
+          <div class="lab-note nc"><b class="h">Mission complete when</b>
+            <ul><li>GPU nodes have joined and carry the label and taint.</li>
+            <li><code>nvidia.com/gpu</code> is allocatable and non-zero.</li>
+            <li>A test pod without the toleration is <b>refused</b> by the district.</li></ul></div>
+        </div>
+      </details>
+
+      <details class="lab-m"><summary><span class="lab-num">3</span><span class="lab-t">The Model Serving Layer</span>
+        <span class="lab-meta"><span class="lab-pill time">45 min</span><span class="lab-pill tool">kubectl</span><span class="lab-pill tool">flux</span></span>
+        <span class="lab-s">Somewhere to send a question and reliably get an answer.</span></summary>
+        <div class="lab-body">
+          <div class="lab-note nm" style="margin-top:8px;"><b class="h">The metaphor</b>
+            The brain needs a front desk: one address, a queue, a health check, and the ability to hire more
+            staff when the queue grows.</div>
+
+          <div class="lab-step">Task 3.1 &mdash; Namespace and model storage</div>
+<pre class="lab-pre">kubectl create namespace "$AI_NAMESPACE" --dry-run=client -o yaml | kubectl apply -f -
+
+cat &gt; "$GITOPS_DIR/ai-model-storage.yaml" &lt;&lt;EOF
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: model-weights
+  namespace: ${AI_NAMESPACE}
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 200Gi
+EOF</pre>
+
+          <div class="lab-step">Task 3.2 &mdash; Deploy the serving workload onto the AI district</div>
+<pre class="lab-pre y">spec:
+  template:
+    spec:
+      nodeSelector:
+        workload-class: ai-inference
+      tolerations:
+        - key: workload-class
+          value: ai-inference
+          effect: NoSchedule
+      containers:
+        - name: model-server
+          image: &lt;your-model-serving-image&gt;
+          resources:
+            limits:
+              nvidia.com/gpu: 1
+          readinessProbe:
+            httpGet: { path: /health, port: 8080 }
+            initialDelaySeconds: 60
+          volumeMounts:
+            - name: weights
+              mountPath: /models</pre>
+          <div class="lab-note nr"><b class="h">No GPU? The lab still works</b>
+            Drop the <code>nvidia.com/gpu</code> limit, the nodeSelector and the toleration, and use a small
+            CPU model. Every later mission &mdash; events, retrieval, governance, cost &mdash; is unchanged.
+            Only latency differs.</div>
+
+          <div class="lab-step">Task 3.3 &mdash; Prove the front desk answers</div>
+<pre class="lab-pre">kubectl -n "$AI_NAMESPACE" rollout status deploy/"$AI_MODEL_NAME"
+kubectl -n "$AI_NAMESPACE" port-forward svc/"$AI_MODEL_NAME" 8080:8080 &amp;
+
+curl -s localhost:8080/health
+curl -s -X POST localhost:8080/v1/completions \
+  -H 'Content-Type: application/json' \
+  -d '{"prompt":"Summarise: the migration completed with two warnings.","max_tokens":64}'</pre>
+          <div class="lab-note nw"><b class="h">The readiness probe is the whole mission</b>
+            Model containers take minutes to load weights. Without a correct
+            <code>initialDelaySeconds</code> Kubernetes kills the pod mid-load and restarts it forever. If your
+            model server crash-loops, this is why &mdash; before you blame the image.</div>
+
+          <div class="lab-note nc"><b class="h">Mission complete when</b>
+            <ul><li>The deployment is <code>Ready</code> on a GPU (or documented CPU) node.</li>
+            <li><code>/health</code> returns healthy and an inference call returns a real completion.</li>
+            <li>Weights load from the PVC, not baked into the image.</li></ul></div>
+        </div>
+      </details>
+
+      <!-- ══════════ PART 2 ══════════ -->
+      <div class="lab-lvl"><span class="n">Part 2 &middot; Wire it into the business</span>
+        <span>Missions 4&ndash;6</span><span class="b">&#128268; Events, vendor platform, knowledge</span></div>
+
+      <details class="lab-m"><summary><span class="lab-num">4</span><span class="lab-t">Event-Driven Inference on Kafka</span>
+        <span class="lab-meta"><span class="lab-pill time">45 min</span><span class="lab-pill tool">kafka</span><span class="lab-pill tool">strimzi</span></span>
+        <span class="lab-s">The brain stops waiting to be asked and starts reacting to what happens.</span></summary>
+        <div class="lab-body">
+          <div class="lab-note nm" style="margin-top:8px;"><b class="h">The metaphor</b>
+            Until now the brain answers only when someone walks up and asks. Connect it to the railway and it
+            reacts to every parcel passing through the city &mdash; and its answers become parcels other
+            services can collect.</div>
+
+          <div class="lab-step">Task 4.1 &mdash; Create the inference topic pair</div>
+<pre class="lab-pre">for T in "$AI_TOPIC_IN" "$AI_TOPIC_OUT" "$AI_TOPIC_FEEDBACK"; do
+cat &gt; "$GITOPS_DIR/kafka-topic-$T.yaml" &lt;&lt;EOF
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaTopic
+metadata:
+  name: ${T}
+  namespace: ${KAFKA_NAMESPACE}
+  labels:
+    strimzi.io/cluster: ${KAFKA_CLUSTER}
+spec:
+  partitions: 6
+  replicas: 3
+EOF
+done
+
+git -C "$GITOPS_DIR" add . &amp;&amp; git -C "$GITOPS_DIR" commit -m "Add AI inference topics"
+git -C "$GITOPS_DIR" push &amp;&amp; flux reconcile source git flux-system</pre>
+
+          <div class="lab-step">Task 4.2 &mdash; The event contract</div>
+          <p style="margin:0 0 6px;font-size:13px;">Agree the shape <b>before</b> writing the consumer. This is
+            the interface between the business and the model, and changing it later breaks every consumer.</p>
+<pre class="lab-pre y">{
+  "event_id":     "uuid",
+  "occurred_at":  "2026-07-31T20:14:00Z",
+  "source":       "cutover-service",
+  "subject":      "acme-payments",
+  "task":         "summarise | classify | extract",
+  "payload":      { "...": "already PII-redacted, see Mission 7" },
+  "trace_id":     "for joining request to result"
+}</pre>
+
+          <div class="lab-step">Task 4.3 &mdash; Run the inference worker</div>
+          <p style="margin:0 0 6px;font-size:13px;">A consumer in group <code>ai-workers</code> reads
+            <code>$AI_TOPIC_IN</code>, calls the model service, and produces to <code>$AI_TOPIC_OUT</code>
+            carrying the same <code>trace_id</code>. Scale it by adding replicas &mdash; the consumer group
+            rebalances partitions automatically, exactly as in Kafka lab Mission 5.</p>
+<pre class="lab-pre">kubectl -n "$AI_NAMESPACE" scale deploy/ai-inference-worker --replicas=3
+
+<span class="c"># Lag is your AI backlog. This is the number that matters.</span>
+kubectl -n "$KAFKA_NAMESPACE" run kafka-admin -ti \
+  --image="$KAFKA_CLIENT_IMAGE" --rm=true --restart=Never -- \
+  bin/kafka-consumer-groups.sh \
+    --bootstrap-server "$KAFKA_CLUSTER-kafka-bootstrap:9092" \
+    --describe --group ai-workers</pre>
+
+          <div class="lab-note nr"><b class="h">Why this beats a REST call</b>
+            A slow model no longer blocks the business app &mdash; requests queue instead of timing out. Bursts
+            are absorbed. The model can be restarted or upgraded with zero lost requests. And you can
+            <b>replay</b> a day of traffic through a new model version to compare it against the old one before
+            switching. None of that is available over synchronous HTTP.</div>
+
+          <div class="lab-note nc"><b class="h">Mission complete when</b>
+            <ul><li>All three topics exist and are <code>Ready</code>.</li>
+            <li>An event on the request topic produces a result on the result topic with a matching
+              <code>trace_id</code>.</li>
+            <li>Scaling the worker changes partition assignment and reduces lag.</li>
+            <li>Killing the model service causes lag to grow &mdash; and no events to be lost.</li></ul></div>
+        </div>
+      </details>
+
+      <details class="lab-m"><summary><span class="lab-num">5</span><span class="lab-t">Uniphore Platform Integration</span>
+        <span class="lab-meta"><span class="lab-pill time">45 min</span><span class="lab-pill tool">uniphore</span><span class="lab-pill tool">kubectl</span></span>
+        <span class="lab-s">Connect the platform you built to the enterprise AI product the customer bought.</span></summary>
+        <div class="lab-body">
+          <div class="lab-note nx" style="margin-top:8px;"><b class="h">Highest-placeholder mission &mdash; confirm everything</b>
+            Every identifier in this mission is written <code>&lt;uniphore-*&gt;</code> because I will not invent
+            a vendor's API surface. Before delivering: get the current integration guide from Uniphore, confirm
+            what the Rackspace partnership entitles the customer to, and replace each placeholder. The
+            <i>shape</i> of the integration below (credentials as Secrets, egress policy, a bridge on the event
+            backbone, health verification) is correct regardless of the product's specifics.</div>
+
+          <div class="lab-step">Task 5.1 &mdash; Store tenant credentials as a Secret, never in Git plaintext</div>
+<pre class="lab-pre">kubectl -n "$AI_NAMESPACE" create secret generic uniphore-tenant \
+  --from-literal=endpoint="$UNIPHORE_ENDPOINT" \
+  --from-literal=tenant-id="$UNIPHORE_TENANT" \
+  --from-literal=api-key='&lt;uniphore-api-key&gt;' \
+  --dry-run=client -o yaml &gt; uniphore-tenant.yaml
+
+<span class="c"># Encrypt before it goes near Git - Advanced lab Module 7</span>
+opencenter secrets encrypt --path applications/overlays/"$LAB_CLUSTER"</pre>
+          <div class="lab-note nx"><b class="h">Never commit this unencrypted</b>
+            A vendor API key in Git history is a credential rotation and an incident report, even in a private
+            repo. SOPS-encrypt it or use a secret store &mdash; there is no third acceptable option.</div>
+
+          <div class="lab-step">Task 5.2 &mdash; Open <i>only</i> the egress the integration needs</div>
+<pre class="lab-pre y">apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-uniphore-egress
+  namespace: &lt;ai-namespace&gt;
+spec:
+  podSelector:
+    matchLabels: { app: uniphore-bridge }
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - ipBlock:
+            cidr: &lt;uniphore-endpoint-cidr&gt;
+      ports:
+        - protocol: TCP
+          port: 443</pre>
+          <p style="margin:6px 0 0;font-size:13px;">Default-deny plus one explicit allow. If the customer is
+            regulated, this policy is the artifact their auditor will ask to see &mdash; it proves the AI
+            namespace cannot call anywhere else.</p>
+
+          <div class="lab-step">Task 5.3 &mdash; The bridge</div>
+          <p style="margin:0 0 6px;font-size:13px;">A deployment that consumes <code>$AI_TOPIC_OUT</code> and
+            forwards to <code>&lt;uniphore-ingest-endpoint&gt;</code>, and/or consumes
+            <code>&lt;uniphore-event-source&gt;</code> and produces onto <code>$AI_TOPIC_IN</code>. Kafka is
+            deliberately in the middle: the vendor platform and your business systems never talk directly, so
+            either side can be replaced without touching the other.</p>
+<pre class="lab-pre">kubectl -n "$AI_NAMESPACE" rollout status deploy/uniphore-bridge
+kubectl -n "$AI_NAMESPACE" logs deploy/uniphore-bridge --tail=50
+
+<span class="c"># Verify the allowlist works in BOTH directions</span>
+kubectl -n "$AI_NAMESPACE" exec deploy/uniphore-bridge -- \
+  curl -s -o /dev/null -w '%{http_code}\n' https://example.com   <span class="c"># expect failure</span></pre>
+
+          <div class="lab-note nc"><b class="h">Mission complete when</b>
+            <ul><li>Credentials exist as an encrypted Secret, absent from Git plaintext.</li>
+            <li>Egress is default-deny with a single documented exception.</li>
+            <li>The bridge is running and a round trip is demonstrated end to end.</li>
+            <li>A call to any non-allowlisted host is <b>refused</b>, with the failure captured.</li>
+            <li><b>Every <code>&lt;uniphore-*&gt;</code> placeholder has been replaced with a confirmed value.</b></li></ul></div>
+        </div>
+      </details>
+
+      <details class="lab-m"><summary><span class="lab-num">6</span><span class="lab-t">Retrieval and the Knowledge Layer</span>
+        <span class="lab-meta"><span class="lab-pill time">40 min</span><span class="lab-pill tool">kubectl</span><span class="lab-pill tool">postgres</span></span>
+        <span class="lab-s">Give the brain the customer's own records, so it stops inventing answers.</span></summary>
+        <div class="lab-body">
+          <div class="lab-note nm" style="margin-top:8px;"><b class="h">The metaphor</b>
+            A brilliant employee who has never read the company's files will confidently give wrong answers.
+            Retrieval is handing them the filing cabinet &mdash; and requiring them to cite which file they used.</div>
+
+          <div class="lab-step">Task 6.1 &mdash; Stand up the vector store</div>
+          <p style="margin:0 0 6px;font-size:13px;">You already run <code>postgres-operator</code> from the
+            platform services. A PostgreSQL database with a vector extension avoids adding another stateful
+            system to operate.</p>
+<pre class="lab-pre">kubectl -n "$AI_NAMESPACE" get pods -l application=spilo
+kubectl -n "$AI_NAMESPACE" exec -it &lt;postgres-pod&gt; -- \
+  psql -c 'CREATE EXTENSION IF NOT EXISTS vector;'</pre>
+
+          <div class="lab-step">Task 6.2 &mdash; Ingest through the event backbone, not a batch script</div>
+          <p style="margin:0 0 6px;font-size:13px;">Documents and record changes arrive as events; an embedding
+            consumer writes vectors. The knowledge layer then stays current automatically instead of being
+            re-indexed nightly and drifting all day.</p>
+<pre class="lab-pre y">source record changes
+      &darr;
+Kafka topic: knowledge-updates
+      &darr;
+embedding consumer  &rarr;  vector store
+      &darr;
+retrieval API  &rarr;  model prompt (with citations)</pre>
+
+          <div class="lab-step">Task 6.3 &mdash; Require citations</div>
+          <div class="lab-note nr"><b class="h">The rule that makes RAG defensible</b>
+            An answer with no citation is not an answer, it is a guess with good grammar. Configure the
+            retrieval layer to return source ids alongside the text, and have the serving layer refuse to
+            answer when retrieval returns nothing. "I don't have that information" is a correct, valuable
+            output &mdash; a confident fabrication is a liability in a regulated account.</div>
+
+          <div class="lab-note nc"><b class="h">Mission complete when</b>
+            <ul><li>The vector store is running with a working extension.</li>
+            <li>A record change event results in an updated embedding, with no manual step.</li>
+            <li>A query returns an answer <b>with citations</b> to source records.</li>
+            <li>A query with no relevant records returns a refusal, not an invention.</li></ul></div>
+        </div>
+      </details>
+
+      <!-- ══════════ PART 3 ══════════ -->
+      <div class="lab-lvl"><span class="n">Part 3 &middot; Make it defensible</span>
+        <span>Missions 7&ndash;9</span><span class="b">&#128272; Governance, measurement, exit</span></div>
+
+      <details class="lab-m"><summary><span class="lab-num">7</span><span class="lab-t">Governance, PII and Guardrails</span>
+        <span class="lab-meta"><span class="lab-pill time">45 min</span><span class="lab-pill tool">kyverno</span><span class="lab-pill tool">keycloak</span></span>
+        <span class="lab-s">The mission that decides whether this ever reaches production.</span></summary>
+        <div class="lab-body">
+          <div class="lab-note nm" style="margin-top:8px;"><b class="h">The metaphor</b>
+            The brain is capable. Now the city decides what it is permitted to know, who may ask it, and what
+            it must never repeat.</div>
+
+          <div class="lab-step">Task 7.1 &mdash; Redact before the data leaves its home namespace</div>
+          <p style="margin:0 0 6px;font-size:13px;">Redaction belongs at the producer, not the model. Once an
+            unredacted value is on a topic it is retained, replicated and replayable &mdash; a retention policy
+            problem, not a prompt problem.</p>
+<pre class="lab-pre y">Business system
+      &darr;  redact here  &larr; account numbers, names, card data, health identifiers
+Kafka: ai-inference-requests
+      &darr;
+model  &mdash; never sees the original values</pre>
+
+          <div class="lab-step">Task 7.2 &mdash; Block ungoverned AI workloads with policy</div>
+<pre class="lab-pre y">apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-ai-governance
+spec:
+  validationFailureAction: Enforce
+  rules:
+    - name: require-data-classification
+      match:
+        any:
+          - resources:
+              kinds: [Deployment]
+              namespaces: [&lt;ai-namespace&gt;]
+      validate:
+        message: "AI workloads must declare data-classification and model-owner labels."
+        pattern:
+          metadata:
+            labels:
+              data-classification: "?*"
+              model-owner: "?*"</pre>
+          <p style="margin:6px 0 0;font-size:13px;">Now an undocumented model cannot be deployed at all. That
+            is a far stronger control than a policy document nobody reads.</p>
+
+          <div class="lab-step">Task 7.3 &mdash; Authenticate and authorise callers</div>
+<pre class="lab-pre">kubectl get pods -n keycloak
+<span class="c"># Who may call the model? Which team owns which topic?</span>
+<span class="c"># Reuse the KafkaUser ACL pattern from Kafka lab Mission 8.</span></pre>
+
+          <div class="lab-step">Task 7.4 &mdash; The challenge</div>
+          <div class="lab-note nr"><b class="h">Prove all five, with evidence</b>
+            <ul><li>A PII value entering the business system <b>never appears</b> on any Kafka topic.</li>
+            <li>A Deployment without governance labels is <b>rejected</b> &mdash; capture the Kyverno message.</li>
+            <li>An unauthenticated caller cannot reach the model service.</li>
+            <li>A prompt attempting to extract another tenant's data <b>fails</b>.</li>
+            <li>You can name, for any given answer, which records produced it.</li></ul></div>
+
+          <div class="lab-note nc"><b class="h">Mission complete when</b>
+            <ul><li>Redaction happens at the producer and is demonstrated on a real topic.</li>
+            <li>The Kyverno policy is <code>Enforce</code>, not <code>Audit</code>.</li>
+            <li>All five challenge outcomes are evidenced with their error messages.</li></ul></div>
+        </div>
+      </details>
+
+      <details class="lab-m"><summary><span class="lab-num">8</span><span class="lab-t">Observability, Quality and Cost</span>
+        <span class="lab-meta"><span class="lab-pill time">35 min</span><span class="lab-pill tool">prometheus</span><span class="lab-pill tool">grafana</span></span>
+        <span class="lab-s">Answer the only two questions leadership will actually ask.</span></summary>
+        <div class="lab-body">
+          <div class="lab-note nm" style="margin-top:8px;"><b class="h">The two questions</b>
+            "Is it working?" and "What is it costing us?" A platform that cannot answer both gets switched off
+            at the next budget review, however good the technology is.</div>
+
+          <div class="lab-step">Task 8.1 &mdash; The metrics that matter</div>
+          <table class="lab-tbl">
+            <thead><tr><th style="width:230px">Signal</th><th>Why it earns its dashboard space</th></tr></thead>
+            <tbody>
+              <tr><td><b>Consumer lag on <code>$AI_TOPIC_IN</code></b></td><td>The AI backlog. Rising lag = users waiting. <b>Alert on this.</b></td></tr>
+              <tr><td><b>Inference latency p50/p95/p99</b></td><td>p99 is what users complain about; averages hide it</td></tr>
+              <tr><td><b>Tokens in / out per request</b></td><td>The unit of cost. No tokens metric, no cost model.</td></tr>
+              <tr><td><b>GPU utilisation</b></td><td>Low utilisation on premium nodes is money burning quietly</td></tr>
+              <tr><td><b>Refusal / no-citation rate</b></td><td>Rising refusals mean the knowledge layer is stale</td></tr>
+              <tr><td><b>Feedback topic volume</b></td><td>Humans disagreeing with the model &mdash; your quality signal</td></tr>
+            </tbody>
+          </table>
+
+          <div class="lab-step">Task 8.2 &mdash; Close the quality loop</div>
+          <p style="margin:0 0 6px;font-size:13px;">Human corrections publish to
+            <code>$AI_TOPIC_FEEDBACK</code>. That topic is the training set for the next iteration and the
+            evidence that the system is improving &mdash; which is what renews the budget.</p>
+<pre class="lab-pre">kubectl -n "$KAFKA_NAMESPACE" run kafka-admin -ti \
+  --image="$KAFKA_CLIENT_IMAGE" --rm=true --restart=Never -- \
+  bin/kafka-console-consumer.sh \
+    --bootstrap-server "$KAFKA_CLUSTER-kafka-bootstrap:9092" \
+    --topic "$AI_TOPIC_FEEDBACK" --from-beginning --timeout-ms 10000</pre>
+
+          <div class="lab-step">Task 8.3 &mdash; Cost per outcome, not cost per node</div>
+          <div class="lab-note nr"><b class="h">The number that wins the argument</b>
+            "GPU nodes cost $X/month" invites a cut. "Each handled ticket costs $0.04 in inference against
+            $6.00 of agent time" ends the conversation. Build the second number: total inference cost divided
+            by business events successfully handled. You need the tokens metric from 8.1 to do it.</div>
+
+          <div class="lab-note nc"><b class="h">Mission complete when</b>
+            <ul><li>A dashboard shows lag, latency percentiles, tokens and GPU utilisation.</li>
+            <li>An alert fires on sustained lag.</li>
+            <li>The feedback topic is receiving real human corrections.</li>
+            <li>You can state cost per business outcome, not just cost per node.</li></ul></div>
+        </div>
+      </details>
+
+      <details class="lab-m"><summary><span class="lab-num">9</span><span class="lab-t">Cleanup and Assessment</span>
+        <span class="lab-meta"><span class="lab-pill time">25 min</span><span class="lab-pill tool">opencenter</span><span class="lab-pill tool">git</span></span>
+        <span class="lab-s">Release the expensive district, and prove you understood it.</span></summary>
+        <div class="lab-body">
+          <div class="lab-step">Task 9.1 &mdash; Capture evidence</div>
+<pre class="lab-pre">kubectl -n "$AI_NAMESPACE" get all,pvc,networkpolicy -o yaml &gt; ai-lab-evidence.yaml
+kubectl get clusterpolicy require-ai-governance -o yaml &gt;&gt; ai-lab-evidence.yaml
+git -C "$GITOPS_DIR" log --oneline &gt;&gt; ai-lab-evidence.yaml</pre>
+
+          <div class="lab-step">Task 9.2 &mdash; Tear down through Git, then release the GPUs</div>
+<pre class="lab-pre">git -C "$GITOPS_DIR" rm ai-*.yaml kafka-topic-ai-*.yaml
+git -C "$GITOPS_DIR" commit -m "Remove AI lab resources"
+git -C "$GITOPS_DIR" push &amp;&amp; flux reconcile source git flux-system
+
+<span class="c"># Remove the GPU pool from the blueprint - this is the expensive part</span>
+opencenter cluster edit "$LAB_CLUSTER"
+opencenter cluster validate "$LAB_CLUSTER"
+opencenter cluster generate "$LAB_CLUSTER" --render-only --force
+
+kubectl delete namespace "$AI_NAMESPACE"</pre>
+          <div class="lab-note nx"><b class="h">Confirm the GPU nodes are actually gone</b>
+            <code>openstack server list</code> and check the FLEX bill. Orphaned GPU instances are the single
+            most expensive mistake available in this entire curriculum.</div>
+
+          <div class="lab-step">Graduation questions</div>
+          <div class="lab-note nr"><b class="h">Answer with evidence, not opinion</b>
+            <ul><li>Why does inference run off an event stream rather than a REST call? Name two things that
+              buys you.</li>
+            <li>Where must PII redaction happen, and why not at the model?</li>
+            <li>What stops an undocumented model reaching this cluster? Show the rejection message.</li>
+            <li>An answer has no citation. What should the system do, and why?</li>
+            <li>What is your cost per business outcome, and how did you calculate it?</li>
+            <li>Name one customer workload that should <b>not</b> get an AI layer, and say why.</li></ul></div>
+
+          <div class="lab-note nc"><b class="h">Lab complete when</b>
+            <ul><li>Evidence captured before teardown.</li>
+            <li>Everything removed through Git; namespace deleted.</li>
+            <li><b>GPU instances confirmed released in FLEX.</b></li>
+            <li>All six graduation questions answered with evidence.</li></ul></div>
+        </div>
+      </details>
+
+      <div class="lab-note nr" style="margin-top:18px;">
+        <b class="h">Where this sits</b>
+        Terminal branch of the OpenCenter learning path, parallel to Certification: Boot Camp &rarr; Advanced
+        &rarr; Kafka Event Backbone &rarr; <b>Enterprise AI &amp; Uniphore</b>. Certification proves you can
+        operate the platform; this lab proves you can put a governed AI workload on top of it. Take both.
+      </div>
+
+    </div>
+    </div>
+  </div>

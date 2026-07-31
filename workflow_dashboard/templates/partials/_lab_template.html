@@ -1,0 +1,257 @@
+  <!-- ══════════════════════════════════════════════════════════════════════
+       LAB TEMPLATE — copy this file to create a new training lab.
+
+       ┌─ HOW TO ADD A NEW LAB ──────────────────────────────────────────────┐
+       │ 1. cp _lab_template.html  _lab_<yourname>.html                      │
+       │ 2. Replace every "ocnew" in this file with a unique 4-letter prefix  │
+       │    (there are exactly 4: -outer-wrap, -inline-toggle, -inline-body,  │
+       │     -inline-arrow). Nothing else in the file is prefixed.            │
+       │ 3. Set --lab-accent / --lab-accent-dark / --lab-accent-soft on the   │
+       │    wrapper div below — that recolours the entire lab.                │
+       │ 4. Add an {% raw %}{% include %}{% endraw %} for the new file to _panel_training.html,   │
+       │    just above the closing </div> of .trn-wrap.                       │
+       │ 5. Add an index card in _panel_training.html's .trn-grid with        │
+       │    onclick="trainOpenLab('<yourprefix>')".                           │
+       └─────────────────────────────────────────────────────────────────────┘
+
+       No CSS to copy: every .lab-* class used here is defined once in
+       _panel_training.html. Delete the "Design system reference" card and the
+       example missions, then write your own content.
+  ═══════════════════════════════════════════════════════════════════════ -->
+  <div id="ocnew-outer-wrap" data-lab-band
+       style="--lab-accent:#475569;--lab-accent-dark:#1e293b;--lab-accent-soft:#f1f5f9;
+              margin-bottom:18px;border:2px dashed #94a3b8;border-radius:12px;overflow:hidden;
+              box-shadow:0 2px 8px rgba(71,85,105,.14);">
+    <div id="ocnew-inline-toggle" onclick="(function(){var b=document.getElementById('ocnew-inline-body');var a=document.getElementById('ocnew-inline-arrow');var open=b.style.display!=='none';b.style.display=open?'none':'block';a.textContent=open?'▶':'▼';})()" style="display:flex;align-items:center;justify-content:space-between;padding:14px 20px;background:linear-gradient(135deg,#1e293b,#475569,#94a3b8);cursor:pointer;user-select:none;">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <span style="font-size:20px;">🧩</span>
+        <div>
+          <div style="font-size:15px;font-weight:800;color:#fff;">New Lab Template</div>
+          <div style="font-size:12px;color:#e2e8f0;margin-top:2px;">Copy this to add a new feature lab or production training programme</div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;">
+        <span style="font-size:10px;font-weight:800;letter-spacing:1px;background:#e2e8f0;color:#1e293b;padding:3px 10px;border-radius:999px;">TEMPLATE</span>
+        <span id="ocnew-inline-arrow" style="color:#fff;font-size:16px;font-weight:900;">▶</span>
+      </div>
+    </div>
+    <div id="ocnew-inline-body" style="display:none;background:#f0f4f8;padding:0;">
+
+    <div class="lab">
+
+      <!-- ── Delete from here… ─────────────────────────────────────────── -->
+      <div class="lab-note nx" style="margin-top:0;">
+        <b class="h">This is a template, not training</b>
+        Nothing below teaches anything &mdash; it is a working skeleton showing every available building block.
+        Copy the file, then delete this note, the &ldquo;How to add a new lab&rdquo; card and the
+        &ldquo;Design system reference&rdquo; card, and replace the example missions with your own.
+      </div>
+
+      <div class="lab-card">
+        <div class="lab-h">How to add a new lab &mdash; five steps</div>
+        <table class="lab-tbl">
+          <thead><tr><th style="width:40px">#</th><th style="width:290px">Do this</th><th>Detail</th></tr></thead>
+          <tbody>
+            <tr><td><b>1</b></td><td><code>cp _lab_template.html _lab_&lt;name&gt;.html</code></td><td>In <code>workflow_dashboard/templates/partials/</code></td></tr>
+            <tr><td><b>2</b></td><td>Replace <code>ocnew</code> with your prefix</td><td>Exactly 4 occurrences: <code>-outer-wrap</code>, <code>-inline-toggle</code>, <code>-inline-body</code>, <code>-inline-arrow</code>. Must be unique across the whole page.</td></tr>
+            <tr><td><b>3</b></td><td>Set the three accent variables</td><td>On the wrapper <code>&lt;div&gt;</code> &mdash; recolours headings, mission numbers, tables, notes and level bands in one edit</td></tr>
+            <tr><td><b>4</b></td><td>Add the <code>{% raw %}{% include %}{% endraw %}</code></td><td>In <code>_panel_training.html</code>, above the closing <code>&lt;/div&gt;</code> of <code>.trn-wrap</code></td></tr>
+            <tr><td><b>5</b></td><td>Add an index card</td><td>In <code>.trn-grid</code>, with <code>onclick="trainOpenLab('&lt;prefix&gt;')"</code></td></tr>
+          </tbody>
+        </table>
+        <div class="lab-note nr">
+          <b class="h">Why no stylesheet to copy</b>
+          Every <code>.lab-*</code> class is defined once in <code>_panel_training.html</code>. Earlier bands
+          (<code>ocqs-</code>, <code>ocqx-</code>, <code>ocqc-</code>, <code>ockl-</code>) each carry their own
+          copy of the CSS, which is exactly the duplication this template removes. Do not add a
+          <code>&lt;style&gt;</code> block to a new lab.
+        </div>
+        <div class="lab-note nw">
+          <b class="h">One rule that is not optional</b>
+          Element ids must be unique across the entire rendered page &mdash; every panel is in the DOM at once,
+          not just the visible one. A duplicated id silently breaks <code>getElementById</code> for whichever
+          copy comes second. Prefix <b>every</b> id you add, not just the four in this file.
+        </div>
+      </div>
+
+      <div class="lab-card">
+        <div class="lab-h">Design system reference &mdash; every available block</div>
+        <p class="lab-sub">Live examples. Copy the markup you need from this file.</p>
+
+        <div class="lab-step">Notes &mdash; five kinds, pick by meaning not by colour</div>
+        <div class="lab-note nm"><b class="h">nm &mdash; the metaphor / framing</b>Opens a mission. Uses the lab accent colour.</div>
+        <div class="lab-note nc"><b class="h">nc &mdash; complete when</b>Green. Closes a mission with its exit criteria.</div>
+        <div class="lab-note nw"><b class="h">nw &mdash; caution</b>Amber. Version-dependent details, things that commonly go wrong.</div>
+        <div class="lab-note nx"><b class="h">nx &mdash; stop / destructive</b>Red. Gates, data-loss warnings, "do not continue until".</div>
+        <div class="lab-note nr"><b class="h">nr &mdash; aside</b>Grey. Context, rationale, "why this matters", challenges.</div>
+
+        <div class="lab-step">Command block &mdash; dark, for things the learner types</div>
+<pre class="lab-pre"><span class="c"># comments use &lt;span class="c"&gt;</span>
+opencenter cluster validate "$LAB_CLUSTER"
+
+<span class="c"># escape &lt; &gt; &amp; as &amp;lt; &amp;gt; &amp;amp; inside &lt;pre&gt;</span>
+cat &gt; file.yaml &lt;&lt;'EOF'
+key: value
+EOF</pre>
+
+        <div class="lab-step">Quoted block &mdash; light, for YAML/output the learner reads</div>
+<pre class="lab-pre y">status:
+  conditions:
+    - type: Ready
+      status: "True"</pre>
+
+        <div class="lab-step">Table</div>
+        <table class="lab-tbl">
+          <thead><tr><th style="width:200px">Column</th><th>Meaning</th></tr></thead>
+          <tbody>
+            <tr><td><b>Bold first cell</b></td><td>Reads as a definition list</td></tr>
+            <tr><td><code>code cell</code></td><td>Use <code>&lt;code&gt;</code> for anything typed</td></tr>
+          </tbody>
+        </table>
+
+        <div class="lab-step">Two-column list</div>
+        <div class="lab-grid">
+          <ul class="t" style="margin:0;"><li>Left column item</li><li>Another item</li></ul>
+          <ul class="t" style="margin:0;"><li>Right column item</li><li>Another item</li></ul>
+        </div>
+
+        <div class="lab-step">Pills, on a mission summary</div>
+        <div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:6px;">
+          <span class="lab-pill time">45 min</span>
+          <span class="lab-pill tool">opencenter</span>
+          <span class="lab-pill tool">kubectl</span>
+          <span class="lab-pill">plain pill</span>
+        </div>
+      </div>
+      <!-- ── …delete to here ───────────────────────────────────────────── -->
+
+      <!-- ══════════ SKELETON STARTS — keep and edit everything below ══════════ -->
+
+      <div class="lab-hero">
+        <div class="lab-kick">&lt;Programme name&gt; &middot; &lt;hands-on | curriculum | assessment&gt;</div>
+        <h3>&#129513; &lt;Lab title &mdash; what the learner builds&gt;</h3>
+        <div class="lab-tag">&lt;One sentence: the situation this lab starts from.&gt;</div>
+        <div class="lab-flow">
+          &lt;Two or three sentences. What exists already, what this lab adds, and the one capability the
+          learner walks away with. Bold the payoff with &lt;b style="color:#fff;"&gt;.&gt;
+        </div>
+      </div>
+
+      <div class="lab-card">
+        <div class="lab-h">What you will build</div>
+        <div class="lab-grid">
+          <ul class="t" style="margin:0;"><li>&lt;Concrete artifact 1&gt;</li><li>&lt;Concrete artifact 2&gt;</li><li>&lt;Concrete artifact 3&gt;</li></ul>
+          <ul class="t" style="margin:0;"><li>&lt;Concrete artifact 4&gt;</li><li>&lt;Concrete artifact 5&gt;</li><li>&lt;Concrete artifact 6&gt;</li></ul>
+        </div>
+        <div class="lab-note nr"><b class="h">Write outcomes, not topics</b>
+          &ldquo;A six-partition topic with two consumers sharing it&rdquo; is an outcome.
+          &ldquo;Learn about topics&rdquo; is not. Delete this note.</div>
+      </div>
+
+      <div class="lab-card">
+        <div class="lab-h">Duration</div>
+        <table class="lab-tbl">
+          <thead><tr><th style="width:300px">Section</th><th>Estimated time</th></tr></thead>
+          <tbody>
+            <tr><td>&lt;Section 1&gt;</td><td>&lt;n&gt; minutes</td></tr>
+            <tr><td>&lt;Section 2&gt;</td><td>&lt;n&gt; minutes</td></tr>
+            <tr><td><b>Total</b></td><td><b>&lt;n&ndash;n hours&gt;</b></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="lab-card">
+        <div class="lab-h">Prerequisites</div>
+        <div class="lab-grid">
+          <ul class="t" style="margin:0;"><li>&lt;Prerequisite 1&gt;</li><li>&lt;Prerequisite 2&gt;</li></ul>
+          <ul class="t" style="margin:0;"><li>&lt;Prerequisite 3&gt;</li><li>&lt;Required CLIs&gt;</li></ul>
+        </div>
+      </div>
+
+      <div class="lab-card">
+        <div class="lab-h">Lab variables</div>
+        <p class="lab-sub">One environment file, so a learner changes values in exactly one place.</p>
+<pre class="lab-pre">cat &gt; &lt;name&gt;-lab.env &lt;&lt;'EOF'
+export LAB_ORG="my-company"
+export LAB_CLUSTER="prod-cluster"
+<span class="c"># add your own</span>
+EOF
+
+source &lt;name&gt;-lab.env</pre>
+      </div>
+
+      <div class="lab-lvl"><span class="n">Part 1 &middot; &lt;Theme&gt;</span>
+        <span>Missions 1&ndash;2</span><span class="b">&#128269; &lt;One-line promise&gt;</span></div>
+
+      <details class="lab-m" open><summary><span class="lab-num">1</span><span class="lab-t">&lt;Mission title &mdash; a verb phrase&gt;</span>
+        <span class="lab-meta"><span class="lab-pill time">&lt;n&gt; min</span><span class="lab-pill tool">&lt;tool&gt;</span></span>
+        <span class="lab-s">&lt;One line the learner sees before opening it.&gt;</span></summary>
+        <div class="lab-body">
+          <div class="lab-note nm" style="margin-top:8px;"><b class="h">Why</b>
+            &lt;Why this mission exists. What breaks later if it is skipped.&gt;</div>
+
+          <div class="lab-step">Task 1.1 &mdash; &lt;Do one thing&gt;</div>
+<pre class="lab-pre">&lt;command&gt;</pre>
+          <p style="margin:6px 0 0;font-size:13px;"><b>Expected:</b> &lt;what the learner should see&gt;.</p>
+
+          <div class="lab-step">Task 1.2 &mdash; &lt;Do the next thing&gt;</div>
+<pre class="lab-pre">&lt;command&gt;</pre>
+
+          <div class="lab-step">Checkpoint</div>
+          <table class="lab-tbl">
+            <thead><tr><th style="width:340px">Check</th><th>Result</th></tr></thead>
+            <tbody>
+              <tr><td>&lt;Check 1&gt;</td><td>Pass / Fail</td></tr>
+              <tr><td>&lt;Check 2&gt;</td><td>Pass / Fail</td></tr>
+            </tbody>
+          </table>
+          <div class="lab-note nx"><b class="h">Gate</b>
+            Do not continue until all required checks pass.</div>
+
+          <div class="lab-note nc"><b class="h">Mission complete when</b>
+            <ul><li>&lt;Verifiable outcome 1&gt;</li>
+            <li>&lt;Verifiable outcome 2&gt;</li></ul></div>
+        </div>
+      </details>
+
+      <details class="lab-m"><summary><span class="lab-num">2</span><span class="lab-t">&lt;Second mission&gt;</span>
+        <span class="lab-meta"><span class="lab-pill time">&lt;n&gt; min</span><span class="lab-pill tool">&lt;tool&gt;</span></span>
+        <span class="lab-s">&lt;One line.&gt;</span></summary>
+        <div class="lab-body">
+          <div class="lab-note nm" style="margin-top:8px;"><b class="h">Why</b>&lt;Reason.&gt;</div>
+          <div class="lab-step">Task 2.1 &mdash; &lt;Action&gt;</div>
+<pre class="lab-pre">&lt;command&gt;</pre>
+          <div class="lab-note nc"><b class="h">Mission complete when</b>
+            <ul><li>&lt;Verifiable outcome&gt;</li></ul></div>
+        </div>
+      </details>
+
+      <div class="lab-lvl"><span class="n">Part 2 &middot; &lt;Theme&gt;</span>
+        <span>Mission 3</span><span class="b">&#127937; &lt;One-line promise&gt;</span></div>
+
+      <details class="lab-m"><summary><span class="lab-num">3</span><span class="lab-t">Cleanup and Assessment</span>
+        <span class="lab-meta"><span class="lab-pill time">&lt;n&gt; min</span><span class="lab-pill tool">git</span></span>
+        <span class="lab-s">Close it down the same way you opened it.</span></summary>
+        <div class="lab-body">
+          <div class="lab-step">Task 3.1 &mdash; Capture evidence before teardown</div>
+<pre class="lab-pre">&lt;command that writes an evidence file&gt;</pre>
+
+          <div class="lab-step">Task 3.2 &mdash; Remove what you created</div>
+<pre class="lab-pre">&lt;teardown, through the same path that created it&gt;</pre>
+
+          <div class="lab-step">Graduation questions</div>
+          <div class="lab-note nr"><b class="h">Answer with evidence, not opinion</b>
+            <ul><li>&lt;Question about why, not what&gt;</li>
+            <li>&lt;Question that requires reading a real output&gt;</li>
+            <li>&lt;Question about when NOT to use this&gt;</li></ul></div>
+
+          <div class="lab-note nc"><b class="h">Lab complete when</b>
+            <ul><li>Evidence captured before teardown.</li>
+            <li>Everything removed through the same path that created it.</li>
+            <li>All graduation questions answered with evidence.</li></ul></div>
+        </div>
+      </details>
+
+    </div>
+    </div>
+  </div>

@@ -1,0 +1,902 @@
+  <!-- ══════════════════════════════════════════════════════════════════════
+       OpenCenter Kafka Training Lab — hands-on, 4-5 hours.
+
+       Distinct from Module 9 of the Advanced OpenCenter + Kafka lab: that module
+       is the ~15-minute conceptual primer (what Kafka is, how the service is
+       enabled). This is the full build: preflight, operator, cluster, topics,
+       producers/consumers, groups, failure recovery, monitoring, security,
+       cleanup and assessment.
+
+       Lives directly in the Training & Tutorials panel — it is new markup, so
+       unlike the ocqs/ocqp/ocqc bands it needs no DOM relocation. Prefix: ockl-
+  ═══════════════════════════════════════════════════════════════════════ -->
+  <div id="ockl-outer-wrap" style="margin-bottom:18px;border:2px solid #FFBE5C;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(234,88,12,.2);">
+    <div id="ockl-inline-toggle" onclick="(function(){var b=document.getElementById('ockl-inline-body');var a=document.getElementById('ockl-inline-arrow');var open=b.style.display!=='none';b.style.display=open?'none':'block';a.textContent=open?'▶':'▼';})()" style="display:flex;align-items:center;justify-content:space-between;padding:14px 20px;background:linear-gradient(135deg,#B26800,#FF9500,#FFBE5C);cursor:pointer;user-select:none;">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <span style="font-size:20px;">🚉</span>
+        <div>
+          <div style="font-size:15px;font-weight:800;color:#fff;">OpenCenter Kafka Training Lab</div>
+          <div style="font-size:12px;color:#FFF1DE;margin-top:2px;">Hands-on · 9 missions · 4–5 hours · Build the digital city's postal and railway system</div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;">
+        <span style="font-size:10px;font-weight:800;letter-spacing:1px;background:#fbbf24;color:#422006;padding:3px 10px;border-radius:999px;">HANDS-ON</span>
+        <span id="ockl-inline-arrow" style="color:#fff;font-size:16px;font-weight:900;">▶</span>
+      </div>
+    </div>
+    <div id="ockl-inline-body" style="display:none;background:#f0f4f8;padding:0;">
+    <style>
+      .ockl{padding:20px 24px;max-width:1180px;font-size:14px;line-height:1.62;color:#0f172a;}
+      .ockl-hero{background:linear-gradient(135deg,#0f172a,#1e3a5f);color:#fff !important;border-radius:12px;padding:22px 24px;margin-bottom:16px;}
+      .ockl-kick{font-size:9.5px;font-weight:800;letter-spacing:2.2px;text-transform:uppercase;color:#38bdf8 !important;}
+      .ockl-hero h3{margin:7px 0 4px;font-size:22px;font-weight:800;color:#fff !important;}
+      .ockl-tag{font-size:14px;font-weight:700;color:#bae6fd !important;margin-bottom:12px;}
+      .ockl-flow{background:rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.20);border-radius:9px;padding:11px 14px;font-size:12.5px;color:#dbeafe !important;line-height:1.75;}
+      .ockl-card{background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:16px 18px;margin-bottom:14px;}
+      .ockl-h{font-size:11px;font-weight:800;color:#CC7700;text-transform:uppercase;letter-spacing:1.2px;margin:0 0 9px;}
+      .ockl-sub{font-size:12.5px;color:#64748b;margin:0 0 9px;}
+      .ockl-tbl{width:100%;border-collapse:collapse;font-size:12.5px;}
+      .ockl-tbl th{background:#8A5200;color:#fff;text-align:left;padding:7px 9px;font-size:9.5px;text-transform:uppercase;letter-spacing:.8px;}
+      .ockl-tbl td{padding:7px 9px;border-bottom:1px solid #e2e8f0;vertical-align:top;}
+      .ockl-tbl code{background:#f1f5f9;padding:1px 5px;border-radius:4px;font-size:11.5px;}
+      details.ockl-m{background:#fff;border:1px solid #e2e8f0;border-radius:10px;margin-bottom:10px;overflow:hidden;}
+      details.ockl-m[open]{border-color:#FFCE85;box-shadow:0 1px 4px rgba(234,88,12,.10);}
+      details.ockl-m>summary{list-style:none;cursor:pointer;padding:12px 16px;display:flex;align-items:center;gap:11px;flex-wrap:wrap;}
+      details.ockl-m>summary::-webkit-details-marker{display:none;}
+      details.ockl-m>summary:hover{background:#FFF8EE;}
+      .ockl-num{flex:none;width:29px;height:29px;border-radius:8px;background:#8A5200;color:#fff;font-size:12px;font-weight:800;display:grid;place-items:center;}
+      .ockl-t{font-size:14px;font-weight:800;}
+      .ockl-s{font-size:12px;color:#64748b;flex-basis:100%;margin-left:40px;}
+      .ockl-meta{margin-left:auto;display:flex;gap:5px;flex-wrap:wrap;}
+      .ockl-pill{font-size:10px;font-weight:800;padding:3px 9px;border-radius:999px;border:1px solid #e2e8f0;color:#64748b;background:#f8fafc;}
+      .ockl-pill.tool{background:#FFF8EE;border-color:#FFE2B8;color:#CC7700;}
+      .ockl-pill.time{background:#eff6ff;border-color:#bfdbfe;color:#1d4ed8;}
+      .ockl-body{padding:4px 17px 17px 56px;border-top:1px solid #e2e8f0;}
+      .ockl-step{font-size:12.5px;font-weight:800;margin:15px 0 6px;color:#8A5200;}
+      .ockl-pre{background:#0f172a;color:#FFCE85;border-radius:7px;padding:11px 13px;font-size:12px;overflow-x:auto;margin:0;white-space:pre;font-family:ui-monospace,Menlo,Consolas,monospace;}
+      .ockl-pre.y{background:#f8fafc;color:#334155;border:1px solid #e2e8f0;}
+      .ockl-pre .c{color:#7d8da1;}
+      .ockl-note{border-left:3px solid;border-radius:0 7px 7px 0;padding:10px 13px;margin-top:11px;font-size:12.5px;}
+      .ockl-nm{border-color:#CC7700;background:#FFF8EE;}
+      .ockl-nc{border-color:#15803d;background:#f0fdf4;}
+      .ockl-nw{border-color:#b45309;background:#fffbeb;}
+      .ockl-nx{border-color:#b91c1c;background:#fef2f2;}
+      .ockl-nr{border-color:#94a3b8;background:#f8fafc;}
+      .ockl-note b.h{display:block;font-size:9.5px;text-transform:uppercase;letter-spacing:1.1px;margin-bottom:4px;}
+      .ockl-nm b.h{color:#CC7700;} .ockl-nc b.h{color:#15803d;} .ockl-nw b.h{color:#b45309;}
+      .ockl-nx b.h{color:#b91c1c;} .ockl-nr b.h{color:#64748b;}
+      .ockl-note ul{margin:5px 0 0;padding-left:18px;} .ockl-note li{margin:2px 0;}
+      .ockl ul.t{margin:6px 0 0;padding-left:19px;} .ockl ul.t li{margin:3px 0;font-size:13px;}
+      .ockl-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:11px;margin-top:9px;}
+      .ockl-lvl{margin:24px 0 11px;padding:12px 15px;border-radius:9px;border:1px solid #FFE2B8;background:#FFF8EE;color:#B26800;display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
+      .ockl-lvl .n{font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:1.3px;}
+      .ockl-lvl .b{margin-left:auto;font-size:10px;font-weight:800;padding:3px 11px;border-radius:999px;background:rgba(255,255,255,.75);}
+    </style>
+
+    <div class="ockl">
+
+      <div class="ockl-hero">
+        <div class="ockl-kick">OpenCenter Kafka Training Lab &middot; Hands-on build</div>
+        <h3>&#128650; Building the Digital City's Postal and Railway System</h3>
+        <div class="ockl-tag">The city is built. Now its applications need a dependable way to exchange information.</div>
+        <div class="ockl-flow">
+          Your OpenCenter city already has FLEX infrastructure, Kubernetes, GitOps, networking, storage,
+          monitoring and security. In this lab you build <b style="color:#fff;">Kafka</b> &mdash; the postal
+          service and railway network. Applications place events onto named routes; Kafka stores them, carries
+          them, and lets many services receive them <b style="color:#fff;">without being directly connected</b>.
+        </div>
+      </div>
+
+      <div class="ockl-note ockl-nw" style="margin-top:0;">
+        <b class="h">Read this first</b>
+        Service names, image tags and supported fields differ between OpenCenter and Strimzi releases. Every
+        task below tells you to confirm the real name from <code>opencenter cluster describe</code> or
+        <code>kubectl explain</code> before you type it. <b>Never enable an invented service name.</b>
+      </div>
+
+      <!-- ── Where are we ── -->
+      <div class="ockl-card">
+        <div class="ockl-h">Where are we in the OpenCenter journey?</div>
+<pre class="ockl-pre y">Plan
+  &darr;
+Build FLEX infrastructure
+  &darr;
+Deploy Kubernetes
+  &darr;
+Install platform services
+  &darr;
+Secure and monitor the platform
+  &darr;
+<b>&#9733; Deploy Kafka event backbone</b>   &larr; you are here
+  &darr;
+Connect applications and AI services</pre>
+        <p style="margin:10px 0 0;font-size:13px;">OpenCenter ships <code>kafka-cluster</code> as an
+          <b>optional</b> workload service, disabled by default because not every cluster needs an
+          event-streaming platform. The GitOps base provides <b>Strimzi</b> as the Kubernetes operator that
+          deploys and manages the Kafka resources.</p>
+      </div>
+
+      <!-- ── Metaphor ── -->
+      <div class="ockl-card">
+        <div class="ockl-h">The simple metaphor</div>
+        <p class="ockl-sub">Kafka organises events into topics. Producers write; consumers read and process
+          independently. That separation is what lets applications communicate without depending on each other.</p>
+        <table class="ockl-tbl">
+          <thead><tr><th style="width:200px">Kafka component</th><th>Digital-city metaphor</th></tr></thead>
+          <tbody>
+            <tr><td><b>Kafka cluster</b></td><td>Central postal and railway system</td></tr>
+            <tr><td><b>Broker</b></td><td>Postal sorting office</td></tr>
+            <tr><td><b>Producer</b></td><td>Person sending a parcel</td></tr>
+            <tr><td><b>Consumer</b></td><td>Person receiving a parcel</td></tr>
+            <tr><td><b>Event</b></td><td>Parcel or letter</td></tr>
+            <tr><td><b>Topic</b></td><td>Named delivery route</td></tr>
+            <tr><td><b>Partition</b></td><td>Lane on the delivery route</td></tr>
+            <tr><td><b>Consumer group</b></td><td>Delivery team sharing the work</td></tr>
+            <tr><td><b>Replication</b></td><td>Extra copies stored at other offices</td></tr>
+            <tr><td><b>Strimzi Operator</b></td><td>Kafka operations department</td></tr>
+            <tr><td><b>OpenCenter</b></td><td>City control center</td></tr>
+            <tr><td><b>Flux</b></td><td>Inspector keeping reality aligned with Git</td></tr>
+            <tr><td><b>FLEX storage</b></td><td>Warehouse where parcels are retained</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- ── What you will build + duration ── -->
+      <div class="ockl-card">
+        <div class="ockl-h">What you will build</div>
+        <div class="ockl-grid">
+          <ul class="t" style="margin:0;">
+            <li>A Strimzi-managed Kafka cluster</li>
+            <li>Three Kafka nodes</li>
+            <li>Persistent Cinder-backed storage</li>
+            <li>A six-partition topic</li>
+            <li>A producer sending city events</li>
+            <li>Consumers receiving those events</li>
+          </ul>
+          <ul class="t" style="margin:0;">
+            <li>A consumer group sharing work</li>
+            <li>Kafka data surviving a broker restart</li>
+            <li>Kafka Exporter metrics</li>
+            <li>A GitOps-managed Kafka configuration</li>
+            <li>A controlled failure and recovery exercise</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="ockl-card">
+        <div class="ockl-h">Training duration</div>
+        <table class="ockl-tbl">
+          <thead><tr><th style="width:300px">Section</th><th>Estimated time</th></tr></thead>
+          <tbody>
+            <tr><td>Environment and preflight</td><td>20 minutes</td></tr>
+            <tr><td>Enable Kafka through OpenCenter</td><td>30 minutes</td></tr>
+            <tr><td>Deploy the Kafka cluster</td><td>40 minutes</td></tr>
+            <tr><td>Topics, producers and consumers</td><td>40 minutes</td></tr>
+            <tr><td>Consumer groups and partitions</td><td>30 minutes</td></tr>
+            <tr><td>Persistence and failure recovery</td><td>35 minutes</td></tr>
+            <tr><td>Monitoring</td><td>25 minutes</td></tr>
+            <tr><td>Security challenge</td><td>35 minutes</td></tr>
+            <tr><td>Cleanup and assessment</td><td>20 minutes</td></tr>
+            <tr><td><b>Total</b></td><td><b>4&ndash;5 hours</b></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- ── Prerequisites ── -->
+      <div class="ockl-card">
+        <div class="ockl-h">Prerequisites</div>
+        <div class="ockl-grid">
+          <ul class="t" style="margin:0;">
+            <li>A working OpenCenter cluster</li>
+            <li>Kubernetes nodes in <code>Ready</code> state</li>
+            <li>Flux running</li>
+            <li>A working GitOps repository</li>
+          </ul>
+          <ul class="t" style="margin:0;">
+            <li>A default Kubernetes storage class</li>
+            <li>At least three worker nodes recommended</li>
+            <li>Sufficient compute and storage quota</li>
+            <li><code>opencenter</code>, <code>kubectl</code>, <code>git</code>, <code>flux</code> installed</li>
+          </ul>
+        </div>
+        <div class="ockl-note ockl-nr"><b class="h">Sizing</b>
+          For a small learning environment, three Kafka nodes may share worker machines. For production, use
+          dedicated Kafka workers and separate controller and broker pools.</div>
+      </div>
+
+      <!-- ── Lab variables ── -->
+      <div class="ockl-card">
+        <div class="ockl-h">Lab variables</div>
+        <p class="ockl-sub">Create a local environment file. Every command below uses these variables, so you
+          only change values in one place.</p>
+<pre class="ockl-pre">cat &gt; kafka-lab.env &lt;&lt;'EOF'
+export LAB_ORG="my-company"
+export LAB_CLUSTER="prod-cluster"
+
+export KAFKA_NAMESPACE="kafka-lab"
+export KAFKA_CLUSTER="city-stream"
+export KAFKA_TOPIC="city-events"
+
+<span class="c"># Current official Strimzi example image.</span>
+<span class="c"># Change this when your installed operator supports a different version.</span>
+export KAFKA_CLIENT_IMAGE="quay.io/strimzi/kafka:1.1.0-kafka-4.3.0"
+EOF</pre>
+
+        <div class="ockl-step">Load it and select the cluster</div>
+<pre class="ockl-pre">source kafka-lab.env
+
+opencenter cluster use "$LAB_ORG/$LAB_CLUSTER"
+
+<span class="c"># Load its Kubernetes access into this shell</span>
+eval "$(opencenter cluster use "$LAB_ORG/$LAB_CLUSTER" --export-only)"</pre>
+
+        <div class="ockl-step">Find and confirm the GitOps working directory</div>
+<pre class="ockl-pre">export GITOPS_DIR="$(
+  opencenter cluster describe "$LAB_ORG/$LAB_CLUSTER" 2&gt;/dev/null |
+  awk '/git_dir:/ {print $2; exit}'
+)"
+
+printf 'GitOps directory: %s\n' "$GITOPS_DIR"
+test -d "$GITOPS_DIR"</pre>
+        <div class="ockl-note ockl-nx"><b class="h">Stop if this fails</b>
+          If <code>test -d</code> returns non-zero, <code>GITOPS_DIR</code> did not resolve. Every GitOps task
+          in this lab writes into that directory &mdash; fix it now rather than committing into the wrong tree.</div>
+      </div>
+
+      <!-- ══════════ PART 1 ══════════ -->
+      <div class="ockl-lvl"><span class="n">Part 1 &middot; Inspect and enable</span>
+        <span>Missions 1&ndash;2</span><span class="b">&#128269; Look before you build</span></div>
+
+      <!-- ── MISSION 1 ── -->
+      <details class="ockl-m" open><summary><span class="ockl-num">1</span><span class="ockl-t">Inspect the City</span>
+        <span class="ockl-meta"><span class="ockl-pill time">20 min</span><span class="ockl-pill tool">opencenter</span><span class="ockl-pill tool">kubectl</span><span class="ockl-pill tool">flux</span></span>
+        <span class="ockl-s">Check the roads, buildings and storage warehouses before installing the postal system.</span></summary>
+        <div class="ockl-body">
+          <div class="ockl-note ockl-nm" style="margin-top:8px;"><b class="h">Why</b>
+            Kafka needs compute, memory, network connectivity, persistent storage and a healthy Kubernetes
+            cluster. Every one of those is cheaper to verify now than to debug at broker-start time.</div>
+
+          <div class="ockl-step">Task 1.1 &mdash; Check OpenCenter</div>
+<pre class="ockl-pre">opencenter version
+opencenter cluster list
+opencenter cluster describe "$LAB_ORG/$LAB_CLUSTER"</pre>
+
+          <div class="ockl-step">Task 1.2 &mdash; Check Kubernetes</div>
+<pre class="ockl-pre">kubectl cluster-info
+kubectl get nodes -o wide
+kubectl get pods -A</pre>
+          <p style="margin:6px 0 0;font-size:13px;"><b>Expected:</b> the API is reachable, all required nodes
+            show <code>Ready</code>, and no critical platform pod is repeatedly restarting.</p>
+
+          <div class="ockl-step">Task 1.3 &mdash; Check Flux</div>
+<pre class="ockl-pre">flux get sources git -A
+flux get kustomizations -A</pre>
+          <p style="margin:6px 0 0;font-size:13px;"><b>Expected:</b> <code>READY=True</code> for the main Git
+            source and the platform Kustomizations.</p>
+
+          <div class="ockl-step">Task 1.4 &mdash; Check storage</div>
+<pre class="ockl-pre">kubectl get storageclass
+
+<span class="c"># Record which one is the default</span>
+kubectl get storageclass \
+  -o custom-columns='NAME:.metadata.name,DEFAULT:.metadata.annotations.storageclass\.kubernetes\.io/is-default-class'</pre>
+          <p style="margin:6px 0 0;font-size:13px;"><b>Expected:</b> at least one usable storage class. On
+            FLEX/OpenStack this is normally backed by Cinder block storage.</p>
+
+          <div class="ockl-step">Checkpoint</div>
+          <table class="ockl-tbl">
+            <thead><tr><th style="width:340px">Check</th><th>Result</th></tr></thead>
+            <tbody>
+              <tr><td>OpenCenter cluster selected</td><td>Pass / Fail</td></tr>
+              <tr><td>Kubernetes API reachable</td><td>Pass / Fail</td></tr>
+              <tr><td>Nodes ready</td><td>Pass / Fail</td></tr>
+              <tr><td>Flux healthy</td><td>Pass / Fail</td></tr>
+              <tr><td>Storage class available</td><td>Pass / Fail</td></tr>
+            </tbody>
+          </table>
+          <div class="ockl-note ockl-nx"><b class="h">Gate</b>
+            Do not continue until all required checks pass.</div>
+        </div>
+      </details>
+
+      <!-- ── MISSION 2 ── -->
+      <details class="ockl-m"><summary><span class="ockl-num">2</span><span class="ockl-t">Open the Kafka Operations Department</span>
+        <span class="ockl-meta"><span class="ockl-pill time">30 min</span><span class="ockl-pill tool">opencenter</span><span class="ockl-pill tool">git</span><span class="ockl-pill tool">flux</span></span>
+        <span class="ockl-s">The city has no department that knows how to operate Kafka. Open one.</span></summary>
+        <div class="ockl-body">
+          <div class="ockl-note ockl-nm" style="margin-top:8px;"><b class="h">The metaphor</b>
+            OpenCenter asks the city council to open a specialist Kafka operations office. That office is
+            <b>Strimzi</b>. It watches Kafka resources and automatically creates, repairs, configures and
+            updates Kafka components: the Cluster Operator manages Kafka clusters, while the Topic and User
+            Operators manage topics and users.</div>
+
+          <div class="ockl-step">Task 2.1 &mdash; Inspect available OpenCenter services</div>
+<pre class="ockl-pre">opencenter cluster describe "$LAB_ORG/$LAB_CLUSTER"</pre>
+          <p style="margin:6px 0 0;font-size:13px;">Look for <code>kafka-cluster</code>, <code>strimzi</code>
+            or <code>strimzi-kafka-operator</code>. The exact displayed name depends on the OpenCenter service
+            definitions in your installed release.</p>
+
+          <div class="ockl-step">Task 2.2 &mdash; Enable the OpenCenter Kafka service</div>
+          <p style="margin:0 0 6px;font-size:13px;">Use the service name confirmed by
+            <code>cluster describe</code>. Primary example:</p>
+<pre class="ockl-pre">opencenter cluster set "$LAB_CLUSTER" \
+  opencenter.services.kafka-cluster.enabled=true
+
+<span class="c"># If your configuration exposes the operator separately, use that confirmed path:</span>
+opencenter cluster set "$LAB_CLUSTER" \
+  opencenter.services.strimzi-kafka-operator.enabled=true</pre>
+          <div class="ockl-note ockl-nx"><b class="h">Do not invent a service name</b>
+            Use only the name shown by your own OpenCenter configuration. A setting that does not exist is
+            accepted silently by some versions and renders nothing &mdash; you will debug an empty namespace.</div>
+
+          <div class="ockl-step">Task 2.3 &mdash; Validate the change</div>
+<pre class="ockl-pre">opencenter cluster validate "$LAB_CLUSTER"
+
+<span class="c"># Cloud and capacity checks</span>
+opencenter cluster validate "$LAB_CLUSTER" \
+  --validation online</pre>
+
+          <div class="ockl-step">Task 2.4 &mdash; Render the GitOps changes</div>
+<pre class="ockl-pre">opencenter cluster generate "$LAB_CLUSTER" \
+  --render-only \
+  --force
+
+<span class="c"># Review before anything is applied</span>
+git -C "$GITOPS_DIR" status
+git -C "$GITOPS_DIR" diff</pre>
+
+          <div class="ockl-step">Task 2.5 &mdash; Commit and push</div>
+<pre class="ockl-pre">git -C "$GITOPS_DIR" add .
+git -C "$GITOPS_DIR" commit \
+  -m "Enable Kafka platform capability"
+git -C "$GITOPS_DIR" push</pre>
+
+          <div class="ockl-step">Task 2.6 &mdash; Watch Flux open the department</div>
+<pre class="ockl-pre">flux reconcile source git flux-system
+flux get kustomizations -A
+
+<span class="c"># The operator itself</span>
+kubectl get pods -A | grep -i strimzi
+kubectl get crds | grep kafka</pre>
+          <p style="margin:6px 0 0;font-size:13px;"><b>Expected:</b> a running Strimzi Cluster Operator pod,
+            and CRDs including <code>kafkas.kafka.strimzi.io</code>,
+            <code>kafkanodepools.kafka.strimzi.io</code>, <code>kafkatopics.kafka.strimzi.io</code> and
+            <code>kafkausers.kafka.strimzi.io</code>.</p>
+
+          <div class="ockl-note ockl-nc"><b class="h">Mission complete when</b>
+            <ul><li>The service is enabled in the blueprint and validation passes.</li>
+            <li>The rendered change was reviewed in <code>git diff</code> before it was pushed.</li>
+            <li>Flux reports the Kustomization reconciled.</li>
+            <li>The Strimzi operator pod is <code>Running</code> and the Kafka CRDs exist.</li></ul></div>
+        </div>
+      </details>
+
+      <!-- ══════════ PART 2 ══════════ -->
+      <div class="ockl-lvl"><span class="n">Part 2 &middot; Build and use the railway</span>
+        <span>Missions 3&ndash;5</span><span class="b">&#128646; Cluster, topics, traffic</span></div>
+
+      <!-- ── MISSION 3 ── -->
+      <details class="ockl-m"><summary><span class="ockl-num">3</span><span class="ockl-t">Build the Kafka Cluster</span>
+        <span class="ockl-meta"><span class="ockl-pill time">40 min</span><span class="ockl-pill tool">kubectl</span><span class="ockl-pill tool">strimzi</span></span>
+        <span class="ockl-s">Three sorting offices, each with its own warehouse.</span></summary>
+        <div class="ockl-body">
+          <div class="ockl-note ockl-nm" style="margin-top:8px;"><b class="h">The metaphor</b>
+            The operations department exists; now it builds the sorting offices. Three nodes, each with a
+            persistent Cinder warehouse, so a parcel is never held by only one office.</div>
+
+          <div class="ockl-step">Task 3.1 &mdash; Create the namespace</div>
+<pre class="ockl-pre">kubectl create namespace "$KAFKA_NAMESPACE" --dry-run=client -o yaml | kubectl apply -f -
+kubectl get ns "$KAFKA_NAMESPACE"</pre>
+
+          <div class="ockl-step">Task 3.2 &mdash; Confirm the version your operator supports</div>
+<pre class="ockl-pre"><span class="c"># Never guess the Kafka version - ask the installed CRD</span>
+kubectl explain kafka.spec.kafka.version
+kubectl get crd kafkas.kafka.strimzi.io -o jsonpath='{.spec.versions[*].name}'; echo</pre>
+
+          <div class="ockl-step">Task 3.3 &mdash; Declare the node pool and the cluster</div>
+          <p style="margin:0 0 6px;font-size:13px;">Modern Strimzi runs Kafka in <b>KRaft</b> mode &mdash; no
+            ZooKeeper &mdash; and nodes are declared through a <code>KafkaNodePool</code>. Write this into your
+            GitOps tree, not straight to the cluster.</p>
+<pre class="ockl-pre">cat &gt; "$GITOPS_DIR/kafka-city-stream.yaml" &lt;&lt;EOF
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaNodePool
+metadata:
+  name: city-pool
+  namespace: ${KAFKA_NAMESPACE}
+  labels:
+    strimzi.io/cluster: ${KAFKA_CLUSTER}
+spec:
+  replicas: 3
+  roles:
+    - controller
+    - broker
+  storage:
+    type: jbod
+    volumes:
+      - id: 0
+        type: persistent-claim
+        size: 100Gi
+        deleteClaim: false
+---
+apiVersion: kafka.strimzi.io/v1beta2
+kind: Kafka
+metadata:
+  name: ${KAFKA_CLUSTER}
+  namespace: ${KAFKA_NAMESPACE}
+spec:
+  kafka:
+    listeners:
+      - name: plain
+        port: 9092
+        type: internal
+        tls: false
+      - name: tls
+        port: 9093
+        type: internal
+        tls: true
+    config:
+      offsets.topic.replication.factor: 3
+      transaction.state.log.replication.factor: 3
+      transaction.state.log.min.isr: 2
+      default.replication.factor: 3
+      min.insync.replicas: 2
+  entityOperator:
+    topicOperator: {}
+    userOperator: {}
+EOF</pre>
+          <div class="ockl-note ockl-nw"><b class="h">Two version-dependent details</b>
+            <ul><li>Operators <b>older than Strimzi 1.0</b> also need the annotations
+              <code>strimzi.io/node-pools: enabled</code> and <code>strimzi.io/kraft: enabled</code> on the
+              <code>Kafka</code> resource. Newer ones reject or ignore them.</li>
+            <li>If <code>kubectl explain</code> in Task 3.2 showed <code>spec.kafka.version</code> as required,
+              add it with a value your operator supports.</li>
+            <li>Omitting <code>storage.class</code> uses the cluster default from Task 1.4. Set it explicitly
+              if you need a specific Cinder type.</li></ul></div>
+
+          <div class="ockl-step">Task 3.4 &mdash; Commit, push, and let Flux build it</div>
+<pre class="ockl-pre">git -C "$GITOPS_DIR" add kafka-city-stream.yaml
+git -C "$GITOPS_DIR" commit -m "Add ${KAFKA_CLUSTER} Kafka cluster"
+git -C "$GITOPS_DIR" push
+
+flux reconcile source git flux-system
+kubectl -n "$KAFKA_NAMESPACE" get kafka,kafkanodepool</pre>
+
+          <div class="ockl-step">Task 3.5 &mdash; Watch it come up</div>
+<pre class="ockl-pre">kubectl -n "$KAFKA_NAMESPACE" get pods -w
+
+<span class="c"># Wait for the operator to report the cluster ready (may take several minutes)</span>
+kubectl -n "$KAFKA_NAMESPACE" wait kafka/"$KAFKA_CLUSTER" \
+  --for=condition=Ready --timeout=600s
+
+<span class="c"># The warehouses</span>
+kubectl -n "$KAFKA_NAMESPACE" get pvc</pre>
+
+          <div class="ockl-note ockl-nc"><b class="h">Mission complete when</b>
+            <ul><li>Three Kafka pods are <code>Running</code>.</li>
+            <li><code>kafka/$KAFKA_CLUSTER</code> reports <code>Ready=True</code>.</li>
+            <li>Three <code>Bound</code> PVCs exist, backed by your storage class.</li>
+            <li>The whole definition lives in Git, not in an ad-hoc <code>kubectl apply</code>.</li></ul></div>
+        </div>
+      </details>
+
+      <!-- ── MISSION 4 ── -->
+      <details class="ockl-m"><summary><span class="ockl-num">4</span><span class="ockl-t">Topics, Producers and Consumers</span>
+        <span class="ockl-meta"><span class="ockl-pill time">40 min</span><span class="ockl-pill tool">kubectl</span><span class="ockl-pill tool">kafka-cli</span></span>
+        <span class="ockl-s">Open a delivery route, then send and receive your first parcels.</span></summary>
+        <div class="ockl-body">
+          <div class="ockl-note ockl-nm" style="margin-top:8px;"><b class="h">The metaphor</b>
+            A topic is a named delivery route. Six partitions are six lanes on that route &mdash; the reason
+            more than one delivery van can work it at the same time.</div>
+
+          <div class="ockl-step">Task 4.1 &mdash; Declare the topic</div>
+<pre class="ockl-pre">cat &gt; "$GITOPS_DIR/kafka-topic-city-events.yaml" &lt;&lt;EOF
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaTopic
+metadata:
+  name: ${KAFKA_TOPIC}
+  namespace: ${KAFKA_NAMESPACE}
+  labels:
+    strimzi.io/cluster: ${KAFKA_CLUSTER}
+spec:
+  partitions: 6
+  replicas: 3
+  config:
+    retention.ms: 604800000
+    segment.bytes: 1073741824
+EOF
+
+git -C "$GITOPS_DIR" add kafka-topic-city-events.yaml
+git -C "$GITOPS_DIR" commit -m "Add ${KAFKA_TOPIC} topic"
+git -C "$GITOPS_DIR" push
+flux reconcile source git flux-system</pre>
+          <p style="margin:6px 0 0;font-size:13px;"><code>retention.ms: 604800000</code> is seven days &mdash;
+            how long the warehouse keeps a parcel after delivery. This is the setting that makes replay possible.</p>
+
+          <div class="ockl-step">Task 4.2 &mdash; Confirm the Topic Operator created it</div>
+<pre class="ockl-pre">kubectl -n "$KAFKA_NAMESPACE" get kafkatopic
+kubectl -n "$KAFKA_NAMESPACE" describe kafkatopic "$KAFKA_TOPIC"</pre>
+
+          <div class="ockl-step">Task 4.3 &mdash; Send city events (producer)</div>
+          <p style="margin:0 0 6px;font-size:13px;">Open a terminal. Type a line, press Enter &mdash; that is
+            one event.</p>
+<pre class="ockl-pre">kubectl -n "$KAFKA_NAMESPACE" run kafka-producer -ti \
+  --image="$KAFKA_CLIENT_IMAGE" --rm=true --restart=Never -- \
+  bin/kafka-console-producer.sh \
+    --bootstrap-server "$KAFKA_CLUSTER-kafka-bootstrap:9092" \
+    --topic "$KAFKA_TOPIC"
+
+<span class="c"># Then type, one per line:</span>
+<span class="c">#   vm.migrated  server-01  DFW-&gt;IAD3</span>
+<span class="c">#   cutover.started  acme-payments</span>
+<span class="c">#   uat.approved  acme-payments</span></pre>
+
+          <div class="ockl-step">Task 4.4 &mdash; Receive them (consumer)</div>
+          <p style="margin:0 0 6px;font-size:13px;">In a <b>second</b> terminal (remember to
+            <code>source kafka-lab.env</code> there too):</p>
+<pre class="ockl-pre">kubectl -n "$KAFKA_NAMESPACE" run kafka-consumer -ti \
+  --image="$KAFKA_CLIENT_IMAGE" --rm=true --restart=Never -- \
+  bin/kafka-console-consumer.sh \
+    --bootstrap-server "$KAFKA_CLUSTER-kafka-bootstrap:9092" \
+    --topic "$KAFKA_TOPIC" \
+    --from-beginning</pre>
+          <div class="ockl-note ockl-nr"><b class="h">The point of the exercise</b>
+            <code>--from-beginning</code> replays events that were sent before this consumer existed. A queue
+            could not do that &mdash; the message would have been consumed and deleted. This is the single
+            most important difference between Kafka and RabbitMQ, and you have just demonstrated it.</div>
+
+          <div class="ockl-note ockl-nc"><b class="h">Mission complete when</b>
+            <ul><li>The <code>KafkaTopic</code> shows <code>Ready</code> with 6 partitions.</li>
+            <li>Events typed in the producer appear in the consumer.</li>
+            <li>A second consumer started later still sees the earlier events with
+              <code>--from-beginning</code>.</li></ul></div>
+        </div>
+      </details>
+
+      <!-- ── MISSION 5 ── -->
+      <details class="ockl-m"><summary><span class="ockl-num">5</span><span class="ockl-t">Consumer Groups and Partitions</span>
+        <span class="ockl-meta"><span class="ockl-pill time">30 min</span><span class="ockl-pill tool">kafka-cli</span></span>
+        <span class="ockl-s">A delivery team sharing the lanes, instead of one van doing everything.</span></summary>
+        <div class="ockl-body">
+          <div class="ockl-note ockl-nm" style="margin-top:8px;"><b class="h">The metaphor</b>
+            A consumer group is a delivery team. Kafka assigns lanes (partitions) across the team. Add a van,
+            each van carries fewer lanes. Lose a van, its lanes are reassigned automatically.</div>
+
+          <div class="ockl-step">Task 5.1 &mdash; Start two consumers in the same group</div>
+          <p style="margin:0 0 6px;font-size:13px;">Run this in two terminals, changing only the pod name:</p>
+<pre class="ockl-pre">kubectl -n "$KAFKA_NAMESPACE" run kafka-team-1 -ti \
+  --image="$KAFKA_CLIENT_IMAGE" --rm=true --restart=Never -- \
+  bin/kafka-console-consumer.sh \
+    --bootstrap-server "$KAFKA_CLUSTER-kafka-bootstrap:9092" \
+    --topic "$KAFKA_TOPIC" \
+    --group city-team
+
+<span class="c"># second terminal: same command, pod name kafka-team-2</span></pre>
+
+          <div class="ockl-step">Task 5.2 &mdash; Produce a burst and watch the split</div>
+<pre class="ockl-pre">kubectl -n "$KAFKA_NAMESPACE" run kafka-burst -ti \
+  --image="$KAFKA_CLIENT_IMAGE" --rm=true --restart=Never -- \
+  bash -c 'for i in $(seq 1 60); do echo "city-event-$i"; done | \
+    bin/kafka-console-producer.sh \
+      --bootstrap-server '"$KAFKA_CLUSTER"'-kafka-bootstrap:9092 \
+      --topic '"$KAFKA_TOPIC"''</pre>
+          <p style="margin:6px 0 0;font-size:13px;"><b>Expected:</b> the 60 events are split between the two
+            consumers &mdash; not duplicated to both. That is a group sharing work. Two consumers in
+            <i>different</i> groups would each get all 60.</p>
+
+          <div class="ockl-step">Task 5.3 &mdash; Inspect the group and its lag</div>
+<pre class="ockl-pre">kubectl -n "$KAFKA_NAMESPACE" run kafka-admin -ti \
+  --image="$KAFKA_CLIENT_IMAGE" --rm=true --restart=Never -- \
+  bin/kafka-consumer-groups.sh \
+    --bootstrap-server "$KAFKA_CLUSTER-kafka-bootstrap:9092" \
+    --describe --group city-team</pre>
+          <p style="margin:6px 0 0;font-size:13px;">Read the <code>PARTITION</code>,
+            <code>CURRENT-OFFSET</code>, <code>LOG-END-OFFSET</code> and <code>LAG</code> columns.
+            <b>Lag is the single number that tells you a consumer is falling behind</b> &mdash; it is what you
+            will alert on in production.</p>
+
+          <div class="ockl-step">Task 5.4 &mdash; Kill one consumer, watch rebalancing</div>
+<pre class="ockl-pre"><span class="c"># Ctrl-C one of the two consumers, then immediately:</span>
+kubectl -n "$KAFKA_NAMESPACE" run kafka-admin -ti \
+  --image="$KAFKA_CLIENT_IMAGE" --rm=true --restart=Never -- \
+  bin/kafka-consumer-groups.sh \
+    --bootstrap-server "$KAFKA_CLUSTER-kafka-bootstrap:9092" \
+    --describe --group city-team</pre>
+          <p style="margin:6px 0 0;font-size:13px;"><b>Expected:</b> all six partitions are now assigned to the
+            surviving consumer. No events were lost.</p>
+
+          <div class="ockl-note ockl-nc"><b class="h">Mission complete when</b>
+            <ul><li>Two consumers in one group split the partitions rather than duplicating events.</li>
+            <li>You can read lag per partition and say what it means.</li>
+            <li>Removing a consumer rebalances its partitions onto the survivor with no loss.</li></ul></div>
+        </div>
+      </details>
+
+      <!-- ══════════ PART 3 ══════════ -->
+      <div class="ockl-lvl"><span class="n">Part 3 &middot; Prove it survives</span>
+        <span>Missions 6&ndash;8</span><span class="b">&#128293; Failure, sight, locks</span></div>
+
+      <!-- ── MISSION 6 ── -->
+      <details class="ockl-m"><summary><span class="ockl-num">6</span><span class="ockl-t">Persistence and Failure Recovery</span>
+        <span class="ockl-meta"><span class="ockl-pill time">35 min</span><span class="ockl-pill tool">kubectl</span><span class="ockl-pill tool">strimzi</span></span>
+        <span class="ockl-s">Burn down a sorting office and prove the parcels survive.</span></summary>
+        <div class="ockl-body">
+          <div class="ockl-note ockl-nm" style="margin-top:8px;"><b class="h">The metaphor</b>
+            A sorting office closes unexpectedly. Because every parcel was copied to other offices and the
+            warehouse is separate from the building, nothing is lost and deliveries continue.</div>
+
+          <div class="ockl-step">Task 6.1 &mdash; Record the state before the failure</div>
+<pre class="ockl-pre">kubectl -n "$KAFKA_NAMESPACE" get pods -o wide
+kubectl -n "$KAFKA_NAMESPACE" get pvc
+
+<span class="c"># Note the end offsets - this is your "before" evidence</span>
+kubectl -n "$KAFKA_NAMESPACE" run kafka-admin -ti \
+  --image="$KAFKA_CLIENT_IMAGE" --rm=true --restart=Never -- \
+  bin/kafka-get-offsets.sh \
+    --bootstrap-server "$KAFKA_CLUSTER-kafka-bootstrap:9092" \
+    --topic "$KAFKA_TOPIC"</pre>
+
+          <div class="ockl-step">Task 6.2 &mdash; Cause a controlled failure</div>
+<pre class="ockl-pre"><span class="c"># Delete ONE broker pod. Never scale the node pool to 0 to simulate this.</span>
+kubectl -n "$KAFKA_NAMESPACE" delete pod "$KAFKA_CLUSTER-city-pool-0"
+
+kubectl -n "$KAFKA_NAMESPACE" get pods -w</pre>
+          <div class="ockl-note ockl-nx"><b class="h">Do not delete the PVC</b>
+            Deleting the pod tests recovery. Deleting the PersistentVolumeClaim destroys the warehouse and is
+            data loss, not a drill. <code>deleteClaim: false</code> in Mission 3 is what protects you here.</div>
+
+          <div class="ockl-step">Task 6.3 &mdash; Prove the data survived</div>
+<pre class="ockl-pre">kubectl -n "$KAFKA_NAMESPACE" wait kafka/"$KAFKA_CLUSTER" \
+  --for=condition=Ready --timeout=600s
+
+<span class="c"># Same offsets as before? Then nothing was lost.</span>
+kubectl -n "$KAFKA_NAMESPACE" run kafka-admin -ti \
+  --image="$KAFKA_CLIENT_IMAGE" --rm=true --restart=Never -- \
+  bin/kafka-get-offsets.sh \
+    --bootstrap-server "$KAFKA_CLUSTER-kafka-bootstrap:9092" \
+    --topic "$KAFKA_TOPIC"
+
+<span class="c"># And replay everything from the start</span>
+kubectl -n "$KAFKA_NAMESPACE" run kafka-verify -ti \
+  --image="$KAFKA_CLIENT_IMAGE" --rm=true --restart=Never -- \
+  bin/kafka-console-consumer.sh \
+    --bootstrap-server "$KAFKA_CLUSTER-kafka-bootstrap:9092" \
+    --topic "$KAFKA_TOPIC" \
+    --from-beginning --timeout-ms 15000</pre>
+
+          <div class="ockl-step">Task 6.4 &mdash; Check under-replicated partitions</div>
+<pre class="ockl-pre">kubectl -n "$KAFKA_NAMESPACE" run kafka-admin -ti \
+  --image="$KAFKA_CLIENT_IMAGE" --rm=true --restart=Never -- \
+  bin/kafka-topics.sh \
+    --bootstrap-server "$KAFKA_CLUSTER-kafka-bootstrap:9092" \
+    --describe --under-replicated-partitions</pre>
+          <p style="margin:6px 0 0;font-size:13px;"><b>Expected:</b> empty output once the replacement broker
+            has caught up. Any lasting output here means a replica has not re-synced.</p>
+
+          <div class="ockl-note ockl-nc"><b class="h">Mission complete when</b>
+            <ul><li>The deleted broker was rebuilt automatically by Strimzi.</li>
+            <li>It re-attached its existing PVC rather than provisioning a new one.</li>
+            <li>Offsets match the pre-failure reading and all events replay.</li>
+            <li>No under-replicated partitions remain.</li>
+            <li>You recorded how long recovery took &mdash; that is your measured RTO.</li></ul></div>
+        </div>
+      </details>
+
+      <!-- ── MISSION 7 ── -->
+      <details class="ockl-m"><summary><span class="ockl-num">7</span><span class="ockl-t">Monitoring</span>
+        <span class="ockl-meta"><span class="ockl-pill time">25 min</span><span class="ockl-pill tool">prometheus</span><span class="ockl-pill tool">grafana</span></span>
+        <span class="ockl-s">Cameras on the sorting offices, and an alarm on the backlog.</span></summary>
+        <div class="ockl-body">
+          <div class="ockl-note ockl-nm" style="margin-top:8px;"><b class="h">The metaphor</b>
+            The postal system runs. Now the control room needs to see the parcel backlog before customers
+            complain about late deliveries.</div>
+
+          <div class="ockl-step">Task 7.1 &mdash; Add Kafka Exporter to the cluster definition</div>
+          <p style="margin:0 0 6px;font-size:13px;">Append to the <code>Kafka</code> resource in
+            <code>kafka-city-stream.yaml</code>, at the same indent level as <code>entityOperator</code>:</p>
+<pre class="ockl-pre y">  kafkaExporter:
+    topicRegex: ".*"
+    groupRegex: ".*"</pre>
+<pre class="ockl-pre">git -C "$GITOPS_DIR" add kafka-city-stream.yaml
+git -C "$GITOPS_DIR" commit -m "Add Kafka Exporter metrics"
+git -C "$GITOPS_DIR" push
+flux reconcile source git flux-system
+
+kubectl -n "$KAFKA_NAMESPACE" get pods | grep exporter</pre>
+
+          <div class="ockl-step">Task 7.2 &mdash; Look at the metrics directly</div>
+<pre class="ockl-pre">kubectl -n "$KAFKA_NAMESPACE" port-forward \
+  svc/"$KAFKA_CLUSTER-kafka-exporter" 9308:9308 &amp;
+
+curl -s localhost:9308/metrics | grep -E 'kafka_consumergroup_lag|kafka_topic_partitions' | head -20</pre>
+
+          <div class="ockl-step">Task 7.3 &mdash; The four numbers that matter</div>
+          <table class="ockl-tbl">
+            <thead><tr><th style="width:250px">Metric</th><th>What it tells the control room</th></tr></thead>
+            <tbody>
+              <tr><td><code>kafka_consumergroup_lag</code></td><td>How far behind a delivery team is. <b>Alert on this one.</b></td></tr>
+              <tr><td><code>kafka_brokers</code></td><td>How many sorting offices are open</td></tr>
+              <tr><td><code>kafka_topic_partitions</code></td><td>Lanes per route &mdash; catches accidental topic changes</td></tr>
+              <tr><td><code>kafka_topic_partition_under_replicated_partition</code></td><td>Parcels with too few copies &mdash; a data-loss risk</td></tr>
+            </tbody>
+          </table>
+
+          <div class="ockl-step">Task 7.4 &mdash; Confirm Prometheus is scraping it</div>
+<pre class="ockl-pre">kubectl -n "$KAFKA_NAMESPACE" get podmonitor,servicemonitor 2&gt;/dev/null
+kubectl -n observability get pods | grep -E 'prometheus|grafana'</pre>
+          <div class="ockl-note ockl-nw"><b class="h">If nothing is scraped</b>
+            The exporter exposes metrics, but Prometheus only collects what it is told to. Your OpenCenter
+            release supplies either a <code>PodMonitor</code> or a <code>ServiceMonitor</code> for Kafka &mdash;
+            confirm which, and that its label selector matches your namespace. This is the most common reason a
+            Grafana Kafka dashboard stays empty.</div>
+
+          <div class="ockl-note ockl-nc"><b class="h">Mission complete when</b>
+            <ul><li>The Kafka Exporter pod is running.</li>
+            <li><code>kafka_consumergroup_lag</code> is visible for <code>city-team</code>.</li>
+            <li>Prometheus is scraping the exporter.</li>
+            <li>You can state which metric you would alert on, and why.</li></ul></div>
+        </div>
+      </details>
+
+      <!-- ── MISSION 8 ── -->
+      <details class="ockl-m"><summary><span class="ockl-num">8</span><span class="ockl-t">Security Challenge</span>
+        <span class="ockl-meta"><span class="ockl-pill time">35 min</span><span class="ockl-pill tool">strimzi</span><span class="ockl-pill tool">kubectl</span></span>
+        <span class="ockl-s">Not everyone may post a parcel, and not on every route.</span></summary>
+        <div class="ockl-body">
+          <div class="ockl-note ockl-nm" style="margin-top:8px;"><b class="h">The metaphor</b>
+            Until now, anyone inside the city could post anything on any route. A real postal system checks who
+            you are, and what you are allowed to send.</div>
+
+          <div class="ockl-step">Task 8.1 &mdash; Add an authenticated listener and authorization</div>
+          <p style="margin:0 0 6px;font-size:13px;">Add a listener to <code>spec.kafka.listeners</code>, and
+            <code>authorization</code> at the same level as <code>listeners</code>:</p>
+<pre class="ockl-pre y">      - name: scram
+        port: 9095
+        type: internal
+        tls: true
+        authentication:
+          type: scram-sha-512
+
+    authorization:
+      type: simple</pre>
+          <div class="ockl-note ockl-nx"><b class="h">Order matters</b>
+            Turning on <code>authorization</code> denies everything not explicitly allowed. Apply this
+            <b>before</b> you create the user in 8.2, then verify the existing plain listener on 9092 still
+            works for the earlier missions &mdash; or accept that they now need credentials too.</div>
+
+          <div class="ockl-step">Task 8.2 &mdash; Create a user with least privilege</div>
+<pre class="ockl-pre">cat &gt; "$GITOPS_DIR/kafka-user-city-writer.yaml" &lt;&lt;EOF
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaUser
+metadata:
+  name: city-writer
+  namespace: ${KAFKA_NAMESPACE}
+  labels:
+    strimzi.io/cluster: ${KAFKA_CLUSTER}
+spec:
+  authentication:
+    type: scram-sha-512
+  authorization:
+    type: simple
+    acls:
+      - resource:
+          type: topic
+          name: ${KAFKA_TOPIC}
+          patternType: literal
+        operations:
+          - Describe
+          - Write
+EOF
+
+git -C "$GITOPS_DIR" add kafka-user-city-writer.yaml
+git -C "$GITOPS_DIR" commit -m "Add least-privilege city-writer user"
+git -C "$GITOPS_DIR" push
+flux reconcile source git flux-system</pre>
+
+          <div class="ockl-step">Task 8.3 &mdash; Collect the generated credential</div>
+<pre class="ockl-pre">kubectl -n "$KAFKA_NAMESPACE" get kafkauser city-writer
+
+<span class="c"># The User Operator generates the password into a Secret named after the user</span>
+kubectl -n "$KAFKA_NAMESPACE" get secret city-writer \
+  -o jsonpath='{.data.password}' | base64 -d; echo</pre>
+          <div class="ockl-note ockl-nx"><b class="h">Lab only</b>
+            Printing a password to a terminal is acceptable in an isolated training sandbox and nowhere else.
+            In production this Secret is consumed by the workload directly, and the GitOps copy is encrypted
+            with SOPS &mdash; see Module 7 of the Advanced lab.</div>
+
+          <div class="ockl-step">Task 8.4 &mdash; The challenge</div>
+          <div class="ockl-note ockl-nr"><b class="h">Prove all four, with evidence</b>
+            <ul><li><code>city-writer</code> <b>can</b> write to <code>city-events</code>.</li>
+            <li><code>city-writer</code> <b>cannot</b> read from <code>city-events</code> &mdash; the ACL grants
+              only <code>Describe</code> and <code>Write</code>.</li>
+            <li><code>city-writer</code> <b>cannot</b> write to any other topic.</li>
+            <li>An unauthenticated client is refused on the <code>scram</code> listener.</li></ul>
+            Capture the exact error message for each denial. "It failed" is not evidence; <code>TopicAuthorizationException</code> is.</div>
+
+          <div class="ockl-note ockl-nc"><b class="h">Mission complete when</b>
+            <ul><li>An authenticated listener and <code>simple</code> authorization are live.</li>
+            <li><code>city-writer</code> exists with only the ACLs it needs.</li>
+            <li>All four outcomes in 8.4 are demonstrated with their error messages recorded.</li>
+            <li>Every change went through Git, not <code>kubectl edit</code>.</li></ul></div>
+        </div>
+      </details>
+
+      <!-- ══════════ PART 4 ══════════ -->
+      <div class="ockl-lvl"><span class="n">Part 4 &middot; Close it down</span>
+        <span>Mission 9</span><span class="b">&#127937; Clean exit and assessment</span></div>
+
+      <!-- ── MISSION 9 ── -->
+      <details class="ockl-m"><summary><span class="ockl-num">9</span><span class="ockl-t">Cleanup and Assessment</span>
+        <span class="ockl-meta"><span class="ockl-pill time">20 min</span><span class="ockl-pill tool">opencenter</span><span class="ockl-pill tool">git</span></span>
+        <span class="ockl-s">Close the postal system the same way you opened it &mdash; through Git.</span></summary>
+        <div class="ockl-body">
+          <div class="ockl-note ockl-nm" style="margin-top:8px;"><b class="h">The metaphor</b>
+            A city that cannot decommission a service cleanly does not really control it. Removing Kafka
+            through the same GitOps path that created it is the proof.</div>
+
+          <div class="ockl-step">Task 9.1 &mdash; Capture your evidence first</div>
+<pre class="ockl-pre">kubectl -n "$KAFKA_NAMESPACE" get kafka,kafkanodepool,kafkatopic,kafkauser -o yaml \
+  &gt; kafka-lab-evidence.yaml
+kubectl -n "$KAFKA_NAMESPACE" get pods,pvc -o wide &gt;&gt; kafka-lab-evidence.yaml
+git -C "$GITOPS_DIR" log --oneline &gt;&gt; kafka-lab-evidence.yaml</pre>
+
+          <div class="ockl-step">Task 9.2 &mdash; Remove the workload resources through Git</div>
+<pre class="ockl-pre">git -C "$GITOPS_DIR" rm kafka-topic-city-events.yaml kafka-user-city-writer.yaml
+git -C "$GITOPS_DIR" commit -m "Remove Kafka lab topic and user"
+git -C "$GITOPS_DIR" push
+flux reconcile source git flux-system
+
+kubectl -n "$KAFKA_NAMESPACE" get kafkatopic,kafkauser</pre>
+
+          <div class="ockl-step">Task 9.3 &mdash; Remove the cluster, then the capability</div>
+<pre class="ockl-pre">git -C "$GITOPS_DIR" rm kafka-city-stream.yaml
+git -C "$GITOPS_DIR" commit -m "Remove ${KAFKA_CLUSTER} Kafka cluster"
+git -C "$GITOPS_DIR" push
+flux reconcile source git flux-system
+
+<span class="c"># Then disable the OpenCenter service, using the same name you enabled</span>
+opencenter cluster set "$LAB_CLUSTER" \
+  opencenter.services.kafka-cluster.enabled=false
+opencenter cluster validate "$LAB_CLUSTER"
+opencenter cluster generate "$LAB_CLUSTER" --render-only --force
+
+git -C "$GITOPS_DIR" add .
+git -C "$GITOPS_DIR" commit -m "Disable Kafka platform capability"
+git -C "$GITOPS_DIR" push</pre>
+
+          <div class="ockl-step">Task 9.4 &mdash; Confirm the warehouses are gone</div>
+<pre class="ockl-pre">kubectl -n "$KAFKA_NAMESPACE" get pvc
+kubectl delete namespace "$KAFKA_NAMESPACE"</pre>
+          <div class="ockl-note ockl-nw"><b class="h">deleteClaim: false has a cost</b>
+            The setting that protected your data in Mission 6 also means the PVCs &mdash; and the Cinder volumes
+            behind them &mdash; outlive the cluster. Deleting the namespace removes the PVCs; confirm in FLEX
+            that the underlying volumes were released, or you will pay for them indefinitely.</div>
+
+          <div class="ockl-step">Graduation questions</div>
+          <div class="ockl-note ockl-nr"><b class="h">Answer with evidence, not opinion</b>
+            <ul><li>Why is Kafka an operator-managed service rather than an ordinary Deployment?</li>
+            <li>What did <code>--from-beginning</code> demonstrate that a queue cannot do?</li>
+            <li>What is consumer lag, and at what value would you page someone?</li>
+            <li>What exactly survived the broker deletion in Mission 6, and why?</li>
+            <li>Which single metric would you put on the control-room wall, and why that one?</li>
+            <li>Name one workload in your own estate that should <b>not</b> get Kafka, and say why.</li></ul></div>
+
+          <div class="ockl-note ockl-nc"><b class="h">Lab complete when</b>
+            <ul><li>Evidence file captured before teardown.</li>
+            <li>Every resource was removed through Git, not by hand.</li>
+            <li>The OpenCenter service is disabled and the blueprint validates clean.</li>
+            <li>No orphaned PVCs or Cinder volumes remain.</li>
+            <li>All six graduation questions answered with evidence.</li></ul></div>
+        </div>
+      </details>
+
+      <div class="ockl-note ockl-nr" style="margin-top:18px;">
+        <b class="h">Related</b>
+        Kafka is deliberately kept out of the Advanced OpenCenter Training Lab &mdash; it is a workload-specific
+        capability, not something every cluster needs, and it is large enough to deserve its own programme.
+        The Advanced lab covers the platform this one is built on: worker pools and capacity (Module 8),
+        secrets management (Module 7), observability (Module 9) and GitOps discipline throughout.
+      </div>
+
+    </div>
+    </div>
+  </div>

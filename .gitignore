@@ -175,3 +175,9 @@ age/keys/
 [Cc]laude*
 output/export/manifests/secret.yaml
 **/secret.yaml
+
+# SSO — the filled-in oauth2-proxy config holds the Entra client secret and the
+# cookie secret. Only the .example template is committed.
+oauth2-proxy.cfg
+**/oauth2-proxy.cfg
+!**/oauth2-proxy.cfg.example

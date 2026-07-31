@@ -1,0 +1,460 @@
+  <!-- ══════════════════════════════════════════════════════════════════════
+       Training & Tutorials Stage (panel-s_train)
+
+       This panel is the dedicated home for every OpenCenter training lab. The
+       three lab bands themselves are NOT duplicated here: they are relocated
+       into #train-labs-mount by activateStage() in _closing_scripts.html and
+       moved back to #oc-labs-home-anchor (inside the OpenCenter sub-stage) when
+       another stage opens.
+
+       Why a move and not a copy: each band carries ~2,500-3,500 lines of markup
+       whose scripts address their own element ids (ocqs-*, ocqp-*, ocqc-*) via
+       getElementById. A second static copy in the DOM would give every one of
+       those ids a duplicate, getElementById would return whichever came first,
+       and BOTH placements would break. This is the same single-live-copy
+       pattern already used for co-adv-dash and the Stage 4C relocations.
+  ═══════════════════════════════════════════════════════════════════════ -->
+  <div class="panel" id="panel-s_train" style="overflow:auto;">
+    <style>
+      /* ── iOS system palette. Blue is the action colour throughout, per the iOS
+            convention that every tappable action is systemBlue; the per-lab accent
+            is carried on borders, kickers and left rules instead. Variables come
+            from static/ios-theme.css, with literal fallbacks so this panel still
+            renders correctly if the theme stylesheet is not loaded. ── */
+      #panel-s_train {
+        --trn-blue:   #0A7CFF;
+        --trn-label:  var(--ios-label, #000000);
+        --trn-label2: var(--ios-label-secondary, rgba(60,60,67,.60));
+        --trn-sep:    var(--ios-separator, rgba(60,60,67,.29));
+        --trn-bg:     var(--ios-bg, #ffffff);
+        --trn-bg2:    var(--ios-bg-secondary, #F2F2F7);
+        --trn-fill:   var(--ios-fill-soft, rgba(120,120,128,.06));
+        --trn-r:      var(--ios-radius, 12px);
+        --trn-rlg:    var(--ios-radius-lg, 16px);
+        --trn-sh1:    var(--ios-shadow-1, 0 1px 2px rgba(0,0,0,.04), 0 1px 8px rgba(0,0,0,.04));
+        --trn-sh2:    var(--ios-shadow-2, 0 2px 6px rgba(0,0,0,.05), 0 8px 24px rgba(0,0,0,.06));
+        font-family: var(--ios-font, -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif);
+      }
+      #panel-s_train .trn-wrap { max-width:1320px; margin:0 auto; padding:6px 0 48px; }
+      #panel-s_train .trn-hero {
+        position:relative; overflow:hidden; border-radius:var(--trn-rlg);
+        border:1px solid var(--trn-sep); margin-bottom:20px; padding:34px 36px 30px;
+        background:linear-gradient(135deg,#ffffff 0%,#F2F7FF 54%,#E5F0FF 100%);
+        box-shadow:var(--trn-sh2);
+      }
+      #panel-s_train .trn-badge {
+        display:inline-flex; align-items:center; gap:8px; margin-bottom:16px;
+        border-radius:980px; border:1px solid rgba(0,122,255,.28); background:rgba(255,255,255,.92);
+        padding:7px 15px; font-size:10.5px; font-weight:600; letter-spacing:.16em;
+        text-transform:uppercase; color:var(--ios-blue-text, #0040DD);
+      }
+      #panel-s_train .trn-badge i { width:8px; height:8px; border-radius:50%; background:var(--trn-blue); }
+      #panel-s_train .trn-hero h1 {
+        margin:0; font-size:40px; line-height:1.1; font-weight:700; color:var(--trn-label); letter-spacing:-.022em;
+      }
+      #panel-s_train .trn-hero h1 span { display:block; color:var(--trn-blue); }
+      #panel-s_train .trn-hero p { margin:16px 0 0; max-width:760px; font-size:15px; line-height:1.72; color:var(--trn-label2); }
+      #panel-s_train .trn-note {
+        margin-top:18px; border-left:3px solid var(--trn-blue); border-radius:0 var(--trn-r) var(--trn-r) 0;
+        background:rgba(255,255,255,.82); padding:11px 15px; font-size:12.5px; color:var(--trn-label2); max-width:760px;
+      }
+      #panel-s_train .trn-note b { color:var(--ios-blue-text, #0040DD); }
+      #panel-s_train .trn-grid {
+        display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:14px; margin-bottom:22px;
+      }
+      #panel-s_train .trn-card {
+        background:var(--trn-bg); border:1px solid var(--trn-sep); border-radius:var(--trn-rlg);
+        padding:18px 20px 16px; box-shadow:var(--trn-sh1); display:flex; flex-direction:column;
+        border-top:4px solid var(--trn-accent,var(--trn-blue));
+      }
+      #panel-s_train .trn-card-kick {
+        font-size:9.5px; font-weight:700; letter-spacing:1.5px; text-transform:uppercase;
+        color:var(--trn-accent,var(--trn-blue)); margin-bottom:6px;
+      }
+      #panel-s_train .trn-card h3 { margin:0 0 8px; font-size:16px; font-weight:700; color:var(--trn-label); line-height:1.3; letter-spacing:-.01em; }
+      #panel-s_train .trn-card p { margin:0 0 12px; font-size:13px; line-height:1.6; color:var(--trn-label2); flex:1; }
+      #panel-s_train .trn-pills { display:flex; flex-wrap:wrap; gap:5px; margin-bottom:13px; }
+      #panel-s_train .trn-pill {
+        font-size:10px; font-weight:600; padding:3px 10px; border-radius:980px;
+        border:1px solid var(--trn-sep); background:var(--trn-fill); color:var(--trn-label2);
+      }
+      #panel-s_train .trn-pill.live {
+        background:rgba(52,199,89,.12); border-color:rgba(52,199,89,.42); color:var(--ios-green-text, #248A3D);
+      }
+      #panel-s_train .trn-pill.mock {
+        background:rgba(255,149,0,.14); border-color:rgba(255,149,0,.45); color:var(--ios-orange-text, #B25000);
+      }
+      /* iOS filled pill. Blue for every action - the accent lives on the card edge. */
+      #panel-s_train .trn-go {
+        border:none !important; border-radius:980px !important; padding:10px 18px;
+        font-size:12.5px; font-weight:600; color:#fff !important; cursor:pointer;
+        background:var(--trn-blue) !important; align-self:flex-start;
+        box-shadow:none !important; text-shadow:none !important;
+        font-family:inherit; transition:filter .15s ease;
+      }
+      #panel-s_train .trn-go:hover { filter:brightness(.92); }
+      #panel-s_train .trn-sec {
+        margin:26px 0 12px; padding:11px 15px; border-radius:var(--trn-r);
+        border:1px solid rgba(0,122,255,.22); background:rgba(0,122,255,.07);
+        color:var(--ios-blue-text, #0040DD);
+        font-size:11.5px; font-weight:700; letter-spacing:1.2px; text-transform:uppercase;
+        display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+      }
+      #panel-s_train .trn-sec span.b {
+        margin-left:auto; font-size:10px; font-weight:600; letter-spacing:0;
+        text-transform:none; padding:3px 11px; border-radius:980px; background:rgba(255,255,255,.85);
+      }
+      #panel-s_train .trn-empty {
+        border:1px dashed var(--trn-sep); border-radius:var(--trn-r); background:var(--trn-bg2);
+        padding:26px; text-align:center; color:var(--trn-label2); font-size:13px; line-height:1.7;
+      }
+
+      /* ── Learning path diagram ── */
+      #panel-s_train .trn-path {
+        background:var(--trn-bg); border:1px solid var(--trn-sep); border-radius:var(--trn-rlg);
+        padding:22px 24px 24px; margin-bottom:22px; box-shadow:var(--trn-sh1);
+      }
+      #panel-s_train .trn-path-h {
+        font-size:11px; font-weight:700; color:var(--ios-blue-text, #0040DD); text-transform:uppercase;
+        letter-spacing:1.2px; margin:0 0 4px;
+      }
+      #panel-s_train .trn-path-sub { font-size:12.5px; color:var(--trn-label2); margin:0 0 18px; }
+      /* !important throughout: a global skyline rule repaints every unlisted
+         button #a33e3e with border-radius 2px. .trn-node is excluded there, but
+         these keep the node correct even if that allowlist is edited again. */
+      #panel-s_train .trn-node {
+        display:block; width:100%; text-align:left; cursor:pointer;
+        border:1px solid var(--trn-sep) !important;
+        border-left:4px solid var(--n,var(--trn-blue)) !important;
+        border-radius:var(--trn-r) !important; background:var(--trn-bg) !important;
+        padding:12px 16px; box-shadow:var(--trn-sh1) !important;
+        font-family:inherit; text-shadow:none !important;
+        transition:box-shadow .15s ease, transform .15s ease;
+      }
+      #panel-s_train .trn-node:hover { box-shadow:var(--trn-sh2) !important; transform:translateY(-1px); }
+      #panel-s_train .trn-node .s {
+        display:block; font-size:9.5px; font-weight:700; letter-spacing:1.3px;
+        text-transform:uppercase; color:var(--n,var(--trn-blue)); margin-bottom:3px;
+      }
+      #panel-s_train .trn-node .n {
+        display:block; font-size:14px; font-weight:600; color:var(--trn-label); line-height:1.3; letter-spacing:-.01em;
+      }
+      #panel-s_train .trn-node .d { display:block; font-size:11.5px; color:var(--trn-label2); margin-top:3px; line-height:1.45; }
+      #panel-s_train .trn-arrow { text-align:center; font-size:19px; color:var(--ios-gray2, #AEAEB2); line-height:1; margin:7px 0; }
+      #panel-s_train .trn-branch {
+        display:grid; grid-template-columns:repeat(auto-fit,minmax(270px,1fr)); gap:14px;
+      }
+      #panel-s_train .trn-split {
+        display:flex; align-items:center; gap:10px; margin:9px 0 4px;
+        font-size:10px; font-weight:900; letter-spacing:1.3px; text-transform:uppercase; color:var(--ios-gray,#8E8E93);
+      }
+      #panel-s_train .trn-split::before,
+      #panel-s_train .trn-split::after { content:""; flex:1; height:1px; background:var(--trn-sep); }
+
+      /* ── Shared lab design system ───────────────────────────────────────────
+         Every lab band added to this stage from now on uses these classes, so a
+         new lab is markup only — no stylesheet to copy or keep in sync. Set
+         three custom properties on the band wrapper and the whole lab recolours:
+
+           --lab-accent       headings, mission numbers, buttons
+           --lab-accent-dark  band header gradient start, table header
+           --lab-accent-soft  tinted note/level backgrounds
+
+         partials/_lab_template.html is the copy-ready skeleton.
+
+         Scoped to [data-lab-band], NOT to #panel-s_train: programme bands are
+         homed in the OpenCenter sub-stage and only move into this panel while
+         the Training stage is open, so the styling has to travel with them.
+         Every lab wrapper must carry the data-lab-band attribute.
+
+         The Boot Camp (ocqs-), Advanced (ocqx-) and Certification (ocqc-) bands
+         predate this and carry their own scoped CSS; so does the Kafka lab
+         (ockl-). They are left alone deliberately — restyling working labs buys
+         nothing. New labs should use these classes.
+      ───────────────────────────────────────────────────────────────────────── */
+      [data-lab-band] .lab { padding:20px 24px; max-width:1180px; font-size:14px; line-height:1.62; color:#0f172a; }
+      /* Dark blue for every lab hero, matching Boot Camp, so the title is legible
+         on all of them. !important throughout: body.flex-skyline-mode sets
+         h1-h4 and p to #151922 !important, which otherwise wins here. The
+         per-lab accent still identifies the band in its collapsed header bar. */
+      [data-lab-band] .lab-hero {
+        background:linear-gradient(135deg,#0f172a,#1e3a5f);
+        color:#fff !important; border-radius:12px; padding:22px 24px; margin-bottom:16px;
+      }
+      [data-lab-band] .lab-kick { font-size:9.5px; font-weight:800; letter-spacing:2.2px; text-transform:uppercase; color:#38bdf8 !important; }
+      [data-lab-band] .lab-hero h3 { margin:7px 0 4px; font-size:22px; font-weight:800; color:#fff !important; }
+      [data-lab-band] .lab-tag { font-size:14px; font-weight:700; color:#bae6fd !important; margin-bottom:12px; }
+      [data-lab-band] .lab-flow {
+        background:rgba(255,255,255,.10); border:1px solid rgba(255,255,255,.20); border-radius:9px;
+        padding:11px 14px; font-size:12.5px; line-height:1.75; color:#dbeafe !important;
+      }
+      [data-lab-band] .lab-card { background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:16px 18px; margin-bottom:14px; }
+      [data-lab-band] .lab-h {
+        font-size:11px; font-weight:800; color:var(--lab-accent,#475569);
+        text-transform:uppercase; letter-spacing:1.2px; margin:0 0 9px;
+      }
+      [data-lab-band] .lab-sub { font-size:12.5px; color:#64748b; margin:0 0 9px; }
+      [data-lab-band] .lab-tbl { width:100%; border-collapse:collapse; font-size:12.5px; }
+      [data-lab-band] .lab-tbl th {
+        background:var(--lab-accent-dark,#1e293b); color:#fff; text-align:left; padding:7px 9px;
+        font-size:9.5px; text-transform:uppercase; letter-spacing:.8px;
+      }
+      [data-lab-band] .lab-tbl td { padding:7px 9px; border-bottom:1px solid #e2e8f0; vertical-align:top; }
+      [data-lab-band] .lab-tbl code { background:#f1f5f9; padding:1px 5px; border-radius:4px; font-size:11.5px; }
+      [data-lab-band] details.lab-m { background:#fff; border:1px solid #e2e8f0; border-radius:10px; margin-bottom:10px; overflow:hidden; }
+      [data-lab-band] details.lab-m[open] { border-color:var(--lab-accent,#475569); box-shadow:0 1px 4px rgba(15,23,42,.10); }
+      [data-lab-band] details.lab-m > summary {
+        list-style:none; cursor:pointer; padding:12px 16px; display:flex; align-items:center; gap:11px; flex-wrap:wrap;
+      }
+      [data-lab-band] details.lab-m > summary::-webkit-details-marker { display:none; }
+      [data-lab-band] details.lab-m > summary:hover { background:#f8fafc; }
+      [data-lab-band] .lab-num {
+        flex:none; width:29px; height:29px; border-radius:8px; background:var(--lab-accent-dark,#1e293b);
+        color:#fff; font-size:12px; font-weight:800; display:grid; place-items:center;
+      }
+      [data-lab-band] .lab-t { font-size:14px; font-weight:800; }
+      [data-lab-band] .lab-s { font-size:12px; color:#64748b; flex-basis:100%; margin-left:40px; }
+      [data-lab-band] .lab-meta { margin-left:auto; display:flex; gap:5px; flex-wrap:wrap; }
+      [data-lab-band] .lab-pill {
+        font-size:10px; font-weight:800; padding:3px 9px; border-radius:999px;
+        border:1px solid #e2e8f0; color:#64748b; background:#f8fafc;
+      }
+      [data-lab-band] .lab-pill.tool { background:var(--lab-accent-soft,#f8fafc); border-color:var(--lab-accent,#475569); color:var(--lab-accent,#475569); }
+      [data-lab-band] .lab-pill.time { background:#eff6ff; border-color:#bfdbfe; color:#1d4ed8; }
+      [data-lab-band] .lab-body { padding:4px 17px 17px 56px; border-top:1px solid #e2e8f0; }
+      [data-lab-band] .lab-step { font-size:12.5px; font-weight:800; margin:15px 0 6px; color:var(--lab-accent-dark,#1e293b); }
+      [data-lab-band] .lab-pre {
+        background:#0f172a; color:#a5b4fc; border-radius:7px; padding:11px 13px; font-size:12px;
+        overflow-x:auto; margin:0; white-space:pre; font-family:ui-monospace,Menlo,Consolas,monospace;
+      }
+      [data-lab-band] .lab-pre.y { background:#f8fafc; color:#334155; border:1px solid #e2e8f0; }
+      [data-lab-band] .lab-pre .c { color:#7d8da1; }
+      [data-lab-band] .lab-note { border-left:3px solid; border-radius:0 7px 7px 0; padding:10px 13px; margin-top:11px; font-size:12.5px; }
+      [data-lab-band] .lab-note.nm { border-color:var(--lab-accent,#475569); background:var(--lab-accent-soft,#f8fafc); }
+      [data-lab-band] .lab-note.nc { border-color:#15803d; background:#f0fdf4; }
+      [data-lab-band] .lab-note.nw { border-color:#b45309; background:#fffbeb; }
+      [data-lab-band] .lab-note.nx { border-color:#b91c1c; background:#fef2f2; }
+      [data-lab-band] .lab-note.nr { border-color:#94a3b8; background:#f8fafc; }
+      [data-lab-band] .lab-note b.h { display:block; font-size:9.5px; text-transform:uppercase; letter-spacing:1.1px; margin-bottom:4px; }
+      [data-lab-band] .lab-note.nm b.h { color:var(--lab-accent,#475569); }
+      [data-lab-band] .lab-note.nc b.h { color:#15803d; }
+      [data-lab-band] .lab-note.nw b.h { color:#b45309; }
+      [data-lab-band] .lab-note.nx b.h { color:#b91c1c; }
+      [data-lab-band] .lab-note.nr b.h { color:#64748b; }
+      [data-lab-band] .lab-note ul { margin:5px 0 0; padding-left:18px; }
+      [data-lab-band] .lab-note li { margin:2px 0; }
+      [data-lab-band] .lab ul.t { margin:6px 0 0; padding-left:19px; }
+      [data-lab-band] .lab ul.t li { margin:3px 0; font-size:13px; }
+      [data-lab-band] .lab-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:11px; margin-top:9px; }
+      [data-lab-band] .lab-lvl {
+        margin:24px 0 11px; padding:12px 15px; border-radius:9px;
+        border:1px solid var(--lab-accent,#475569); background:var(--lab-accent-soft,#f8fafc);
+        color:var(--lab-accent-dark,#1e293b); display:flex; align-items:center; gap:12px; flex-wrap:wrap;
+      }
+      [data-lab-band] .lab-lvl .n { font-size:12px; font-weight:800; text-transform:uppercase; letter-spacing:1.3px; }
+      [data-lab-band] .lab-lvl .b {
+        margin-left:auto; font-size:10px; font-weight:800; padding:3px 11px;
+        border-radius:999px; background:rgba(255,255,255,.75);
+      }
+    </style>
+
+    <div class="trn-wrap">
+
+      <div class="trn-hero">
+        <div class="trn-badge"><i></i>Training &amp; Tutorials</div>
+        <h1>OpenCenter Training<span>Boot Camp · Advanced Labs · Certification</span></h1>
+        <p>Every OpenCenter training programme in one place &mdash; from the first cluster deployment in an
+          isolated sandbox, through the full sixteen-module advanced curriculum including Kafka event
+          streaming, to the certification blueprint. Each programme keeps its own progress, logs and lab
+          session.</p>
+        <div class="trn-note">
+          <b>One live copy.</b> These are the same lab surfaces that appear under
+          Stage&nbsp;2 &rarr; Flex to OpenCenter K8 Replatform &rarr; OpenCenter. Opening this stage brings them
+          here; opening any other stage returns them. Your session, entered credentials and progress are never
+          duplicated or reset by the move.
+        </div>
+      </div>
+
+      <div class="trn-path">
+        <div class="trn-path-h">The learning path</div>
+        <p class="trn-path-sub">Three sequential programmes build the platform, then the path branches into two
+          specialist tracks. Take either or both &mdash; they do not depend on each other.</p>
+
+        <button class="trn-node" style="--n:#0A7CFF;" type="button" onclick="trainOpenLab('ocqs')">
+          <span class="s">Step 1 &middot; Foundation</span>
+          <span class="n">&#127957; OpenCenter Boot Camp</span>
+          <span class="d">Deploy your first cluster in an isolated sandbox</span>
+        </button>
+        <div class="trn-arrow">&darr;</div>
+
+        <button class="trn-node" style="--n:#4CD964;" type="button" onclick="trainOpenLab('ocqp')">
+          <span class="s">Step 2 &middot; Operate</span>
+          <span class="n">&#127981; Advanced OpenCenter</span>
+          <span class="d">15 modules &mdash; services, networking, secrets, capacity, observability, DR, upgrade, multi-cluster</span>
+        </button>
+        <div class="trn-arrow">&darr;</div>
+
+        <button class="trn-node" style="--n:#FF9500;" type="button" onclick="trainOpenLab('ockl')">
+          <span class="s">Step 3 &middot; Event backbone</span>
+          <span class="n">&#128650; Kafka Event Backbone</span>
+          <span class="d">Hands-on Strimzi build &mdash; the data-in-motion layer everything above it depends on</span>
+        </button>
+        <div class="trn-arrow">&darr;</div>
+
+        <div class="trn-split">Then branch &mdash; either or both</div>
+        <div class="trn-branch">
+          <button class="trn-node" style="--n:#FF3B30;" type="button" onclick="trainOpenLab('ocqc')">
+            <span class="s">Track A &middot; Prove it</span>
+            <span class="n">&#127891; OpenCenter Certification</span>
+            <span class="d">OCCA / OCCP / OCCX &mdash; evidence that you can operate the platform</span>
+          </button>
+          <button class="trn-node" style="--n:#5856D6;" type="button" onclick="trainOpenLab('ocai')">
+            <span class="s">Track B &middot; Specialise</span>
+            <span class="n">&#129504; Enterprise AI &amp; Uniphore Specialist</span>
+            <span class="d">Governed AI on top of the platform &mdash; GPU pools, event-driven inference, RAG, guardrails</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="trn-grid">
+        <div class="trn-card" style="--trn-accent:#0A7CFF;">
+          <div class="trn-card-kick">Level 1 &middot; Start here</div>
+          <h3>&#127957; OpenCenter Boot Camp</h3>
+          <p>Deploy your first OpenCenter cluster in an isolated per-learner sandbox. Guided configuration,
+            credentials, validation, generate and deploy &mdash; with a real lab session, training log and
+            cohort review.</p>
+          <div class="trn-pills">
+            <span class="trn-pill live">Live lab session</span>
+            <span class="trn-pill">Training log</span>
+            <span class="trn-pill">Cohort review</span>
+          </div>
+          <button class="trn-go" type="button" onclick="trainOpenLab('ocqs')">Open Boot Camp &rarr;</button>
+        </div>
+
+        <div class="trn-card" style="--trn-accent:#4CD964;">
+          <div class="trn-card-kick">Level 2 &middot; Full curriculum</div>
+          <h3>&#127981; Advanced OpenCenter Training</h3>
+          <p>Fifteen modules across five levels: plan and build the city, make it useful and safe, operate and
+            protect it, manage a region of clusters, then prove operational readiness in a capstone mission.
+            Event streaming has its own dedicated lab &mdash; see the Kafka card.</p>
+          <div class="trn-pills">
+            <span class="trn-pill">15 modules</span>
+            <span class="trn-pill">5 levels</span>
+            <span class="trn-pill mock">Curriculum mockup</span>
+          </div>
+          <button class="trn-go" type="button" onclick="trainOpenLab('ocqp')">Open Advanced Lab &rarr;</button>
+        </div>
+
+        <div class="trn-card" style="--trn-accent:#FF9500;">
+          <div class="trn-card-kick">Level 2 &middot; Hands-on build</div>
+          <h3>&#128650; OpenCenter Kafka Training Lab</h3>
+          <p>Build the event backbone for real: preflight, Strimzi operator, a three-node KRaft cluster on
+            Cinder storage, a six-partition topic, producers and consumers, consumer groups, a controlled
+            broker failure, metrics, an ACL security challenge, then a clean GitOps teardown.</p>
+          <div class="trn-pills">
+            <span class="trn-pill">9 missions</span>
+            <span class="trn-pill">4&ndash;5 hours</span>
+            <span class="trn-pill">Strimzi &middot; KRaft</span>
+            <span class="trn-pill live">Hands-on</span>
+          </div>
+          <button class="trn-go" type="button" onclick="trainOpenLab('ockl')">Open Kafka Lab &rarr;</button>
+        </div>
+
+        <div class="trn-card" style="--trn-accent:#FF3B30;">
+          <div class="trn-card-kick">Level 3 &middot; Prove it</div>
+          <h3>&#127891; OpenCenter Certification</h3>
+          <p>The certification blueprint &mdash; OCCA, OCCP and OCCX tracks, the competency statements behind
+            each one, and which lab produces the evidence for each statement.</p>
+          <div class="trn-pills">
+            <span class="trn-pill">OCCA</span>
+            <span class="trn-pill">OCCP</span>
+            <span class="trn-pill">OCCX</span>
+            <span class="trn-pill mock">Blueprint mockup</span>
+          </div>
+          <button class="trn-go" type="button" onclick="trainOpenLab('ocqc')">Open Certification &rarr;</button>
+        </div>
+
+        <div class="trn-card" style="--trn-accent:#5856D6;">
+          <div class="trn-card-kick">Track B &middot; Specialist</div>
+          <h3>&#129504; Enterprise AI &amp; Uniphore Specialist</h3>
+          <p>Put governed enterprise AI on the platform you built: a GPU worker pool on FLEX, a model-serving
+            layer, inference driven by Kafka events rather than batch jobs, retrieval with citations, PII
+            redaction and policy guardrails, then cost per business outcome.</p>
+          <div class="trn-pills">
+            <span class="trn-pill">9 missions</span>
+            <span class="trn-pill">5&ndash;6 hours</span>
+            <span class="trn-pill">GPU &middot; RAG &middot; Guardrails</span>
+            <span class="trn-pill mock">Curriculum mockup</span>
+          </div>
+          <button class="trn-go" type="button" onclick="trainOpenLab('ocai')">Open AI Specialist Lab &rarr;</button>
+        </div>
+
+        <div class="trn-card" style="--trn-accent:var(--ios-gray,#8E8E93);border-style:dashed;">
+          <div class="trn-card-kick">For authors &middot; not training</div>
+          <h3>&#129513; New Lab Template</h3>
+          <p>A copy-ready skeleton for the next feature lab or production training programme. Five steps to a
+            new lab, every layout block shown live, and no stylesheet to copy &mdash; the
+            <code>.lab-*</code> design system is defined once for the whole stage.</p>
+          <div class="trn-pills">
+            <span class="trn-pill">5-step recipe</span>
+            <span class="trn-pill">Shared CSS</span>
+            <span class="trn-pill">Accent-themed</span>
+          </div>
+          <button class="trn-go" type="button" onclick="trainOpenLab('ocnew')">Open Template &rarr;</button>
+        </div>
+      </div>
+
+      <div class="trn-sec">The training labs<span class="b">Scroll, or use the buttons above</span></div>
+
+      <!-- Relocation target. activateStage('s_train') moves ocqs-/ocqp-/ocqc-outer-wrap
+           in here; any other stage moves them back to #oc-labs-home-anchor. -->
+      <div id="train-labs-mount"></div>
+
+      <!-- The Kafka and AI labs are homed in the OpenCenter sub-stage alongside the
+           other three programme bands, and relocate into #train-labs-mount above
+           with them. New *programme* labs belong there too, so they appear in both
+           stages; only authoring aids like the template below live here. -->
+
+      <!-- Always last: the copy-ready skeleton for new labs. -->
+      {% include "partials/_lab_template.html" %}
+
+      <div style="margin-top:18px;padding:14px 18px;border:1px solid #e2e8f0;border-radius:12px;background:#fff;
+                  display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+        <div style="font-size:12.5px;color:#475569;line-height:1.6;flex:1;min-width:260px;">
+          <b style="color:#0f172a;">Upstream documentation.</b> The labs above are Rackspace training material.
+          The official OpenCenter CLI tutorials live on the vendor documentation site.
+        </div>
+        <a href="https://docs.opencenter.dev/opencenter-cli/latest/getting-started/openstack-first-cluster.html"
+           target="_blank" rel="noopener noreferrer"
+           style="display:inline-flex;align-items:center;gap:6px;border:1px solid #bae6fd;border-radius:999px;
+                  background:#f0f9ff;color:#0369a1;padding:9px 16px;text-decoration:none;font-weight:800;font-size:12.5px;">
+          Other Tutorials &#8599;
+        </a>
+      </div>
+
+      <div class="trn-empty" id="train-labs-empty" style="display:none;">
+        The OpenCenter training labs could not be located in this page.<br>
+        They live in the OpenCenter sub-stage &mdash; open
+        <b>Stage&nbsp;2 &rarr; Flex to OpenCenter K8 Replatform &rarr; OpenCenter</b> to reach them directly.
+      </div>
+
+    </div>
+
+    <script>
+      /* Expand a relocated lab band and scroll it into view. The bands keep their
+         own ids and their own collapse handlers after the move, so this only has
+         to open the body and jump to it. */
+      window.trainOpenLab = function(prefix) {
+        var wrap  = document.getElementById(prefix + '-outer-wrap');
+        var body  = document.getElementById(prefix + '-inline-body');
+        var arrow = document.getElementById(prefix + '-inline-arrow');
+        if (!wrap) return;
+        if (body && body.style.display === 'none') {
+          body.style.display = 'block';
+          if (arrow) arrow.textContent = '▼';
+        }
+        try { wrap.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+        catch (e) { wrap.scrollIntoView(); }
+      };
+    </script>
+  </div>
