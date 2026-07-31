@@ -1,0 +1,1549 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OpenCenter Advanced Platform Engineering Lab — workflow mockup</title>
+<style>
+  :root{
+    --ink:#0f172a; --muted:#64748b; --line:#e2e8f0; --bg:#f1f5f9; --card:#fff;
+    --navy:#1e3a5f; --blue:#0369a1; --blue-soft:#eff6ff;
+    --green:#15803d; --green-soft:#f0fdf4; --amber:#b45309; --amber-soft:#fffbeb;
+    --red:#b91c1c; --red-soft:#fef2f2; --violet:#6d28d9; --violet-soft:#f5f3ff;
+    --term:#0f172a; --term-ink:#a5f3a5;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+       font:14px/1.62 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+  code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+
+  /* ---------- header ---------- */
+  .hero{background:linear-gradient(135deg,#0c2340,#1e3a5f 55%,#0e4d64);color:#fff;padding:30px 30px 26px}
+  .hero .kicker{font-size:10px;font-weight:800;letter-spacing:2.4px;text-transform:uppercase;color:#7dd3fc}
+  .hero h1{margin:8px 0 2px;font-size:25px;font-weight:800;letter-spacing:.2px}
+  .hero .tag{font-size:15px;font-weight:700;color:#bae6fd;margin:6px 0 14px}
+  .facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;max-width:1000px}
+  .fact{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.16);
+        border-radius:8px;padding:9px 12px}
+  .fact b{display:block;font-size:9px;font-weight:800;letter-spacing:1.3px;
+          text-transform:uppercase;color:#7dd3fc;margin-bottom:2px}
+  .fact span{font-size:12.5px;color:#e0f2fe}
+  .mockbar{background:#fef3c7;border-bottom:1px solid #fcd34d;color:#78350f;
+           padding:10px 30px;font-size:12px;font-weight:700}
+
+  /* ---------- layout ---------- */
+  .wrap{display:grid;grid-template-columns:250px minmax(0,1fr);gap:22px;
+        max-width:1260px;margin:22px auto;padding:0 20px;align-items:start}
+  @media(max-width:920px){.wrap{grid-template-columns:1fr}.nav{position:static!important}}
+
+  .nav{position:sticky;top:16px;background:var(--card);border:1px solid var(--line);
+       border-radius:10px;padding:14px;max-height:calc(100vh - 32px);overflow:auto}
+  .nav h4{margin:0 0 6px;font-size:9.5px;font-weight:800;color:var(--muted);
+          text-transform:uppercase;letter-spacing:1.5px}
+  .nav .lvl{margin:13px 0 5px;font-size:9.5px;font-weight:800;letter-spacing:1.1px;
+            text-transform:uppercase;color:var(--blue)}
+  .nav a{display:block;padding:3.5px 7px;border-radius:5px;color:#334155;
+         text-decoration:none;font-size:12.5px}
+  .nav a:hover{background:var(--blue-soft);color:var(--blue)}
+
+  .card{background:var(--card);border:1px solid var(--line);border-radius:10px;
+        padding:18px 20px;margin-bottom:16px}
+  .card h2{margin:0 0 8px;font-size:17px;font-weight:800}
+  .card h3{margin:18px 0 6px;font-size:12px;font-weight:800;color:var(--blue);
+           text-transform:uppercase;letter-spacing:.9px}
+
+  /* ---------- lab ---------- */
+  details.lab{background:var(--card);border:1px solid var(--line);border-radius:10px;
+              margin-bottom:11px;overflow:hidden}
+  details.lab[open]{border-color:#bae6fd;box-shadow:0 1px 4px rgba(2,132,199,.10)}
+  summary{list-style:none;cursor:pointer;padding:13px 17px;display:flex;
+          align-items:center;gap:11px;flex-wrap:wrap}
+  summary::-webkit-details-marker{display:none}
+  summary:hover{background:#f8fafc}
+  .num{flex:none;width:30px;height:30px;border-radius:8px;background:var(--navy);
+       color:#fff;font-size:12px;font-weight:800;display:grid;place-items:center}
+  .lab-t{font-size:14.5px;font-weight:800}
+  .lab-s{font-size:12px;color:var(--muted);flex-basis:100%;margin-left:41px}
+  .meta{margin-left:auto;display:flex;gap:5px;flex-wrap:wrap}
+  .pill{font-size:10px;font-weight:800;padding:3px 9px;border-radius:999px;
+        border:1px solid var(--line);color:var(--muted);background:#f8fafc}
+  .pill.xp{background:#fffbeb;border-color:#fde68a;color:#b45309}
+  .pill.bg{background:#f5f3ff;border-color:#ddd6fe;color:#6d28d9}
+  .body{padding:4px 18px 18px 58px;border-top:1px solid var(--line)}
+  @media(max-width:620px){.body{padding-left:18px}}
+
+  .step{font-size:12.5px;font-weight:800;margin:15px 0 6px;color:var(--navy)}
+  .tagm{font-size:9px;font-weight:800;letter-spacing:.9px;padding:2px 7px;
+        border-radius:4px;margin-left:7px;vertical-align:1px}
+  .t-safe{background:var(--green-soft);color:var(--green);border:1px solid #bbf7d0}
+  .t-chg{background:var(--amber-soft);color:var(--amber);border:1px solid #fde68a}
+  .t-dest{background:var(--red-soft);color:var(--red);border:1px solid #fecaca}
+
+  pre{background:var(--term);color:var(--term-ink);border-radius:7px;padding:11px 13px;
+      font-size:12px;overflow-x:auto;margin:0;white-space:pre}
+  pre.yaml{background:#f8fafc;color:#334155;border:1px solid var(--line)}
+  pre .c{color:#7d8da1}
+  pre.yaml .c{color:#94a3b8}
+
+  .note{border-left:3px solid;border-radius:0 7px 7px 0;padding:10px 13px;
+        margin-top:12px;font-size:12.5px}
+  .n-check{border-color:var(--green);background:var(--green-soft)}
+  .n-chal{border-color:var(--violet);background:var(--violet-soft)}
+  .n-reset{border-color:var(--muted);background:#f8fafc}
+  .n-warn{border-color:var(--amber);background:var(--amber-soft)}
+  .n-stop{border-color:var(--red);background:var(--red-soft)}
+  .note b.h{display:block;font-size:9.5px;text-transform:uppercase;letter-spacing:1.1px;margin-bottom:4px}
+  .n-check b.h{color:var(--green)} .n-chal b.h{color:var(--violet)}
+  .n-reset b.h{color:var(--muted)} .n-warn b.h{color:var(--amber)} .n-stop b.h{color:var(--red)}
+  .note ul{margin:5px 0 0;padding-left:18px} .note li{margin:2px 0}
+
+  table{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:8px}
+  th,td{text-align:left;padding:7px 9px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{font-size:9.5px;text-transform:uppercase;letter-spacing:.8px;color:#fff;background:var(--navy)}
+  td code{font-size:11.5px;background:#f1f5f9;padding:1px 5px;border-radius:4px}
+
+  .level{margin:26px 0 11px;padding:11px 15px;border-radius:9px;border:1px solid;
+         display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  .level .lname{font-size:11.5px;font-weight:800;text-transform:uppercase;letter-spacing:1.4px}
+  .level .lbadge{margin-left:auto;font-size:10px;font-weight:800;padding:3px 11px;
+                 border-radius:999px;background:rgba(255,255,255,.75)}
+  .l1{background:var(--blue-soft);color:var(--blue);border-color:#bae6fd}
+  .l2{background:var(--violet-soft);color:var(--violet);border-color:#ddd6fe}
+  .l3{background:var(--green-soft);color:var(--green);border-color:#bbf7d0}
+  .l4{background:var(--amber-soft);color:var(--amber);border-color:#fde68a}
+  .l5{background:var(--red-soft);color:var(--red);border-color:#fecaca}
+
+  ul.tight{margin:6px 0 0;padding-left:19px} ul.tight li{margin:3px 0;font-size:13px}
+  ol.tight{margin:6px 0 0;padding-left:20px} ol.tight li{margin:3px 0;font-size:13px}
+
+  .btnrow{margin-top:13px;padding-top:10px;border-top:1px dashed var(--line)}
+  .btnrow small{color:var(--muted);font-size:10.5px;display:block;margin-bottom:5px;
+                text-transform:uppercase;letter-spacing:.9px;font-weight:800}
+  .btn{display:inline-block;background:#e2e8f0;color:#94a3b8;border:1px dashed #cbd5e1;
+       border-radius:6px;padding:5px 13px;font-size:11.5px;font-weight:800;
+       cursor:not-allowed;margin:3px 5px 0 0}
+  .foot{text-align:center;color:var(--muted);font-size:11.5px;padding:18px;font-style:italic}
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <div class="kicker">Aurora Labs · Advanced Training · Evidence over assumption</div>
+  <h1>OpenCenter Advanced Platform Engineering Lab</h1>
+  <div class="tag">Build it. Prove it. Break it safely. Recover it.</div>
+  <div class="facts">
+    <div class="fact"><b>Audience</b><span>Platform engineers, SREs, cloud architects, K8s operators, presales</span></div>
+    <div class="fact"><b>Delivery</b><span>Three instructor-led days, or five self-paced levels</span></div>
+    <div class="fact"><b>Primary lane</b><span>OpenStack + OpenTofu + FluxCD</span></div>
+    <div class="fact"><b>Safe practice lane</b><span>Kind or dry-run where cloud access is unavailable</span></div>
+    <div class="fact"><b>Scope</b><span>15 labs · 5 levels · 2,125 XP · ~18 h</span></div>
+  </div>
+</div>
+
+<div class="mockbar">
+  ⚠ Workflow mockup — structure and content proposal only. Buttons are inert, no commands
+  run, no backend is called. Wiring comes after sign-off.
+</div>
+
+<div class="wrap">
+
+  <!-- ================= NAV ================= -->
+  <nav class="nav">
+    <h4>Course</h4>
+    <a href="#story">The story &amp; outcomes</a>
+    <a href="#map">Course map</a>
+    <a href="#conventions">Conventions &amp; setup</a>
+    <div class="lvl">L1 · Launchpad</div>
+    <a href="#lab0">0 · Mission Control Setup</a>
+    <a href="#lab1">1 · Guided Cluster Design</a>
+    <a href="#lab2">2 · Validate Before You Fly</a>
+    <div class="lvl">L2 · Delivery Engine</div>
+    <a href="#lab3">3 · GitOps Engine Room</a>
+    <a href="#lab4">4 · Service Composer</a>
+    <a href="#lab5">5 · Network Arena</a>
+    <div class="lvl">L3 · Platform Operations</div>
+    <a href="#lab6">6 · Secrets Vault</a>
+    <a href="#lab7">7 · Elastic Capacity</a>
+    <a href="#lab8">8 · Observe and Access</a>
+    <div class="lvl">L4 · Resilience &amp; Evolution</div>
+    <a href="#lab9">9 · Resilience Lab</a>
+    <a href="#lab10">10 · Upgrade Flight Simulator</a>
+    <a href="#lab11">11 · Fleet Command</a>
+    <div class="lvl">L5 · Architecture &amp; GameDay</div>
+    <a href="#lab12">12 · Migration Mission</a>
+    <a href="#lab13">13 · Chaos GameDay</a>
+    <a href="#lab14">14 · Capstone</a>
+    <div class="lvl">Appendices</div>
+    <a href="#appA">A · Standard workflow</a>
+    <a href="#appB">B · Resume &amp; lock</a>
+    <a href="#appC">C · Evidence checklist</a>
+    <a href="#appD">D · Injection catalog</a>
+    <a href="#appE">E · Cleanup &amp; cost</a>
+    <a href="#appF">F · Cleanup decisions</a>
+    <a href="#appG">G · Healthy state</a>
+  </nav>
+
+  <!-- ================= MAIN ================= -->
+  <main>
+
+    <section class="card" id="story">
+      <div class="note n-warn" style="margin-top:0">
+        <b class="h">Golden rule</b>
+        Never make a production change that you cannot validate, observe, prove, and reverse.
+      </div>
+
+      <h3>The story</h3>
+      <p style="margin:4px 0 0">
+        You are the platform team for <b>Aurora Labs</b>, a regulated digital-services company.
+        You must launch a secure Kubernetes platform on OpenStack, grow it into a multi-cluster
+        fleet, survive failures, perform an upgrade, and migrate an application without losing
+        data. Every lab earns XP and ends with an <b>evidence checkpoint</b> rather than
+        "it looks okay."
+      </p>
+
+      <h3>Learning outcomes</h3>
+      <ul class="tight">
+        <li>Design and create a v2 OpenCenter cluster configuration using guided or manual workflows.</li>
+        <li>Validate provider, network, GitOps, service, and secret dependencies before deployment.</li>
+        <li>Generate and operate the GitOps repository, including reconciliation and rollback.</li>
+        <li>Select and configure platform services, CNI, load balancing, DNS, TLS, and policy.</li>
+        <li>Encrypt, rotate, and recover secrets with SOPS and Age.</li>
+        <li>Add specialized worker pools and control workload placement with labels and taints.</li>
+        <li>Back up and restore cluster state and applications.</li>
+        <li>Upgrade Kubernetes using prechecks, controlled rollout, verification, and rollback gates.</li>
+        <li>Manage dev, staging, and production clusters with shared organization defaults.</li>
+        <li>Plan and execute provider or region migration with a tested cutover and rollback plan.</li>
+        <li>Diagnose failures from configuration through cloud infrastructure, Kubernetes, Flux, and services.</li>
+      </ul>
+    </section>
+
+    <section class="card" id="map">
+      <h2>Course map</h2>
+      <table>
+        <thead><tr><th style="width:180px">Level</th><th style="width:70px">Labs</th><th>Theme</th><th style="width:170px">Badge</th></tr></thead>
+        <tbody>
+          <tr><td><b>1. Launchpad</b></td><td>0–2</td><td>Environment, guided configuration, validation</td><td>Config Navigator</td></tr>
+          <tr><td><b>2. Delivery Engine</b></td><td>3–5</td><td>GitOps, services, networking</td><td>GitOps Pilot</td></tr>
+          <tr><td><b>3. Platform Operations</b></td><td>6–8</td><td>Secrets, worker pools, observability/access</td><td>Platform Operator</td></tr>
+          <tr><td><b>4. Resilience &amp; Evolution</b></td><td>9–11</td><td>Backup/restore, upgrade, multi-cluster</td><td>Reliability Guardian</td></tr>
+          <tr><td><b>5. Architecture &amp; GameDay</b></td><td>12–14</td><td>Migration, troubleshooting, capstone</td><td>OpenCenter Architect</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Recommended schedule</h3>
+      <table>
+        <thead><tr><th style="width:110px">Day</th><th style="width:110px">Labs</th><th>Approximate time</th></tr></thead>
+        <tbody>
+          <tr><td>Day 1</td><td>0–5</td><td>6 hours</td></tr>
+          <tr><td>Day 2</td><td>6–10</td><td>6 hours</td></tr>
+          <tr><td>Day 3</td><td>11–14</td><td>5.5 hours</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="card" id="conventions">
+      <h2>Lab conventions</h2>
+      <ul class="tight">
+        <li>Replace values inside <code>&lt;angle-brackets&gt;</code> before execution.</li>
+        <li><span class="tagm t-safe" style="margin:0">SAFE</span> — read-only, local, validation, or dry-run operations.</li>
+        <li><span class="tagm t-chg" style="margin:0">CHANGE</span> — modifies Git, cluster state, or infrastructure.</li>
+        <li><span class="tagm t-dest" style="margin:0">DESTRUCTIVE</span> — requires an explicit instructor checkpoint.</li>
+        <li>Use an <b>application credential</b>, never a personal username/password, for OpenStack automation.</li>
+        <li>Confirm supported Kubernetes, CNI, and service versions in your installed OpenCenter release.</li>
+        <li>Use <code>opencenter &lt;command&gt; --help</code> when the lab environment differs from the reference build.</li>
+      </ul>
+
+      <h3>Shared environment variables</h3>
+<pre>export OC_ORG=aurora-labs
+export OC_CLUSTER=aurora-prod
+export OC_REF="$OC_ORG/$OC_CLUSTER"
+export OC_REGION=sjc3
+export OC_GIT_URL=git@github.com:&lt;your-org&gt;/aurora-prod-gitops.git</pre>
+
+      <h3>Evidence folder</h3>
+<pre>mkdir -p ~/opencenter-training-evidence/{00-setup,01-config,02-validation,03-gitops,\
+04-services,05-network,06-secrets,07-pools,08-observability,09-backup,10-upgrade,\
+11-multicluster,12-migration,13-gameday,14-capstone}</pre>
+    </section>
+
+    <!-- ══════════ LEVEL 1 ══════════ -->
+    <div class="level l1"><span class="lname">Level 1 · Launchpad</span>
+      <span>Environment, guided configuration, validation</span>
+      <span class="lbadge">🏅 Config Navigator</span></div>
+
+    <details class="lab" id="lab0" open>
+      <summary><span class="num">0</span><span class="lab-t">Mission Control Setup</span>
+        <span class="meta"><span class="pill">35 min</span><span class="pill xp">50 XP</span><span class="pill bg">Safety Officer</span></span>
+        <span class="lab-s">Prepare a safe, repeatable operator workstation.</span></summary>
+      <div class="body">
+        <p><b>Mission —</b> Build a trusted workstation and prove that every required tool and
+           credential works before touching a cluster.</p>
+
+        <div class="step">Step 1 — Toolchain preflight <span class="tagm t-safe">SAFE</span></div>
+<pre>{ opencenter version
+  git --version
+  kubectl version --client
+  openstack --version
+  opentofu version
+  flux version
+  sops --version
+  age --version
+} | tee ~/opencenter-training-evidence/00-setup/tool-versions.txt</pre>
+
+        <div class="step">Step 2 — Cloud authentication <span class="tagm t-safe">SAFE</span></div>
+<pre>openstack token issue
+openstack image list --name Ubuntu
+openstack flavor list
+openstack network list
+openstack subnet list
+openstack network list --external
+openstack availability zone list</pre>
+
+        <div class="step">Step 3 — Safety contract</div>
+        <p style="font-size:13px;margin:4px 0 0">Create
+           <code>00-setup/safety-contract.txt</code> recording:</p>
+        <ol class="tight">
+          <li>The lab project/tenant name.</li>
+          <li>The external network you are permitted to use.</li>
+          <li>The approved node quota.</li>
+          <li>The source-of-truth Git repository.</li>
+          <li>The person authorized to approve destroy operations.</li>
+        </ol>
+
+        <div class="note n-check"><b class="h">Evidence checkpoint</b>
+          <ul><li>Tool version file exists.</li>
+              <li><code>openstack token issue</code> succeeds.</li>
+              <li>At least one image, flavor, network, subnet, and external network identified.</li>
+              <li>Safety contract is complete.</li></ul>
+        </div>
+        <div class="note n-chal"><b class="h">Challenge card — "Wrong cloud"</b>
+          Your shell points at a different OpenStack project. Detect it before deployment by
+          comparing the token project ID against the safety contract.
+        </div>
+        <div class="note n-reset"><b class="h">Reset</b>
+          No infrastructure changed. Unset accidental credentials and reload the approved
+          application credential.
+        </div>
+        <div class="btnrow"><small>Mockup controls</small>
+          <span class="btn">▶ Run preflight</span><span class="btn">📋 Copy</span>
+          <span class="btn">⤓ Save evidence</span><span class="btn">✓ Claim 50 XP</span></div>
+      </div>
+    </details>
+
+    <details class="lab" id="lab1">
+      <summary><span class="num">1</span><span class="lab-t">Guided Cluster Design</span>
+        <span class="meta"><span class="pill">60 min</span><span class="pill xp">100 XP</span><span class="pill bg">Config Navigator</span></span>
+        <span class="lab-s">Create the v2 source of truth.</span></summary>
+      <div class="body">
+        <p><b>Mission —</b> Create a production-shaped OpenStack cluster configuration using
+           guided discovery, then inspect the resulting v2 structure.</p>
+        <div class="note n-warn"><b class="h">Why this workflow</b>
+          Guided mode discovers images, flavors, networks, subnets, external networks and
+          availability zones — and keeps the duplicated OpenStack network fields synchronized,
+          which manual editing does not.
+        </div>
+
+        <div class="step">Step 1 — Guided configuration <span class="tagm t-chg">CHANGE: local files</span></div>
+<pre>opencenter cluster configure "$OC_CLUSTER" \
+  --guided \
+  --org "$OC_ORG" \
+  --type openstack
+
+<span class="c"># re-run to fill unresolved placeholders</span>
+opencenter cluster configure "$OC_REF" --guided</pre>
+        <p style="font-size:13px;margin:8px 0 0">During the prompts, select:</p>
+        <ul class="tight">
+          <li>Application credential authentication.</li>
+          <li>An approved Ubuntu image.</li>
+          <li>Three control-plane nodes and two workers — or one plus two for a low-cost sandbox.</li>
+          <li>One CNI only.</li>
+          <li>A Git remote and branch.</li>
+          <li>DNS and object-storage values only for services you plan to enable.</li>
+        </ul>
+
+        <div class="step">Step 2 — Describe resolved paths <span class="tagm t-safe">SAFE</span></div>
+<pre>opencenter cluster describe "$OC_REF" | tee ~/opencenter-training-evidence/01-config/describe.txt</pre>
+        <p style="font-size:13px;margin:8px 0 0">Locate the cluster config path, GitOps working
+           directory, cluster-owned kubeconfig, SSH key location and SOPS Age key location.</p>
+
+        <div class="step">Step 3 — Inspect, do not expose</div>
+<pre class="yaml">opencenter:
+  meta:
+    env: production
+    region: &lt;region&gt;
+  cluster:
+    cluster_fqdn: &lt;cluster-fqdn&gt;
+    admin_email: &lt;platform-email&gt;
+  gitops:
+    repository:
+      url: &lt;git-url&gt;
+      branch: main
+  infrastructure:
+    cloud:
+      openstack:
+        auth_url: &lt;keystone-v3-url&gt;
+        project_id: &lt;project-id&gt;
+        application_credential_id: &lt;app-cred-id&gt;
+        application_credential_secret: &lt;protected-secret&gt;
+        image_id: &lt;image-id&gt;
+        network_id: &lt;network-id&gt;
+        subnet_id: &lt;subnet-id&gt;
+        router_external_network_id: &lt;external-network-id&gt;</pre>
+        <div class="note n-stop"><b class="h">Never copy secrets</b>
+          Confirm these sections exist without pasting values into chat, tickets, or screenshots.
+        </div>
+
+        <div class="step">Step 4 — Architecture decision record</div>
+        <p style="font-size:13px;margin:4px 0 0">Create
+           <code>01-config/ADR-001-cluster-shape.md</code> covering availability target, node
+           counts and flavors, CNI choice, load-balancer choice, storage class, expected failure
+           domains, and the lab-versus-production cost trade-off.</p>
+
+        <div class="note n-check"><b class="h">Evidence checkpoint</b>
+          <ul><li>v2 configuration exists under the organization-aware directory.</li>
+              <li>Git repository URL is not a placeholder.</li>
+              <li>Exactly one CNI is enabled.</li>
+              <li>Node, pod, and service CIDRs do not overlap.</li>
+              <li>ADR explains every major choice.</li></ul>
+        </div>
+        <div class="note n-chal"><b class="h">Challenge card — "Manual lane"</b>
+          Initialize a second disposable config with <code>cluster init --full-schema</code>,
+          then identify five fields guided mode would have populated more safely.
+        </div>
+        <div class="note n-reset"><b class="h">Reset</b>
+          Remove only the disposable second configuration. Preserve the primary cluster
+          configuration and generated keys.
+        </div>
+      </div>
+    </details>
+
+    <details class="lab" id="lab2">
+      <summary><span class="num">2</span><span class="lab-t">Validate Before You Fly</span>
+        <span class="meta"><span class="pill">45 min</span><span class="pill xp">100 XP</span><span class="pill bg">Preflight Specialist</span></span>
+        <span class="lab-s">Turn configuration errors into fast feedback.</span></summary>
+      <div class="body">
+        <p><b>Mission —</b> Use layered validation so failures occur in seconds, not halfway
+           through infrastructure provisioning.</p>
+
+        <div class="step">The validation ladder</div>
+        <table>
+          <thead><tr><th style="width:130px">Gate</th><th style="width:230px">Command</th><th>What it proves</th></tr></thead>
+          <tbody>
+            <tr><td>Workstation</td><td><code>cluster doctor</code></td><td>Required local tools and basic provider hints</td></tr>
+            <tr><td>Offline</td><td><code>validate</code></td><td>Schema, required fields, dependencies, CIDRs, Git/SOPS shape</td></tr>
+            <tr><td>Online</td><td><code>validate --validation online</code></td><td>Provider discovery/connectivity and Git remote checks</td></tr>
+            <tr><td>Render</td><td><code>generate --dry-run</code></td><td>Templates resolve without writing</td></tr>
+            <tr><td>Deploy preview</td><td><code>deploy --dry-run</code></td><td>Ordered execution plan is sane</td></tr>
+          </tbody>
+        </table>
+
+        <div class="step">Step 1 — Doctor and offline validation <span class="tagm t-safe">SAFE</span></div>
+<pre>opencenter cluster doctor "$OC_REF"
+opencenter cluster validate "$OC_REF" --verbose \
+  | tee ~/opencenter-training-evidence/02-validation/offline.txt</pre>
+
+        <div class="step">Step 2 — Online validation <span class="tagm t-safe">SAFE · external calls</span></div>
+<pre>opencenter cluster validate "$OC_REF" --validation online --output json \
+  | tee ~/opencenter-training-evidence/02-validation/online.json</pre>
+
+        <div class="step">Step 3 — Debug artifact <span class="tagm t-safe">SAFE · may contain secrets</span></div>
+<pre>mkdir -p ~/opencenter-training-evidence/02-validation/debug
+opencenter cluster validate "$OC_REF" \
+  --generate-debug-config \
+  --output-dir ~/opencenter-training-evidence/02-validation/debug
+chmod -R go-rwx ~/opencenter-training-evidence/02-validation/debug</pre>
+        <div class="note n-stop"><b class="h">Do not commit this directory</b>
+          The debug config contains fully resolved values, including sensitive ones.
+        </div>
+
+        <div class="step">Step 4 — Break/fix circuit</div>
+        <p style="font-size:13px;margin:4px 0 0">The instructor assigns one fault:</p>
+        <ul class="tight">
+          <li>Invalid CIDR prefix.</li><li>Overlapping pod and service networks.</li>
+          <li>Two CNIs enabled.</li><li>Missing application credential ID.</li>
+          <li>VRRP enabled without <code>vrrp_ip</code>.</li><li>Git origin mismatch.</li>
+          <li>Missing SOPS key.</li>
+        </ul>
+        <p style="font-size:13px;margin:6px 0 0">Run validation, capture the exact field path,
+           repair, and rerun until green.</p>
+
+        <div class="step">Step 5 — Preview <span class="tagm t-safe">SAFE</span></div>
+<pre>opencenter cluster generate "$OC_REF" --dry-run
+opencenter cluster deploy   "$OC_REF" --dry-run</pre>
+
+        <div class="note n-check"><b class="h">Evidence checkpoint</b>
+          Submit a two-column record: <b>failure observed</b> and <b>proof of repair</b>.
+          A passing command without the failure evidence earns only half credit.
+        </div>
+        <div class="note n-chal"><b class="h">Challenge card — "CI gate"</b>
+          Write a shell gate that fails a pipeline when online validation returns a non-zero
+          exit code, and preserves the JSON as a build artifact.
+        </div>
+        <div class="note n-reset"><b class="h">Reset</b>
+          Return the configuration to a passing state and remove any deliberate fault.
+        </div>
+      </div>
+    </details>
+
+    <!-- ══════════ LEVEL 2 ══════════ -->
+    <div class="level l2"><span class="lname">Level 2 · Delivery Engine</span>
+      <span>GitOps, services, networking</span>
+      <span class="lbadge">🏅 GitOps Pilot</span></div>
+
+    <details class="lab" id="lab3">
+      <summary><span class="num">3</span><span class="lab-t">GitOps Engine Room</span>
+        <span class="meta"><span class="pill">70 min</span><span class="pill xp">125 XP</span><span class="pill bg">GitOps Pilot</span></span>
+        <span class="lab-s">Generate, publish, reconcile, and roll back.</span></summary>
+      <div class="body">
+        <p><b>Mission —</b> Generate the repository, understand every major directory, publish the
+           initial commit, and prove that Git — not an operator laptop — is the desired-state source.</p>
+
+        <div class="step">Step 1 — Generate repository <span class="tagm t-chg">CHANGE: local Git</span></div>
+<pre>opencenter cluster generate "$OC_REF"
+
+GITOPS_DIR=$(opencenter cluster describe "$OC_REF" 2&gt;/dev/null | awk '/git_dir:/ {print $2}')
+find "$GITOPS_DIR" -maxdepth 4 -type d | sort | tee ~/opencenter-training-evidence/03-gitops/tree.txt
+git -C "$GITOPS_DIR" log --oneline -3</pre>
+
+        <div class="step">Step 2 — Map the repository</div>
+<pre class="yaml">applications/overlays/&lt;cluster&gt;/
+  flux-system/       Flux bootstrap and sources
+  services/          Platform-service desired state
+  managed-services/  Customer/application workloads
+infrastructure/clusters/&lt;cluster&gt;/
+  provider.tf        OpenTofu provider/backend
+  main.tf            Cloud resources
+  inventory/         Cluster provisioning inputs
+  kubeconfig.yaml    Cluster-owned kubeconfig after deployment</pre>
+
+        <div class="step">Step 3 — Publish initial state <span class="tagm t-chg">CHANGE: remote Git</span></div>
+<pre>git -C "$GITOPS_DIR" remote add origin "$OC_GIT_URL" 2&gt;/dev/null || \
+  git -C "$GITOPS_DIR" remote set-url origin "$OC_GIT_URL"
+git -C "$GITOPS_DIR" branch -M main
+git -C "$GITOPS_DIR" push -u origin main
+git -C "$GITOPS_DIR" remote -v</pre>
+
+        <div class="step">Step 4 — Deploy and observe <span class="tagm t-chg">CHANGE: cloud infrastructure</span></div>
+<pre>opencenter cluster deploy "$OC_REF" --confirm-commit</pre>
+        <table>
+          <thead><tr><th style="width:34px">#</th><th>Step ID</th></tr></thead>
+          <tbody>
+            <tr><td>1</td><td><code>openstack-preflight</code></td></tr>
+            <tr><td>2</td><td><code>opentofu-init</code></td></tr>
+            <tr><td>3</td><td><code>opentofu-apply</code></td></tr>
+            <tr><td>4</td><td><code>openstack-normalize-kubeconfig</code></td></tr>
+            <tr><td>5</td><td><code>openstack-install-network-plugin</code></td></tr>
+          </tbody>
+        </table>
+        <div class="note n-warn"><b class="h">Completion is API reachability</b>
+          Deployment returns when the Kubernetes API is reachable. Flux and platform services
+          may still be reconciling — that is expected, not a failure.
+        </div>
+
+        <div class="step">Step 5 — Prove reconciliation</div>
+<pre>eval "$(opencenter cluster use "$OC_REF" --export-only)"
+kubectl cluster-info
+kubectl get nodes -o wide
+kubectl get pods -n flux-system
+flux get sources git -A
+flux get kustomizations -A</pre>
+
+        <div class="step">Step 6 — Controlled rollback</div>
+<pre>git -C "$GITOPS_DIR" revert &lt;commit-sha&gt;
+git -C "$GITOPS_DIR" push
+flux reconcile source git flux-system -n flux-system</pre>
+
+        <div class="note n-check"><b class="h">Evidence checkpoint</b>
+          <ul><li>Git origin equals the configured repository URL.</li>
+              <li>All nodes are Ready.</li>
+              <li>Flux source and kustomizations converge.</li>
+              <li>A Git revert restores the previous desired state.</li></ul>
+        </div>
+        <div class="note n-chal"><b class="h">Challenge card — "Interrupted deployment"</b>
+          The instructor stops a run after OpenTofu initialization. Resume with
+          <code>--from-step</code>, explain saved state and locks, and avoid a full restart.
+        </div>
+        <div class="note n-reset"><b class="h">Reset</b>
+          Leave the repository clean and Flux reconciled. Do not destroy infrastructure.
+        </div>
+      </div>
+    </details>
+
+    <details class="lab" id="lab4">
+      <summary><span class="num">4</span><span class="lab-t">Service Composer</span>
+        <span class="meta"><span class="pill">60 min</span><span class="pill xp">100 XP</span><span class="pill bg">Service Curator</span></span>
+        <span class="lab-s">Build minimal and production service profiles.</span></summary>
+      <div class="body">
+        <p><b>Mission —</b> Select services intentionally, satisfy dependencies, and avoid enabling
+           every component "because it exists."</p>
+
+        <div class="step">Core design pattern</div>
+        <table>
+          <thead><tr><th style="width:150px">Profile</th><th style="width:160px">Purpose</th><th>Suggested services</th></tr></thead>
+          <tbody>
+            <tr><td>Minimal</td><td>Fast sandbox</td><td>CNI, FluxCD, sources, Gateway API, cert-manager</td></tr>
+            <tr><td>Team platform</td><td>Shared engineering</td><td>Minimal + Keycloak, RBAC manager, Headlamp</td></tr>
+            <tr><td>Production operations</td><td>Operated service</td><td>Team + Prometheus/Grafana, Loki, Velero, policy engine</td></tr>
+            <tr><td>AI/data platform</td><td>Specialized workloads</td><td>Production + Harbor, tracing, GPU operator/workload services</td></tr>
+          </tbody>
+        </table>
+
+        <div class="step">Step 1 — Inventory current services <span class="tagm t-safe">SAFE</span></div>
+<pre>opencenter cluster describe "$OC_REF" | tee ~/opencenter-training-evidence/04-services/describe.txt</pre>
+
+        <div class="step">Step 2 — Create two profiles</div>
+<pre class="yaml">opencenter:
+  services:
+    cert-manager:          { enabled: true }
+    gateway-api:           { enabled: true }
+    gateway:               { enabled: true }
+    keycloak:              { enabled: true }
+    rbac-manager:          { enabled: true }
+    headlamp:              { enabled: true }
+    kube-prometheus-stack: { enabled: true }
+    loki:                  { enabled: true }
+    tempo:                 { enabled: false }
+    harbor:                { enabled: true }
+    velero:                { enabled: true }
+    kyverno:               { enabled: true }</pre>
+
+        <div class="step">Step 3 — Dependency game</div>
+        <p style="font-size:13px;margin:4px 0 0">For each enabled service, document its
+           ingress/Gateway dependency, TLS/cert-manager dependency, identity/RBAC dependency,
+           persistent-storage requirement, object-storage requirement, secret requirement, and
+           approximate resource footprint.</p>
+        <div class="note n-warn"><b class="h">Worked example</b>
+          Keycloak commonly needs cert-manager/Gateway for external TLS, RBAC integration, and
+          PostgreSQL/operator dependencies.
+        </div>
+
+        <div class="step">Step 4 — Apply one service change <span class="tagm t-chg">CHANGE</span></div>
+<pre>opencenter cluster set "$OC_REF" opencenter.services.headlamp.enabled=true
+opencenter cluster validate "$OC_REF"
+opencenter cluster generate "$OC_REF" --render-only --force
+
+git -C "$GITOPS_DIR" diff --stat
+git -C "$GITOPS_DIR" add .
+git -C "$GITOPS_DIR" commit -m "feat(platform): enable Headlamp"
+git -C "$GITOPS_DIR" push</pre>
+
+        <div class="step">Step 5 — Observe service readiness</div>
+<pre>flux get kustomizations -A
+kubectl get helmreleases -A
+kubectl get pods -A | grep -E 'headlamp|keycloak|cert-manager|prometheus|loki|velero'</pre>
+
+        <div class="note n-check"><b class="h">Evidence checkpoint</b>
+          <ul><li>Production profile contains no unexplained service.</li>
+              <li>All enabled services have dependencies and secret sources documented.</li>
+              <li>The change is visible in Git history and in the cluster.</li></ul>
+        </div>
+        <div class="note n-chal"><b class="h">Challenge card — "Budget cut"</b>
+          Reduce the non-production resource footprint without removing TLS, GitOps, or basic
+          access. Defend your decisions.
+        </div>
+        <div class="note n-reset"><b class="h">Reset</b>
+          Keep the service selected by the instructor; revert any temporary extras.
+        </div>
+      </div>
+    </details>
+
+    <details class="lab" id="lab5">
+      <summary><span class="num">5</span><span class="lab-t">Network Arena</span>
+        <span class="meta"><span class="pill">85 min</span><span class="pill xp">150 XP</span><span class="pill bg">Network Strategist</span></span>
+        <span class="lab-s">Design address space, CNI, load balancing, DNS, and policy.</span></summary>
+      <div class="body">
+        <p><b>Mission —</b> Create a network design that is routable, non-overlapping, observable,
+           and least-privilege.</p>
+
+        <div class="step">Step 1 — Address plan</div>
+        <table>
+          <thead><tr><th style="width:150px">Network</th><th style="width:150px">Example</th><th>Must not overlap with</th></tr></thead>
+          <tbody>
+            <tr><td>Node subnet</td><td><code>10.2.128.0/22</code></td><td>Pod, service, corporate/VPN routes</td></tr>
+            <tr><td>Pod subnet</td><td><code>10.42.0.0/16</code></td><td>Node, service, peer clusters</td></tr>
+            <tr><td>Service subnet</td><td><code>10.43.0.0/16</code></td><td>Node, pod, peer clusters</td></tr>
+            <tr><td>API allowlist</td><td>Corporate/VPN CIDRs</td><td>Never default to world-open in production</td></tr>
+          </tbody>
+        </table>
+
+        <div class="step">Step 2 — Select exactly one CNI</div>
+<pre class="yaml">opencenter:
+  cluster:
+    kubernetes:
+      network_plugin:
+        calico:   { enabled: true, install_method: helm }
+        cilium:   { enabled: false }
+        kube-ovn: { enabled: false }</pre>
+        <ul class="tight">
+          <li><b>Calico</b> — familiar network policy, broad operational experience.</li>
+          <li><b>Cilium</b> — eBPF visibility and advanced networking features.</li>
+          <li><b>Kube-OVN</b> — OVN integration and virtual-network features.</li>
+        </ul>
+
+        <div class="step">Step 3 — Select one HA / load-balancing model</div>
+<pre class="yaml">opencenter:
+  infrastructure:
+    networking:
+      use_octavia: true
+      loadbalancer_provider: octavia
+      vrrp_enabled: false</pre>
+        <div class="note n-stop"><b class="h">Never enable competing HA modes</b>
+          Use Octavia <b>or</b> VRRP/OVN per the provider design — not both.
+        </div>
+
+        <div class="step">Step 4 — Lock down the Kubernetes API</div>
+<pre class="yaml">opencenter:
+  infrastructure:
+    cloud:
+      openstack:
+        networking:
+          k8s_api_port_acl:
+            - "&lt;office-or-vpn-cidr&gt;"</pre>
+
+        <div class="step">Step 5 — Validate and render</div>
+<pre>opencenter cluster validate "$OC_REF" --validation online
+opencenter cluster generate "$OC_REF" --render-only --force
+git -C "$GITOPS_DIR" diff</pre>
+
+        <div class="step">Step 6 — Apply a default-deny policy <span class="tagm t-chg">CHANGE: namespace</span></div>
+<pre class="yaml">apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: network-lab
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]</pre>
+        <p style="font-size:13px;margin:8px 0 0">Add controlled allow rules for DNS and the test
+           application. Prove an unauthorized pod cannot connect and an authorized pod can.</p>
+
+        <div class="step">Step 7 — Diagnose from outside in</div>
+<pre>openstack loadbalancer list
+kubectl get gateway,httproute -A
+kubectl get svc,endpoints -A
+kubectl get pods -n kube-system | grep -E 'coredns|calico|cilium|ovn'
+kubectl run dns-test --image=busybox:1.36 --rm -it -- nslookup kubernetes.default</pre>
+
+        <div class="note n-check"><b class="h">Evidence checkpoint</b>
+          <ul><li>CIDRs are non-overlapping.</li>
+              <li>One CNI and one load-balancing strategy are enabled.</li>
+              <li>API allowlist excludes <code>0.0.0.0/0</code> for production.</li>
+              <li>Default-deny and explicit-allow behavior are demonstrated.</li></ul>
+        </div>
+        <div class="note n-chal"><b class="h">Challenge card — "Pending external IP"</b>
+          A LoadBalancer service remains pending. Trace provider, controller, quota, subnet,
+          security-group, and service events — in that order.
+        </div>
+        <div class="note n-reset"><b class="h">Reset</b>
+          Delete the <code>network-lab</code> namespace; preserve the validated network design.
+        </div>
+      </div>
+    </details>
+
+    <!-- ══════════ LEVEL 3 ══════════ -->
+    <div class="level l3"><span class="lname">Level 3 · Platform Operations</span>
+      <span>Secrets, worker pools, observability &amp; access</span>
+      <span class="lbadge">🏅 Platform Operator</span></div>
+
+    <details class="lab" id="lab6">
+      <summary><span class="num">6</span><span class="lab-t">Secrets Vault</span>
+        <span class="meta"><span class="pill">65 min</span><span class="pill xp">125 XP</span><span class="pill bg">Vault Keeper</span></span>
+        <span class="lab-s">Encrypt, rotate, and recover without leaking plaintext.</span></summary>
+      <div class="body">
+        <p><b>Mission —</b> Operate the full secret lifecycle: generate, encrypt, decrypt locally,
+           rotate, and recover.</p>
+
+        <div class="step">Step 1 — Locate and protect keys <span class="tagm t-safe">SAFE</span></div>
+<pre>opencenter cluster describe "$OC_REF"
+find ~/.config/opencenter/clusters/"$OC_ORG"/secrets -maxdepth 3 -type f -ls
+chmod 600 ~/.config/opencenter/clusters/"$OC_ORG"/secrets/age/* 2&gt;/dev/null || true</pre>
+
+        <div class="step">Step 2 — Create a lab secret</div>
+<pre class="yaml">apiVersion: v1
+kind: Secret
+metadata:
+  name: payment-api
+  namespace: secrets-lab
+type: Opaque
+stringData:
+  API_TOKEN: replace-me</pre>
+
+        <div class="step">Step 3 — Encrypt before commit <span class="tagm t-chg">CHANGE: Git file</span></div>
+<pre>opencenter secrets encrypt --path "$GITOPS_DIR/applications/overlays/$OC_CLUSTER"
+grep -R "ENC\[AES256_GCM" "$GITOPS_DIR/applications/overlays/$OC_CLUSTER" | head
+
+<span class="c"># prove the plaintext is gone</span>
+! grep -R "replace-me" "$GITOPS_DIR/applications/overlays/$OC_CLUSTER"</pre>
+
+        <div class="step">Step 4 — Commit and reconcile</div>
+<pre>git -C "$GITOPS_DIR" add .
+git -C "$GITOPS_DIR" commit -m "feat(security): add encrypted payment API secret"
+git -C "$GITOPS_DIR" push
+flux get kustomizations -A</pre>
+
+        <div class="step">Step 5 — Rotate the cluster key</div>
+<pre>opencenter secrets keys rotate --cluster "$OC_REF" --type age
+opencenter secrets keys check  --org "$OC_ORG"</pre>
+
+        <div class="step">Step 6 — Recovery drill</div>
+        <p style="font-size:13px;margin:4px 0 0">The instructor temporarily removes the local key.
+           Learners must:</p>
+        <ol class="tight">
+          <li>Identify the decryption failure.</li>
+          <li>Restore the protected backup key.</li>
+          <li>Repair file permissions.</li>
+          <li>Reconcile Flux.</li>
+          <li>Prove the secret exists in-cluster <b>without printing its value</b>.</li>
+        </ol>
+<pre>kubectl get secret payment-api -n secrets-lab
+kubectl describe secret payment-api -n secrets-lab</pre>
+
+        <div class="note n-check"><b class="h">Evidence checkpoint</b>
+          <ul><li>No plaintext secret exists in Git.</li>
+              <li>Key permissions are restrictive.</li>
+              <li>Rotation is recorded and files are re-encrypted.</li>
+              <li>Recovery restores reconciliation.</li></ul>
+        </div>
+        <div class="note n-chal"><b class="h">Challenge card — "Shared versus cluster-specific"</b>
+          Design <code>.sops.yaml</code> rules for organization-shared secrets and separate
+          dev/staging/prod keys. Explain the blast radius of each choice.
+        </div>
+        <div class="note n-reset"><b class="h">Reset</b>
+          Delete the lab namespace only after evidence is collected. Preserve rotated keys securely.
+        </div>
+      </div>
+    </details>
+
+    <details class="lab" id="lab7">
+      <summary><span class="num">7</span><span class="lab-t">Elastic Capacity</span>
+        <span class="meta"><span class="pill">70 min</span><span class="pill xp">125 XP</span><span class="pill bg">Capacity Engineer</span></span>
+        <span class="lab-s">Add specialized worker pools and control placement.</span></summary>
+      <div class="body">
+        <p><b>Mission —</b> Add high-memory, GPU, or tenant-dedicated capacity while preventing
+           ordinary workloads from landing there.</p>
+
+        <div class="step">Step 1 — Design pools</div>
+<pre class="yaml">opencenter:
+  cluster:
+    additional_server_pools:
+      - name: highmem
+        count: 2
+        flavor: &lt;high-memory-flavor&gt;
+        labels: { pool: highmem, workload-type: data-processing }
+        taints:
+          - { key: workload-type, value: data-processing, effect: NoSchedule }
+        volume_size: 100
+        volume_type: &lt;volume-type&gt;
+      - name: gpu
+        count: 1
+        flavor: &lt;gpu-flavor&gt;
+        labels: { pool: gpu, accelerator: nvidia }
+        taints:
+          - { key: nvidia.com/gpu, value: "true", effect: NoSchedule }</pre>
+
+        <div class="step">Step 2 — Validate the capacity plan</div>
+<pre>openstack quota show
+opencenter cluster validate "$OC_REF" --validation online</pre>
+        <p style="font-size:13px;margin:8px 0 0">Calculate total instances, vCPU, RAM, volume and
+           GPU demand, and compare against provider quota <b>before</b> applying.</p>
+
+        <div class="step">Step 3 — Render and review infrastructure change</div>
+<pre>opencenter cluster generate "$OC_REF" --render-only --force
+cd "$GITOPS_DIR/infrastructure/clusters/$OC_CLUSTER"
+opentofu init
+opentofu plan | tee ~/opencenter-training-evidence/07-pools/tofu-plan.txt</pre>
+        <div class="note n-warn"><b class="h">Apply only after instructor approval</b>
+          Use the supported provider workflow — the plan output is the artifact to review first.
+        </div>
+
+        <div class="step">Step 4 — Verify labels and taints</div>
+<pre>kubectl get nodes -L pool,workload-type,accelerator
+kubectl get nodes -o json | jq '.items[] | {name:.metadata.name,taints:.spec.taints}'</pre>
+
+        <div class="step">Step 5 — Placement test</div>
+<pre class="yaml">spec:
+  nodeSelector:
+    pool: highmem
+  tolerations:
+    - key: workload-type
+      operator: Equal
+      value: data-processing
+      effect: NoSchedule
+  containers:
+    - name: demo
+      image: nginx:stable
+      resources:
+        requests: { cpu: "500m", memory: "512Mi" }</pre>
+
+        <div class="note n-check"><b class="h">Evidence checkpoint</b>
+          <ul><li>Provider quota supports the plan.</li>
+              <li>Infrastructure plan shows only intended additions.</li>
+              <li>Specialized nodes are Ready with correct labels/taints.</li>
+              <li>Test pod lands on the intended pool.</li>
+              <li>A pod <b>without</b> toleration remains unscheduled.</li></ul>
+        </div>
+        <div class="note n-chal"><b class="h">Challenge card — "Noisy neighbor"</b>
+          Design a dedicated tenant pool with taints, namespace quota, limit range, and policy.
+          Explain which control handles <i>placement</i> versus <i>consumption</i>.
+        </div>
+        <div class="note n-reset"><b class="h">Reset</b>
+          Scale or remove expensive GPU capacity after the lab, per instructor policy.
+        </div>
+      </div>
+    </details>
+
+    <details class="lab" id="lab8">
+      <summary><span class="num">8</span><span class="lab-t">Observe and Access</span>
+        <span class="meta"><span class="pill">60 min</span><span class="pill xp">100 XP</span><span class="pill bg">Operations Observer</span></span>
+        <span class="lab-s">Prove identity, TLS, metrics, logs, and traces.</span></summary>
+      <div class="body">
+        <p><b>Mission —</b> Turn a running cluster into an operable platform with secure access and
+           useful telemetry.</p>
+
+        <div class="step">Step 1 — Access stack map</div>
+<pre class="yaml">User → DNS → Load balancer → Gateway/HTTPRoute → TLS certificate → Service → Pod
+                                    ↘ OIDC / Keycloak authorization</pre>
+
+        <div class="step">Step 2 — Readiness checks</div>
+<pre>kubectl get certificate,certificaterequest,issuer,clusterissuer -A
+kubectl get gateway,httproute -A
+kubectl get pods -A | grep -E 'keycloak|headlamp|prometheus|grafana|loki|tempo'
+kubectl get helmreleases -A</pre>
+
+        <div class="step">Step 3 — Golden signals</div>
+        <p style="font-size:13px;margin:4px 0 0">Build a dashboard covering request rate, error
+           rate, latency, saturation, node/pod health, and Flux reconciliation failures.</p>
+
+        <div class="step">Step 4 — Trace one incident</div>
+        <ol class="tight">
+          <li>Gateway/access log.</li><li>Application log in Loki.</li>
+          <li>Metric spike in Prometheus/Grafana.</li><li>Trace in Tempo if enabled.</li>
+          <li>Git commit and Flux revision currently deployed.</li>
+        </ol>
+
+        <div class="step">Step 5 — Identity and least privilege</div>
+<pre>kubectl auth can-i get pods        --as=&lt;oidc-user&gt; -A
+kubectl auth can-i delete deployments --as=&lt;oidc-user&gt; -A</pre>
+
+        <div class="note n-check"><b class="h">Evidence checkpoint</b>
+          <ul><li>TLS certificate is Ready.</li>
+              <li>A user authenticates through the intended identity path.</li>
+              <li>The dashboard shows all four golden signals.</li>
+              <li>One request is correlated across logs, metrics, and deployment revision.</li>
+              <li>Read-only access is proven with <code>kubectl auth can-i</code>.</li></ul>
+        </div>
+        <div class="note n-chal"><b class="h">Challenge card — "Blind spot"</b>
+          Choose one component with no alert or dashboard coverage. Add an actionable alert with
+          owner, severity, threshold, and runbook link.
+        </div>
+        <div class="note n-reset"><b class="h">Reset</b>
+          Remove only the test workload and the temporary user/role.
+        </div>
+      </div>
+    </details>
+
+    <!-- ══════════ LEVEL 4 ══════════ -->
+    <div class="level l4"><span class="lname">Level 4 · Resilience &amp; Evolution</span>
+      <span>Backup/restore, upgrade, multi-cluster</span>
+      <span class="lbadge">🏅 Reliability Guardian</span></div>
+
+    <details class="lab" id="lab9">
+      <summary><span class="num">9</span><span class="lab-t">Resilience Lab</span>
+        <span class="meta"><span class="pill">90 min</span><span class="pill xp">175 XP</span><span class="pill bg">Reliability Guardian</span></span>
+        <span class="lab-s">Back up and restore cluster state and applications.</span></summary>
+      <div class="body">
+        <p><b>Mission —</b> Prove <i>recovery</i>, not merely backup creation.</p>
+
+        <div class="step">Recovery model</div>
+        <table>
+          <thead><tr><th style="width:110px">Layer</th><th style="width:240px">Typical mechanism</th><th>Protects</th></tr></thead>
+          <tbody>
+            <tr><td>Git</td><td>Remote Git + history</td><td>Desired state and audit trail</td></tr>
+            <tr><td>etcd</td><td>Scheduled snapshots</td><td>Kubernetes API state</td></tr>
+            <tr><td>Velero</td><td>Object storage + volume snapshots</td><td>Namespaces, resources, application data</td></tr>
+            <tr><td>Provider</td><td>Volume/image snapshots</td><td>Infrastructure or data volumes</td></tr>
+          </tbody>
+        </table>
+
+        <div class="step">Step 1 — Define RPO and RTO</div>
+        <p style="font-size:13px;margin:4px 0 0">Record maximum acceptable data loss, maximum
+           acceptable recovery time, backup frequency, retention, and restore target
+           (same cluster <i>and</i> alternate cluster).</p>
+
+        <div class="step">Step 2 — Verify backup components</div>
+<pre>kubectl get pods -n velero
+velero backup-location get
+velero snapshot-location get
+kubectl get cronjobs -A | grep -E 'backup|etcd'</pre>
+
+        <div class="step">Step 3 — Create test data and backup</div>
+<pre>kubectl create namespace recovery-lab
+kubectl create configmap recovery-marker \
+  --from-literal=value="before-failure" -n recovery-lab
+
+velero backup create recovery-lab-001 --include-namespaces recovery-lab --wait
+velero backup describe recovery-lab-001 --details</pre>
+
+        <div class="step">Step 4 — Failure injection <span class="tagm t-dest">DESTRUCTIVE: namespace only</span></div>
+<pre>kubectl delete namespace recovery-lab</pre>
+
+        <div class="step">Step 5 — Restore and verify</div>
+<pre>velero restore create --from-backup recovery-lab-001 --wait
+kubectl get namespace recovery-lab
+kubectl get configmap recovery-marker -n recovery-lab -o yaml</pre>
+
+        <div class="step">Step 6 — Alternate-cluster rehearsal</div>
+        <p style="font-size:13px;margin:4px 0 0">Restore into a designated recovery cluster, or
+           simulate with a second namespace. Identify storage-class mappings, DNS changes,
+           external secrets and provider-specific resources that require translation.</p>
+
+        <div class="step">Step 7 — Measure recovery</div>
+        <p style="font-size:13px;margin:4px 0 0">Record detection time, decision time, restore
+           duration, validation duration, total RTO, and data loss versus RPO.</p>
+
+        <div class="note n-check"><b class="h">Evidence checkpoint</b>
+          <ul><li>Backup completed and stored in an accessible location.</li>
+              <li>Namespace deletion is recovered.</li>
+              <li>Marker data is intact.</li>
+              <li>Measured RPO/RTO meets or misses the target <b>explicitly</b>.</li>
+              <li>Alternate-cluster gaps are documented.</li></ul>
+        </div>
+        <div class="note n-chal"><b class="h">Challenge card — "Backup succeeds, restore fails"</b>
+          The backup exists but a PVC remains Pending on the target. Diagnose storage class,
+          CSI driver, snapshot location, access mode, and zone constraints.
+        </div>
+        <div class="note n-reset"><b class="h">Reset</b>
+          Keep one known-good backup for the migration labs. Remove temporary restores after
+          instructor approval.
+        </div>
+      </div>
+    </details>
+
+    <details class="lab" id="lab10">
+      <summary><span class="num">10</span><span class="lab-t">Upgrade Flight Simulator</span>
+        <span class="meta"><span class="pill">80 min</span><span class="pill xp">150 XP</span><span class="pill bg">Upgrade Commander</span></span>
+        <span class="lab-s">Upgrade with gates, canaries, and rollback criteria.</span></summary>
+      <div class="body">
+        <p><b>Mission —</b> Plan and rehearse a Kubernetes upgrade without treating a version
+           change as a single command.</p>
+
+        <div class="step">Step 1 — Baseline</div>
+<pre>kubectl version
+kubectl get nodes -o wide
+kubectl get pods -A
+flux get kustomizations -A
+kubectl get --raw='/readyz?verbose'</pre>
+
+        <div class="step">Step 2 — Compatibility matrix</div>
+        <p style="font-size:13px;margin:4px 0 0">Current and target Kubernetes versions · CNI ·
+           CSI/CCM · Flux controllers · cert-manager, Gateway API, Keycloak, observability,
+           Velero · application APIs and deprecated resources.</p>
+
+        <div class="step">Step 3 — Upgrade gates</div>
+        <div class="note n-stop"><b class="h">Do not proceed unless</b>
+          <ul><li>Backup/restore was tested.</li>
+              <li>Cluster is healthy.</li>
+              <li>Target version is supported by OpenCenter and provider tooling.</li>
+              <li>Disruption budgets permit node drains.</li>
+              <li>Capacity can absorb one unavailable node.</li>
+              <li>Rollback trigger and decision owner are named.</li></ul>
+        </div>
+
+        <div class="step">Step 4 — Change configuration and render</div>
+<pre>opencenter cluster set "$OC_REF" opencenter.cluster.kubernetes.version=&lt;target-version&gt;
+opencenter cluster validate "$OC_REF" --validation online
+opencenter cluster generate "$OC_REF" --render-only --force
+git -C "$GITOPS_DIR" diff</pre>
+
+        <div class="step">Step 5 — Controlled rollout</div>
+<pre>kubectl get nodes -w
+kubectl get pods -A --field-selector=status.phase!=Running
+kubectl get events -A --sort-by=.lastTimestamp | tail -50</pre>
+        <p style="font-size:13px;margin:8px 0 0">Use a canary worker first where supported, and
+           observe after <b>every</b> control-plane and worker step.</p>
+
+        <div class="step">Step 6 — Post-upgrade validation</div>
+<pre>kubectl version
+kubectl get nodes
+kubectl get --raw='/readyz?verbose'
+flux get kustomizations -A
+kubectl get helmreleases -A</pre>
+        <p style="font-size:13px;margin:8px 0 0">Then run application smoke tests, storage
+           attach/mount, DNS, LoadBalancer, identity, backup and observability checks.</p>
+
+        <div class="note n-check"><b class="h">Evidence checkpoint</b>
+          <ul><li>Compatibility matrix is complete.</li>
+              <li>Pre-upgrade backup is known-good.</li>
+              <li>Upgrade proceeds through explicit gates.</li>
+              <li>Post-upgrade tests pass.</li>
+              <li>Rollback conditions are documented even if rollback is not executed.</li></ul>
+        </div>
+        <div class="note n-chal"><b class="h">Challenge card — "API removed"</b>
+          A manifest uses a removed API version. Find it before the upgrade, update it in Git,
+          and prove Flux reconciliation on the current version.
+        </div>
+        <div class="note n-reset"><b class="h">Reset</b>
+          Leave Git and cluster on the instructor-approved target version. Revert failed experiments.
+        </div>
+      </div>
+    </details>
+
+    <details class="lab" id="lab11">
+      <summary><span class="num">11</span><span class="lab-t">Fleet Command</span>
+        <span class="meta"><span class="pill">70 min</span><span class="pill xp">125 XP</span><span class="pill bg">Fleet Manager</span></span>
+        <span class="lab-s">Manage dev, staging, and production as one platform.</span></summary>
+      <div class="body">
+        <p><b>Mission —</b> Create an organization model with shared defaults, environment-specific
+           overlays, and controlled promotion.</p>
+
+        <div class="step">Step 1 — Organization defaults</div>
+<pre class="yaml">~/.config/opencenter/clusters/aurora-labs/
+  .defaults.yaml
+  infrastructure/clusters/dev/
+  infrastructure/clusters/staging/
+  infrastructure/clusters/prod/
+  secrets/age/
+  secrets/ssh/</pre>
+        <div class="note n-warn"><b class="h">What belongs where</b>
+          Shared: naming, Kubernetes version, CIDR strategy, CNI, core services.
+          <b>Not</b> shared: environment credentials, capacity, retention, endpoints.
+        </div>
+
+        <div class="step">Step 2 — Create environment shapes</div>
+        <table>
+          <thead><tr><th style="width:120px">Environment</th><th style="width:220px">Provider/shape</th><th>Purpose</th></tr></thead>
+          <tbody>
+            <tr><td>Dev</td><td>Kind or small OpenStack</td><td>Fast feedback and low cost</td></tr>
+            <tr><td>Staging</td><td>Smaller HA OpenStack</td><td>Production-like validation</td></tr>
+            <tr><td>Prod</td><td>HA OpenStack</td><td>Availability, retention, operations</td></tr>
+          </tbody>
+        </table>
+
+        <div class="step">Step 3 — Shared GitOps repository</div>
+<pre class="yaml">applications/overlays/dev/       infrastructure/clusters/dev/
+applications/overlays/staging/   infrastructure/clusters/staging/
+applications/overlays/prod/      infrastructure/clusters/prod/</pre>
+
+        <div class="step">Step 4 — Context discipline</div>
+<pre>opencenter cluster list
+opencenter cluster use aurora-labs/dev
+kubectl config current-context
+opencenter cluster use aurora-labs/staging
+opencenter cluster use aurora-labs/prod</pre>
+        <div class="note n-stop"><b class="h">Before every write</b>
+          Print the active cluster, namespace, and Git branch. Every time.
+        </div>
+
+        <div class="step">Step 5 — Promotion exercise</div>
+        <ol class="tight">
+          <li>Feature branch to dev.</li><li>Automated tests and Flux readiness.</li>
+          <li>Pull request to staging overlay.</li><li>Smoke and resilience tests.</li>
+          <li>Approved pull request to production overlay.</li><li>Post-production verification.</li>
+        </ol>
+        <div class="note n-warn"><b class="h">Not the final operating model</b>
+          Blind directory copy works for a lab. Prefer versioned artifacts, Kustomize components,
+          Helm values, or automated pull requests in production.
+        </div>
+
+        <div class="note n-check"><b class="h">Evidence checkpoint</b>
+          <ul><li>Shared defaults are clearly separated from environment overrides.</li>
+              <li>Learner can switch contexts without ambiguity.</li>
+              <li>Promotion leaves an auditable Git trail.</li>
+              <li>Production change requires a gate absent from dev.</li></ul>
+        </div>
+        <div class="note n-chal"><b class="h">Challenge card — "Drift detective"</b>
+          Find one setting that differs accidentally between staging and prod. Decide whether to
+          centralize it, document it, or keep it as an intentional override.
+        </div>
+        <div class="note n-reset"><b class="h">Reset</b>
+          Return all environments to a clean, reconciled state.
+        </div>
+      </div>
+    </details>
+
+    <!-- ══════════ LEVEL 5 ══════════ -->
+    <div class="level l5"><span class="lname">Level 5 · Architecture &amp; GameDay</span>
+      <span>Migration, troubleshooting, capstone</span>
+      <span class="lbadge">🏅 OpenCenter Architect</span></div>
+
+    <details class="lab" id="lab12">
+      <summary><span class="num">12</span><span class="lab-t">Migration Mission</span>
+        <span class="meta"><span class="pill">105 min</span><span class="pill xp">200 XP</span><span class="pill bg">Migration Architect</span></span>
+        <span class="lab-s">Move an application across cluster, region, or provider.</span></summary>
+      <div class="body">
+        <p><b>Mission —</b> Migrate a stateful application using discovery, dependency mapping,
+           backup, rehearsal, cutover, validation, and rollback.</p>
+
+        <div class="step">Migration choices</div>
+        <table>
+          <thead><tr><th style="width:190px">Strategy</th><th style="width:100px">Downtime</th><th style="width:100px">Complexity</th><th>When to use</th></tr></thead>
+          <tbody>
+            <tr><td>Dual run / traffic shift</td><td>Near zero</td><td>High</td><td>Critical services with compatible data replication</td></tr>
+            <tr><td>Final backup / quick cutover</td><td>5–30 min</td><td>Medium</td><td>Most controlled migrations</td></tr>
+            <tr><td>Planned outage</td><td>1–4 hours</td><td>Lower</td><td>Legacy or tightly coupled workloads</td></tr>
+          </tbody>
+        </table>
+
+        <div class="step">Phase 1 — Discover</div>
+        <ul class="tight">
+          <li>Namespaces, deployments, stateful sets, jobs, CRDs.</li>
+          <li>PVCs, storage classes, snapshots, object storage.</li>
+          <li>DNS, certificates, gateways, load balancers, firewall rules.</li>
+          <li>ConfigMaps, encrypted secrets, external secret systems.</li>
+          <li>Databases, APIs, message brokers, identity providers.</li>
+          <li>SLOs, RPO, RTO, peak traffic, business blackout windows.</li>
+        </ul>
+
+        <div class="step">Phase 2 — Prepare target</div>
+        <p style="font-size:13px;margin:4px 0 0">Build and validate the target cluster, install
+           compatible services, configure storage and network mappings, then run a blank smoke test.</p>
+
+        <div class="step">Phase 3 — Rehearse restore</div>
+<pre>velero backup create app-preflight --include-namespaces &lt;app-namespace&gt; --wait
+velero restore create app-preflight-test \
+  --from-backup app-preflight \
+  --namespace-mappings &lt;app-namespace&gt;:&lt;test-namespace&gt; \
+  --wait</pre>
+
+        <div class="step">Phase 4 — Cutover plan</div>
+        <p style="font-size:13px;margin:4px 0 0">The runbook must name: freeze time and owner,
+           final backup/replication checkpoint, DNS TTL reduction timing, traffic-switch mechanism,
+           validation probes, rollback trigger, maximum decision time, and communication cadence.</p>
+
+        <div class="step">Phase 5 — Execute <span class="tagm t-chg">CHANGE</span></div>
+        <ol class="tight">
+          <li>Freeze writes.</li><li>Create final backup/snapshot.</li>
+          <li>Restore or complete replication.</li><li>Run target smoke tests.</li>
+          <li>Switch DNS/load balancer/route.</li><li>Unfreeze writes.</li>
+          <li>Watch error rate, latency, data consistency, background jobs.</li>
+        </ol>
+
+        <div class="step">Phase 6 — Rollback test</div>
+        <div class="note n-stop"><b class="h">A rollback plan that ignores data divergence is incomplete</b>
+          Before production cutover, prove you can route back <b>and</b> reconcile any data
+          written after the switch.
+        </div>
+
+        <div class="note n-check"><b class="h">Evidence checkpoint</b>
+          <ul><li>Dependency map and migration wave exist.</li>
+              <li>Rehearsal restore succeeds.</li>
+              <li>Cutover runbook names owners and timings.</li>
+              <li>Validation covers technical <i>and</i> business checks.</li>
+              <li>Rollback includes data-consistency handling.</li></ul>
+        </div>
+        <div class="note n-chal"><b class="h">Challenge card — "Provider translation"</b>
+          Move from OpenStack Cinder to a different storage class. Identify fields that cannot be
+          copied directly and create a mapping table.
+        </div>
+        <div class="note n-reset"><b class="h">Reset</b>
+          Keep the source available during the agreed observation window. Decommission only after
+          formal acceptance.
+        </div>
+      </div>
+    </details>
+
+    <details class="lab" id="lab13">
+      <summary><span class="num">13</span><span class="lab-t">Chaos GameDay</span>
+        <span class="meta"><span class="pill">90 min</span><span class="pill xp">200 XP</span><span class="pill bg">Incident Commander</span></span>
+        <span class="lab-s">Diagnose by layer instead of guessing.</span></summary>
+      <div class="body">
+        <p><b>Mission —</b> Resolve injected failures using a repeatable diagnostic funnel.</p>
+
+        <div class="step">The funnel</div>
+<pre class="yaml">1. Scope and recent change
+2. Configuration and validation
+3. Git and Flux source
+4. Cloud infrastructure and quota
+5. Kubernetes node / control plane
+6. CNI, DNS, load balancer, storage
+7. HelmRelease / application
+8. User-facing symptom and business impact</pre>
+
+        <div class="step">First five commands</div>
+<pre>opencenter cluster validate "$OC_REF" --verbose
+opencenter cluster status   "$OC_REF" 2&gt;/dev/null || true
+git -C "$GITOPS_DIR" log --oneline -10
+flux get all -A
+kubectl get nodes,pods -A -o wide</pre>
+
+        <div class="step">Incident cards — the instructor injects two or more</div>
+        <table>
+          <thead><tr><th style="width:34px">#</th><th>Injected fault</th><th style="width:34px">#</th><th>Injected fault</th></tr></thead>
+          <tbody>
+            <tr><td>1</td><td>Invalid CIDR or missing required field</td><td>7</td><td>Helm chart/source unavailable</td></tr>
+            <tr><td>2</td><td>OpenStack quota exceeded</td><td>8</td><td>Node NotReady — disk or memory pressure</td></tr>
+            <tr><td>3</td><td>Image/network ID changed</td><td>9</td><td>CNI failure breaks pod connectivity</td></tr>
+            <tr><td>4</td><td>Git authentication or branch failure</td><td>10</td><td>LoadBalancer external IP pending</td></tr>
+            <tr><td>5</td><td>SOPS key cannot decrypt</td><td>11</td><td>PVC Pending after storage-class mismatch</td></tr>
+            <tr><td>6</td><td>Flux Kustomization path invalid</td><td>12</td><td>CrashLoopBackOff from a missing secret</td></tr>
+          </tbody>
+        </table>
+
+        <div class="step">Incident record — capture for every incident</div>
+        <p style="font-size:13px;margin:4px 0 0">Start/end time · user impact · first signal ·
+           last known good change · hypotheses in order · commands and evidence · root cause ·
+           recovery action · prevention action.</p>
+
+        <div class="step">Useful commands</div>
+<pre><span class="c"># Flux</span>
+kubectl describe gitrepository -A
+kubectl describe kustomization -A
+kubectl get helmrepositories,helmreleases -A
+kubectl logs -n flux-system deployment/kustomize-controller
+
+<span class="c"># Nodes and workloads</span>
+kubectl describe node &lt;node&gt;
+kubectl get events -A --sort-by=.lastTimestamp | tail -100
+kubectl logs &lt;pod&gt; -n &lt;namespace&gt; --previous
+kubectl top nodes ; kubectl top pods -A
+
+<span class="c"># Provider / OpenTofu</span>
+openstack server list ; openstack volume list ; openstack quota show
+cd "$GITOPS_DIR/infrastructure/clusters/$OC_CLUSTER" &amp;&amp; opentofu plan</pre>
+
+        <div class="note n-check"><b class="h">Evidence checkpoint</b>
+          <ul><li>Root cause is supported by evidence, not intuition.</li>
+              <li>Recovery restores service.</li>
+              <li>Learner identifies the <b>earliest gate</b> that should have caught the fault.</li>
+              <li>A prevention action is added to validation, monitoring, policy, or runbook.</li></ul>
+        </div>
+        <div class="note n-chal"><b class="h">Challenge card — "Two failures, one symptom"</b>
+          A service is unreachable because both DNS <i>and</i> a missing endpoint are wrong.
+          Avoid stopping after the first fix.
+        </div>
+        <div class="note n-reset"><b class="h">Reset</b>
+          Remove all injected faults, reconcile Flux, and rerun the baseline health checks.
+        </div>
+      </div>
+    </details>
+
+    <details class="lab" id="lab14">
+      <summary><span class="num">14</span><span class="lab-t">Capstone — Aurora Platform Launch</span>
+        <span class="meta"><span class="pill">120 min</span><span class="pill xp">300 XP</span><span class="pill bg">OpenCenter Architect</span></span>
+        <span class="lab-s">Design, deploy, prove, and defend the platform.</span></summary>
+      <div class="body">
+        <p><b>Mission —</b> Deliver a production-readiness review for Aurora Labs and demonstrate
+           the platform under change and failure.</p>
+
+        <div class="step">Scenario — Aurora needs</div>
+        <ul class="tight">
+          <li>Dev, staging, and production clusters.</li>
+          <li>OpenStack production infrastructure and a private GitOps repository.</li>
+          <li>OIDC access and least-privilege RBAC.</li>
+          <li>TLS and Gateway API ingress.</li>
+          <li>Metrics, logs, and backup.</li>
+          <li>A high-memory workload pool.</li>
+          <li><b>RPO 30 minutes, RTO 60 minutes</b> for the demo application.</li>
+          <li>A tested migration path to a second region.</li>
+        </ul>
+
+        <div class="step">Team roles</div>
+        <p style="font-size:13px;margin:4px 0 0">Platform architect · OpenStack/infrastructure
+           operator · GitOps/service operator · security and identity lead · reliability/incident lead.</p>
+
+        <div class="step">Required deliverables</div>
+        <ol class="tight">
+          <li>Architecture diagram.</li>
+          <li>v2 cluster configuration with no placeholders.</li>
+          <li>Passing offline and online validation reports.</li>
+          <li>GitOps repository map and clean history.</li>
+          <li>Network and security decision record.</li>
+          <li>Service dependency matrix.</li>
+          <li>Secret lifecycle and key-recovery procedure.</li>
+          <li>Worker-pool placement demonstration.</li>
+          <li>Backup and restore evidence with measured RPO/RTO.</li>
+          <li>Upgrade plan with rollback gates.</li>
+          <li>Multi-cluster promotion evidence.</li>
+          <li>Migration cutover and rollback runbook.</li>
+          <li>One resolved GameDay incident report.</li>
+        </ol>
+
+        <div class="step">Live demonstration sequence</div>
+        <ol class="tight">
+          <li>Show current cluster/context and Git revision.</li>
+          <li>Deploy a change through Git.</li>
+          <li>Prove Flux reconciliation.</li>
+          <li>Authenticate as a read-only user.</li>
+          <li>Show TLS, metrics, and logs.</li>
+          <li>Schedule a workload to the high-memory pool.</li>
+          <li>Delete and restore the demo namespace.</li>
+          <li>Inject one fault and diagnose it.</li>
+          <li>Present migration and upgrade decision gates.</li>
+        </ol>
+
+        <div class="step">Scoring rubric</div>
+        <table>
+          <thead><tr><th>Area</th><th style="width:90px">Points</th></tr></thead>
+          <tbody>
+            <tr><td>Architecture and clarity</td><td>20</td></tr>
+            <tr><td>Configuration and validation</td><td>15</td></tr>
+            <tr><td>GitOps and service operations</td><td>15</td></tr>
+            <tr><td>Network and security</td><td>15</td></tr>
+            <tr><td>Resilience and recovery proof</td><td>15</td></tr>
+            <tr><td>Troubleshooting method</td><td>10</td></tr>
+            <tr><td>Communication and evidence</td><td>10</td></tr>
+          </tbody>
+        </table>
+
+        <div class="note n-check"><b class="h">Graduation standard</b>
+          A team passes when it can answer all four with evidence:
+          <ol style="margin:5px 0 0;padding-left:18px">
+            <li>What is running?</li><li>Why is it configured that way?</li>
+            <li>How do you know it is healthy and secure?</li><li>How do you recover or roll back?</li>
+          </ol>
+        </div>
+        <div class="note n-chal"><b class="h">Final boss bonus</b>
+          Perform a region-migration rehearsal while a separate operator rotates a secret and a
+          third monitors service health. No direct <code>kubectl edit</code> is permitted.
+        </div>
+      </div>
+    </details>
+
+    <!-- ══════════ APPENDICES ══════════ -->
+    <div class="level l1" style="margin-top:30px"><span class="lname">Appendices</span>
+      <span>Reference material, not teaching material</span></div>
+
+    <section class="card" id="appA">
+      <h2>Appendix A — Standard command workflow</h2>
+<pre><span class="c"># 1. Select and inspect</span>
+opencenter cluster use      &lt;org&gt;/&lt;cluster&gt;
+opencenter cluster describe &lt;org&gt;/&lt;cluster&gt;
+
+<span class="c"># 2. Validate locally and online</span>
+opencenter cluster doctor   &lt;org&gt;/&lt;cluster&gt;
+opencenter cluster validate &lt;org&gt;/&lt;cluster&gt; --verbose
+opencenter cluster validate &lt;org&gt;/&lt;cluster&gt; --validation online
+
+<span class="c"># 3. Render and review</span>
+opencenter cluster generate &lt;org&gt;/&lt;cluster&gt; --render-only --force
+git -C &lt;git-dir&gt; diff
+
+<span class="c"># 4. Commit and push</span>
+git -C &lt;git-dir&gt; add .
+git -C &lt;git-dir&gt; commit -m "&lt;intentional-message&gt;"
+git -C &lt;git-dir&gt; push
+
+<span class="c"># 5. Reconcile and prove</span>
+flux get all -A
+kubectl get nodes ; kubectl get pods -A ; kubectl get helmreleases -A</pre>
+    </section>
+
+    <section class="card" id="appB">
+      <h2>Appendix B — Deployment resume and lock playbook</h2>
+<pre><span class="c"># Show the plan without change</span>
+opencenter cluster deploy &lt;cluster&gt; --dry-run
+
+<span class="c"># Resume from OpenTofu apply</span>
+opencenter cluster deploy &lt;cluster&gt; --from-step opentofu-apply
+
+<span class="c"># Re-run only CNI installation</span>
+opencenter cluster deploy &lt;cluster&gt; --step openstack-install-network-plugin
+
+<span class="c"># Ignore saved state and rerun everything — only when justified</span>
+opencenter cluster deploy &lt;cluster&gt; --restart</pre>
+      <div class="note n-stop"><b class="h">Before breaking a lock</b>
+        Confirm no other operator or automation is active. Preserve the bootstrap log and saved
+        state for incident analysis.
+      </div>
+    </section>
+
+    <section class="card" id="appC">
+      <h2>Appendix C — Evidence checklist</h2>
+      <table>
+        <thead><tr><th>Artifact</th><th style="width:110px">Lab</th></tr></thead>
+        <tbody>
+          <tr><td>☐ Tool versions and cloud token proof</td><td>0</td></tr>
+          <tr><td>☐ Cluster describe output, sensitive values removed</td><td>1</td></tr>
+          <tr><td>☐ Architecture decision record</td><td>1</td></tr>
+          <tr><td>☐ Offline and online validation outputs</td><td>2</td></tr>
+          <tr><td>☐ Git repository tree and commit history</td><td>3</td></tr>
+          <tr><td>☐ Node and Flux readiness</td><td>3</td></tr>
+          <tr><td>☐ Service dependency matrix</td><td>4</td></tr>
+          <tr><td>☐ Network CIDR and policy test</td><td>5</td></tr>
+          <tr><td>☐ SOPS encryption and rotation proof</td><td>6</td></tr>
+          <tr><td>☐ Worker pool scheduling proof</td><td>7</td></tr>
+          <tr><td>☐ Identity and observability proof</td><td>8</td></tr>
+          <tr><td>☐ Backup and restore timing</td><td>9</td></tr>
+          <tr><td>☐ Upgrade compatibility matrix</td><td>10</td></tr>
+          <tr><td>☐ Multi-cluster promotion record</td><td>11</td></tr>
+          <tr><td>☐ Migration rehearsal and rollback plan</td><td>12</td></tr>
+          <tr><td>☐ GameDay incident report</td><td>13</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="card" id="appD">
+      <h2>Appendix D — Instructor injection catalog</h2>
+      <table>
+        <thead><tr><th style="width:210px">Injection</th><th style="width:250px">Earliest expected detection</th><th>Primary recovery</th></tr></thead>
+        <tbody>
+          <tr><td>Missing app credential</td><td>Online validation / preflight</td><td>Restore credential reference</td></tr>
+          <tr><td>Overlapping CIDR</td><td>Offline validation</td><td>Correct address plan</td></tr>
+          <tr><td>Two CNIs enabled</td><td>Cross-field validation</td><td>Enable exactly one</td></tr>
+          <tr><td>Git origin mismatch</td><td>Online validation / deploy preflight</td><td>Align config and origin</td></tr>
+          <tr><td>SOPS key missing</td><td>Validation / Flux</td><td>Restore protected key</td></tr>
+          <tr><td>Quota exceeded</td><td>Online validation / OpenTofu</td><td>Quota increase or resize</td></tr>
+          <tr><td>LoadBalancer pending</td><td>Service events / provider controller</td><td>Repair provider/network/quota</td></tr>
+          <tr><td>PVC Pending</td><td>Storage events</td><td>Map storage class / CSI / zone</td></tr>
+          <tr><td>Helm dependency missing</td><td>Flux / HelmRelease</td><td>Restore dependency or order</td></tr>
+          <tr><td>Node pressure</td><td>Node conditions / metrics</td><td>Free or add resources</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="card" id="appE">
+      <h2>Appendix E — Cleanup and cost control</h2>
+      <div class="note n-stop" style="margin-top:0"><b class="h">Disposable lab clusters only</b>
+        Use the destroy path only after preserving required evidence.
+      </div>
+<pre><span class="c"># DESTRUCTIVE: cloud infrastructure, preserves local files by default</span>
+opencenter cluster destroy &lt;cluster&gt; --force
+
+<span class="c"># DESTRUCTIVE: cloud infrastructure AND local config/GitOps files</span>
+opencenter cluster destroy &lt;cluster&gt; --force --remove-files
+
+<span class="c"># Remove local files only, leave provider infrastructure alone</span>
+opencenter cluster destroy &lt;cluster&gt; --force --skip-infrastructure --remove-files
+
+<span class="c"># Confirm the cloud is actually empty</span>
+openstack server list --name &lt;cluster&gt;
+openstack volume list --long | grep &lt;cluster&gt;
+openstack loadbalancer list</pre>
+    </section>
+
+    <section class="card" id="appF">
+      <h2>Appendix F — Source cleanup decisions</h2>
+      <ul class="tight">
+        <li>Duplicate <b>Manage Secrets</b>, <b>Migrate Clusters</b> and <b>Troubleshoot Deployment</b> chapters merged into one lab each.</li>
+        <li>The basic production-cluster tutorial and the separate deploy chapter were integrated into the guided build, validation, GitOps and deployment labs.</li>
+        <li>v2 configuration and application credentials replace older username/password examples.</li>
+        <li>OpenTofu terminology replaces mixed Terraform/OpenTofu wording.</li>
+        <li>Guided configuration is the default; manual editing is retained as an advanced lane.</li>
+        <li>OpenStack deployment completion is defined as Kubernetes API reachability; Flux and platform services are verified separately.</li>
+        <li>Dangerous commands are isolated behind checkpoints; every operational lab ends with evidence and reset steps.</li>
+        <li>Hard-coded image and component versions are treated as examples — learners confirm versions supported by their installed release.</li>
+      </ul>
+    </section>
+
+    <section class="card" id="appG">
+      <h2>Appendix G — Quick reference: healthy state</h2>
+<pre>opencenter cluster validate &lt;cluster&gt; --validation online
+kubectl cluster-info
+kubectl get nodes
+flux get sources git -A
+flux get kustomizations -A
+kubectl get helmreleases -A
+kubectl get pods -A --field-selector=status.phase!=Running
+kubectl get events -A --sort-by=.lastTimestamp | tail -50</pre>
+      <div class="note n-check"><b class="h">Healthy means more than "pods are Running"</b>
+        Configuration is valid · desired state is committed · Flux is reconciled · nodes are Ready ·
+        dependencies are healthy · user journeys work · backup is recent · rollback is understood.
+      </div>
+    </section>
+
+    <div class="foot">Aurora Labs · Advanced Training · Evidence over assumption</div>
+
+  </main>
+</div>
+</body>
+</html>
