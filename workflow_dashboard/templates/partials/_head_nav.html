@@ -616,16 +616,20 @@
       filter: none !important;
       margin-right: 10px;
     }
-    /* Per-letter wrappers created by hdrTitleRiffle() on load. inline-block is
-       required for the rotateX; spaces stay as plain text nodes so word spacing
-       and the nowrap title are unaffected. */
-    /* Masthead letters ARE board tiles (.mfb-flap), just smaller. Everything
-       else — gradient, hinge seam, mono face, shadows — comes from the shared
-       .mfb-flap rule above, so the two surfaces can never drift apart. */
-    /* Line 1 is now 41 tiles (35 characters + 6 word separators), so they are
-       sized to fit one row down to a 1280px viewport. Every tile is border-box
-       (see the global * rule), so padding sits inside min-width and adds
-       nothing to the line length. */
+    /* Masthead tiles. Same object as the counter flaps — hinge seam, mono face,
+       riffle classes all inherited from the shared .mfb-flap rule — but sky
+       blue and smaller.
+
+       Sized so line 1 (41 tiles: 35 characters + 6 word separators) fits one
+       row down to a 1280px viewport. Padding sits inside min-width because
+       `* { box-sizing: border-box }` is global, so it costs no line length.
+
+       The gradient still breaks at the 50% hinge, lighter above and darker
+       below, so it reads as a physical tile rather than a flat blue chip.
+       The blue is the one already used by .s0-dawn-title-highlight (#2563eb),
+       so the masthead matches the FLEX banner rather than inventing a shade.
+       colour/text-shadow/box-shadow need !important because the shared
+       .mfb-flap rule sets them that way for the dark counter tiles. */
     html header h1 .mfb-flap {
       min-width: clamp(19px, 2.1vw, 40px);
       padding: clamp(4px, .58vw, 10px) clamp(1px, .22vw, 4px) clamp(5px, .66vw, 12px);
@@ -633,11 +637,24 @@
       margin: 1px;
       vertical-align: middle;
       border-radius: 4px;
+      background: linear-gradient(180deg,
+                    #3b82f6 0%, #2563eb 49.6%,
+                    #1d4ed8 50.4%, #1e40af 100%) !important;
+      color: #ffffff !important;
+      text-shadow: 0 1px 2px rgba(0,0,0,.5) !important;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.28),
+                  0 1px 3px rgba(0,0,0,.5) !important;
+    }
+    /* Hinge line: dark enough to read as a seam on a mid-blue tile, with a
+       hairline highlight under it for the fold. */
+    html header h1 .mfb-flap::after {
+      background: rgba(0,0,0,.42);
+      box-shadow: 0 1px 0 rgba(255,255,255,.22);
     }
     /* The word separator: a real tile carrying "-", dimmed so words still read
        as words rather than one continuous string. */
     html header h1 .mfb-flap.hdr-sep {
-      color: #7c7c7c !important;
+      color: rgba(255,255,255,.55) !important;
     }
     /* Replay button, tucked at the right end of the board. */
     #mfbBoard .mfb-refresh,
