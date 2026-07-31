@@ -168,6 +168,7 @@
         return [
           '/api/opencenter/lab-session','/api/opencenter/cohort-review','/api/opencenter/lab-result','/api/opencenter/lab-feedback',
           '/api/opencenter/lab-feedback-answer','/api/opencenter/training-log',
+          '/api/opencenter/training-log.csv',
           '/api/opencenter/deploy-readiness','/api/opencenter/clusters','/api/opencenter/export-bundle',
           '/api/opencenter/restore-bundle','/api/openstack/quota-check',
           '/api/openstack/force-delete-security-group','/api/openstack/free-fips',
@@ -3039,16 +3040,18 @@ kubectl describe kustomization &lt;name&gt; -n flux-system</div>
           var status=document.getElementById('ocqs-log-status');
           var old=button&&button.textContent;
           if(button){button.disabled=true;button.textContent='Exporting...';}
-          /* lab.ready is a fetch promise, so by the time it resolves the click
-             gesture has expired and popup blockers silently kill window.open().
-             Stream the CSV instead and save it through a temporary anchor, which
-             needs no gesture. The token rides the header, so it stays out of the
-             URL, browser history and the server access log. */
-          return lab.ready.then(function(){
-            var token=(lab.data&&lab.data.csrf)||'';
-            if(!token) throw new Error('no active lab session');
-            return fetch('/api/opencenter/training-log.csv',{
-              headers:{'X-OpenCenter-Lab-CSRF':token}
+          /* `lab` is a local inside the bootstrap IIFE in an earlier <script>
+             block, so touching it from here threw ReferenceError and killed the
+             handler mid-click. training-log.csv is registered in protectedLabUrl
+             instead, which makes the patched window.fetch wait for the session
+             and attach X-OpenCenter-Lab-CSRF itself - no cross-block reference,
+             and the token never reaches the URL, history or access log.
+             A plain window.open() would not work here either: it runs after an
+             await, by which time the click gesture has expired and popup
+             blockers drop it silently. */
+          return Promise.resolve()
+            .then(function(){
+              return fetch('/api/opencenter/training-log.csv');
             }).then(function(r){
               if(!r.ok){
                 return r.json().catch(function(){return {};}).then(function(d){
@@ -3069,12 +3072,13 @@ kubectl describe kustomization &lt;name&gt; -n flux-system</div>
               a.remove();
               setTimeout(function(){ URL.revokeObjectURL(url); },60000);
               if(status){status.textContent='Downloaded '+file.name;status.style.color='#15803d';}
+            })
+            .catch(function(error){
+              if(status){status.textContent=error.message;status.style.color='#dc2626';}
+            })
+            .finally(function(){
+              if(button){button.disabled=false;button.textContent=old;}
             });
-          }).catch(function(error){
-            if(status){status.textContent=error.message;status.style.color='#dc2626';}
-          }).finally(function(){
-            if(button){button.disabled=false;button.textContent=old;}
-          });
         };
         window.ocqsAnswerQuestion=function(id,box,button){
           var answer=(box&&box.value||'').trim();
