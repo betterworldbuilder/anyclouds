@@ -464,11 +464,11 @@
             if(button){button.disabled=false;button.textContent=old;}
           });
       };
-      /* Expand one of the two collapsed lab bands and bring it into view.
-         Both bands render collapsed, so a deep link that only reveals the
+      /* Expand one of the collapsed lab bands and bring it into view.
+         Every band renders collapsed, so a deep link that only reveals the
          OpenCenter pane still leaves the learner staring at a closed
-         accordion they have to find and click. which: 'ocqs' (Quick Start)
-         or 'ocqp' (Advanced Training Lab). */
+         accordion they have to find and click. which: 'ocqs' (Quick Start),
+         'ocqp' (Advanced Training Lab) or 'ocqc' (Certification Lab). */
       window.ocOpenLabBand = function(which,scroll){
         var body=document.getElementById(which+'-inline-body');
         var arrow=document.getElementById(which+'-inline-arrow');
@@ -484,11 +484,11 @@
       };
       window.ocqsOpenQuickStart=function(){ return window.ocOpenLabBand('ocqs'); };
 
-      /* ?lab=quickstart | ?lab=advanced opens that band on arrival.
-         The pane is revealed by the ?only= router, which may run after
+      /* ?lab=quickstart | ?lab=advanced | ?lab=certification opens that band on
+         arrival. The pane is revealed by the ?only= router, which may run after
          DOMContentLoaded, so retry briefly rather than fire once and miss. */
       (function autoOpenLabBand(attempt){
-        var which={quickstart:'ocqs',advanced:'ocqp'}[
+        var which={quickstart:'ocqs',advanced:'ocqp',certification:'ocqc'}[
           (new URLSearchParams(window.location.search).get('lab')||'').toLowerCase()];
         if(!which) return;
         var body=document.getElementById(which+'-inline-body');
@@ -8067,20 +8067,406 @@ mise run build
 
       {% include "_opencenter_platform.html" %}
 
+      <!-- ── OpenCenter Certification Lab (collapsed) — MOCKUP, not wired ── -->
+      <div id="ocqc-outer-wrap" style="margin-bottom:18px;border:2px solid #a78bfa;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(124,58,237,.2);">
+        <div id="ocqc-inline-toggle" onclick="(function(){var b=document.getElementById('ocqc-inline-body');var a=document.getElementById('ocqc-inline-arrow');var open=b.style.display!=='none';b.style.display=open?'none':'block';a.textContent=open?'&#9654;':'&#9660;';})()" style="display:flex;align-items:center;justify-content:space-between;padding:14px 20px;background:linear-gradient(135deg,#4c1d95,#7c3aed,#a78bfa);cursor:pointer;user-select:none;">
+          <div style="display:flex;align-items:center;gap:12px;">
+            <span style="font-size:20px;">&#127891;</span>
+            <div>
+              <div style="font-size:15px;font-weight:800;color:#fff;">OpenCenter Certification Lab</div>
+              <div style="font-size:12px;color:#ddd6fe;margin-top:2px;">Exam blueprints &middot; Practice tests &middot; Performance labs &middot; Score reports</div>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:12px;">
+            <span style="font-size:10px;font-weight:800;letter-spacing:1px;background:#fbbf24;color:#422006;padding:3px 10px;border-radius:999px;">MOCKUP</span>
+            <span id="ocqc-inline-arrow" style="color:#fff;font-size:16px;font-weight:900;">&#9654;</span>
+          </div>
+        </div>
+
+        <div id="ocqc-inline-body" style="display:none;background:#f8fafc;padding:0;">
+        <style>
+          .ocqc-wrap{padding:20px 24px;max-width:1180px;}
+          .ocqc-card{background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:16px 18px;margin-bottom:14px;}
+          .ocqc-h{font-size:11px;font-weight:800;color:#6d28d9;text-transform:uppercase;letter-spacing:1.2px;margin:0 0 10px;}
+          .ocqc-sub{font-size:12.5px;color:#64748b;margin:0 0 10px;}
+          .ocqc-tbl{width:100%;border-collapse:collapse;font-size:12.5px;}
+          .ocqc-tbl th{background:#4c1d95;color:#fff;text-align:left;padding:7px 9px;font-size:9.5px;text-transform:uppercase;letter-spacing:.8px;}
+          .ocqc-tbl td{padding:7px 9px;border-bottom:1px solid #e2e8f0;vertical-align:top;}
+          .ocqc-tbl code{background:#f1f5f9;padding:1px 5px;border-radius:4px;font-size:11.5px;}
+          .ocqc-chip{display:inline-block;font-size:9.5px;font-weight:800;padding:3px 9px;border-radius:999px;letter-spacing:.6px;}
+          .ocqc-c1{background:#eff6ff;color:#0369a1;border:1px solid #bae6fd;}
+          .ocqc-c2{background:#f5f3ff;color:#6d28d9;border:1px solid #ddd6fe;}
+          .ocqc-c3{background:#fef2f2;color:#b91c1c;border:1px solid #fecaca;}
+          /* exam chrome */
+          .ocqc-exam{border:2px solid #4c1d95;border-radius:12px;overflow:hidden;background:#fff;}
+          .ocqc-exam-hd{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:11px 16px;background:#1e1b4b;color:#e0e7ff;}
+          .ocqc-exam-hd .t{font-size:13px;font-weight:800;}
+          .ocqc-timer{margin-left:auto;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:16px;font-weight:800;color:#fbbf24;}
+          .ocqc-prog{height:5px;background:#e2e8f0;}
+          .ocqc-prog i{display:block;height:100%;width:30%;background:linear-gradient(90deg,#7c3aed,#a78bfa);}
+          .ocqc-nav{display:flex;flex-wrap:wrap;gap:4px;padding:11px 16px;background:#f5f3ff;border-bottom:1px solid #ddd6fe;}
+          .ocqc-nav span{width:25px;height:25px;border-radius:5px;display:grid;place-items:center;font-size:10.5px;font-weight:800;background:#fff;border:1px solid #cbd5e1;color:#64748b;}
+          .ocqc-nav span.done{background:#16a34a;border-color:#16a34a;color:#fff;}
+          .ocqc-nav span.flag{background:#f59e0b;border-color:#f59e0b;color:#fff;}
+          .ocqc-nav span.cur{background:#4c1d95;border-color:#4c1d95;color:#fff;}
+          .ocqc-q{padding:15px 18px;border-bottom:1px solid #e2e8f0;}
+          .ocqc-qn{font-size:10px;font-weight:800;color:#7c3aed;letter-spacing:1px;text-transform:uppercase;margin-bottom:6px;}
+          .ocqc-qt{font-size:13.5px;font-weight:700;color:#0f172a;margin-bottom:4px;line-height:1.5;}
+          .ocqc-opt{display:flex;gap:9px;align-items:flex-start;padding:7px 10px;border:1px solid #e2e8f0;border-radius:7px;margin-top:6px;font-size:13px;cursor:pointer;}
+          .ocqc-opt:hover{background:#faf5ff;border-color:#ddd6fe;}
+          .ocqc-opt input{margin-top:3px;flex:none;}
+          .ocqc-key{margin-top:10px;font-size:12.5px;background:#f0fdf4;border-left:3px solid #15803d;border-radius:0 7px 7px 0;padding:9px 12px;}
+          .ocqc-key summary{cursor:pointer;font-weight:800;color:#15803d;font-size:11px;letter-spacing:.7px;text-transform:uppercase;}
+          .ocqc-pre{background:#0f172a;color:#a5f3a5;border-radius:7px;padding:11px 13px;font-size:12px;overflow-x:auto;margin:8px 0 0;white-space:pre;font-family:ui-monospace,Menlo,Consolas,monospace;}
+          .ocqc-btn{background:#e2e8f0;color:#94a3b8;border:1px dashed #cbd5e1;border-radius:6px;padding:6px 14px;font-size:11.5px;font-weight:800;cursor:not-allowed;margin:3px 5px 0 0;}
+          .ocqc-bar{height:9px;background:#e2e8f0;border-radius:999px;overflow:hidden;}
+          .ocqc-bar i{display:block;height:100%;border-radius:999px;}
+          .ocqc-note{border-left:3px solid;border-radius:0 7px 7px 0;padding:9px 12px;margin-top:10px;font-size:12.5px;}
+          .ocqc-nw{border-color:#b45309;background:#fffbeb;}
+          .ocqc-ng{border-color:#15803d;background:#f0fdf4;}
+          .ocqc-nr{border-color:#b91c1c;background:#fef2f2;}
+        </style>
+
+        <div class="ocqc-wrap">
+
+          <div class="ocqc-note ocqc-nw" style="margin-top:0;">
+            <b>Mockup only.</b> Nothing here is wired — timers do not run, answers are not scored,
+            and no result is recorded. This is the proposed certification experience for review.
+          </div>
+
+          <!-- ============ 1. CERTIFICATION PATHS ============ -->
+          <div class="ocqc-card">
+            <div class="ocqc-h">1 &middot; Certification paths</div>
+            <p class="ocqc-sub">Three stacked credentials, each mapped onto the Advanced Lab levels.
+               A candidate must hold the previous credential to sit the next exam.</p>
+            <table class="ocqc-tbl">
+              <thead><tr><th style="width:190px">Credential</th><th style="width:110px">Covers</th><th style="width:80px">Time</th><th style="width:150px">Items</th><th style="width:70px">Pass</th><th>Proves</th></tr></thead>
+              <tbody>
+                <tr>
+                  <td><span class="ocqc-chip ocqc-c1">OCCA</span><br><b>Certified Associate</b></td>
+                  <td>Labs 0&ndash;5<br><small>Levels 1&ndash;2</small></td><td>60 min</td>
+                  <td>40 knowledge items</td><td>70&nbsp;%</td>
+                  <td>Can configure, validate and deploy a cluster through GitOps</td>
+                </tr>
+                <tr>
+                  <td><span class="ocqc-chip ocqc-c2">OCCP</span><br><b>Certified Professional</b></td>
+                  <td>Labs 6&ndash;11<br><small>Levels 3&ndash;4</small></td><td>90 min</td>
+                  <td>35 items + 2 performance tasks</td><td>75&nbsp;%</td>
+                  <td>Can operate secrets, capacity, observability, backup and upgrade</td>
+                </tr>
+                <tr>
+                  <td><span class="ocqc-chip ocqc-c3">OCCX</span><br><b>Certified Architect</b></td>
+                  <td>Labs 12&ndash;14<br><small>Level 5</small></td><td>150 min</td>
+                  <td>1 scenario design + 3 performance tasks + oral defence</td><td>80&nbsp;%</td>
+                  <td>Can plan migration, lead an incident, and defend a design with evidence</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- ============ 2. BLUEPRINT ============ -->
+          <div class="ocqc-card">
+            <div class="ocqc-h">2 &middot; Exam blueprint &mdash; domain weighting</div>
+            <table class="ocqc-tbl">
+              <thead><tr><th>Domain</th><th style="width:90px">OCCA</th><th style="width:90px">OCCP</th><th style="width:90px">OCCX</th><th style="width:180px">Source labs</th></tr></thead>
+              <tbody>
+                <tr><td>Environment &amp; credential safety</td><td>15&nbsp;%</td><td>5&nbsp;%</td><td>&mdash;</td><td>Lab 0</td></tr>
+                <tr><td>Configuration design (v2 schema)</td><td>25&nbsp;%</td><td>10&nbsp;%</td><td>15&nbsp;%</td><td>Labs 1, 11</td></tr>
+                <tr><td>Validation &amp; failure triage</td><td>20&nbsp;%</td><td>10&nbsp;%</td><td>20&nbsp;%</td><td>Labs 2, 13</td></tr>
+                <tr><td>GitOps &amp; reconciliation</td><td>25&nbsp;%</td><td>10&nbsp;%</td><td>10&nbsp;%</td><td>Lab 3</td></tr>
+                <tr><td>Services &amp; dependencies</td><td>10&nbsp;%</td><td>15&nbsp;%</td><td>&mdash;</td><td>Lab 4</td></tr>
+                <tr><td>Networking &amp; policy</td><td>5&nbsp;%</td><td>15&nbsp;%</td><td>10&nbsp;%</td><td>Lab 5</td></tr>
+                <tr><td>Secrets lifecycle</td><td>&mdash;</td><td>15&nbsp;%</td><td>10&nbsp;%</td><td>Lab 6</td></tr>
+                <tr><td>Capacity &amp; placement</td><td>&mdash;</td><td>10&nbsp;%</td><td>&mdash;</td><td>Lab 7</td></tr>
+                <tr><td>Observability &amp; access</td><td>&mdash;</td><td>10&nbsp;%</td><td>5&nbsp;%</td><td>Lab 8</td></tr>
+                <tr><td>Resilience, upgrade &amp; migration</td><td>&mdash;</td><td>&mdash;</td><td>30&nbsp;%</td><td>Labs 9, 10, 12</td></tr>
+              </tbody>
+            </table>
+            <div class="ocqc-note ocqc-nw">
+              <b>Weighting rule.</b> No domain may exceed 30&nbsp;% of a single exam, so a candidate
+              cannot pass on one strong area alone. Every exam must also draw at least one item
+              from each of its non-zero domains.
+            </div>
+          </div>
+
+          <!-- ============ 3. ITEM TYPES ============ -->
+          <div class="ocqc-card">
+            <div class="ocqc-h">3 &middot; Item types</div>
+            <table class="ocqc-tbl">
+              <thead><tr><th style="width:170px">Type</th><th style="width:80px">Scoring</th><th>Used for</th></tr></thead>
+              <tbody>
+                <tr><td><b>Single choice</b></td><td>1 pt</td><td>Facts with exactly one defensible answer &mdash; flags, step IDs, defaults</td></tr>
+                <tr><td><b>Multiple response</b></td><td>2 pts, all-or-nothing</td><td>Dependency sets, "select every field that must match"</td></tr>
+                <tr><td><b>Scenario</b></td><td>3 pts</td><td>Symptom &rarr; earliest gate that should have caught it</td></tr>
+                <tr><td><b>Ordering</b></td><td>2 pts</td><td>Bootstrap step sequence, cutover runbook order</td></tr>
+                <tr><td><b>Performance task</b></td><td>10&ndash;25 pts, rubric</td><td>Live sandbox &mdash; fix a broken config, prove the repair</td></tr>
+              </tbody>
+            </table>
+            <div class="ocqc-note ocqc-nr">
+              <b>No trick questions.</b> Every item must be answerable from the lab material and the
+              CLI's own <code>--help</code>. Items testing memorised version numbers are banned &mdash;
+              those change per release.
+            </div>
+          </div>
+
+          <!-- ============ 4. PRACTICE EXAM MOCKUP ============ -->
+          <div class="ocqc-card" style="padding:0;border:none;background:transparent;">
+            <div class="ocqc-h" style="padding:0 2px;">4 &middot; Practice exam &mdash; candidate view</div>
+
+            <div class="ocqc-exam">
+              <div class="ocqc-exam-hd">
+                <span class="t">&#127891; OCCP &mdash; Practice Exam A</span>
+                <span style="font-size:11.5px;color:#a5b4fc;">Candidate: Cooper &middot; Attempt 1 of 3</span>
+                <span style="font-size:11.5px;color:#a5b4fc;">Question 12 of 40</span>
+                <span class="ocqc-timer">42:17</span>
+              </div>
+              <div class="ocqc-prog"><i></i></div>
+
+              <div class="ocqc-nav">
+                <span class="done">1</span><span class="done">2</span><span class="done">3</span>
+                <span class="done">4</span><span class="flag">5</span><span class="done">6</span>
+                <span class="done">7</span><span class="done">8</span><span class="flag">9</span>
+                <span class="done">10</span><span class="done">11</span><span class="cur">12</span>
+                <span>13</span><span>14</span><span>15</span><span>16</span><span>17</span>
+                <span>18</span><span>19</span><span>20</span>
+                <span style="border:none;background:transparent;width:auto;padding:0 6px;color:#7c3aed;font-size:10.5px;">&hellip; 40</span>
+                <span style="border:none;background:transparent;width:auto;padding:0 8px;color:#64748b;font-size:10.5px;">
+                  <b style="color:#16a34a;">&#9632;</b> answered &nbsp; <b style="color:#f59e0b;">&#9632;</b> flagged &nbsp; <b style="color:#4c1d95;">&#9632;</b> current
+                </span>
+              </div>
+
+              <!-- Q1 single -->
+              <div class="ocqc-q">
+                <div class="ocqc-qn">Question 12 &middot; Single choice &middot; Validation &amp; triage &middot; 1 pt</div>
+                <div class="ocqc-qt">A cluster passes <code>opencenter cluster validate</code> offline, but
+                  <code>cluster deploy</code> fails immediately at the first step. Which explanation fits best?</div>
+                <label class="ocqc-opt"><input type="radio" name="ocqc-q12"> <span>The GitOps repository has uncommitted changes.</span></label>
+                <label class="ocqc-opt"><input type="radio" name="ocqc-q12"> <span>Offline validation checks config shape only; the application credential is invalid or expired.</span></label>
+                <label class="ocqc-opt"><input type="radio" name="ocqc-q12"> <span>The Kubernetes version is not supported by the installed Kubespray.</span></label>
+                <label class="ocqc-opt"><input type="radio" name="ocqc-q12"> <span>Two CNI plugins are enabled at the same time.</span></label>
+                <details class="ocqc-key"><summary>Answer key &amp; rationale</summary>
+                  <p style="margin:7px 0 0"><b>B.</b> Offline validation never contacts Keystone. The failing step is
+                  <code>openstack-preflight</code>, which is the first point where real credentials are used.
+                  Options C and D would both be caught earlier by cross-field validation, and A is auto-committed
+                  rather than fatal.</p>
+                  <p style="margin:6px 0 0"><b>Maps to:</b> Lab 2 evidence checkpoint, Lab 13 funnel step 2.</p>
+                </details>
+              </div>
+
+              <!-- Q2 multiple response -->
+              <div class="ocqc-q">
+                <div class="ocqc-qn">Question 13 &middot; Multiple response &middot; Configuration design &middot; 2 pts &middot; select all that apply</div>
+                <div class="ocqc-qt">Which fields must be kept synchronised by hand when editing an OpenStack
+                  v2 config manually rather than through guided mode?</div>
+                <label class="ocqc-opt"><input type="checkbox" name="ocqc-q13a"> <span><code>project_name</code> and <code>tenant_name</code></span></label>
+                <label class="ocqc-opt"><input type="checkbox" name="ocqc-q13b"> <span>Top-level <code>network_id</code> and nested <code>networking.network_id</code></span></label>
+                <label class="ocqc-opt"><input type="checkbox" name="ocqc-q13c"> <span><code>auth_url</code> and <code>region</code></span></label>
+                <label class="ocqc-opt"><input type="checkbox" name="ocqc-q13d"> <span>Top-level <code>subnet_id</code> and nested <code>networking.subnet_id</code></span></label>
+                <details class="ocqc-key"><summary>Answer key &amp; rationale</summary>
+                  <p style="margin:7px 0 0"><b>A, B and D.</b> Validation reads the top-level network fields while some
+                  rendered OpenTofu templates still read the nested block, so both must agree. Several service
+                  templates still read <code>tenant_name</code>. <code>auth_url</code> and <code>region</code> are
+                  independent values, not a mirrored pair.</p>
+                  <p style="margin:6px 0 0"><b>Maps to:</b> Lab 1 step 3.</p>
+                </details>
+              </div>
+
+              <!-- Q3 ordering -->
+              <div class="ocqc-q">
+                <div class="ocqc-qn">Question 14 &middot; Ordering &middot; GitOps &amp; reconciliation &middot; 2 pts</div>
+                <div class="ocqc-qt">Place the OpenStack bootstrap step IDs in execution order.</div>
+                <div style="display:grid;grid-template-columns:38px 1fr;gap:6px;margin-top:8px;font-size:13px;">
+                  <div style="background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;display:grid;place-items:center;font-weight:800;color:#6d28d9;">?</div>
+                  <div style="border:1px solid #e2e8f0;border-radius:6px;padding:7px 10px;"><code>openstack-normalize-kubeconfig</code></div>
+                  <div style="background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;display:grid;place-items:center;font-weight:800;color:#6d28d9;">?</div>
+                  <div style="border:1px solid #e2e8f0;border-radius:6px;padding:7px 10px;"><code>opentofu-apply</code></div>
+                  <div style="background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;display:grid;place-items:center;font-weight:800;color:#6d28d9;">?</div>
+                  <div style="border:1px solid #e2e8f0;border-radius:6px;padding:7px 10px;"><code>openstack-preflight</code></div>
+                  <div style="background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;display:grid;place-items:center;font-weight:800;color:#6d28d9;">?</div>
+                  <div style="border:1px solid #e2e8f0;border-radius:6px;padding:7px 10px;"><code>openstack-install-network-plugin</code></div>
+                  <div style="background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;display:grid;place-items:center;font-weight:800;color:#6d28d9;">?</div>
+                  <div style="border:1px solid #e2e8f0;border-radius:6px;padding:7px 10px;"><code>opentofu-init</code></div>
+                </div>
+                <details class="ocqc-key"><summary>Answer key &amp; rationale</summary>
+                  <p style="margin:7px 0 0"><b>preflight &rarr; opentofu-init &rarr; opentofu-apply &rarr;
+                  normalize-kubeconfig &rarr; install-network-plugin.</b> Knowing this order is what makes
+                  <code>--from-step</code> usable instead of restarting a 40-minute deploy.</p>
+                  <p style="margin:6px 0 0"><b>Maps to:</b> Lab 3 step 4, Appendix B.</p>
+                </details>
+              </div>
+
+              <!-- Q4 scenario -->
+              <div class="ocqc-q">
+                <div class="ocqc-qn">Question 15 &middot; Scenario &middot; Validation &amp; triage &middot; 3 pts</div>
+                <div class="ocqc-qt">A Flux Kustomization reports <code>decryption failed: no key could decrypt the data</code>
+                  after a colleague rotated the cluster Age key. Which single action restores reconciliation, and which
+                  gate should have caught this first?</div>
+                <label class="ocqc-opt"><input type="radio" name="ocqc-q15"> <span>Re-run <code>cluster generate --force</code>; the render gate should have caught it.</span></label>
+                <label class="ocqc-opt"><input type="radio" name="ocqc-q15"> <span>Recreate the <code>sops-age</code> secret in <code>flux-system</code> from the rotated key; the secrets validation gate should have caught it.</span></label>
+                <label class="ocqc-opt"><input type="radio" name="ocqc-q15"> <span>Restart the kustomize-controller; no gate applies.</span></label>
+                <label class="ocqc-opt"><input type="radio" name="ocqc-q15"> <span>Revert the rotation commit in Git; the deploy preflight gate should have caught it.</span></label>
+                <details class="ocqc-key"><summary>Answer key &amp; rationale</summary>
+                  <p style="margin:7px 0 0"><b>B.</b> Rotation changes the key material; the in-cluster
+                  <code>sops-age</code> secret still holds the old key, so Flux cannot decrypt. Reverting (D)
+                  discards a legitimate security action, and restarting the controller (C) changes nothing.
+                  <code>opencenter secrets keys check</code> is the gate that flags the mismatch.</p>
+                  <p style="margin:6px 0 0"><b>Maps to:</b> Lab 6 steps 5&ndash;6, Appendix D row "SOPS key missing".</p>
+                </details>
+              </div>
+
+              <div style="padding:13px 18px;background:#f8fafc;display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+                <button class="ocqc-btn">&#9204; Previous</button>
+                <button class="ocqc-btn">&#9873; Flag for review</button>
+                <button class="ocqc-btn">Next &#9205;</button>
+                <span style="flex:1"></span>
+                <button class="ocqc-btn">&#128203; Review all</button>
+                <button class="ocqc-btn" style="background:#4c1d95;color:#c4b5fd;border-style:solid;border-color:#6d28d9;">Submit exam</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- ============ 5. PERFORMANCE TASK ============ -->
+          <div class="ocqc-card">
+            <div class="ocqc-h">5 &middot; Performance task &mdash; graded in a live sandbox</div>
+            <p class="ocqc-sub"><b>OCCP Task 2 &middot; 25 points &middot; 20 minutes.</b> Each candidate gets a
+               disposable cluster that has been broken in exactly one way.</p>
+            <div style="background:#fff;border:1px solid #ddd6fe;border-radius:8px;padding:13px 15px;">
+              <div style="font-size:13px;font-weight:800;color:#4c1d95;margin-bottom:5px;">Task prompt</div>
+              <p style="margin:0;font-size:13px;">The <code>aurora-prod</code> cluster stopped reconciling four hours
+                 ago. Restore reconciliation <b>without</b> reverting any application commit, then produce evidence
+                 that identifies the earliest gate which should have caught the fault.</p>
+              <div class="ocqc-pre">$ <span style="color:#e2e8f0;">candidate sandbox &mdash; live shell, 20:00 remaining</span>
+$ flux get kustomizations -A
+NAME              READY   MESSAGE
+platform-base     False   decryption failed: no key could decrypt the data
+managed-services  False   dependency 'platform-base' is not ready
+$ _</div>
+            </div>
+
+            <div style="font-size:11px;font-weight:800;color:#6d28d9;text-transform:uppercase;letter-spacing:1px;margin:15px 0 6px;">Grading rubric &mdash; automatic where possible</div>
+            <table class="ocqc-tbl">
+              <thead><tr><th style="width:56px">Points</th><th style="width:120px">Check</th><th>Criterion</th></tr></thead>
+              <tbody>
+                <tr><td><b>8</b></td><td>Automatic</td><td>All Kustomizations report <code>READY=True</code> at submission</td></tr>
+                <tr><td><b>5</b></td><td>Automatic</td><td>No application commit was reverted (git history intact)</td></tr>
+                <tr><td><b>4</b></td><td>Automatic</td><td>No plaintext secret written to the repository</td></tr>
+                <tr><td><b>4</b></td><td>Automatic</td><td>Key file permissions left at <code>600</code></td></tr>
+                <tr><td><b>4</b></td><td>Human</td><td>Written evidence names the earliest gate and the prevention action</td></tr>
+              </tbody>
+            </table>
+            <div class="ocqc-note ocqc-nr">
+              <b>Automatic zero.</b> Destroying and rebuilding the cluster scores nothing, even if the end state
+              is green. The task measures diagnosis, not brute force.
+            </div>
+          </div>
+
+          <!-- ============ 6. SCORE REPORT ============ -->
+          <div class="ocqc-card">
+            <div class="ocqc-h">6 &middot; Score report &mdash; issued immediately</div>
+            <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:center;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:9px;padding:14px 16px;margin-bottom:12px;">
+              <div style="font-size:34px;">&#127942;</div>
+              <div>
+                <div style="font-size:15px;font-weight:800;color:#15803d;">PASS &mdash; 82&nbsp;% (threshold 75&nbsp;%)</div>
+                <div style="font-size:12.5px;color:#166534;">OpenCenter Certified Professional &middot; Cooper &middot; valid 24 months &middot; ID OCCP-2026-0417</div>
+              </div>
+              <div style="margin-left:auto;text-align:right;">
+                <span class="ocqc-chip ocqc-c2" style="font-size:11px;">&#127891; Badge issued</span>
+              </div>
+            </div>
+
+            <div style="font-size:11px;font-weight:800;color:#6d28d9;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Domain breakdown</div>
+            <table class="ocqc-tbl">
+              <thead><tr><th style="width:230px">Domain</th><th style="width:240px">Score</th><th style="width:70px">Result</th><th>Recommended review</th></tr></thead>
+              <tbody>
+                <tr><td>Secrets lifecycle</td>
+                    <td><div class="ocqc-bar"><i style="width:93%;background:#16a34a;"></i></div><small>93&nbsp;%</small></td>
+                    <td style="color:#15803d;font-weight:800;">Strong</td><td>&mdash;</td></tr>
+                <tr><td>Services &amp; dependencies</td>
+                    <td><div class="ocqc-bar"><i style="width:88%;background:#16a34a;"></i></div><small>88&nbsp;%</small></td>
+                    <td style="color:#15803d;font-weight:800;">Strong</td><td>&mdash;</td></tr>
+                <tr><td>Observability &amp; access</td>
+                    <td><div class="ocqc-bar"><i style="width:80%;background:#16a34a;"></i></div><small>80&nbsp;%</small></td>
+                    <td style="color:#15803d;font-weight:800;">Pass</td><td>&mdash;</td></tr>
+                <tr><td>Networking &amp; policy</td>
+                    <td><div class="ocqc-bar"><i style="width:71%;background:#f59e0b;"></i></div><small>71&nbsp;%</small></td>
+                    <td style="color:#b45309;font-weight:800;">Marginal</td><td>Lab 5 steps 3, 6</td></tr>
+                <tr><td>Capacity &amp; placement</td>
+                    <td><div class="ocqc-bar"><i style="width:58%;background:#dc2626;"></i></div><small>58&nbsp;%</small></td>
+                    <td style="color:#b91c1c;font-weight:800;">Weak</td><td>Lab 7 &mdash; taint effects</td></tr>
+              </tbody>
+            </table>
+            <div class="ocqc-note ocqc-ng">
+              <b>Report rule.</b> A pass never hides a weak domain. Any domain below 70&nbsp;% is named with the
+              exact lab and step to revisit, even when the overall result is a pass.
+            </div>
+          </div>
+
+          <!-- ============ 7. RULES ============ -->
+          <div class="ocqc-card">
+            <div class="ocqc-h">7 &middot; Exam rules, integrity and retakes</div>
+            <table class="ocqc-tbl">
+              <thead><tr><th style="width:190px">Policy</th><th>Rule</th></tr></thead>
+              <tbody>
+                <tr><td>Open resources</td><td>The CLI's own <code>--help</code> and <code>cluster describe</code> output are permitted. External docs, notes and AI assistants are not.</td></tr>
+                <tr><td>Identity</td><td>Exam session binds to the SSO identity that owns the sandbox &mdash; the same isolation the training labs use.</td></tr>
+                <tr><td>Attempts</td><td>Three per 12 months. Attempt 2 after 7 days, attempt 3 after 30 days.</td></tr>
+                <tr><td>Item reuse</td><td>Each attempt draws a fresh form from the item bank; no two attempts share more than 20&nbsp;% of items.</td></tr>
+                <tr><td>Validity</td><td>24 months. Recertify by passing the current form or by completing the delta exam after a major release.</td></tr>
+                <tr><td>Appeals</td><td>Performance-task scores can be appealed within 14 days; the sandbox snapshot is retained for that window.</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- ============ 8. READINESS ============ -->
+          <div class="ocqc-card" style="margin-bottom:4px;">
+            <div class="ocqc-h">8 &middot; Am I ready? &mdash; self-check before booking</div>
+            <p class="ocqc-sub">Each row is a claim the candidate should be able to demonstrate from memory,
+               with evidence, in under five minutes.</p>
+            <table class="ocqc-tbl">
+              <thead><tr><th style="width:80px">Exam</th><th>Readiness claim</th><th style="width:110px">Lab evidence</th></tr></thead>
+              <tbody>
+                <tr><td><span class="ocqc-chip ocqc-c1">OCCA</span></td><td>I can explain why offline validation passing does not mean deploy will succeed.</td><td>Lab 2</td></tr>
+                <tr><td><span class="ocqc-chip ocqc-c1">OCCA</span></td><td>I can resume an interrupted deploy without restarting it.</td><td>Lab 3</td></tr>
+                <tr><td><span class="ocqc-chip ocqc-c1">OCCA</span></td><td>I can name every field that must stay synchronised in a manual OpenStack config.</td><td>Lab 1</td></tr>
+                <tr><td><span class="ocqc-chip ocqc-c2">OCCP</span></td><td>I can rotate an Age key and prove Flux still decrypts.</td><td>Lab 6</td></tr>
+                <tr><td><span class="ocqc-chip ocqc-c2">OCCP</span></td><td>I can restore a deleted namespace and state the measured RTO.</td><td>Lab 9</td></tr>
+                <tr><td><span class="ocqc-chip ocqc-c2">OCCP</span></td><td>I can explain which control governs placement versus consumption.</td><td>Lab 7</td></tr>
+                <tr><td><span class="ocqc-chip ocqc-c3">OCCX</span></td><td>I can produce a cutover runbook that handles data divergence on rollback.</td><td>Lab 12</td></tr>
+                <tr><td><span class="ocqc-chip ocqc-c3">OCCX</span></td><td>I can answer all four graduation questions with evidence, not opinion.</td><td>Lab 14</td></tr>
+              </tbody>
+            </table>
+            <div style="margin-top:13px;padding-top:11px;border-top:1px dashed #e2e8f0;">
+              <small style="color:#64748b;font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.9px;">Mockup controls</small><br>
+              <button class="ocqc-btn">&#127891; Book OCCA</button>
+              <button class="ocqc-btn">&#128221; Start practice exam</button>
+              <button class="ocqc-btn">&#128190; Download blueprint</button>
+              <button class="ocqc-btn">&#128202; View my transcript</button>
+            </div>
+          </div>
+
+        </div>
+        </div>
+      </div>
+      <!-- ── end OpenCenter Certification Lab ── -->
+
       <script>
-        // Move the Quick Start / Real Production banners to below the OpenCenter
-        // overview + "Other Tutorials" links, without physically relocating the
-        // ~6,000 lines of markup/scripts that make up those two collapsible sections —
+        // Move the Quick Start / Real Production / Certification banners to below the
+        // OpenCenter overview + "Other Tutorials" links, without physically relocating
+        // the ~6,000 lines of markup/scripts that make up those collapsible sections —
         // a plain DOM move preserves every id, handler and already-run init script.
         (function() {
           var qs = document.getElementById('ocqs-outer-wrap');
           var qp = document.getElementById('ocqp-outer-wrap');
+          var qc = document.getElementById('ocqc-outer-wrap');
           var overview = document.getElementById('oc-what-open-body');
           if (!overview || !overview.parentNode) return;
           var parent = overview.parentNode;
           var afterOverview = overview.nextSibling;
+          // Inserted in reading order: each insertBefore places the band immediately
+          // ahead of afterOverview, so the last one inserted ends up last on screen.
           if (qs) parent.insertBefore(qs, afterOverview);
           if (qp) parent.insertBefore(qp, afterOverview);
+          if (qc) parent.insertBefore(qc, afterOverview);
         })();
       </script>
 
