@@ -475,22 +475,29 @@
       font-family: 'Share Tech Mono', 'Courier New', monospace;
     }
     /* One flap per character. The 50% seam and the darker lower half are what
-       read as a physical split-flap tile. */
-    #mfbBoard .mfb-flap {
+       read as a physical split-flap tile.
+       Not scoped to #mfbBoard: the masthead letters carry .mfb-flap too, so the
+       tile is defined once and both surfaces get exactly the same object. Size
+       is the only thing that differs, set per surface below. */
+    .mfb-flap {
       position: relative; display: inline-flex; align-items: center; justify-content: center;
-      min-width: 34px; padding: 5px 4px 6px; border-radius: 3px;
+      border-radius: 3px;
       font-family: "Share Tech Mono", "Courier New", monospace !important;
-      font-size: 38px !important; font-weight: 700; line-height: 1;
+      font-weight: 700; line-height: 1;
       color: #ffffff !important; text-shadow: 0 1px 0 rgba(0,0,0,.9) !important;
       background: linear-gradient(180deg, #333 0%, #2a2a2a 49.6%, #171717 50.4%, #101010 100%);
       box-shadow: inset 0 1px 0 rgba(255,255,255,.10), 0 1px 2px rgba(0,0,0,.7);
+      transform-origin: center center;
+      backface-visibility: hidden;
+      will-change: transform;
     }
     /* The hinge line across the middle of the tile. */
-    #mfbBoard .mfb-flap::after {
+    .mfb-flap::after {
       content: ""; position: absolute; left: 0; right: 0; top: 50%;
       height: 1px; background: rgba(0,0,0,.85);
       box-shadow: 0 1px 0 rgba(255,255,255,.06);
     }
+    #mfbBoard .mfb-flap { min-width: 34px; padding: 5px 4px 6px; font-size: 38px !important; }
     /* Two speeds, like the real thing: a fast half-turn for each character the
        drum riffles past, then a slower one for the character that lands. */
     @keyframes mfbFlip {
@@ -510,11 +517,16 @@
     }
     /* Durations track MFB_STEP_MS in the script: the riffle animation must fit
        inside one step or frames get cut off mid-turn. */
-    #mfbBoard .mfb-flap.is-riffling { animation: mfbRiffle .32s linear; }
-    #mfbBoard .mfb-flap.is-flipping { animation: mfbFlip 1.2s ease-in-out; }
+    .mfb-flap.is-riffling { animation: mfbRiffle .48s linear; }
+    .mfb-flap.is-flipping { animation: mfbFlip 1.8s ease-in-out; }
+    /* The masthead runs the same engine at a faster step (HDR_FACE_MS), so its
+       durations are shorter — a CSS duration longer than the JS step gets
+       clipped mid-turn. */
+    header h1 .mfb-flap.is-riffling { animation: mfbRiffle .3s linear; }
+    header h1 .mfb-flap.is-flipping { animation: mfbFlip .62s ease-in-out; }
     @media (prefers-reduced-motion: reduce) {
-      #mfbBoard .mfb-flap.is-riffling,
-      #mfbBoard .mfb-flap.is-flipping { animation: none; }
+      .mfb-flap.is-riffling,
+      .mfb-flap.is-flipping { animation: none; }
     }
     /* The sign-in cell sits on the same board, so it loses its green tube edge. */
     #mfbBoard #ocAuthCell,
@@ -546,7 +558,12 @@
       box-shadow: none !important;
       animation: none !important;
       padding: 4px 10px !important;
+      display: block !important;
+      max-width: 100%;
     }
+    /* Give the taller two-line masthead room instead of clipping it. */
+    html header, html body.flex-skyline-mode header { padding: 14px 20px 12px !important; }
+    html header .header-inner { width: 100%; }
     /* The skyline theme re-applies the neon on
        `body.flex-skyline-mode header .neon-sign h1` via an important
        text-shadow, and re-starts the HUB pulse on
@@ -558,15 +575,26 @@
     html body.flex-skyline-mode header h1,
     html body.flex-skyline-mode header .neon-sign h1 {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif !important;
-      font-size: clamp(19px, 2.9vw, 40px) !important;
+      /* Every visible character is its own tile now, so the h1's own type only
+         affects leftover whitespace. Word gaps are explicit .hdr-gap elements. */
+      font-size: clamp(11px, 1.4vw, 20px) !important;
       font-weight: 800 !important;
-      letter-spacing: .14em !important;
+      /* MUST be 0. letter-spacing applies after every inline-level box,
+         including each tile, so .14em was silently adding ~100px to the line
+         and forcing "N HUB" onto a second row. The earlier :has() override lost
+         the cascade to this very rule. */
+      letter-spacing: 0 !important;
+      word-spacing: 0 !important;
       text-transform: uppercase !important;
       color: #ffffff !important;
       text-shadow: none !important;
       animation: none !important;
-      line-height: 1.18 !important;
-      white-space: nowrap;
+      /* Tiles are inline-block, so the title flows and wraps like text. The
+         explicit <br> before OPEN 24/24 puts it on its own line; nowrap would
+         have forced everything onto one and overflowed at this size. */
+      white-space: normal !important;
+      text-align: center;
+      line-height: 1.5 !important;
     }
     /* The three animated spans: HUB, the accent, and the inline-styled
        OPEN 24/24 (its animation is an inline style, hence !important). */
@@ -591,17 +619,26 @@
     /* Per-letter wrappers created by hdrTitleRiffle() on load. inline-block is
        required for the rotateX; spaces stay as plain text nodes so word spacing
        and the nowrap title are unaffected. */
-    html header h1 .hdr-ltr {
-      display: inline-block;
-      transform-origin: center center;
-      backface-visibility: hidden;
-      white-space: pre;
+    /* Masthead letters ARE board tiles (.mfb-flap), just smaller. Everything
+       else — gradient, hinge seam, mono face, shadows — comes from the shared
+       .mfb-flap rule above, so the two surfaces can never drift apart. */
+    /* Line 1 is now 41 tiles (35 characters + 6 word separators), so they are
+       sized to fit one row down to a 1280px viewport. Every tile is border-box
+       (see the global * rule), so padding sits inside min-width and adds
+       nothing to the line length. */
+    html header h1 .mfb-flap {
+      min-width: clamp(19px, 2.1vw, 40px);
+      padding: clamp(4px, .58vw, 10px) clamp(1px, .22vw, 4px) clamp(5px, .66vw, 12px);
+      font-size: clamp(15px, 2vw, 34px) !important;
+      margin: 1px;
+      vertical-align: middle;
+      border-radius: 4px;
     }
-    @keyframes hdrLtrFlip {
-      0%   { transform: perspective(180px) rotateX(-82deg); filter: brightness(.45); }
-      100% { transform: perspective(180px) rotateX(0deg);   filter: brightness(1); }
+    /* The word separator: a real tile carrying "-", dimmed so words still read
+       as words rather than one continuous string. */
+    html header h1 .mfb-flap.hdr-sep {
+      color: #7c7c7c !important;
     }
-    html header h1 .hdr-ltr.is-flip { animation: hdrLtrFlip .1s linear; }
     /* Replay button, tucked at the right end of the board. */
     #mfbBoard .mfb-refresh,
     body.flex-skyline-mode #mfbBoard .mfb-refresh {
@@ -618,9 +655,6 @@
     body.flex-skyline-mode #mfbBoard .mfb-refresh:hover {
       background: #1f1f1f !important; color: #ffffff !important;
       transform: rotate(180deg);
-    }
-    @media (prefers-reduced-motion: reduce) {
-      html header h1 .hdr-ltr.is-flip { animation: none; }
     }
     /* Ticker keeps its green, but loses the glow so it sits quietly under a
        flat board masthead instead of competing with it. */
@@ -2995,7 +3029,7 @@ body.flex-skyline-mode .uat-s1-template-tab.active {
   <div class="header-inner">
     <div class="neon-sign-outer">
       <div class="neon-sign">
-        <h1><span class="shield">🛡</span> ANYWHERE TO ANYWHERE FLEX MIGRATION <span class="mission-control">HUB</span> – <span style="font-style:italic;animation:open-2424-neon 6s linear infinite;">OPEN 24/24</span></h1>
+        <h1><span class="shield">🛡</span> ANYWHERE TO ANYWHERE FLEX MIGRATION <span class="mission-control">HUB</span><br><span style="font-style:italic;animation:open-2424-neon 6s linear infinite;">OPEN 24/24</span></h1>
       </div>
     </div>
   </div>

@@ -6525,30 +6525,45 @@ ${certContent}
     // The wheel a real split-flap rides through. Digits first so a numeric
     // counter riffles through numbers only; '-' is the idle/no-data face.
     var MFB_WHEEL = '0123456789';
-    // 6x the original pace (3x, then 2x again) so the drum is clearly readable.
-    // The .is-riffling CSS duration must stay <= MFB_STEP_MS or frames get cut
-    // off mid-turn — keep them in step if you change either.
-    var MFB_STEP_MS = 330;    // one intermediate flap
-    var MFB_STAGGER = 280;    // delay between neighbouring tiles
+    // 9x the original pace. The .is-riffling CSS duration must stay
+    // <= MFB_STEP_MS or frames get cut off mid-turn; keep them in step if you
+    // change either.
+    var MFB_STEP_MS = 495;    // one intermediate flap
+    var MFB_STAGGER = 420;    // delay between neighbouring tiles
 
     /* Riffle one tile from whatever it shows to `target`, the way a board does:
        a run of intermediate characters, each a quick half-flip, then the real
        one landing with the slower settle animation. */
-    function mfbRiffle(tile, target, delay) {
-      var from = MFB_WHEEL.indexOf(tile.textContent);
-      var to = MFB_WHEEL.indexOf(target);
+    /* One engine for both boards. `opts` lets the masthead run the very same
+       drum walk on a letter wheel at its own pace, instead of a second
+       implementation that only looks similar:
+         wheel    characters the drum carries   (default: digits)
+         step     ms per intermediate face
+         settle   ms to hold the landing flip
+         maxSteps cap on the walk length        (a 36-face letter drum would
+                  otherwise take 35 faces to travel A -> Z) */
+    function mfbRiffle(tile, target, delay, opts) {
+      opts = opts || {};
+      var wheel = opts.wheel || MFB_WHEEL;
+      var step = opts.step || MFB_STEP_MS;
+      var settle = opts.settle || 1860;
+      var maxSteps = opts.maxSteps || 12;
+
+      var from = wheel.indexOf(tile.textContent);
+      var to = wheel.indexOf(target);
       var seq = [];
       if (from >= 0 && to >= 0) {
         // Walk forward around the wheel, like the physical drum.
-        var steps = (to - from + MFB_WHEEL.length) % MFB_WHEEL.length;
-        if (steps === 0) steps = MFB_WHEEL.length;      // full turn on a repeat
-        if (steps > 12) steps = 12;                      // keep it snappy
+        var steps = (to - from + wheel.length) % wheel.length;
+        if (steps === 0) steps = wheel.length;          // full turn on a repeat
+        if (steps > maxSteps) steps = maxSteps;
         for (var s = steps - 1; s > 0; s--) {
-          seq.push(MFB_WHEEL.charAt((to - s + MFB_WHEEL.length * 2) % MFB_WHEEL.length));
+          seq.push(wheel.charAt((to - s + wheel.length * 2) % wheel.length));
         }
       } else {
-        // Non-numeric target (the "--" idle face): a couple of teasers.
-        seq = ['8', '0'];
+        // Target is not on the drum (the "--" idle face, punctuation, the
+        // emoji): land it directly rather than inventing a walk.
+        seq = [];
       }
       seq.push(target);
 
@@ -6560,9 +6575,9 @@ ${certContent}
           void tile.offsetWidth;                        // restart the animation
           tile.classList.add(last ? 'is-flipping' : 'is-riffling');
           if (last) {
-            setTimeout(function() { tile.classList.remove('is-flipping'); }, 1240);
+            setTimeout(function() { tile.classList.remove('is-flipping'); }, settle);
           }
-        }, (delay || 0) + i * MFB_STEP_MS);
+        }, (delay || 0) + i * step);
       });
     }
 
@@ -6643,7 +6658,7 @@ ${certContent}
         var tiles = el.querySelectorAll('.mfb-flap');
         for (var i = 0; i < tiles.length; i++) {
           // from === to, so mfbRiffle takes the long way round: a full wheel.
-          mfbRiffle(tiles[i], tiles[i].textContent, col * 220 + i * MFB_STAGGER);
+          mfbRiffle(tiles[i], tiles[i].textContent, col * 330 + i * MFB_STAGGER);
         }
       });
     }
@@ -6681,8 +6696,10 @@ ${certContent}
        does. Nothing is hidden — a title that depends on JS to be legible is a
        title that is sometimes blank. */
     var HDR_WHEEL = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    var HDR_STAGGER = 55;    // between neighbouring letters
-    var HDR_FACE_MS = 105;   // one intermediate glyph
+    // 3x slower again. Like the board, the .is-flip CSS duration must stay
+    // <= HDR_FACE_MS or a glyph gets replaced before its flip has finished.
+    var HDR_STAGGER = 165;   // between neighbouring letters
+    var HDR_FACE_MS = 315;   // one intermediate glyph
 
     /* Split by CODE POINT, not by UTF-16 unit. `charAt(i)` cut the shield emoji
        (U+1F6E1) in half and rendered two replacement characters. */
@@ -6697,34 +6714,22 @@ ${certContent}
       } catch (e) { return false; }
     }
 
+    /* The masthead runs mfbRiffle — the board's engine — on a letter wheel.
+       Under reduced motion the walk is cut to a single face, so the sweep is
+       still staggered but nothing scrambles; the CSS keyframe is suppressed for
+       those users anyway. This used to `return` outright, which meant anyone
+       with Windows animation effects off saw no title animation at all while
+       the board below still moved. */
     function hdrAnimate(letters) {
-      // Under reduced motion, drop the glyph scrambling but keep the staggered
-      // sweep. This used to `return` outright, which meant anyone with Windows
-      // animation effects turned off saw no title animation at all while the
-      // board below still moved — the CSS keyframe still suppresses the
-      // transform for them, so nothing here forces motion on anyone.
       var calm = hdrReduceMotion();
       letters.forEach(function(span, i) {
         var finalCh = span.dataset.ch || span.textContent;
-        // Riffle letters and digits; punctuation and the emoji just flip once,
-        // since cycling a slash through the alphabet only reads as noise.
-        var faces = calm ? 0 : (/^[A-Z0-9]$/i.test(finalCh) ? 3 : 1);
-        for (var k = 0; k <= faces; k++) {
-          (function(step) {
-            setTimeout(function() {
-              var last = (step === faces);
-              span.textContent = last
-                ? finalCh
-                : HDR_WHEEL.charAt(Math.floor(Math.random() * HDR_WHEEL.length));
-              span.classList.remove('is-flip');
-              void span.offsetWidth;                      // restart the animation
-              span.classList.add('is-flip');
-              if (last) {
-                setTimeout(function() { span.classList.remove('is-flip'); }, 220);
-              }
-            }, i * HDR_STAGGER + step * HDR_FACE_MS);
-          })(k);
-        }
+        mfbRiffle(span, finalCh, i * HDR_STAGGER, {
+          wheel: HDR_WHEEL,
+          step: HDR_FACE_MS,
+          settle: 660,
+          maxSteps: calm ? 1 : 4,
+        });
       });
     }
 
@@ -6749,11 +6754,13 @@ ${certContent}
           if (!txt.trim()) return;
           var frag = document.createDocumentFragment();
           hdrChars(txt).forEach(function(ch) {
-            if (ch === ' ') { frag.appendChild(document.createTextNode(' ')); return; }
+            var sep = (ch === ' ');
+            // A word break gets its own tile carrying "-", the way a real board
+            // fills the positions between words, rather than an empty gap.
             var s = document.createElement('span');
-            s.className = 'hdr-ltr';
-            s.textContent = ch;
-            s.dataset.ch = ch;            // the truth, if a riffle is interrupted
+            s.className = 'hdr-ltr mfb-flap' + (sep ? ' hdr-sep' : '');
+            s.textContent = sep ? '-' : ch;
+            s.dataset.ch = sep ? '-' : ch;   // the truth, if a riffle is interrupted
             frag.appendChild(s);
             letters.push(s);
           });
@@ -6792,7 +6799,7 @@ ${certContent}
             if (el && saved[id] && saved[id] !== '00') el.textContent = saved[id];
           });
           mfbLoadBoardCounters();       // and pick up any real change
-        }, 2800);
+        }, 4200);
       });
     }
     window.mfbReplay = mfbReplay;
@@ -6805,7 +6812,7 @@ ${certContent}
       // rather than a jump-cut.
       requestAnimationFrame(mfbBootRoll);
       // After the boot roll has had time to read as a roll, not a glitch.
-      setTimeout(mfbLoadBoardCounters, 2800);
+      setTimeout(mfbLoadBoardCounters, 4200);
     }
 
     if (document.readyState === 'loading') {
