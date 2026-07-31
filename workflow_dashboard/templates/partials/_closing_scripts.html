@@ -6522,26 +6522,83 @@ ${certContent}
     var IDS = ['ledToBeMigrated', 'ledReady', 'ledSuccess',
                'ledOpenCenter', 'ledPalantir'];
 
+    // The wheel a real split-flap rides through. Digits first so a numeric
+    // counter riffles through numbers only; '-' is the idle/no-data face.
+    var MFB_WHEEL = '0123456789';
+    // 6x the original pace (3x, then 2x again) so the drum is clearly readable.
+    // The .is-riffling CSS duration must stay <= MFB_STEP_MS or frames get cut
+    // off mid-turn — keep them in step if you change either.
+    var MFB_STEP_MS = 330;    // one intermediate flap
+    var MFB_STAGGER = 280;    // delay between neighbouring tiles
+
+    /* Riffle one tile from whatever it shows to `target`, the way a board does:
+       a run of intermediate characters, each a quick half-flip, then the real
+       one landing with the slower settle animation. */
+    function mfbRiffle(tile, target, delay) {
+      var from = MFB_WHEEL.indexOf(tile.textContent);
+      var to = MFB_WHEEL.indexOf(target);
+      var seq = [];
+      if (from >= 0 && to >= 0) {
+        // Walk forward around the wheel, like the physical drum.
+        var steps = (to - from + MFB_WHEEL.length) % MFB_WHEEL.length;
+        if (steps === 0) steps = MFB_WHEEL.length;      // full turn on a repeat
+        if (steps > 12) steps = 12;                      // keep it snappy
+        for (var s = steps - 1; s > 0; s--) {
+          seq.push(MFB_WHEEL.charAt((to - s + MFB_WHEEL.length * 2) % MFB_WHEEL.length));
+        }
+      } else {
+        // Non-numeric target (the "--" idle face): a couple of teasers.
+        seq = ['8', '0'];
+      }
+      seq.push(target);
+
+      seq.forEach(function(ch, i) {
+        setTimeout(function() {
+          tile.textContent = ch;
+          var last = (i === seq.length - 1);
+          tile.classList.remove('is-riffling', 'is-flipping');
+          void tile.offsetWidth;                        // restart the animation
+          tile.classList.add(last ? 'is-flipping' : 'is-riffling');
+          if (last) {
+            setTimeout(function() { tile.classList.remove('is-flipping'); }, 1240);
+          }
+        }, (delay || 0) + i * MFB_STEP_MS);
+      });
+    }
+
     function mfbRender(el) {
       if (!el) return;
       // textContent of the rendered form is the concatenation of the tiles, so
       // comparing against it is what stops the observer re-entering forever.
       var txt = (el.textContent || '').replace(/\s+/g, '');
-      if (el.dataset.mfbText === txt) return;
+      var tiles = el.querySelectorAll('.mfb-flap');
+      // The text alone is not enough to decide we are up to date. The 60s
+      // refresh rewrites textContent with the SAME string, which destroys the
+      // tiles; returning early there left a bare text node behind, and
+      // .mfb-count is font-size:0/transparent, so the column went blank.
+      // Re-render whenever the tiles are missing, whatever the text says.
+      var intact = tiles.length === txt.length && txt.length > 0;
+      if (intact && el.dataset.mfbText === txt) return;
+
       var prev = el.dataset.mfbText || '';
-      el.dataset.mfbText = txt;
+
+      // Same length and tiles already present: animate in place rather than
+      // rebuilding, so the riffle is visible instead of being thrown away.
+      if (intact && prev.length === txt.length) {
+        for (var k = 0; k < txt.length; k++) {
+          if (tiles[k].textContent !== txt.charAt(k)) {
+            mfbRiffle(tiles[k], txt.charAt(k), k * MFB_STAGGER);
+          }
+        }
+        el.dataset.mfbText = txt;
+        return;
+      }
 
       var frag = document.createDocumentFragment();
       for (var i = 0; i < txt.length; i++) {
         var flap = document.createElement('span');
         flap.className = 'mfb-flap';
         flap.textContent = txt.charAt(i);
-        if (prev && prev.charAt(i) !== txt.charAt(i)) {
-          flap.classList.add('is-flipping');
-          (function(node) {
-            setTimeout(function() { node.classList.remove('is-flipping'); }, 400);
-          })(flap);
-        }
         frag.appendChild(flap);
       }
       el.textContent = '';
@@ -6549,6 +6606,17 @@ ${certContent}
       // Re-assert after the DOM write, since clearing textContent above would
       // otherwise leave the guard holding a stale value.
       el.dataset.mfbText = txt;
+
+      // Riffle the characters that actually changed, left to right.
+      if (prev) {
+        var built = el.querySelectorAll('.mfb-flap');
+        for (var j = 0; j < built.length; j++) {
+          if (prev.charAt(j) !== txt.charAt(j)) {
+            built[j].textContent = prev.charAt(j) || '0';
+            mfbRiffle(built[j], txt.charAt(j), j * MFB_STAGGER);
+          }
+        }
+      }
     }
 
     function mfbInit() {
@@ -6561,6 +6629,22 @@ ${certContent}
           new MutationObserver(function() { mfbRender(el); })
             .observe(el, { childList: true, characterData: true, subtree: true });
         } catch (e) { /* no MutationObserver: tiles still render once */ }
+      });
+    }
+
+    /* Startup roll. Every column ships showing 00, and on load each tile takes a
+       full turn of the drum before settling back on 0 — the way a departures
+       board wakes up. The real values land a moment later and count UP from
+       zero, because mfbRiffle always walks the wheel forward. */
+    function mfbBootRoll() {
+      IDS.forEach(function(id, col) {
+        var el = document.getElementById(id);
+        if (!el) return;
+        var tiles = el.querySelectorAll('.mfb-flap');
+        for (var i = 0; i < tiles.length; i++) {
+          // from === to, so mfbRiffle takes the long way round: a full wheel.
+          mfbRiffle(tiles[i], tiles[i].textContent, col * 220 + i * MFB_STAGGER);
+        }
       });
     }
 
@@ -6579,19 +6663,155 @@ ${certContent}
             if (!el) return;
             var v = map[id];
             if (v === null || v === undefined) return;
-            el.textContent = String(v).padStart(2, '0');   // observer re-flaps it
+            var s = String(v).padStart(2, '0');
+            // Skip the write when nothing changed: rewriting the same string
+            // would destroy the tiles for no reason.
+            if (el.dataset.mfbText === s) return;
+            el.textContent = s;                            // observer re-flaps it
           });
         })
         .catch(function() { /* leave "--" */ });
     }
 
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', function() {
-        mfbInit(); mfbLoadBoardCounters();
+    /* Masthead riffle: the title rides the same drum as the board, left to
+       right, on load.
+
+       The letters are wrapped in place and start showing their REAL characters,
+       so the title is correct before this runs and stays correct if it never
+       does. Nothing is hidden — a title that depends on JS to be legible is a
+       title that is sometimes blank. */
+    var HDR_WHEEL = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    var HDR_STAGGER = 55;    // between neighbouring letters
+    var HDR_FACE_MS = 105;   // one intermediate glyph
+
+    /* Split by CODE POINT, not by UTF-16 unit. `charAt(i)` cut the shield emoji
+       (U+1F6E1) in half and rendered two replacement characters. */
+    function hdrChars(s) {
+      return s.match(/[\uD800-\uDBFF][\uDC00-\uDFFF]|[\s\S]/g) || [];
+    }
+
+    function hdrReduceMotion() {
+      try {
+        return !!(window.matchMedia &&
+                  window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+      } catch (e) { return false; }
+    }
+
+    function hdrAnimate(letters) {
+      // Under reduced motion, drop the glyph scrambling but keep the staggered
+      // sweep. This used to `return` outright, which meant anyone with Windows
+      // animation effects turned off saw no title animation at all while the
+      // board below still moved — the CSS keyframe still suppresses the
+      // transform for them, so nothing here forces motion on anyone.
+      var calm = hdrReduceMotion();
+      letters.forEach(function(span, i) {
+        var finalCh = span.dataset.ch || span.textContent;
+        // Riffle letters and digits; punctuation and the emoji just flip once,
+        // since cycling a slash through the alphabet only reads as noise.
+        var faces = calm ? 0 : (/^[A-Z0-9]$/i.test(finalCh) ? 3 : 1);
+        for (var k = 0; k <= faces; k++) {
+          (function(step) {
+            setTimeout(function() {
+              var last = (step === faces);
+              span.textContent = last
+                ? finalCh
+                : HDR_WHEEL.charAt(Math.floor(Math.random() * HDR_WHEEL.length));
+              span.classList.remove('is-flip');
+              void span.offsetWidth;                      // restart the animation
+              span.classList.add('is-flip');
+              if (last) {
+                setTimeout(function() { span.classList.remove('is-flip'); }, 220);
+              }
+            }, i * HDR_STAGGER + step * HDR_FACE_MS);
+          })(k);
+        }
       });
-    } else {
+    }
+
+    function hdrTitleRiffle() {
+      var h1 = document.querySelector('header h1');
+      if (!h1) return;
+
+      // Already wrapped (a replay): animate the existing spans rather than
+      // wrapping them a second time, which would nest spans inside spans.
+      if (h1.dataset.riffled === '1') {
+        hdrAnimate(Array.prototype.slice.call(h1.querySelectorAll('.hdr-ltr')));
+        return;
+      }
+      h1.dataset.riffled = '1';
+
+      var letters = [];
+      // Wrap each character of each text node, leaving the element structure
+      // (shield, .mission-control, the OPEN 24/24 span) exactly as it was.
+      function wrap(node) {
+        if (node.nodeType === 3) {
+          var txt = node.nodeValue || '';
+          if (!txt.trim()) return;
+          var frag = document.createDocumentFragment();
+          hdrChars(txt).forEach(function(ch) {
+            if (ch === ' ') { frag.appendChild(document.createTextNode(' ')); return; }
+            var s = document.createElement('span');
+            s.className = 'hdr-ltr';
+            s.textContent = ch;
+            s.dataset.ch = ch;            // the truth, if a riffle is interrupted
+            frag.appendChild(s);
+            letters.push(s);
+          });
+          node.parentNode.replaceChild(frag, node);
+        } else if (node.nodeType === 1) {
+          Array.prototype.slice.call(node.childNodes).forEach(wrap);
+        }
+      }
+      Array.prototype.slice.call(h1.childNodes).forEach(wrap);
+      hdrAnimate(letters);
+    }
+    window.hdrTitleRiffle = hdrTitleRiffle;
+
+    /* Replay: drop every column back to 00, roll the drum, then let the values
+       climb back. The tracker columns are restored from what they were showing,
+       so the button never invents or loses a number; the two backend columns
+       are genuinely re-fetched. */
+    function mfbReplay() {
+      var saved = {};
+      IDS.forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el) saved[id] = el.dataset.mfbText || '00';
+      });
+      IDS.forEach(function(id) {
+        var el = document.getElementById(id);
+        if (!el) return;
+        el.dataset.mfbText = '';        // force a rebuild rather than a diff
+        el.textContent = '00';
+      });
+      requestAnimationFrame(function() {
+        hdrTitleRiffle();
+        mfbBootRoll();
+        setTimeout(function() {
+          IDS.forEach(function(id) {
+            var el = document.getElementById(id);
+            if (el && saved[id] && saved[id] !== '00') el.textContent = saved[id];
+          });
+          mfbLoadBoardCounters();       // and pick up any real change
+        }, 2800);
+      });
+    }
+    window.mfbReplay = mfbReplay;
+
+    function mfbStart() {
       mfbInit();
-      mfbLoadBoardCounters();
+      requestAnimationFrame(hdrTitleRiffle);
+      // Roll first, then fetch: the board wakes up from 00 and the real numbers
+      // arrive into a board that is already spinning, so they read as a count-up
+      // rather than a jump-cut.
+      requestAnimationFrame(mfbBootRoll);
+      // After the boot roll has had time to read as a roll, not a glitch.
+      setTimeout(mfbLoadBoardCounters, 2800);
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', mfbStart);
+    } else {
+      mfbStart();
     }
     // Same 60s cadence the rest of the header uses; cheap (two directory walks).
     setInterval(mfbLoadBoardCounters, 60000);

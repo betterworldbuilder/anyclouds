@@ -491,15 +491,29 @@
       height: 1px; background: rgba(0,0,0,.85);
       box-shadow: 0 1px 0 rgba(255,255,255,.06);
     }
-    /* A flap briefly flips when its character changes. */
+    /* Two speeds, like the real thing: a fast half-turn for each character the
+       drum riffles past, then a slower one for the character that lands. */
     @keyframes mfbFlip {
       0%   { transform: perspective(220px) rotateX(0deg);   filter: brightness(1); }
       45%  { transform: perspective(220px) rotateX(-84deg); filter: brightness(.55); }
       55%  { transform: perspective(220px) rotateX(84deg);  filter: brightness(.55); }
       100% { transform: perspective(220px) rotateX(0deg);   filter: brightness(1); }
     }
-    #mfbBoard .mfb-flap.is-flipping { animation: mfbFlip .34s ease-in-out; }
+    @keyframes mfbRiffle {
+      0%   { transform: perspective(220px) rotateX(-72deg); filter: brightness(.5); }
+      100% { transform: perspective(220px) rotateX(0deg);   filter: brightness(1); }
+    }
+    #mfbBoard .mfb-flap {
+      transform-origin: center center;
+      backface-visibility: hidden;
+      will-change: transform;
+    }
+    /* Durations track MFB_STEP_MS in the script: the riffle animation must fit
+       inside one step or frames get cut off mid-turn. */
+    #mfbBoard .mfb-flap.is-riffling { animation: mfbRiffle .32s linear; }
+    #mfbBoard .mfb-flap.is-flipping { animation: mfbFlip 1.2s ease-in-out; }
     @media (prefers-reduced-motion: reduce) {
+      #mfbBoard .mfb-flap.is-riffling,
       #mfbBoard .mfb-flap.is-flipping { animation: none; }
     }
     /* The sign-in cell sits on the same board, so it loses its green tube edge. */
@@ -507,6 +521,111 @@
     body.flex-skyline-mode #mfbBoard #ocAuthCell {
       background: #0a0a0a !important; border: none !important;
       border-right: 1px solid #232323 !important;
+    }
+
+    /* ══ Masthead in departures-board type ═══════════════════════════════════
+       Same treatment as the board captions below: flat black, white, heavy
+       sans-serif caps with wide tracking. The markup is untouched — only the
+       neon tube frames, the glow and the three colour-cycling animations are
+       switched off, so the title reads as one system with the board.
+       `html` leads each selector because the rules being replaced are spread
+       through the stylesheet and some are !important. */
+    html header,
+    html body.flex-skyline-mode header {
+      background: #0a0a0a !important;
+    }
+    html header::before { opacity: .45; }
+    /* Tube frames off — the board has no frame. */
+    html header .neon-sign-outer,
+    html body.flex-skyline-mode header .neon-sign-outer,
+    html header .neon-sign,
+    html body.flex-skyline-mode header .neon-sign {
+      border: none !important;
+      border-radius: 0 !important;
+      background: transparent !important;
+      box-shadow: none !important;
+      animation: none !important;
+      padding: 4px 10px !important;
+    }
+    /* The skyline theme re-applies the neon on
+       `body.flex-skyline-mode header .neon-sign h1` via an important
+       text-shadow, and re-starts the HUB pulse on
+       `body.flex-skyline-mode header .mission-control` via an important
+       animation. Both carry two classes, so a plain `html header h1` loses to
+       them. These selectors deliberately go one step further than each.
+       No braces in this comment on purpose - they confuse naive CSS scanners. */
+    html header h1,
+    html body.flex-skyline-mode header h1,
+    html body.flex-skyline-mode header .neon-sign h1 {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif !important;
+      font-size: clamp(19px, 2.9vw, 40px) !important;
+      font-weight: 800 !important;
+      letter-spacing: .14em !important;
+      text-transform: uppercase !important;
+      color: #ffffff !important;
+      text-shadow: none !important;
+      animation: none !important;
+      line-height: 1.18 !important;
+      white-space: nowrap;
+    }
+    /* The three animated spans: HUB, the accent, and the inline-styled
+       OPEN 24/24 (its animation is an inline style, hence !important). */
+    html header h1 span,
+    html header h1 .mission-control,
+    html header h1 .accent,
+    html body.flex-skyline-mode header .neon-sign h1 span,
+    html body.flex-skyline-mode header .neon-sign .mission-control,
+    html body.flex-skyline-mode header .neon-sign .accent,
+    html body.flex-skyline-mode header .mission-control {
+      color: #ffffff !important;
+      text-shadow: none !important;
+      animation: none !important;
+      font-style: normal !important;
+      letter-spacing: inherit !important;
+    }
+    html header h1 .shield,
+    html body.flex-skyline-mode header .neon-sign h1 .shield {
+      filter: none !important;
+      margin-right: 10px;
+    }
+    /* Per-letter wrappers created by hdrTitleRiffle() on load. inline-block is
+       required for the rotateX; spaces stay as plain text nodes so word spacing
+       and the nowrap title are unaffected. */
+    html header h1 .hdr-ltr {
+      display: inline-block;
+      transform-origin: center center;
+      backface-visibility: hidden;
+      white-space: pre;
+    }
+    @keyframes hdrLtrFlip {
+      0%   { transform: perspective(180px) rotateX(-82deg); filter: brightness(.45); }
+      100% { transform: perspective(180px) rotateX(0deg);   filter: brightness(1); }
+    }
+    html header h1 .hdr-ltr.is-flip { animation: hdrLtrFlip .1s linear; }
+    /* Replay button, tucked at the right end of the board. */
+    #mfbBoard .mfb-refresh,
+    body.flex-skyline-mode #mfbBoard .mfb-refresh {
+      flex: 0 0 auto; align-self: center; margin-left: 4px;
+      width: 30px; height: 30px; padding: 0 !important;
+      display: grid; place-items: center; cursor: pointer;
+      border: 1px solid #2e2e2e !important; border-radius: 50% !important;
+      background: #141414 !important; color: #cfcfcf !important;
+      font-size: 15px; line-height: 1; text-shadow: none !important;
+      box-shadow: none !important;
+      transition: transform .5s ease, background .15s, color .15s;
+    }
+    #mfbBoard .mfb-refresh:hover,
+    body.flex-skyline-mode #mfbBoard .mfb-refresh:hover {
+      background: #1f1f1f !important; color: #ffffff !important;
+      transform: rotate(180deg);
+    }
+    @media (prefers-reduced-motion: reduce) {
+      html header h1 .hdr-ltr.is-flip { animation: none; }
+    }
+    /* Ticker keeps its green, but loses the glow so it sits quietly under a
+       flat board masthead instead of competing with it. */
+    html header .header-ticker {
+      text-shadow: 0 0 6px rgba(0,255,85,.35) !important;
     }
 
     /* ══ Stage bar ═══════════════════════════════════════════════════════════
@@ -1648,7 +1767,7 @@
       box-shadow: none !important;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif !important;
     }
-body.flex-skyline-mode button:not(#top-theme-trigger):not(.global-theme-option):not(.stage-btn):not(.stage-tracker-btn):not(.stage-tour-btn):not(.sub-btn):not(.sub-btn-dropdown):not(.top-stage-dropdown-trigger):not(.uat-s1-template-tab):not(.oc-card):not(.oc-arrow):not(.trn-node):not(.trn-go):not(.oc-auth-btn),
+body.flex-skyline-mode button:not(#top-theme-trigger):not(.global-theme-option):not(.stage-btn):not(.stage-tracker-btn):not(.stage-tour-btn):not(.sub-btn):not(.sub-btn-dropdown):not(.top-stage-dropdown-trigger):not(.uat-s1-template-tab):not(.oc-card):not(.oc-arrow):not(.trn-node):not(.trn-go):not(.oc-auth-btn):not(.mfb-refresh),
     body.flex-skyline-mode .gov-btn,
     body.flex-skyline-mode .uat-btn {
       background: #a33e3e !important;
@@ -2960,19 +3079,19 @@ body.flex-skyline-mode .uat-s1-template-tab.active {
   <div class="mfb-col">
     <div class="mfb-cap">&#9992; Departures</div>
     <div class="mfb-sub">Ready for FLEX migration</div>
-    <div id="ledToBeMigrated" class="mfb-count">--</div>
+    <div id="ledToBeMigrated" class="mfb-count">00</div>
   </div>
   <!-- In Migration Flights (ready / in flight) -->
   <div class="mfb-col">
     <div class="mfb-cap">&#9992; In Flights</div>
     <div class="mfb-sub">Being migrated</div>
-    <div id="ledReady" class="mfb-count">--</div>
+    <div id="ledReady" class="mfb-count">00</div>
   </div>
   <!-- Arrivals — landed on FLEX -->
   <div class="mfb-col">
     <div class="mfb-cap">&#9992; Arrivals</div>
     <div class="mfb-sub">Landed on FLEX</div>
-    <div id="ledSuccess" class="mfb-count">--</div>
+    <div id="ledSuccess" class="mfb-count">00</div>
   </div>
   <!-- In Transit to OpenCenter Gate.
        NOT WIRED YET: no counter code sets #ledOpenCenter, so it stays "--"
@@ -2980,14 +3099,16 @@ body.flex-skyline-mode .uat-s1-template-tab.active {
   <div class="mfb-col">
     <div class="mfb-cap">&#9992; In Transit to OpenCenter Gate</div>
     <div class="mfb-sub">Current OpenCenter deployment</div>
-    <div id="ledOpenCenter" class="mfb-count">--</div>
+    <div id="ledOpenCenter" class="mfb-count">00</div>
   </div>
   <!-- In Transit to RAX Palantir. Also not wired — see #ledOpenCenter above. -->
   <div class="mfb-col mfb-col-last">
     <div class="mfb-cap">&#9992; In Transit to RAX Palantir</div>
     <div class="mfb-sub">Projects ready for RAX AI Palantir Foundry</div>
-    <div id="ledPalantir" class="mfb-count">--</div>
+    <div id="ledPalantir" class="mfb-count">00</div>
   </div>
+  <button id="mfbRefresh" class="mfb-refresh" type="button" onclick="mfbReplay()"
+          title="Reset the board to 00 and count up again">&#10227;</button>
 </div>
 </div><!-- /#mfbBoard -->
 <!-- ── Mission stage buttons ─────────────────────────── -->
