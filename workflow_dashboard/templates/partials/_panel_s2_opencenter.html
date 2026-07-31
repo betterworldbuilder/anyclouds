@@ -720,6 +720,54 @@
             <span style="font-size:10.5px;color:#94a3b8;">Credentials stay in this tab and are never included in exports.</span>
           </div>
         </div>
+
+        <!-- Control Center metaphor: what OpenCenter is, and what we are building -->
+        <div style="background:linear-gradient(135deg,#082f49,#0c4a6e 60%,#0e7490);border-radius:12px;padding:20px 22px;margin-bottom:16px;color:#e0f2fe;">
+          <div style="font-size:10px;font-weight:800;color:#7dd3fc;text-transform:uppercase;letter-spacing:2px;margin-bottom:7px;">First, the big picture</div>
+          <div style="font-size:19px;font-weight:800;color:#fff;margin-bottom:8px;">&#127961;&#65039; OpenCenter is the control center for building and running a digital city</div>
+          <div style="font-size:13.5px;line-height:1.75;max-width:820px;">
+            A Kubernetes cluster is not one thing you install &mdash; it is a <b style="color:#fff;">city</b> you plan,
+            build, connect, protect and keep running. OpenCenter is the control room you do all of that from.
+            In this lab you will walk the city from an empty map to working streets.
+          </div>
+          <div style="background:rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.20);border-radius:9px;padding:11px 14px;margin-top:13px;font-size:12.5px;line-height:1.8;">
+            <b style="color:#fff;">Plan the city</b> &rarr; check the blueprint &rarr; build it &rarr; add services &rarr;
+            connect it &rarr; protect it &rarr; watch it &rarr; expand it &rarr; back it up &rarr; upgrade it &rarr;
+            move it &rarr; <b style="color:#fff;">recover it.</b>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:9px;margin-top:13px;">
+            <div style="background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.14);border-radius:8px;padding:9px 12px;">
+              <div style="font-size:8.5px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:#7dd3fc;margin-bottom:2px;">OpenCenter CLI</div>
+              <div style="font-size:12px;">The control-center console</div></div>
+            <div style="background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.14);border-radius:8px;padding:9px 12px;">
+              <div style="font-size:8.5px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:#7dd3fc;margin-bottom:2px;">OpenStack CLI</div>
+              <div style="font-size:12px;">Talks directly to the cloud</div></div>
+            <div style="background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.14);border-radius:8px;padding:9px 12px;">
+              <div style="font-size:8.5px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:#7dd3fc;margin-bottom:2px;">OpenTofu</div>
+              <div style="font-size:12px;">Builds the cloud resources</div></div>
+            <div style="background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.14);border-radius:8px;padding:9px 12px;">
+              <div style="font-size:8.5px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:#7dd3fc;margin-bottom:2px;">Git</div>
+              <div style="font-size:12px;">Keeps the official history</div></div>
+            <div style="background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.14);border-radius:8px;padding:9px 12px;">
+              <div style="font-size:8.5px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:#7dd3fc;margin-bottom:2px;">FluxCD</div>
+              <div style="font-size:12px;">Keeps the city matching Git</div></div>
+            <div style="background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.14);border-radius:8px;padding:9px 12px;">
+              <div style="font-size:8.5px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:#7dd3fc;margin-bottom:2px;">kubectl</div>
+              <div style="font-size:12px;">Inspects and controls Kubernetes</div></div>
+            <div style="background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.14);border-radius:8px;padding:9px 12px;">
+              <div style="font-size:8.5px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:#7dd3fc;margin-bottom:2px;">SOPS + Age</div>
+              <div style="font-size:12px;">Lock and unlock the secrets</div></div>
+            <div style="background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.14);border-radius:8px;padding:9px 12px;">
+              <div style="font-size:8.5px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:#7dd3fc;margin-bottom:2px;">Velero</div>
+              <div style="font-size:12px;">The city's insurance policy</div></div>
+          </div>
+          <div style="font-size:12px;color:#bae6fd;margin-top:12px;padding-top:10px;border-top:1px solid rgba(255,255,255,.15);">
+            Each stage below opens with its own piece of the metaphor, so you always know
+            <b style="color:#fff;">where you are in the build</b> &mdash; and why the stage matters.
+            The full 15-module version lives in the <b style="color:#fff;">Advanced OpenCenter Training Lab</b> band.
+          </div>
+        </div>
+
         <div style="background:#fff;border:1px solid #bae6fd;border-radius:10px;padding:15px 18px;margin-bottom:16px;">
           <div style="font-size:12px;font-weight:900;color:#075985;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">Current training features</div>
           <div style="overflow-x:auto;">
@@ -859,6 +907,7 @@
             <span style="margin-left:auto;font-size:10px;font-weight:800;color:#6366f1;text-transform:uppercase;letter-spacing:.7px;">Show / hide setup checks</span>
           </summary>
           <div style="margin-top:12px;">
+          <div style="border-left:3px solid #0ea5e9;background:#f0f9ff;border-radius:0 8px 8px 0;padding:9px 13px;margin:0 0 12px;font-size:12.5px;color:#0c4a6e;line-height:1.6;"><div style="font-size:9.5px;font-weight:800;letter-spacing:1.1px;text-transform:uppercase;color:#0369a1;margin-bottom:3px;">&#127961;&#65039; The metaphor &middot; Control Center module 1</div><b>Check the toolbox before entering the control room.</b> Every tool here has one job: OpenCenter is the console, Git keeps the history, kubectl inspects Kubernetes, OpenTofu builds cloud resources. Missing one now becomes a mysterious failure later.</div>
           <p>Before starting, ensure you have all of the following:</p>
 
           <p style="font-size:12px;font-weight:700;color:#0369a1;margin-bottom:4px;">1 — Mise (tool version manager &amp; task runner)</p>
@@ -936,6 +985,7 @@ gh auth status --hostname github.com</div>
             <h3 style="margin:0;">Install OpenCenter CLI</h3>
             <span class="ocqs-status ocqs-s-idle" id="ocqs-st-1">Not Started</span>
           </div>
+          <div style="border-left:3px solid #0ea5e9;background:#f0f9ff;border-radius:0 8px 8px 0;padding:9px 13px;margin:0 0 12px;font-size:12.5px;color:#0c4a6e;line-height:1.6;"><div style="font-size:9.5px;font-weight:800;letter-spacing:1.1px;text-transform:uppercase;color:#0369a1;margin-bottom:3px;">&#127961;&#65039; The metaphor &middot; Control Center module 1</div><b>Install the control-center console.</b> Nothing can be planned or built until the console itself is working. This is the one stage that touches your laptop rather than the cloud.</div>
           <p>OpenCenter CLI initializes cluster configuration, validates readiness, generates the GitOps repository, and deploys the Kubernetes platform.</p>
           <p style="font-size:12px;color:#64748b;"><strong>Recommended — Clone &amp; build:</strong></p>
           <div class="ocqs-cmd" id="ocqs-cmd-1rec"># Idempotent install - skips finished steps, never prompts (no hang)
@@ -996,6 +1046,7 @@ opencenter cluster --help</div>
 
           <div id="ocqs-step-B" style="margin-top:14px;border:2px solid #bae6fd;border-radius:10px;padding:14px;background:#f8fbff;">
             <div style="font-size:12px;font-weight:800;color:#0369a1;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">B. Credentials &amp; Inputs</div>
+          <div style="border-left:3px solid #0ea5e9;background:#f0f9ff;border-radius:0 8px 8px 0;padding:9px 13px;margin:0 0 12px;font-size:12.5px;color:#0c4a6e;line-height:1.6;"><div style="font-size:9.5px;font-weight:800;letter-spacing:1.1px;text-transform:uppercase;color:#0369a1;margin-bottom:3px;">&#127961;&#65039; The metaphor &middot; Control Center module 2</div><b>Collect the keys to the city.</b> Cloud credentials, network IDs and the GitOps repository are what let the control center act on your behalf. Import an OpenRC file to fill most of this automatically.</div>
           <!-- Where to Deploy — platform chooser (kept in sync with the R6 refactor stage) -->
           <div id="ocqs-deploy-choice" style="border:2px solid #0ea5e9;border-radius:10px;padding:12px;background:#f0f9ff;margin-bottom:12px;">
             <div style="font-size:11px;font-weight:800;color:#0369a1;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">&#128205; Where to Deploy</div>
@@ -1997,6 +2048,7 @@ opencenter cluster --help</div>
             <h3 style="margin:0;">Initialize Your First Cluster</h3>
             <span class="ocqs-status ocqs-s-idle" id="ocqs-st-2">Not Started</span>
           </div>
+          <div style="border-left:3px solid #0ea5e9;background:#f0f9ff;border-radius:0 8px 8px 0;padding:9px 13px;margin:0 0 12px;font-size:12.5px;color:#0c4a6e;line-height:1.6;"><div style="font-size:9.5px;font-weight:800;letter-spacing:1.1px;text-transform:uppercase;color:#0369a1;margin-bottom:3px;">&#127961;&#65039; The metaphor &middot; Control Center module 2</div><b>Draw the first blueprint.</b> The cluster does not exist yet. We are writing down what it should be — name, owner, region, size — before a single machine is created.</div>
           <p>Create a new cluster configuration. OpenCenter generates a complete config file with defaults.</p>
           <hr style="border:none;border-top:2px solid #e2e8f0;margin:18px 0;">
           <div style="font-size:13px;font-weight:900;color:#0f172a;margin-bottom:10px;">Stage 2 — Init Cluster</div>
@@ -2019,6 +2071,7 @@ opencenter cluster --help</div>
             <span class="ocqs-status ocqs-s-idle" id="ocqs-st-3">Not Started</span>
             <span class="ocqs-badge-opt">Optional</span>
           </div>
+          <div style="border-left:3px solid #0ea5e9;background:#f0f9ff;border-radius:0 8px 8px 0;padding:9px 13px;margin:0 0 12px;font-size:12.5px;color:#0c4a6e;line-height:1.6;"><div style="font-size:9.5px;font-weight:800;letter-spacing:1.1px;text-transform:uppercase;color:#0369a1;margin-bottom:3px;">&#127961;&#65039; The metaphor &middot; Control Center module 2</div><b>The architect fills in the building plan.</b> Credentials, image, networks and machine sizes turn a rough sketch into a plan the building crew can actually follow.</div>
           <p>Needed only for a real FLEX/OpenStack deployment — skip this if you selected Kind/local Docker in Stage 1. Fill in your FLEX/OpenStack credentials. Import your OpenRC file to auto-fill, click <strong>&#9654; Run Detection</strong> to detect network IDs, then <strong>&#128190; Apply to Config File</strong> to write everything to the cluster config.</p>
           <p style="font-size:12px;color:#64748b;margin-top:14px;"><strong>Open config to edit:</strong></p>
           <div class="ocqs-cmd" id="ocqs-cmd-2b"></div>
@@ -2045,6 +2098,7 @@ opencenter cluster --help</div>
             <h3 style="margin:0;">Select Active Cluster</h3>
             <span class="ocqs-status ocqs-s-idle" id="ocqs-st-4">Not Started</span>
           </div>
+          <div style="border-left:3px solid #0ea5e9;background:#f0f9ff;border-radius:0 8px 8px 0;padding:9px 13px;margin:0 0 12px;font-size:12.5px;color:#0c4a6e;line-height:1.6;"><div style="font-size:9.5px;font-weight:800;letter-spacing:1.1px;text-transform:uppercase;color:#0369a1;margin-bottom:3px;">&#127961;&#65039; The metaphor &middot; Control Center module 1</div><b>Point the control room at the right city.</b> Every later command acts on the active cluster. Selecting the wrong one is how people change production by accident.</div>
           <p>Make this cluster the active one. Required before validate, generate, and deploy.</p>
           <div class="ocqs-cmd" id="ocqs-cmd-2c">opencenter cluster use my-org/my-cluster</div>
           <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;">
@@ -2062,6 +2116,7 @@ opencenter cluster --help</div>
             <h3 style="margin:0;">Simplify Optional Services for First Bootstrap</h3>
             <span class="ocqs-status ocqs-s-idle" id="ocqs-st-5">Not Started</span>
           </div>
+          <div style="border-left:3px solid #0ea5e9;background:#f0f9ff;border-radius:0 8px 8px 0;padding:9px 13px;margin:0 0 12px;font-size:12.5px;color:#0c4a6e;line-height:1.6;"><div style="font-size:9.5px;font-weight:800;letter-spacing:1.1px;text-transform:uppercase;color:#0369a1;margin-bottom:3px;">&#127961;&#65039; The metaphor &middot; Control Center module 5</div><b>Open only the city services you need on day one.</b> A city does not open every hospital and registry at once. Start with the essential services; add the rest when there is a reason.</div>
           <p>Keycloak, Loki, and Tempo require extra secrets. Disable them for the first bootstrap.</p>
           <div class="ocqs-cmd" id="ocqs-cmd-5">echo "[INFO] Optional-service placeholders are ignored while those services are disabled."
 grep -nE "keycloak|loki|tempo|enabled" $HOME/.config/opencenter/clusters/blueprints/my-org/my-cluster/my-cluster-config.yaml</div>
@@ -2080,6 +2135,7 @@ grep -nE "keycloak|loki|tempo|enabled" $HOME/.config/opencenter/clusters/bluepri
             <h3 style="margin:0;">Setup GitOps Repository</h3>
             <span class="ocqs-status ocqs-s-idle" id="ocqs-st-7">Not Started</span>
           </div>
+          <div style="border-left:3px solid #0ea5e9;background:#f0f9ff;border-radius:0 8px 8px 0;padding:9px 13px;margin:0 0 12px;font-size:12.5px;color:#0c4a6e;line-height:1.6;"><div style="font-size:9.5px;font-weight:800;letter-spacing:1.1px;text-transform:uppercase;color:#0369a1;margin-bottom:3px;">&#127961;&#65039; The metaphor &middot; Control Center module 4</div><b>Open the official record office.</b> Git becomes the permanent record of what the cluster should look like. From here on, the repository is the source of truth — not anyone’s laptop.</div>
           <p>Configure your GitOps repository, then generate the FluxCD manifests with <code>cluster generate</code>.</p>
           <div class="ocqs-cmd" id="ocqs-cmd-7">opencenter cluster generate my-cluster
 opencenter secrets sync my-cluster
@@ -2114,6 +2170,7 @@ opencenter cluster validate my-cluster</div>
             <h3 style="margin:0;">Validate Cluster Configuration</h3>
             <span class="ocqs-status ocqs-s-idle" id="ocqs-st-6">Not Started</span>
           </div>
+          <div style="border-left:3px solid #0ea5e9;background:#f0f9ff;border-radius:0 8px 8px 0;padding:9px 13px;margin:0 0 12px;font-size:12.5px;color:#0c4a6e;line-height:1.6;"><div style="font-size:9.5px;font-weight:800;letter-spacing:1.1px;text-transform:uppercase;color:#0369a1;margin-bottom:3px;">&#127961;&#65039; The metaphor &middot; Control Center module 3</div><b>Call the building inspector before concrete is poured.</b> A mistake found now takes minutes to fix. The same mistake found during construction can waste hours and real money.</div>
           <p>Validates provider credentials, GitOps settings, services, secrets, and required fields. <strong>Do not deploy until this passes.</strong></p>
           <div class="ocqs-cmd" id="ocqs-cmd-6">opencenter cluster validate my-org/my-cluster</div>
           <button class="ocqs-btn ocqs-btn-copy" onclick="ocqsCopyCmd('ocqs-cmd-6','ocqs-st-6')">📋 Copy</button><button id="ocqs-run-6" onclick="ocqsRunCmd('ocqs-cmd-6','ocqs-out-6','ocqs-run-6')" style="background:#1e3a5f;color:#7dd3fc;border:1px solid #334155;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#9654; Run</button><button onclick="ocqsCopyOut('ocqs-out-6',this)" style="background:#334155;color:#cbd5e1;border:1px solid #475569;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#128203; Copy Output</button>
@@ -2143,6 +2200,7 @@ opencenter cluster validate my-cluster</div>
             <h3 style="margin:0;">Commit &amp; Push GitOps Repository</h3>
             <span class="ocqs-status ocqs-s-idle" id="ocqs-st-8">Not Started</span>
           </div>
+          <div style="border-left:3px solid #0ea5e9;background:#f0f9ff;border-radius:0 8px 8px 0;padding:9px 13px;margin:0 0 12px;font-size:12.5px;color:#0c4a6e;line-height:1.6;"><div style="font-size:9.5px;font-weight:800;letter-spacing:1.1px;text-transform:uppercase;color:#0369a1;margin-bottom:3px;">&#127961;&#65039; The metaphor &middot; Control Center module 4</div><b>File the approved plans in the record office.</b> Pushing the repository is what makes the plan official. FluxCD only builds what it can read from Git.</div>
           <p>Commit the generated manifests to your GitOps repo so Flux can reconcile them on deploy.</p>
           <div class="ocqs-cmd" id="ocqs-cmd-8">cd $HOME/.config/opencenter/clusters/gitops/my-org
 git status
@@ -2289,6 +2347,7 @@ git push -u origin main</div>
             <h3 style="margin:0;color:#f87171;">Deploy the Cluster</h3>
             <span class="ocqs-status ocqs-s-idle" id="ocqs-st-9">Not Started</span>
           </div>
+          <div style="border-left:3px solid #0ea5e9;background:#f0f9ff;border-radius:0 8px 8px 0;padding:9px 13px;margin:0 0 12px;font-size:12.5px;color:#0c4a6e;line-height:1.6;"><div style="font-size:9.5px;font-weight:800;letter-spacing:1.1px;text-transform:uppercase;color:#0369a1;margin-bottom:3px;">&#127961;&#65039; The metaphor &middot; Control Center module 4</div><b>Hand the blueprint to the building crew.</b> OpenTofu creates the machines, Kubespray installs Kubernetes, FluxCD moves in the services. Deployment keeps saved progress, so a failed stage can be resumed rather than restarted.</div>
           <div class="ocqs-warn-box" style="margin-bottom:10px;">⚠️ <strong>NEVER run deploy until validation passes and no critical CHANGEME values remain.</strong></div>
           <p>Provisions infrastructure, deploys Kubernetes, bootstraps GitOps/Flux, and applies platform services.</p>
           <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px;font-size:12px;line-height:1.9;margin-bottom:10px;">
@@ -2329,6 +2388,7 @@ tail -f $HOME/.local/state/opencenter/logs/bootstrap/my-org/my-cluster/*.log</di
             <h3 style="margin:0;">Verify Deployment</h3>
             <span class="ocqs-status ocqs-s-idle" id="ocqs-st-9b">Not Started</span>
           </div>
+          <div style="border-left:3px solid #0ea5e9;background:#f0f9ff;border-radius:0 8px 8px 0;padding:9px 13px;margin:0 0 12px;font-size:12.5px;color:#0c4a6e;line-height:1.6;"><div style="font-size:9.5px;font-weight:800;letter-spacing:1.1px;text-transform:uppercase;color:#0369a1;margin-bottom:3px;">&#127961;&#65039; The metaphor &middot; Control Center module 9</div><b>Walk the streets and check the lights are on.</b> The API answering is not the same as the city working. Nodes Ready, Flux reconciled, services healthy — that is what "done" means.</div>
           <p>After deploy completes, verify nodes are Ready and all FluxCD kustomizations have reconciled.</p>
           <div class="ocqs-cmd" id="ocqs-cmd-9b"></div>
           <button class="ocqs-btn ocqs-btn-copy" onclick="ocqsCopyCmd('ocqs-cmd-9b','ocqs-st-9b')">&#128203; Copy</button><button id="ocqs-run-9b" onclick="ocqsRunCmd('ocqs-cmd-9b','ocqs-out-9b','ocqs-run-9b')" style="background:#1e3a5f;color:#7dd3fc;border:1px solid #334155;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#9654; Run</button><button onclick="ocqsCopyOut('ocqs-out-9b',this)" style="background:#334155;color:#cbd5e1;border:1px solid #475569;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#128203; Copy Output</button>
