@@ -324,16 +324,90 @@ if ! python3 -B -m py_compile app.py; then
     exit 1
 fi
 
-# Start Flask via systemd user service (keeps it alive across sessions, no port conflicts)
-echo "-> Starting Flask application (via systemd user service)..."
-if systemctl --user is-enabled osflex-dashboard >/dev/null 2>&1; then
-    # Make the public bind reach the systemd-managed Flask too.
-    systemctl --user set-environment "WORKFLOW_DASHBOARD_HOST=$WORKFLOW_DASHBOARD_HOST" 2>/dev/null || true
-    systemctl --user restart osflex-dashboard
-    APP_PID=$(systemctl --user show osflex-dashboard --value --property MainPID 2>/dev/null || echo "")
-else
-    # Fallback: direct launch if service not installed
-    python3 app.py &>> "$SCRIPT_DIR/dashboard.log" &
+# Start Flask via a self-healing systemd user service.
+# IMPORTANT: always rewrite the unit from this clone. An older version only
+# restarted an already-enabled service, so its stale WorkingDirectory could
+# continue serving a completely different checkout after a fresh git clone.
+echo "-> Starting Flask application (via self-healing systemd user service)..."
+SYSTEMD_MANAGED=0
+SYSTEMD_USER_DIR="$HOME/.config/systemd/user"
+SYSTEMD_SERVICE_NAME="osflex-dashboard.service"
+SYSTEMD_SERVICE_FILE="$SYSTEMD_USER_DIR/$SYSTEMD_SERVICE_NAME"
+DASHBOARD_DIR="$(readlink -f "$SCRIPT_DIR/workflow_dashboard")"
+PYTHON_BIN="$(command -v python3)"
+
+install_dashboard_user_service() {
+    command -v systemctl >/dev/null 2>&1 || return 1
+    systemctl --user show-environment >/dev/null 2>&1 || return 1
+
+    mkdir -p "$SYSTEMD_USER_DIR" || return 1
+    local candidate="${SYSTEMD_SERVICE_FILE}.new"
+    cat > "$candidate" <<EOF
+[Unit]
+Description=OSPC to FLEX Migration Dashboard
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=$DASHBOARD_DIR
+ExecStart=$PYTHON_BIN -B $DASHBOARD_DIR/app.py
+Environment=PYTHONDONTWRITEBYTECODE=1
+Environment=WORKFLOW_DASHBOARD_HOST=$WORKFLOW_DASHBOARD_HOST
+Environment=PATH=$HOME/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=default.target
+EOF
+
+    # Replace stale units, including units created from a different clone.
+    if [[ ! -f "$SYSTEMD_SERVICE_FILE" ]] || ! cmp -s "$candidate" "$SYSTEMD_SERVICE_FILE"; then
+        mv "$candidate" "$SYSTEMD_SERVICE_FILE" || return 1
+        echo "   refreshed $SYSTEMD_SERVICE_FILE for this checkout"
+    else
+        rm -f "$candidate"
+    fi
+
+    systemctl --user daemon-reload || return 1
+    systemctl --user reset-failed "$SYSTEMD_SERVICE_NAME" >/dev/null 2>&1 || true
+    systemctl --user enable "$SYSTEMD_SERVICE_NAME" >/dev/null 2>&1 || return 1
+    systemctl --user restart "$SYSTEMD_SERVICE_NAME" || return 1
+
+    # systemctl restart can return just before MainPID becomes non-zero. Wait for
+    # a real process instead of incorrectly falling back to a second Flask copy.
+    APP_PID=""
+    for _i in $(seq 1 50); do
+        APP_PID="$(systemctl --user show "$SYSTEMD_SERVICE_NAME" --value --property MainPID 2>/dev/null || true)"
+        [[ "$APP_PID" =~ ^[1-9][0-9]*$ ]] && break
+        sleep 0.1
+    done
+    [[ "$APP_PID" =~ ^[1-9][0-9]*$ ]] || return 1
+
+    # Fail loudly rather than silently serving an old checkout again.
+    local actual_dir=""
+    for _i in $(seq 1 20); do
+        actual_dir="$(readlink -f "/proc/$APP_PID/cwd" 2>/dev/null || true)"
+        [[ -n "$actual_dir" ]] && break
+        sleep 0.1
+    done
+    if [[ "$actual_dir" != "$DASHBOARD_DIR" ]]; then
+        echo "ERROR: systemd started Flask from the wrong directory."
+        echo "       Expected: $DASHBOARD_DIR"
+        echo "       Actual:   ${actual_dir:-unknown}"
+        systemctl --user status "$SYSTEMD_SERVICE_NAME" --no-pager -l 2>/dev/null || true
+        return 1
+    fi
+
+    echo "   Flask service directory verified: $actual_dir"
+    SYSTEMD_MANAGED=1
+    return 0
+}
+
+if ! install_dashboard_user_service; then
+    echo "WARN: systemd user service unavailable or failed; starting Flask directly."
+    systemctl --user stop "$SYSTEMD_SERVICE_NAME" >/dev/null 2>&1 || true
+    python3 -B app.py &>> "$SCRIPT_DIR/dashboard.log" &
     APP_PID=$!
 fi
 
@@ -353,9 +427,9 @@ echo "-> Waiting for server to initialize (up to 30s)..."
 for i in $(seq 1 30); do
     sleep 1
     # Check via systemd if managed, else check PID directly
-    if systemctl --user is-enabled osflex-dashboard >/dev/null 2>&1; then
-        if ! systemctl --user is-active --quiet osflex-dashboard; then
-            echo "ERROR: Flask service failed. Check: journalctl --user -u osflex-dashboard -n 30"
+    if [[ "$SYSTEMD_MANAGED" -eq 1 ]]; then
+        if ! systemctl --user is-active --quiet "$SYSTEMD_SERVICE_NAME"; then
+            echo "ERROR: Flask service failed. Check: journalctl --user -u $SYSTEMD_SERVICE_NAME -n 30"
             exit 1
         fi
     elif ! kill -0 "$APP_PID" 2>/dev/null; then
@@ -482,9 +556,10 @@ echo "================================================"
 
 trap "echo 'Shutting down dashboard...'; [[ -n \"${USER_NGINX_STARTED:-}\" ]] && stop_user_nginx; [[ -n \"$MOCKUP_PID\" ]] && kill \$MOCKUP_PID 2>/dev/null; exit 0" SIGINT SIGTERM
 # If using systemd service, just wait in the foreground (service manages Flask)
-if systemctl --user is-enabled osflex-dashboard >/dev/null 2>&1; then
-    echo "(Flask managed by systemd — ctrl+C to exit this script, Flask stays running)"
+if [[ "$SYSTEMD_MANAGED" -eq 1 ]]; then
+    echo "(Flask managed by systemd from $DASHBOARD_DIR — ctrl+C exits this launcher; Flask stays running)"
     wait
 else
-    wait $APP_PID
+    wait "$APP_PID"
 fi
+
