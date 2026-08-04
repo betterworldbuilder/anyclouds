@@ -1,2 +1,0 @@
-OSPC Inventory,Flex Inventory,Migrated Status,User Account,Cloud Env,Cutover Test Results,Method of Migration,Duration of Migration (mins),Flex Env Health Status,Improvements,OSPC TCO ($),FLEX TCO ($),TCO Savings ($)
-web-prod-01,web-prod-01-flex,Successfully Migrated,dzng.8294,FLEX Production,PASSED,Blue-Green UI,30,Healthy 🟢,IOPS Upgrade,450.0,300.0,150.0
