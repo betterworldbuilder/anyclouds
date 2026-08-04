@@ -1,7 +1,0 @@
-resource_type,source_server_id,source_name,reason
-server,187a47b1-da8d-4f87-aec9-6f03801457b5,ospc2flex-Alma9-20260428-0625-r3-f2f-DFW3-r3-f2f-1779927070636232216-203261d8-8031b346-794,missing_recommended_target_image_name
-server,8a517aeb-1a09-49b6-98cb-aa98776c1e5f,ospc2flex-dbian10new-20260427-1831-r3-f2f-DFW3-r3-f2f-1779927071772478003-c1f86974-fc51632e-2a5,missing_recommended_target_image_name
-server,3ddbfc93-3e37-4736-be23-e36dc11daac7,ospc2flex-debian11new-20260427-1342-r3-f2f-DFW3-r3-f2f-1779927071389806333-6415bd62-56855e4d-845,missing_recommended_target_image_name
-load_balancer_member,,,FLEX2FLEX scanner captured LB shell; review members before deploy
-load_balancer_member,,,FLEX2FLEX scanner captured LB shell; review members before deploy
-load_balancer_member,,,FLEX2FLEX scanner captured LB shell; review members before deploy
