@@ -298,6 +298,11 @@ if sudo -n systemctl restart nginx >/dev/null 2>&1 \
     || sudo -n nginx -s reload >/dev/null 2>&1 \
     || nginx -s reload >/dev/null 2>&1; then
     :
+elif curl -sk --max-time 2 "https://127.0.0.1:5002/" >/dev/null 2>&1; then
+    # A privileged system nginx may already own :5002 even when this user
+    # cannot restart/reload it. Reuse that healthy listener instead of trying
+    # to launch a second nginx master and producing noisy bind() failures.
+    echo "-> Existing nginx is already serving HTTPS on :5002 - reusing it."
 elif start_user_nginx; then
     # No systemd / no passwordless sudo (typical on WSL): our own nginx master
     # owns :5002 instead, so the UI stays on the documented HTTPS port.
