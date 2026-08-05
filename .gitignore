@@ -119,10 +119,19 @@ backups/
 __pycache__/
 *.pyc
 
+# Node dependencies — never commit; reinstall with `npm ci`
+node_modules/
+**/node_modules/
+.npm/
+package-lock.json.bak
+
 # Local virtualenvs
 .venv/
 venv/
 */venv/
+**/venv/
+env/
+**/site-packages/
 ospc2Flex-Image-migtool/web_ui_python/venv/
 
 # Local scratch backups
