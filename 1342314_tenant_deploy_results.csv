@@ -1,2 +1,0 @@
-step_id,phase,resource_type,resource_name,action,status,exit_code,error
-"step-0001","compute","server","Server-27","create_server_local_boot","FAIL","1","No Flavor found for gp.0.2.2 "

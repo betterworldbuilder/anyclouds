@@ -1,4 +1,0 @@
-severity,code,scope,message
-WARN,boot_volume_below_image_min_disk,flavormap:row:12,server_id=09d88d96-901d-4741-9a61-38bfbd466e84 boot_from_volume_size_gb=50 is below image minimum 80 for 'Windows Server 2019'
-ERROR,missing_target_image,flavormap:row:15,server_id=f2110fde-3890-464c-b35c-8ee1dc0bbf24 missing recommended_target_image_name
-WARN,boot_volume_below_image_min_disk,flavormap:row:19,server_id=aaabe292-762c-4847-b249-b181ead4737c boot_from_volume_size_gb=50 is below image minimum 80 for 'Windows Server 2019'

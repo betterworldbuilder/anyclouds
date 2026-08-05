@@ -1,1 +1,0 @@
-region,source_server_id,source_server_name,target_server_name,target_flavor_name,source_volume_id,source_volume_name,volume_size_gb,source_device_path,target_device_path,volume_role,target_action,boot_strategy,boot_from_volume_size_gb

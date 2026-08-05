@@ -44,6 +44,72 @@ import yaml as _yaml
 BASE_DIR = Path(__file__).resolve().parents[1]
 if str(BASE_DIR) not in sys.path:
     sys.path.insert(0, str(BASE_DIR))
+
+# Helper scripts used to live loose in the repo root and were addressed as
+# BASE_DIR / "name". They now live in scripts/ and tools/ subfolders, so
+# resolve by search instead of by fixed location. BASE_DIR stays first, and an
+# unfound name falls back to it, which keeps the old behaviour for anything
+# still in the root and for names built at runtime.
+HELPER_DIRS = (
+    BASE_DIR,
+    BASE_DIR / "tools" / "scan",
+    BASE_DIR / "tools" / "migration",
+    BASE_DIR / "tools" / "validation",
+    BASE_DIR / "tools" / "misc",
+    BASE_DIR / "scripts" / "jumphost",
+    BASE_DIR / "scripts" / "migration",
+    BASE_DIR / "scripts" / "scan",
+    BASE_DIR / "scripts" / "network",
+    BASE_DIR / "scripts" / "git",
+    BASE_DIR / "scripts" / "setup",
+)
+for _helper_dir in HELPER_DIRS:
+    if _helper_dir.is_dir() and str(_helper_dir) not in sys.path:
+        sys.path.insert(0, str(_helper_dir))
+
+
+def helper_path(name):
+    """Absolute Path to a helper script, wherever it now lives."""
+    for base in HELPER_DIRS:
+        candidate = base / name
+        if candidate.exists():
+            return candidate
+    return BASE_DIR / name
+
+
+# Generated output (flavormaps, blockmaps, tenant deploy scripts, per-account
+# CSVs) is written to artifacts/. Reads still check the root so artifacts
+# generated before the move stay visible.
+ARTIFACTS_DIR = BASE_DIR / "artifacts"
+ARTIFACTS_DIR.mkdir(exist_ok=True)
+
+
+def artifact_path(name):
+    """Where to write a generated artifact."""
+    return ARTIFACTS_DIR / name
+
+
+def find_artifact(name):
+    """Where to read a generated artifact, preferring artifacts/ then root."""
+    candidate = ARTIFACTS_DIR / name
+    if candidate.exists():
+        return candidate
+    legacy = BASE_DIR / name
+    if legacy.exists():
+        return legacy
+    return candidate
+
+
+def iter_artifacts(pattern):
+    """Glob a generated-artifact pattern across artifacts/ and the root."""
+    seen = {}
+    for base in (ARTIFACTS_DIR, BASE_DIR):
+        if not base.is_dir():
+            continue
+        for path in base.glob(pattern):
+            if path.is_file():
+                seen.setdefault(path.name, path)
+    return list(seen.values())
 UPLOAD_DIR = BASE_DIR / "uploads"
 UPLOAD_DIR.mkdir(exist_ok=True)
 TARGET_PROFILE_DIR = UPLOAD_DIR / "tenant_iac_dr_profiles"

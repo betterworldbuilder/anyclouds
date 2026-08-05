@@ -1,3 +1,0 @@
-source_server_id,source_name,resource_type,flex_name,flex_id,flex_private_ip,flex_floating_ip,status
-"cc84a892-b01f-4180-86e8-b434d8513d6a","FlexDFWjumphost","server","FlexDFWjumphost","","","","failed"
-"cc84a892-b01f-4180-86e8-b434d8513d6a","FlexDFWjumphost","server","FlexDFWjumphost","","","","failed"

@@ -1,8 +1,0 @@
-Source Hostname,Source Stack,Target Hostname,Target Stack,Protocol/Port,Dependency Type
-server1,AD Service,server4,DNS Server,UDP/53 (DNS),Inferred Network Infrastructure
-server2,App Web IIS,server1,AD Service,"TCP/389, TCP/636 (LDAP)",Inferred Domain Infrastructure
-server2,App Web IIS,server4,DNS Server,UDP/53 (DNS),Inferred Network Infrastructure
-server3,Database MySQL,server4,DNS Server,UDP/53 (DNS),Inferred Network Infrastructure
-server4,DNS Server,server3,Database MySQL,TCP/3306 (MySQL),Inferred Application Layer
-server5,API Gateway,server4,DNS Server,UDP/53 (DNS),Inferred Network Infrastructure
-server5,API Gateway,server3,Database MySQL,TCP/3306 (MySQL),Inferred Application Layer
