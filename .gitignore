@@ -77,6 +77,11 @@ uploads/migration_output_bundles/
 workflow_dashboard/cache/
 *.log
 
+# Generated migration output — reproducible, never source.
+# Only the README is tracked so the folder survives a clean checkout.
+artifacts/*
+!artifacts/README.md
+
 # Local generated dashboards, screenshots, downloads, and migration artifacts
 /*.zip
 /*.crdownload
