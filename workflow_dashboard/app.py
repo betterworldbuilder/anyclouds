@@ -1744,11 +1744,31 @@ def resolve_target_flavor_catalog_for_region(region: str) -> Optional[Path]:
     return None
 
 
+def _resolve_helper_args(args: List[str]) -> List[str]:
+    """Expand a bare helper script name to its real location.
+
+    Callers pass ["python3", "flavor_mapper.py", ...] and rely on
+    cwd=BASE_DIR to find the script. The helpers now live in tools/ and
+    scripts/ subfolders, so rewrite a bare leading script name to an
+    absolute path. Anything already containing a separator, and anything
+    that cannot be found, is passed through untouched.
+    """
+    if len(args) < 2 or args[0] not in ("python3", "python", "bash", "sh"):
+        return args
+    name = args[1]
+    if os.sep in name or name.startswith("-"):
+        return args
+    resolved = helper_path(name)
+    if resolved.exists():
+        return [args[0], str(resolved)] + list(args[2:])
+    return args
+
+
 def run_cmd(args: List[str]) -> Tuple[int, str]:
     env = os.environ.copy()
     env["PATH"] = f"/home/dzoan/.local/bin:{env.get('PATH', '')}"
     proc = subprocess.run(
-        args,
+        _resolve_helper_args(args),
         cwd=str(BASE_DIR),
         env=env,
         capture_output=True,
@@ -6479,7 +6499,7 @@ def _cutover_scan_ospc_live(creds: Dict[str, Any], region: str) -> Tuple[List[Di
     for tenant_id in candidates:
         env = os.environ.copy()
         env.update({"OSPC_USERNAME": username, "OSPC_APIKEY": api_key, "OSPC_TENANT_ID": tenant_id, "OSPC_REGION": region})
-        proc = subprocess.run(["python3", str(BASE_DIR / "ospcscan.py")], cwd=str(BASE_DIR), env=env, capture_output=True, text=True, timeout=90, check=False)
+        proc = subprocess.run(["python3", str(helper_path("ospcscan.py"))], cwd=str(BASE_DIR), env=env, capture_output=True, text=True, timeout=90, check=False)
         if proc.returncode != 0 and not proc.stdout.strip():
             errors.append(f"tenant {tenant_id}: {(proc.stderr or 'ospcscan failed').strip()[:500]}")
             continue
@@ -6510,7 +6530,7 @@ def _cutover_flex_env(creds: Dict[str, Any], region: str) -> Dict[str, str]:
 
 def _cutover_scan_flex_with_script(creds: Dict[str, Any], region: str, side: str, provider: str) -> Tuple[List[Dict[str, Any]], List[str]]:
     env = _cutover_flex_env(creds, region)
-    proc = subprocess.run(["python3", str(BASE_DIR / "flexscan.py")], cwd=str(BASE_DIR), env={**os.environ.copy(), **env}, capture_output=True, text=True, timeout=90, check=False)
+    proc = subprocess.run(["python3", str(helper_path("flexscan.py"))], cwd=str(BASE_DIR), env={**os.environ.copy(), **env}, capture_output=True, text=True, timeout=90, check=False)
     if proc.returncode != 0 and not proc.stdout.strip():
         raise RuntimeError((proc.stderr or "flexscan failed").strip()[:800])
     data = parse_json_mixed_output(proc.stdout or "{}")
@@ -20430,7 +20450,7 @@ def agent1_run_discovery():
         scan_result = None
         if ospc_user and ospc_key and ospc_tenant:
             try:
-                script_path = os.path.join(os.path.dirname(__file__), '..', 'ospcscan.py')
+                script_path = str(helper_path('ospcscan.py'))
                 env = os.environ.copy()
                 env.update({
                     "OSPC_USERNAME":  ospc_user,
@@ -20748,7 +20768,7 @@ def agent1_run_deep_scan():
     if not hosts_str:
         return jsonify({"ok": False, "error": "No reachable IPs in host list"}), 400
 
-    script_path = os.path.join(os.path.dirname(__file__), '..', 'server_deep_scan.py')
+    script_path = str(helper_path('server_deep_scan.py'))
 
     cmd = ["python3", script_path, "--hosts", hosts_str,
            "--user", ssh_user, "--port", str(ssh_port),
