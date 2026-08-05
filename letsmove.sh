@@ -307,10 +307,32 @@ else
     echo "WARN: nginx not started — dashboard reachable directly at http://127.0.0.1:5001"
 fi
 
-echo "-> Installing dependencies..."
-pip3 install --break-system-packages -q -r "$SCRIPT_DIR/requirements/requirements.txt" || {
+# Keep Python dependencies isolated from Ubuntu's apt-managed Python. In
+# particular, Ubuntu 24.04 owns packages such as typing_extensions and pip
+# cannot safely uninstall or replace them in the system interpreter.
+VENV_DIR="$SCRIPT_DIR/.venv"
+VENV_PYTHON="$VENV_DIR/bin/python"
+CORE_REQUIREMENTS="$SCRIPT_DIR/requirements/requirements-core.txt"
+
+if [[ ! -x "$VENV_PYTHON" ]]; then
+    echo "-> Creating project virtual environment at $VENV_DIR..."
+    if ! python3 -m venv "$VENV_DIR"; then
+        echo "ERROR: Could not create the Python virtual environment."
+        echo "       Install venv support, remove any incomplete $VENV_DIR, and retry:"
+        echo "       sudo apt-get install -y python3-venv"
+        exit 1
+    fi
+    "$VENV_PYTHON" -m pip install -q --upgrade pip || {
+        echo "ERROR: Could not initialize pip inside $VENV_DIR."
+        exit 1
+    }
+fi
+
+echo "-> Installing core dependencies into .venv..."
+PIP_DISABLE_PIP_VERSION_CHECK=1 "$VENV_PYTHON" -m pip install -q -r "$CORE_REQUIREMENTS" || {
     echo "ERROR: pip install failed — Flask cannot start without its dependencies."
-    echo "       Run manually: pip3 install --break-system-packages -r $SCRIPT_DIR/requirements/requirements.txt"
+    echo "       The system Python was not modified. Retry manually with:"
+    echo "       $VENV_PYTHON -m pip install -r $CORE_REQUIREMENTS"
     exit 1
 }
 
@@ -319,7 +341,7 @@ cd "$SCRIPT_DIR/workflow_dashboard" || exit 1
 
 # Check syntax before launching (no bytecode writing)
 echo "-> Verifying app.py syntax..."
-if ! python3 -B -m py_compile app.py; then
+if ! "$VENV_PYTHON" -B -m py_compile app.py; then
     echo "ERROR: app.py has a syntax error. Dashboard cannot start."
     exit 1
 fi
@@ -334,7 +356,7 @@ SYSTEMD_USER_DIR="$HOME/.config/systemd/user"
 SYSTEMD_SERVICE_NAME="osflex-dashboard.service"
 SYSTEMD_SERVICE_FILE="$SYSTEMD_USER_DIR/$SYSTEMD_SERVICE_NAME"
 DASHBOARD_DIR="$(readlink -f "$SCRIPT_DIR/workflow_dashboard")"
-PYTHON_BIN="$(command -v python3)"
+PYTHON_BIN="$VENV_PYTHON"
 
 install_dashboard_user_service() {
     command -v systemctl >/dev/null 2>&1 || return 1
@@ -353,7 +375,8 @@ WorkingDirectory=$DASHBOARD_DIR
 ExecStart=$PYTHON_BIN -B $DASHBOARD_DIR/app.py
 Environment=PYTHONDONTWRITEBYTECODE=1
 Environment=WORKFLOW_DASHBOARD_HOST=$WORKFLOW_DASHBOARD_HOST
-Environment=PATH=$HOME/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+Environment=VIRTUAL_ENV=$VENV_DIR
+Environment=PATH=$VENV_DIR/bin:$HOME/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 Restart=on-failure
 RestartSec=2
 
@@ -407,7 +430,7 @@ EOF
 if ! install_dashboard_user_service; then
     echo "WARN: systemd user service unavailable or failed; starting Flask directly."
     systemctl --user stop "$SYSTEMD_SERVICE_NAME" >/dev/null 2>&1 || true
-    python3 -B app.py &>> "$SCRIPT_DIR/dashboard.log" &
+    "$VENV_PYTHON" -B app.py &>> "$SCRIPT_DIR/dashboard.log" &
     APP_PID=$!
 fi
 
@@ -417,7 +440,7 @@ MOCKUP_LOG="$SCRIPT_DIR/flex_mockup_5005.log"
 MOCKUP_PID=""
 if [[ -f "$MOCKUP_HTML" ]]; then
     echo "-> Starting FLEX web UI mockup on $FLEX_MOCKUP_URL..."
-    (cd "$SCRIPT_DIR" && python3 -m http.server 5005 --bind 0.0.0.0) &> "$MOCKUP_LOG" &
+    (cd "$SCRIPT_DIR" && "$VENV_PYTHON" -m http.server 5005 --bind 0.0.0.0) &> "$MOCKUP_LOG" &
     MOCKUP_PID=$!
 else
     echo "WARN: FLEX web UI mockup file not found: $MOCKUP_HTML"
@@ -562,4 +585,3 @@ if [[ "$SYSTEMD_MANAGED" -eq 1 ]]; then
 else
     wait "$APP_PID"
 fi
-

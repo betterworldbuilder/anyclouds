@@ -1,0 +1,13 @@
+flask
+werkzeug
+requests
+pandas
+openpyxl
+xlrd
+openstacksdk
+python-openstackclient
+python-octaviaclient
+PyYAML
+boto3
+edge-tts
+gTTS

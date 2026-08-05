@@ -1,17 +1,6 @@
-flask
-werkzeug
-requests
-pandas
-openpyxl
-xlrd
-openstacksdk
-python-openstackclient
-python-octaviaclient
-PyYAML
-boto3
-edge-tts
-gTTS
-openai-whisper
+# Backward-compatible default: install only the dashboard/runtime packages.
+# For optional Whisper speech-to-text support, install requirements-ai.txt.
+-r requirements-core.txt
 
 # ── System packages (install via apt, not pip) ────────────────────────────────
 # sudo apt-get install -y mysql-client     # required on jumphost for DBaaS migration

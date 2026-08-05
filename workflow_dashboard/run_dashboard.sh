@@ -5,7 +5,15 @@
 
 LOGFILE="/tmp/osflex-dashboard.log"
 PIDFILE="/tmp/osflex-dashboard.pid"
-APP_DIR="/home/dzoan/OSPC2FLEX/osflex-deployer-fullmig-5.0.0420current/workflow_dashboard"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+APP_DIR="$PROJECT_DIR/workflow_dashboard"
+PYTHON="$PROJECT_DIR/.venv/bin/python"
+
+if [[ ! -x "$PYTHON" ]]; then
+    echo "[osflex] Missing $PYTHON; run $PROJECT_DIR/letsmove.sh first" >> "$LOGFILE"
+    exit 1
+fi
 
 # This host now uses the osflex-dashboard user service as the single owner of
 # Flask. Cron may still call this legacy watchdog with a minimal environment,
@@ -37,7 +45,7 @@ while true; do
         cd "$APP_DIR"
         WORKFLOW_DASHBOARD_HOST=127.0.0.1 \
         WORKFLOW_DASHBOARD_PORT=5001 \
-        python3 app.py >> "$LOGFILE" 2>&1
+        "$PYTHON" app.py >> "$LOGFILE" 2>&1
         EXIT_CODE=$?
         echo "[osflex] Flask exited (code $EXIT_CODE) at $(date)" >> "$LOGFILE"
     ) &

@@ -90,7 +90,7 @@ Dashboard opens at `http://127.0.0.1:5001`
 ### What `letsmove.sh` does
 
 1. Kills any existing app process on ports 5001/5002
-2. Installs Python requirements from `requirements/requirements.txt`
+2. Creates/reuses `.venv` and installs the core Python requirements there
 3. Validates `workflow_dashboard/app.py` syntax
 4. Starts Flask and waits for health check
 5. Opens the dashboard URL
@@ -98,9 +98,14 @@ Dashboard opens at `http://127.0.0.1:5001`
 ### Manual start
 
 ```bash
-pip3 install -r requirements/requirements.txt
-python3 workflow_dashboard/app.py
+python3 -m venv .venv
+.venv/bin/python -m pip install -r requirements/requirements-core.txt
+.venv/bin/python workflow_dashboard/app.py
 ```
+
+Optional Whisper speech-to-text support (including its large Torch dependency
+stack) can be installed with
+`.venv/bin/python -m pip install -r requirements/requirements-ai.txt`.
 
 ### Jumphost system packages
 

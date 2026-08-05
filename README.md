@@ -597,7 +597,7 @@ Logs are written to:
 ### What `./letsmove.sh` does
 
 - Cleans old app processes and frees conflicting ports.
-- Installs Python requirements from `requirements/requirements.txt`.
+- Creates/reuses `.venv` and installs core Python requirements there.
 - Validates `workflow_dashboard/app.py` syntax before launch.
 - Starts the Flask dashboard and waits for health.
 - Opens the dashboard URL automatically when possible.
@@ -605,8 +605,16 @@ Logs are written to:
 ### Manual fallback (if needed)
 
 ```bash
-pip3 install -r requirements/requirements.txt
-python3 workflow_dashboard/app.py
+python3 -m venv .venv
+.venv/bin/python -m pip install -r requirements/requirements-core.txt
+.venv/bin/python workflow_dashboard/app.py
+```
+
+Whisper speech-to-text is optional and is not needed by the dashboard. Install
+it only when needed (it also installs the large Torch dependency stack):
+
+```bash
+.venv/bin/python -m pip install -r requirements/requirements-ai.txt
 ```
 
 **Jumphost Outfitting (System Packages):**

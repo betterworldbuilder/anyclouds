@@ -1,0 +1,4 @@
+# Optional speech-to-text tooling. This is not required by the dashboard.
+# It installs Torch and can download several gigabytes of packages.
+-r requirements-core.txt
+openai-whisper
