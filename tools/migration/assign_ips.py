@@ -1,15 +1,29 @@
+import os
+import sys
+
 import openstack
+
+# Credentials come from the environment (source your OpenRC first):
+#   OS_AUTH_URL, OS_PROJECT_ID, OS_USERNAME, OS_PASSWORD
+AUTH_URL   = os.environ.get("OS_AUTH_URL", "https://keystone.api.dfw3.rackspacecloud.com/v3/")
+PROJECT_ID = os.environ.get("OS_PROJECT_ID", "")
+USERNAME   = os.environ.get("OS_USERNAME", "")
+PASSWORD   = os.environ.get("OS_PASSWORD", "")
+
+if not all([PROJECT_ID, USERNAME, PASSWORD]):
+    print("Error: set OS_PROJECT_ID, OS_USERNAME and OS_PASSWORD in the environment.")
+    sys.exit(1)
 
 print("Connecting to OpenStack...")
 
 conn = openstack.connect(
-    auth_url="https://keystone.api.dfw3.rackspacecloud.com/v3/",
-    project_id="49a2c18a567c402ef560bb0f11821b61",
-    username="dzng.8294",
-    password="0b6f44aad11f4c6fbaeaa159151dd316",
-    user_domain_name="rackspace_cloud_domain",
-    project_domain_name="rackspace_cloud_domain",
-    region_name="DFW3"
+    auth_url=AUTH_URL,
+    project_id=PROJECT_ID,
+    username=USERNAME,
+    password=PASSWORD,
+    user_domain_name=os.environ.get("OS_USER_DOMAIN_NAME", "rackspace_cloud_domain"),
+    project_domain_name=os.environ.get("OS_PROJECT_DOMAIN_NAME", "rackspace_cloud_domain"),
+    region_name=os.environ.get("OS_REGION_NAME", "DFW3")
 )
 
 instances_to_ip = [

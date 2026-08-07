@@ -10,21 +10,22 @@ fi
 
 IP="$1"
 
-# Automatically export OpenRC for FLEX if not set
+# Fill in FLEX OpenRC defaults for anything not already exported.
+# Secrets must come from the environment — source your OpenRC file first.
 if [ -z "$OS_AUTH_URL" ]; then
     export OS_AUTH_URL=https://keystone.api.dfw3.rackspacecloud.com/v3/
     export OS_IDENTITY_API_VERSION=3
     export OS_INTERFACE=public
-    export OS_REGION_NAME=DFW3
+    export OS_REGION_NAME="${OS_REGION_NAME:-DFW3}"
     export OS_AUTH_TYPE=password
-    export OS_USERNAME=dzng.8294
-    export OS_PASSWORD=0b6f44aad11f4c6fbaeaa159151dd316
-    export OS_API_KEY=0b6f44aad11f4c6fbaeaa159151dd316
-    export OS_USER_DOMAIN_NAME=rackspace_cloud_domain
-    export OS_PROJECT_DOMAIN_NAME=rackspace_cloud_domain
-    export OS_PROJECT_ID=49a2c18a567c402ef560bb0f11821b61
-    export OS_PROJECT_NAME=49a2c18a567c402ef560bb0f11821b61
+    export OS_USER_DOMAIN_NAME="${OS_USER_DOMAIN_NAME:-rackspace_cloud_domain}"
+    export OS_PROJECT_DOMAIN_NAME="${OS_PROJECT_DOMAIN_NAME:-rackspace_cloud_domain}"
 fi
+
+: "${OS_USERNAME:?Set OS_USERNAME (source your OpenRC file)}"
+: "${OS_PASSWORD:?Set OS_PASSWORD (source your OpenRC file)}"
+: "${OS_PROJECT_ID:?Set OS_PROJECT_ID (source your OpenRC file)}"
+export OS_PROJECT_NAME="${OS_PROJECT_NAME:-$OS_PROJECT_ID}"
 
 OS_CMD="openstack"
 if ! command -v $OS_CMD &> /dev/null; then

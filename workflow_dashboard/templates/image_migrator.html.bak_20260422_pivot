@@ -534,7 +534,7 @@ function switchVersion(osId, ver) {
                 style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
             </label>
             <label style="display:none;flex-direction:column;gap:4px;font-size:.85rem;">App Credential ID <span style="font-size:.75rem;color:#64748b;">(v3applicationcredential — overrides username)</span>
-              <input id="credFlexAppCredId" type="text" placeholder="e.g. 3e27a1c80075436a9f79573fb878e984"
+              <input id="credFlexAppCredId" type="text" placeholder="e.g. 0123456789abcdef0123456789abcdef"
                 style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
             </label>
             <label style="display:none;flex-direction:column;gap:4px;font-size:.85rem;">App Credential Secret
@@ -704,7 +704,7 @@ function switchVersion(osId, ver) {
      window.addEventListener('DOMContentLoaded', function() {
        const seed = {
          'cred_ospc_username':  'dzng.8294',
-         'cred_ospc_apikey':    '0b6f44aad11f4c6fbaeaa159151dd316',
+         'cred_ospc_apikey':    '',
          'cred_ospc_accountid': '1342314',  // numeric Rackspace tenant ID, NOT UUID
        };
        Object.entries(seed).forEach(([k, v]) => {
