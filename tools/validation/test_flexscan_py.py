@@ -1,6 +1,7 @@
 import subprocess, json, os, sys
 
-script = os.path.abspath(os.path.join(os.path.dirname(__file__), 'flexvmscan.sh'))
+_repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
+script = os.path.join(_repo_root, 'scripts', 'scan', 'flexvmscan.sh')
 
 # Credentials come from the environment — source your OpenRC before running:
 #   OS_AUTH_URL OS_USERNAME OS_PASSWORD OS_PROJECT_ID OS_USER_DOMAIN_NAME
