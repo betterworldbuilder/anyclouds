@@ -610,23 +610,34 @@ Last audited **2026-08-09** at commit `95a40bf` across all 1348 tracked files:
 |---|---|
 | Provider tokens (`ghp_`, `github_pat_`, `sk-ant-`, `xox*-`, `AKIA*`, `AIza*`, `glpat-`, …) | ✅ none |
 | API keys / passwords assigned to literals | ✅ none |
-| 32-hex secret assignments | ✅ none |
+| 32-hex secret assignments | ✅ no credentials (see note 4) |
 | JWTs | ✅ none |
-| PEM private keys | ✅ none outside test fixtures |
+| PEM private keys | ✅ no key material (see notes 1, 5) |
 | `OS_PASSWORD` / `OS_API_KEY` / `OS_APPLICATION_CREDENTIAL_SECRET` literals | ✅ none — all runtime-injected |
 | Tracked `.env`, `*.pem`, `*.key`, `clouds.yaml`, `credentials` files | ✅ none |
 
+Coverage includes vendored and generated assets that are easy to skip: the saved-webpage
+bundle under `The Rackspace Cloud_files/`, minified JS/CSS, `*.download`, `*.map` and
+`*.svg`. Those were scanned separately rather than excluded.
+
 Known and accepted matches, reviewed and not secrets:
 
-- `tests/test_monitoring_backend.py`, `tests/test_r6_scan_appraisal.py` — dummy key
-  material (`AAAA`, `test-key-material`) used to test the log-redaction and scanner code.
-- `workflow_dashboard/ai_adoption/scanner.py`, `importers.py`, `services/ui/lib/uat_runner.py` —
-  secret-detection and redaction **patterns**, not secrets.
-- `placeholder="ghp_..."` attributes in dashboard templates — input hints only.
-- `tools/migration/generate_data_migration_script.py` — emits a MySQL replication
-  user with the fixed password `mig_password`. This is created and consumed by the
-  same generated cutover script for a transient `repl` user; it is not a Rackspace
-  or cloud credential. Still worth parameterising — see below.
+1. `tests/test_monitoring_backend.py`, `tests/test_r6_scan_appraisal.py` — dummy key
+   material (`AAAA`, `test-key-material`) used to test the log-redaction and scanner code.
+2. `workflow_dashboard/ai_adoption/scanner.py`, `importers.py`, `services/ui/lib/uat_runner.py` —
+   secret-detection and redaction **patterns**, not secrets.
+3. `placeholder="ghp_..."` attributes in dashboard templates — input hints only.
+4. `The Rackspace Cloud_files/saved_resource.html` — 32-hex values such as
+   `field frame token:` are Chrome autofill debug metadata (alongside `form signature`
+   and `renderer id`), plus asset hashes and the project tenant UUID. No credentials.
+5. `The Rackspace Cloud_files/main.js.download` — contains the literal text
+   `-----BEGIN RSA PRIVATE KEY-----` inside a localised UI string that explains PEM
+   formatting to the user. No key material.
+6. `tools/migration/generate_data_migration_script.py` (and its `newwindowsfix` copy) —
+   emits a MySQL replication user with the fixed password `mig_password`. Created and
+   consumed by the same generated cutover script for a transient `repl` user, so it is
+   not a Rackspace or cloud credential. It is still a hardcoded password granting
+   `REPLICATION SLAVE ON *.*` to `'repl'@'%'`, and is worth parameterising.
 
 ### Reproducing the audit
 
