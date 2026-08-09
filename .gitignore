@@ -198,4 +198,4 @@ oauth2-proxy.cfg
 
 # The `*tokens*` rule above matches "tokenscan", which would silently exclude
 # the credential scanner from commits.
-!scripts/security/tokenscan.sh
+!tokenscan.sh

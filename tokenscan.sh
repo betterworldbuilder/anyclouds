@@ -20,46 +20,65 @@ set -uo pipefail
 VERSION="1.0.0"
 
 # ─── locate repo root ─────────────────────────────────────────────────────────
-if ! REPO_ROOT=$(git rev-parse --show-toplevel 2>/dev/null); then
-    REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd) || {
-        echo "tokenscan: cannot determine repository root" >&2; exit 2; }
+# This script lives at the repo root. Prefer git's answer; fall back to the
+# script's own directory so it also works in a plain (non-git) directory.
+SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd) || {
+    echo "tokenscan: cannot resolve script directory" >&2; exit 2; }
+IS_GIT=1
+if ! REPO_ROOT=$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel 2>/dev/null); then
+    REPO_ROOT="$SCRIPT_DIR"
+    IS_GIT=0
 fi
 cd "$REPO_ROOT" || exit 2
 
-SELF_REL="scripts/security/tokenscan.sh"
+SELF_REL=$(basename "${BASH_SOURCE[0]}")   # e.g. tokenscan.sh
+RESULT_FILE="tokenscanresult.txt"
 
 # ─── allowlist: reviewed false positives, embedded so this stays one file ──────
 # POSIX ERE, matched against "path:lineno:match:context".
 # Alternative for a one-off: put the marker  tokenscan:allow  on the source line.
-ALLOW_PATTERNS=$(cat <<'PATTERNS'
-# fetch()/XHR option, not a credential:  credentials: 'same-origin'
+# ─── precision filters: things that are structurally NOT credentials ──────────
+# These are dropped silently rather than counted as "suppressed", because they
+# are not judgement calls — the syntax simply is not a secret. Keeping them out
+# of the rules' way is what stops the report filling up with noise.
+NOISE_PATTERNS=$(cat <<'NOISE'
+# the value is an identifier, not a secret:  password: 'cred_flex_password'
+# 'credFlexPassword', 'ocqs-password', 'same-origin', 'cred_ospc_apikey'
+:[^:]*[:=][[:space:]]*["'][a-z][a-z0-9]*([_-][a-z0-9]+)+["'],?[[:space:]]*$
+:[^:]*[:=][[:space:]]*["'](cred|mig)[A-Za-z0-9_]*["'],?[[:space:]]*$
+# fetch()/XHR option:  credentials: 'same-origin'
 :.*credentials["']?[[:space:]]*[:=][[:space:]]*["'](same-origin|include|omit)["']
 # CSS colour values:  secret_candidate:'#fee2e2,#dc2626'
 :.*["']#[0-9a-fA-F]{6}
 # printf/format templates:  "secret": "%s-secrets" % comp
 :.*%[sd]
-# variable holds a FILE PATH:  origin_vm_password_remote_path = "/tmp/..."
+# the value is a FILE PATH:  origin_vm_password_remote_path = "/tmp/..."
 :.*_(path|file|dir|filename|remote_path)["']?[[:space:]]*[:=][[:space:]]*["'][./~]
-# DOM id / localStorage KEY-NAME maps — the value is an element id, not a secret
-:[[:space:]]*[A-Za-z_]+["']?:[[:space:]]*["'](cred|mig)[A-Za-z0-9_]*["'],?
-:[[:space:]]*[A-Za-z_]+["']?:[[:space:]]*["'][a-z0-9]+(-[a-z0-9]+)+["'],?
 # UI strings built by concatenation:  'Pull secret: '+(d.pull_secret||'')
 :.*: ?["'][[:space:]]*\+[[:space:]]*\(
-# empty defaults left by the 94b8750 credential purge
+# empty defaults
 :.*:[[:space:]]*''[,]?[[:space:]]*$
-# documented placeholders, not values
+# the literal word Placeholder
+:.*["'][Pp]laceholder["']
+# documented placeholders rather than values
 :.*placeholder=
 :.*([Cc][Hh][Aa][Nn][Gg][Ee]_?[Mm][Ee]|REPLACE_?ME|TODO|FIXME|xxxx+|\.\.\.)
-:.*["'][Pp]laceholder["']
 :.*(e\.g\.|example\.com|your[-_ ]?(password|token|key|api)|<your|<password>|YOUR_)
 ^[^:]*\.(example|sample|template|dist)\.[^:]*:
 # third-party / vendored code, full of doc examples like https://user:pw@host
 :?.*(site-packages|node_modules|/venv/|/\.venv/|/vendor/)/
+NOISE
+)
+
+# ─── allowlist: genuine judgement calls, reported as "suppressed" ─────────────
+ALLOW_PATTERNS=$(cat <<'PATTERNS'
 # secret-detection and redaction code: patterns, not secrets
 ^workflow_dashboard/ai_adoption/scanner\.py:
 ^workflow_dashboard/ai_adoption/importers\.py:
 ^services/ui/lib/uat_runner\.py:
-^scripts/security/
+# this scanner and its own output file
+^tokenscan\.sh:
+^tokenscanresult\.txt:
 # an OAuth *endpoint URL* constant that happens to be named GITHUB_TOKEN
 ^workflow_dashboard/ai_adoption/auth\.py:.*https://github\.com/login/oauth/access_token
 # test fixtures with deliberately fake material (listed individually, so a real
@@ -247,6 +266,17 @@ is_allowed() { # is_allowed <record>
     return 1
 }
 
+# Structurally not a credential — dropped silently, never counted.
+is_noise() { # is_noise <record>
+    [ "$USE_ALLOW" -eq 1 ] || return 1
+    local rec="$1" re
+    while IFS= read -r re; do
+        [ -n "$re" ] || continue
+        printf '%s' "$rec" | grep -qE -- "$re" && return 0
+    done <<< "$NOISE_CACHE"
+    return 1
+}
+
 # ─── the scan ─────────────────────────────────────────────────────────────────
 declare -A SEEN=()
 
@@ -287,6 +317,7 @@ scan_content() {
             case "$ctx" in *tokenscan:allow*) continue ;; esac
 
             local rec="$path:$lineno:$match:$ctx"
+            is_noise "$rec" && continue
             if is_allowed "$rec"; then
                 printf '%s\t%s\t%s\t%s\n' "$sev" "$name" "$path:$lineno" "$(redact "$match")" >> "$SUPPRESSED"
             else
@@ -383,7 +414,9 @@ report() {
     if [ $((nhigh + nmed)) -eq 0 ]; then
         echo "${C_GRN}${C_BLD}✅ CLEAN${C_off} — no hardcoded tokens or credentials found."
         [ "$ninfo" -gt 0 ] && echo "   ${ninfo} informational item(s) above."
-        [ "$nsup" -gt 0 ] && echo "   ${nsup} known-benign match(es) suppressed by the allowlist (-v to list)."
+        # reviewed non-secrets are not mentioned by default — use -v to see them
+        [ "$VERBOSE" -eq 1 ] && [ "$nsup" -gt 0 ] && \
+            echo "   ${nsup} reviewed non-secret match(es) filtered."
     else
         echo "${C_RED}${C_BLD}❌ ${nhigh} high, ${nmed} medium finding(s).${C_off}"
         echo "   False positive? Add a pattern to ALLOW_PATTERNS in this script"
@@ -397,18 +430,96 @@ report() {
     [ $((nhigh + nmed)) -eq 0 ] && return 0 || return 1
 }
 
+# ─── write tokenscanresult.txt ────────────────────────────────────────────────
+# Plain text, no ANSI codes, always overwritten. Values stay redacted, so this
+# file is safe to read and attach — but it is gitignored (`*token*.txt`) so scan
+# output never gets committed.
+write_result_file() {
+    local nhigh nmed ninfo nsup
+    nhigh=$(grep -c '^HIGH'  "$HITS" 2>/dev/null || true); nhigh=${nhigh:-0}
+    nmed=$(grep -c '^MEDIUM' "$HITS" 2>/dev/null || true); nmed=${nmed:-0}
+    ninfo=$(grep -c '^INFO'  "$HITS" 2>/dev/null || true); ninfo=${ninfo:-0}
+    nsup=$(grep -c . "$SUPPRESSED" 2>/dev/null || true);   nsup=${nsup:-0}
+
+    {
+        echo "tokenscan v$VERSION — credential scan result"
+        echo "==========================================================="
+        echo "repository : $REPO_ROOT"
+        echo "git repo   : $([ "$IS_GIT" -eq 1 ] && echo yes || echo 'no (plain directory)')"
+        [ "$IS_GIT" -eq 1 ] && echo "commit     : $(git rev-parse --short HEAD 2>/dev/null || echo '(no commits)')"
+        echo "scanned at : $(date '+%Y-%m-%d %H:%M:%S %z')"
+        echo "scope      : $MODE$([ "$SCAN_HISTORY" -eq 1 ] && echo ' +history')"
+        echo "files      : $(file_count)"
+        echo "rules      : ${#RULES[@]}"
+        echo
+        echo "SUMMARY: $nhigh high, $nmed medium, $ninfo info, $nsup allowlisted"
+        if [ $((nhigh + nmed)) -eq 0 ]; then
+            echo "RESULT : CLEAN — no hardcoded tokens or credentials found"
+        else
+            echo "RESULT : FINDINGS — review the entries below"
+        fi
+        echo
+
+        local sev head
+        for sev in HIGH MEDIUM INFO; do
+            grep -q "^$sev" "$HITS" 2>/dev/null || continue
+            case "$sev" in
+                HIGH)   head="HIGH — treat as a live leak, rotate immediately" ;;
+                MEDIUM) head="MEDIUM — credential-shaped, needs review" ;;
+                INFO)   head="INFO" ;;
+            esac
+            echo "-----------------------------------------------------------"
+            echo "$head"
+            echo "-----------------------------------------------------------"
+            awk -F'\t' '{printf "  %-52s %s\n      %s\n", $3, $2, $4}' <(grep "^$sev" "$HITS")
+            echo
+        done
+
+        # Reviewed non-secrets are listed only when -v is used, so the report
+        # stays focused on things that actually need action.
+        if [ "$VERBOSE" -eq 1 ] && [ "$nsup" -gt 0 ]; then
+            echo "-----------------------------------------------------------"
+            echo "REVIEWED — matched a rule but is not a secret ($nsup)"
+            echo "-----------------------------------------------------------"
+            awk -F'\t' '{printf "  %-52s %s\n", $3, $2}' "$SUPPRESSED"
+            echo
+        fi
+
+        echo "Values above are redacted. Re-run with --no-allow to see raw hits,"
+        echo "or -v to list allowlisted matches on stdout."
+    } > "$REPO_ROOT/$RESULT_FILE" 2>/dev/null || {
+        echo "tokenscan: warning — could not write $RESULT_FILE" >&2; return 0; }
+}
+
 # ─── main ─────────────────────────────────────────────────────────────────────
 ALLOW_CACHE=$(allow_regexes)
+NOISE_CACHE=$(printf '%s\n' "$NOISE_PATTERNS" | grep -vE '^[[:space:]]*(#|$)')
 
 [ "$QUIET" -eq 1 ] || echo "${C_BLD}tokenscan v$VERSION${C_off} — $REPO_ROOT"
+
+# --tracked / --staged need git; fail clearly instead of scanning nothing
+if [ "$IS_GIT" -eq 0 ] && [ "$MODE" != all ]; then
+    echo "tokenscan: --$MODE needs a git repository; $REPO_ROOT is not one." >&2
+    echo "           use --all (the default) here." >&2
+    exit 2
+fi
+if [ "$IS_GIT" -eq 0 ] && [ "$SCAN_HISTORY" -eq 1 ]; then
+    echo "tokenscan: --history needs a git repository; ignoring it." >&2
+    SCAN_HISTORY=0
+fi
 
 build_filelist
 if [ "$(file_count)" -eq 0 ]; then
     echo "tokenscan: no files to scan (scope=$MODE)" >&2
+    write_result_file
     exit 0
 fi
 
 scan_content
 scan_cred_files
 scan_history
+write_result_file
 report
+rc=$?
+[ "$QUIET" -eq 1 ] || echo "${C_DIM}   full report written to $RESULT_FILE${C_off}"
+exit $rc
