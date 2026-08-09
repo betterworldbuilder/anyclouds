@@ -1,0 +1,95 @@
+# tokenscan allowlist
+#
+# One POSIX ERE per line, matched against the record:
+#     path:lineno:match:context
+# where `context` is the first 160 chars of the source line.
+#
+# Blank lines and lines starting with # are ignored.
+# Prefer anchoring to a path so a rule cannot mask a real leak elsewhere.
+# Alternative for a one-off: put the marker  tokenscan:allow  on the source line.
+#
+# Every entry was verified by reading the flagged line. Run with --no-allow to
+# see the unfiltered output, or -v to list what these rules suppressed.
+
+# ─── Structural false positives: the syntax looks like a credential ───────────
+
+# fetch() / XHR option, not a credential:
+#   credentials: 'same-origin'      next.credentials = 'same-origin';
+:.*credentials[\"']?[[:space:]]*[:=][[:space:]]*[\"'](same-origin|include|omit)[\"']
+
+# CSS colour values:  secret_candidate:'#fee2e2,#dc2626'
+:.*[\"']#[0-9a-fA-F]{6}
+
+# printf/format templates:  "secret": "%s-secrets" % comp
+:.*%[sd]
+
+# Variable holds a FILE PATH, not a secret:
+#   origin_vm_password_remote_path = "/tmp/ospc2flex_origin_password.txt"
+:.*_(path|file|dir|filename|remote_path)[\"']?[[:space:]]*[:=][[:space:]]*[\"'][./~]
+
+# DOM id / localStorage KEY-NAME maps — the value lives in the browser, and the
+# "value" here is just the element id it will be read from:
+#   password: 'credFlexPassword'   cred_flex_password: 'cred_flex_password'
+#   password:'ocqs-password'       username:'ocqp-username'
+:[[:space:]]*[A-Za-z_]+[\"']?:[[:space:]]*[\"'](cred|mig)[A-Za-z0-9_]*[\"'],?
+:[[:space:]]*[A-Za-z_]+[\"']?:[[:space:]]*[\"'][a-z0-9]+(-[a-z0-9]+)+[\"'],?
+
+# UI display strings built by concatenation:
+#   'Pull secret: '+(d.pull_secret||'not generated')
+#   +'<br>pull secret: '+(d.pull_secret||'')
+:.*: ?[\"'][[:space:]]*\+[[:space:]]*\(
+
+# Empty defaults left behind by the 94b8750 credential purge
+:.*:[[:space:]]*''[,]?[[:space:]]*$
+
+# ─── Documented placeholders, not values ─────────────────────────────────────
+:.*placeholder=
+:.*([Cc][Hh][Aa][Nn][Gg][Ee]_?[Mm][Ee]|REPLACE_?ME|TODO|FIXME|xxxx+|\.\.\.)
+:.*[\"'][Pp]laceholder[\"']
+:.*(e\.g\.|example\.com|your[-_ ]?(password|token|key|api)|<your|<password>|YOUR_)
+# *.example.*, *.sample.*, *.template.* config files ship placeholders by design
+^[^:]*\.(example|sample|template|dist)\.[^:]*:
+
+# ─── Third-party / vendored code: not ours to fix, and full of doc examples ──
+# e.g. pydantic/networks.py and urllib3/util/url.py document "https://user:pw@host"
+:?.*(site-packages|node_modules|/venv/|/\.venv/|/vendor/)/
+
+# ─── Secret-detection / redaction code: contains patterns, not secrets ───────
+^workflow_dashboard/ai_adoption/scanner\.py:
+^workflow_dashboard/ai_adoption/importers\.py:
+^services/ui/lib/uat_runner\.py:
+^scripts/security/
+
+# An OAuth *endpoint URL* constant that happens to be named GITHUB_TOKEN
+^workflow_dashboard/ai_adoption/auth\.py:.*https://github\.com/login/oauth/access_token
+
+# ─── Test fixtures with deliberately fake material ───────────────────────────
+# Listed individually rather than a blanket ^tests/ so a real key committed to a
+# new test file is still reported.
+^tests/test_ai_adoption\.py:
+^tests/test_monitoring_backend\.py:
+^tests/test_r6_scan_appraisal\.py:
+^tests/test_r6_generate_bundle\.py:
+
+# ─── Saved copy of the Rackspace portal (browser "Save Page As") ─────────────
+# 32-hex values are Chrome autofill debug metadata (field frame token, form
+# signature, renderer id) plus asset hashes and the tenant UUID.
+# main.js.download embeds "-----BEGIN RSA PRIVATE KEY-----" inside a localised
+# UI string explaining PEM formatting to the user.
+^The Rackspace Cloud_files/
+
+# ─── Runtime-injected OpenRC writers ────────────────────────────────────────
+# f"export OS_PASSWORD={shlex.quote(password)}" — writes a value, never holds one
+:.*export OS_[A-Z_]+=[\{\$]
+:.*(shlex|_shlex[0-9]?|_sx)\.quote
+
+# ─── Deliberate demo credentials in throwaway POC apps ───────────────────────
+# mockbank-e2e is a mock banking app used for end-to-end migration rehearsals.
+# The manifest itself notes "demo only — production uses SOPS-encrypted secret".
+^mockbank-e2e/.*:.*mockbank-demo-pw
+# banking_poc ships a documented demo login (DemoPass123) for its walkthrough.
+^banking_poc/.*:.*DemoPass123
+
+# ─── Docs describing the variables rather than setting them ─────────────────
+^README\.md:
+^docs/
