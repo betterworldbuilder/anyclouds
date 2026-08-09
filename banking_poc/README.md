@@ -275,7 +275,7 @@ You can override the mock credentials before running the installer:
 
 ```bash
 export BANKSYS_MOCK_USERNAME="demo.customer"
-export BANKSYS_MOCK_PASSWORD="DemoPass123"
+export BANKSYS_MOCK_PASSWORD="<choose-a-password>"
 export BANKSYS_MOCK_EMAIL="demo.customer@example.com"
 export BANKSYS_MOCK_NAME="Demo Customer"
 ./BankSys-install.sh
@@ -318,12 +318,15 @@ Check gateway readiness:
 curl http://API-GATEWAY-IP:8100/ready
 ```
 
-Create a new customer:
+Create a new customer. Pick a password first — these examples read it from
+`$POC_PASSWORD` rather than hardcoding one:
 
 ```bash
+export POC_PASSWORD="$(tr -dc 'A-Za-z0-9' </dev/urandom | head -c 16)aA1"
+
 curl -X POST http://API-GATEWAY-IP:8100/api/customers \
   -H 'Content-Type: application/json' \
-  -d '{"name":"POC User","email":"poc@example.com","username":"pocuser","password":"DemoPass123","opening_deposit_cents":500000}'
+  -d "{\"name\":\"POC User\",\"email\":\"poc@example.com\",\"username\":\"pocuser\",\"password\":\"$POC_PASSWORD\",\"opening_deposit_cents\":500000}"
 ```
 
 Log in:
@@ -331,7 +334,7 @@ Log in:
 ```bash
 TOKEN=$(curl -s -X POST http://API-GATEWAY-IP:8100/api/login \
   -H 'Content-Type: application/json' \
-  -d '{"username":"pocuser","password":"DemoPass123"}' \
+  -d "{\"username\":\"pocuser\",\"password\":\"$POC_PASSWORD\"}" \
   | sed -n 's/.*"access_token":"\([^"]*\)".*/\1/p')
 ```
 

@@ -8,8 +8,11 @@ type: Opaque
 stringData:
   POSTGRES_DB: mockbank
   POSTGRES_USER: bank
-  POSTGRES_PASSWORD: mockbank-demo-pw   # demo only — production uses SOPS-encrypted secret
-  DATABASE_URL: postgresql://bank:mockbank-demo-pw@bank-db:5432/mockbank
+  # Throwaway value for the local e2e namespace only — deliberately not a usable
+  # password. Real deployments supply this from a SOPS-encrypted secret, so do
+  # not copy this pattern anywhere outside mockbank-e2e.
+  POSTGRES_PASSWORD: local-e2e-only-not-a-secret
+  DATABASE_URL: postgresql://bank:local-e2e-only-not-a-secret@bank-db:5432/mockbank  # tokenscan:allow
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim

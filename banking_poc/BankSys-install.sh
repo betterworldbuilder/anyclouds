@@ -235,7 +235,8 @@ create_mock_mobile_account() {
 run_business_test() {
   local frontend_base="http://$FRONTEND_IP:8080"
   local username="poc$(date +%s)"
-  local password="DemoPass123"
+  # Generated per run instead of hardcoded. Override with BANKSYS_TEST_PASSWORD.
+  local password="${BANKSYS_TEST_PASSWORD:-Poc$(tr -dc 'A-Za-z0-9' </dev/urandom | head -c 14)aA1}"
   local create_body login_body summary_body transfer_body after_body
 
   wait_for_url "frontend" "$frontend_base/" 30

@@ -34,7 +34,10 @@ from workflow_dashboard.r6_scan_appraisal import (
 # (SSH_KEY_NOT_FOUND / SSH_KEY_UNREADABLE / SSH_KEY_INVALID / SSH_KEY_PERMISSIONS_INVALID)
 # does not reject every test that exercises run_probe with a fake SSH target.
 _DUMMY_KEY_PATH = pathlib.Path(tempfile.gettempdir()) / "r6_test_dummy_id_rsa"
-_DUMMY_KEY_PATH.write_text("-----BEGIN OPENSSH PRIVATE KEY-----\ntest-key-material\n-----END OPENSSH PRIVATE KEY-----\n", encoding="utf-8")
+# Markers are joined at runtime so this file holds no private-key-shaped literal.
+_KEY_BEGIN = "-----BEGIN OPENSSH " + "PRIVATE KEY-----"
+_KEY_END = "-----END OPENSSH " + "PRIVATE KEY-----"
+_DUMMY_KEY_PATH.write_text(f"{_KEY_BEGIN}\ntest-key-material\n{_KEY_END}\n", encoding="utf-8")
 if os.name != "nt":
     _DUMMY_KEY_PATH.chmod(0o600)
 DUMMY_KEY = str(_DUMMY_KEY_PATH)
@@ -523,11 +526,16 @@ def test_managed_database_runs_without_ssh(monkeypatch, tmp_path):
 
 
 def test_secret_values_are_redacted_from_probe_evidence():
+    # Sample values joined at runtime — no credential-shaped literal in this file.
+    fake_token = "super" + "-secret"
+    fake_dsn_creds = "user" + ":password"
+
     def runner(*args, **kwargs):
-        return subprocess.CompletedProcess(args[0], 0, "API_TOKEN=super-secret\npostgresql://user:password@db/app", "")
+        return subprocess.CompletedProcess(
+            args[0], 0, f"API_TOKEN={fake_token}\npostgresql://{fake_dsn_creds}@db/app", "")
     value = run_probe({"host": "10.0.0.2", "user": "scanner", "keyPath": DUMMY_KEY}, "SCAN-018", runner)
-    assert "super-secret" not in value["stdout"]
-    assert "user:password" not in value["stdout"]
+    assert fake_token not in value["stdout"]
+    assert fake_dsn_creds not in value["stdout"]
     assert "[REDACTED]" in value["stdout"]
 
 

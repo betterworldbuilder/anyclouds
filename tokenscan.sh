@@ -93,9 +93,8 @@ ALLOW_PATTERNS=$(cat <<'PATTERNS'
 # runtime OpenRC writers: f"export OS_PASSWORD={shlex.quote(pw)}" holds no value
 :.*export OS_[A-Z_]+=[\{\$]
 :.*(shlex|_shlex[0-9]?|_sx)\.quote
-# deliberate demo credentials in throwaway POC apps (self-documented as demo)
-^mockbank-e2e/.*:.*mockbank-demo-pw
-^banking_poc/.*:.*DemoPass123
+# (the old mockbank/banking_poc demo-password entries were removed once those
+#  passwords were replaced with generated ones — nothing left to allow)
 # docs describing the variables rather than setting them
 ^README\.md:
 ^docs/

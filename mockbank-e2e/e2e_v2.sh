@@ -79,7 +79,8 @@ do_deploy() {
       "opencenter.gitops.auth.token.provider=gitea" || return 1
   # first local bootstrap: disable keycloak so no admin password secret is required
   run opencenter cluster set "$ORG/$CLUSTER" "opencenter.services.keycloak.enabled=false" \
-    || run opencenter cluster set "$ORG/$CLUSTER" "secrets.keycloak.admin_password=MockBankDemo2026pw"
+    || run opencenter cluster set "$ORG/$CLUSTER" \
+         "secrets.keycloak.admin_password=$(tr -dc 'A-Za-z0-9' </dev/urandom | head -c 20)aA1"
   # commit generated blueprint state so validate's dirty-tree warning clears
   GD="$HOME/.config/opencenter/clusters/gitops/$ORG"
   if [ -d "$GD/.git" ]; then
