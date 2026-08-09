@@ -575,6 +575,90 @@ Run the dashboard from a Linux or WSL2 operator workstation. Run heavy image wor
 | `ospc2Flex-Image-migtool/ospc2flex_volsnap_migrate.sh` | Volume snapshot → FLEX Cinder direct-stream (no Glance, no qcow2) |
 | `ospc2Flex-Image-migtool/setup_jumphost.sh` | Jumphost bootstrap |
 
+## 🔐 Credentials & Secrets
+
+**No credentials are hardcoded in this repository.** Every script, tool and template
+reads its credentials from the environment at runtime.
+
+### How to supply credentials
+
+Source your OpenRC file (or export the variables) before running anything:
+
+```bash
+export OS_AUTH_URL=https://keystone.api.<region>.rackspacecloud.com/v3/
+export OS_USERNAME=<your-user>
+export OS_PASSWORD=<your-api-key>          # never commit this
+export OS_PROJECT_ID=<your-project-uuid>
+export OS_USER_DOMAIN_NAME=rackspace_cloud_domain
+export OS_REGION_NAME=<region>
+```
+
+Scripts fail fast with a clear message when a required variable is missing, rather
+than falling back to a baked-in default. Non-secret defaults (auth URL, region,
+domain) are still filled in for convenience.
+
+In the dashboard, credentials are entered through the UI and kept in the browser's
+`localStorage` only. `CLOUD_CREDENTIAL_DEFAULTS` ships with **empty** secret fields;
+`seedCloudCredentialDefaults()` skips empty values, so the credential panels simply
+start unfilled.
+
+### Audit status
+
+Last audited **2026-08-09** at commit `95a40bf` across all 1348 tracked files:
+
+| Check | Result |
+|---|---|
+| Provider tokens (`ghp_`, `github_pat_`, `sk-ant-`, `xox*-`, `AKIA*`, `AIza*`, `glpat-`, …) | ✅ none |
+| API keys / passwords assigned to literals | ✅ none |
+| 32-hex secret assignments | ✅ none |
+| JWTs | ✅ none |
+| PEM private keys | ✅ none outside test fixtures |
+| `OS_PASSWORD` / `OS_API_KEY` / `OS_APPLICATION_CREDENTIAL_SECRET` literals | ✅ none — all runtime-injected |
+| Tracked `.env`, `*.pem`, `*.key`, `clouds.yaml`, `credentials` files | ✅ none |
+
+Known and accepted matches, reviewed and not secrets:
+
+- `tests/test_monitoring_backend.py`, `tests/test_r6_scan_appraisal.py` — dummy key
+  material (`AAAA`, `test-key-material`) used to test the log-redaction and scanner code.
+- `workflow_dashboard/ai_adoption/scanner.py`, `importers.py`, `services/ui/lib/uat_runner.py` —
+  secret-detection and redaction **patterns**, not secrets.
+- `placeholder="ghp_..."` attributes in dashboard templates — input hints only.
+- `tools/migration/generate_data_migration_script.py` — emits a MySQL replication
+  user with the fixed password `mig_password`. This is created and consumed by the
+  same generated cutover script for a transient `repl` user; it is not a Rackspace
+  or cloud credential. Still worth parameterising — see below.
+
+### Reproducing the audit
+
+```bash
+# tracked-file scan for provider token shapes
+git grep -nIE '(ghp|gho|ghs)_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{30,}|sk-ant-[A-Za-z0-9_-]{20,}|AKIA[0-9A-Z]{16}|glpat-[A-Za-z0-9_-]{20}'
+
+# secret-shaped assignments (32-hex values, the shape of a Rackspace API key)
+git grep -nIiE "(api_?key|token|password|secret)[\"']?[[:space:]]*[:=][[:space:]]*[\"']?[0-9a-f]{32}"
+
+# include gitignored files too — plain `grep` skips nothing
+grep -rIlE 'ghp_[A-Za-z0-9]{30,}|-----BEGIN (RSA |OPENSSH )?PRIVATE KEY-----' . \
+  --exclude-dir=.git --exclude-dir=node_modules --exclude-dir=.venv
+```
+
+> ⚠️ Note that `git grep` and ripgrep honour `.gitignore`, which can hide *tracked*
+> backup files (e.g. `*.bak_*`). Always include a plain `grep` sweep as above.
+
+### ⚠️ Git history is not clean
+
+Credentials removed from the working tree in `94b8750` **remain recoverable from git
+history** on `main` and other branches. Scrubbing the tip commit does not un-publish
+them. Any credential that was ever committed must be treated as compromised and
+**rotated** — history rewriting is not a substitute.
+
+### Rules going forward
+
+1. Never commit a real credential — not in scripts, templates, `.bak` files, or test data.
+2. Keep secrets in environment variables or an OpenRC file outside the repo.
+3. `.gitignore` already blocks `ghp_*`, `github_pat_*`, `*.pem`, `.env` and OpenRC files — keep it that way.
+4. If a credential does get committed, **rotate it first**, then clean the tree.
+
 ## 🛠️ Easy Install + Launch
 
 ### Fast path (recommended)
