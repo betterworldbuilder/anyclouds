@@ -195,11 +195,3 @@ output/export/manifests/secret.yaml
 oauth2-proxy.cfg
 **/oauth2-proxy.cfg
 !**/oauth2-proxy.cfg.example
-
-# The credential scanner must be committed. The `*tokens*` rule near the top of
-# this file matches "tokenscan" ("token" + "s"), and `*token*.txt` matches its
-# allowlist, so without these negations the scanner is silently excluded — which
-# is exactly the class of mistake it exists to catch.
-!scripts/security/tokenscan.sh
-!scripts/security/tokenscan-test.sh
-!scripts/security/tokenscan-allow.txt
