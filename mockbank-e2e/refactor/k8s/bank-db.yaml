@@ -8,11 +8,19 @@ type: Opaque
 stringData:
   POSTGRES_DB: mockbank
   POSTGRES_USER: bank
-  # Throwaway value for the local e2e namespace only — deliberately not a usable
-  # password. Real deployments supply this from a SOPS-encrypted secret, so do
-  # not copy this pattern anywhere outside mockbank-e2e.
-  POSTGRES_PASSWORD: local-e2e-only-not-a-secret
-  DATABASE_URL: postgresql://bank:local-e2e-only-not-a-secret@bank-db:5432/mockbank  # tokenscan:allow
+  # POSTGRES_PASSWORD and DATABASE_URL are deliberately NOT committed here.
+  # Supply them before deploying, e.g.:
+  #
+  #   PW="$(tr -dc 'A-Za-z0-9' </dev/urandom | head -c 24)"
+  #   kubectl -n mockbank-prod create secret generic bank-db-credentials \
+  #     --from-literal=POSTGRES_DB=mockbank \
+  #     --from-literal=POSTGRES_USER=bank \
+  #     --from-literal=POSTGRES_PASSWORD="$PW" \
+  #     --from-literal=DATABASE_URL="postgresql://bank:$PW@bank-db:5432/mockbank" \
+  #     --dry-run=client -o yaml | kubectl apply -f -
+  #
+  # Until then bank-db and bank-api will not start: bank-db reads this whole
+  # secret via envFrom, and bank-api reads DATABASE_URL from it.
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
