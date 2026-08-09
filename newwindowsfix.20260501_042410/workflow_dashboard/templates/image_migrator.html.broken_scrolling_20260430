@@ -245,9 +245,9 @@
         <div>
           <h2 class="section-title" style="margin:0 0 14px;font-size:1rem;color:#a5b4fc;border-bottom:1px solid rgba(165,180,252,.2);padding-bottom:8px;">OSPC Cloud Credentials</h2>
           <div style="display:flex;flex-direction:column;gap:10px;">
-            <div class="form-group"><label>Username</label><input type="text" id="ospc_cloud_user" placeholder="e.g. dzng.8294" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;width:100%;"></div>
+            <div class="form-group"><label>Username</label><input type="text" id="ospc_cloud_user" placeholder="e.g. your.username" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;width:100%;"></div>
             <div class="form-group"><label>API Key / Password</label><input type="text" id="ospc_cloud_key" autocomplete="off" placeholder="Enter API Key" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;width:100%;"></div>
-            <div class="form-group"><label>Account / Project ID</label><input type="text" id="ospc_cloud_account" placeholder="e.g. 1342314" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;font-family:monospace;width:100%;"></div>
+            <div class="form-group"><label>Account / Project ID</label><input type="text" id="ospc_cloud_account" placeholder="e.g. 1234567" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;font-family:monospace;width:100%;"></div>
           </div>
         </div>
 
@@ -260,7 +260,7 @@
                 style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
             </label>
             <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">Username
-              <input id="credFlexUsername" type="text" placeholder="e.g. dzng.8294"
+              <input id="credFlexUsername" type="text" placeholder="e.g. your.username"
                 style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
             </label>
             <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">Password
@@ -268,7 +268,7 @@
                 style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
             </label>
             <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">Project ID
-              <input id="credFlexProjectId" type="text" placeholder="e.g. 49a2c18a567c402ef560bb0f11821b61"
+              <input id="credFlexProjectId" type="text" placeholder="e.g. your-project-id"
                 style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
             </label>
             <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">Domain

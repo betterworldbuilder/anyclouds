@@ -5708,13 +5708,13 @@ opencenter cluster --help</div>
           </div>
           <div id="ocqs-pw-fields" style="margin-top:8px;">
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-              <div><label class="ocqs-label">Username</label><input class="ocqs-input" id="ocqs-username" placeholder="dzng.8294" oninput="ocqsUpdate();ocqsReqCheck();ocqsSave()"></div>
+              <div><label class="ocqs-label">Username</label><input class="ocqs-input" id="ocqs-username" placeholder="your.username" oninput="ocqsUpdate();ocqsReqCheck();ocqsSave()"></div>
               <div><label class="ocqs-label">Password / API Key</label><input class="ocqs-input" id="ocqs-password" type="password" placeholder="your-api-key" oninput="ocqsUpdate();ocqsReqCheck();ocqsSave()"></div>
               <div><label class="ocqs-label">User Domain Name</label><input class="ocqs-input" id="ocqs-userdomain" value="rackspace_cloud_domain" oninput="ocqsUpdate()"></div>
               <div><label class="ocqs-label">Project Domain Name</label><input class="ocqs-input" id="ocqs-projdomain" value="rackspace_cloud_domain" oninput="ocqsUpdate()"></div>
             </div>
             <label class="ocqs-label" style="margin-top:8px;">Project ID</label>
-            <input class="ocqs-input" id="ocqs-projectid" placeholder="49a2c18a567c402ef560bb0f11821b61" oninput="ocqsUpdate()">
+            <input class="ocqs-input" id="ocqs-projectid" placeholder="your-project-id" oninput="ocqsUpdate()">
           </div>
           <div id="ocqs-appcred-fields" style="display:none;margin-top:8px;">
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
@@ -23377,33 +23377,33 @@ ${certContent}
 
 
   const CLOUD_CREDENTIAL_DEFAULTS = {
-    cred_ospc_username: 'dzng.8294',
+    cred_ospc_username: '',
     cred_ospc_apikey: '',
-    cred_ospc_accountid: '1342314',
+    cred_ospc_accountid: '',
     cred_ospc_region: 'IAD',
     cred_flex_auth_url: 'https://keystone.api.dfw3.rackspacecloud.com/v3/',
     cred_flex_auth_type: 'password',
-    cred_flex_username: 'dzng.8294',
+    cred_flex_username: '',
     cred_flex_password: '',
-    cred_flex_project_id: '49a2c18a567c402ef560bb0f11821b61',
+    cred_flex_project_id: '',
     cred_flex_domain: 'rackspace_cloud_domain',
     cred_flex_region: 'DFW3',
-    cred_flex_app_cred_id: '0123456789abcdef0123456789abcdef',
+    cred_flex_app_cred_id: '',
     cred_flex_app_cred_secret: '',
     cred_source_flex_auth_url: 'https://keystone.api.dfw3.rackspacecloud.com/v3/',
-    cred_source_flex_username: 'dzng.8294',
+    cred_source_flex_username: '',
     cred_source_flex_password: '',
-    cred_source_flex_project_id: '49a2c18a567c402ef560bb0f11821b61',
+    cred_source_flex_project_id: '',
     cred_source_flex_domain: 'rackspace_cloud_domain',
     cred_source_flex_region: 'DFW3',
-    mig_ospc_cloud_user: 'dzng.8294',
+    mig_ospc_cloud_user: '',
     mig_ospc_cloud_key: '',
-    mig_ospc_cloud_account: '1342314',
+    mig_ospc_cloud_account: '',
     mig_credFlexAuthUrl: 'https://keystone.api.dfw3.rackspacecloud.com/v3/',
     mig_credFlexAuthType: 'password',
-    mig_credFlexUsername: 'dzng.8294',
+    mig_credFlexUsername: '',
     mig_credFlexPassword: '',
-    mig_credFlexProjectId: '49a2c18a567c402ef560bb0f11821b61',
+    mig_credFlexProjectId: '',
     mig_credFlexDomain: 'rackspace_cloud_domain',
     mig_credFlexRegion: 'DFW3',
   };

@@ -824,9 +824,9 @@
         <div>
           <h2 class="section-title" style="margin:0 0 14px;font-size:1rem;color:#a5b4fc;border-bottom:1px solid rgba(165,180,252,.2);padding-bottom:8px;">{% if vmware_mode %}VMware vCenter Credentials{% else %}OSPC Cloud Credentials{% endif %}</h2>
           <div style="display:flex;flex-direction:column;gap:10px;">
-            <div class="form-group"><label>{% if vmware_mode %}vCenter Username{% else %}Username{% endif %}</label><input type="text" id="ospc_cloud_user" placeholder="{% if vmware_mode %}administrator@vsphere.local{% else %}e.g. dzng.8294{% endif %}" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;width:100%;"></div>
+            <div class="form-group"><label>{% if vmware_mode %}vCenter Username{% else %}Username{% endif %}</label><input type="text" id="ospc_cloud_user" placeholder="{% if vmware_mode %}administrator@vsphere.local{% else %}e.g. your.username{% endif %}" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;width:100%;"></div>
             <div class="form-group"><label>{% if vmware_mode %}vCenter Password{% else %}API Key / Password{% endif %}</label><input type="text" id="ospc_cloud_key" autocomplete="off" placeholder="{% if vmware_mode %}vCenter password{% else %}Enter API Key{% endif %}" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;width:100%;"></div>
-            <div class="form-group"><label>{% if vmware_mode %}vCenter URL / FQDN{% else %}Account / Project ID{% endif %}</label><input type="text" id="ospc_cloud_account" placeholder="{% if vmware_mode %}https://vcenter.example.com{% else %}e.g. 1342314{% endif %}" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;font-family:monospace;width:100%;"></div>
+            <div class="form-group"><label>{% if vmware_mode %}vCenter URL / FQDN{% else %}Account / Project ID{% endif %}</label><input type="text" id="ospc_cloud_account" placeholder="{% if vmware_mode %}https://vcenter.example.com{% else %}e.g. 1234567{% endif %}" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;font-family:monospace;width:100%;"></div>
             {% if vmware_mode %}
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
               <div class="form-group"><label>Datacenter</label><input type="text" id="vmware_datacenter" placeholder="DC01" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;width:100%;"></div>
@@ -858,7 +858,7 @@
             </label>
             <div id="credFlexPasswordFields" style="display:flex;flex-direction:column;gap:10px;">
             <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">Username
-              <input id="credFlexUsername" type="text" placeholder="e.g. dzng.8294"
+              <input id="credFlexUsername" type="text" placeholder="e.g. your.username"
                 style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
             </label>
             <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">Password
@@ -880,7 +880,7 @@
             </div>
             </div>
             <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">Project ID
-              <input id="credFlexProjectId" type="text" placeholder="e.g. 49a2c18a567c402ef560bb0f11821b61"
+              <input id="credFlexProjectId" type="text" placeholder="e.g. your-project-id"
                 style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
             </label>
             <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">Domain
@@ -1085,33 +1085,33 @@
     };
 
     const CLOUD_CREDENTIAL_DEFAULTS = {
-      cred_ospc_username: 'dzng.8294',
+      cred_ospc_username: '',
       cred_ospc_apikey: '',
-      cred_ospc_accountid: '1342314',
+      cred_ospc_accountid: '',
       cred_ospc_region: 'IAD',
       cred_flex_auth_url: 'https://keystone.api.dfw3.rackspacecloud.com/v3/',
       cred_flex_auth_type: 'password',
-      cred_flex_username: 'dzng.8294',
+      cred_flex_username: '',
       cred_flex_password: '',
-      cred_flex_project_id: '49a2c18a567c402ef560bb0f11821b61',
+      cred_flex_project_id: '',
       cred_flex_domain: 'rackspace_cloud_domain',
       cred_flex_region: 'DFW3',
       cred_flex_app_cred_id: '',
       cred_flex_app_cred_secret: '',
       cred_source_flex_auth_url: 'https://keystone.api.dfw3.rackspacecloud.com/v3/',
-      cred_source_flex_username: 'dzng.8294',
+      cred_source_flex_username: '',
       cred_source_flex_password: '',
-      cred_source_flex_project_id: '49a2c18a567c402ef560bb0f11821b61',
+      cred_source_flex_project_id: '',
       cred_source_flex_domain: 'rackspace_cloud_domain',
       cred_source_flex_region: 'DFW3',
-      mig_ospc_cloud_user: 'dzng.8294',
+      mig_ospc_cloud_user: '',
       mig_ospc_cloud_key: '',
-      mig_ospc_cloud_account: '1342314',
+      mig_ospc_cloud_account: '',
       mig_credFlexAuthUrl: 'https://keystone.api.dfw3.rackspacecloud.com/v3/',
       mig_credFlexAuthType: 'password',
-      mig_credFlexUsername: 'dzng.8294',
+      mig_credFlexUsername: '',
       mig_credFlexPassword: '',
-      mig_credFlexProjectId: '49a2c18a567c402ef560bb0f11821b61',
+      mig_credFlexProjectId: '',
       mig_credFlexDomain: 'rackspace_cloud_domain',
       mig_credFlexRegion: 'DFW3',
     };

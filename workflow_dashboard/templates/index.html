@@ -512,7 +512,7 @@
               </select>
             </label>
             <label>Auth URL<input id="credSourceFlexAuthUrl" type="text" placeholder="https://keystone.api.dfw3.rackspacecloud.com/v3/" /></label>
-            <label>Username<input id="credSourceFlexUsername" type="text" placeholder="e.g. dzng.8294" /></label>
+            <label>Username<input id="credSourceFlexUsername" type="text" placeholder="e.g. your.username" /></label>
             <label>Password<input id="credSourceFlexPassword" type="text" placeholder="FLEX source password" /></label>
             <label>Project ID<input id="credSourceFlexProjectId" type="text" placeholder="source project UUID" /></label>
             <label>Domain<input id="credSourceFlexDomain" type="text" placeholder="rackspace_cloud_domain" value="rackspace_cloud_domain" /></label>
@@ -544,9 +544,9 @@
             <label>Client Secret<input id="credAzureClientSecret" type="text" autocomplete="off" placeholder="Service principal secret" /></label>
             <label>Azure Region<input id="credAzureRegion" type="text" placeholder="westus2" /></label>
           {% else %}
-            <label>Username<input id="credOspcUsername" type="text" placeholder="e.g. dzng.8294" value="{% if is_hyperflex %}{% else %}dzng.8294{% endif %}" /></label>
+            <label>Username<input id="credOspcUsername" type="text" placeholder="e.g. your.username" value="{% if is_hyperflex %}{% else %}{% endif %}" /></label>
             <label>API Key / Password<input id="credOspcApiKey" type="text" placeholder="Rackspace API key" /></label>
-            <label>Account / Project ID<input id="credOspcAccountId" type="text" placeholder="e.g. 1342314" /></label>
+            <label>Account / Project ID<input id="credOspcAccountId" type="text" placeholder="e.g. 1234567" /></label>
           {% endif %}
           </div>
         </div>
@@ -565,9 +565,9 @@
               </select>
             </label>
             <label>Auth URL<input id="credFlexAuthUrl" type="text" placeholder="https://keystone.api.dfw3.rackspacecloud.com/v3/" /></label>
-            <label>Username<input id="credFlexUsername" type="text" placeholder="e.g. dzng.8294" /></label>
+            <label>Username<input id="credFlexUsername" type="text" placeholder="e.g. your.username" /></label>
             <label>Password<input id="credFlexPassword" type="text" placeholder="FLEX password" /></label>
-            <label>Project ID<input id="credFlexProjectId" type="text" placeholder="e.g. 49a2c18a567c402ef560bb0f11821b61" /></label>
+            <label>Project ID<input id="credFlexProjectId" type="text" placeholder="e.g. your-project-id" /></label>
             <label>Domain<input id="credFlexDomain" type="text" placeholder="rackspace_cloud_domain" value="rackspace_cloud_domain" /></label>
             <label>Import OpenRC File
               <div style="display:flex;gap:8px;align-items:center;">
@@ -623,33 +623,33 @@
     };
 
     const CLOUD_CREDENTIAL_DEFAULTS = {
-      cred_ospc_username: 'dzng.8294',
+      cred_ospc_username: '',
       cred_ospc_apikey: '',
-      cred_ospc_accountid: '1342314',
+      cred_ospc_accountid: '',
       cred_ospc_region: 'IAD',
       cred_flex_auth_url: 'https://keystone.api.dfw3.rackspacecloud.com/v3/',
       cred_flex_auth_type: 'password',
-      cred_flex_username: 'dzng.8294',
+      cred_flex_username: '',
       cred_flex_password: '',
-      cred_flex_project_id: '49a2c18a567c402ef560bb0f11821b61',
+      cred_flex_project_id: '',
       cred_flex_domain: 'rackspace_cloud_domain',
       cred_flex_region: 'DFW3',
       cred_flex_app_cred_id: '',
       cred_flex_app_cred_secret: '',
       cred_source_flex_auth_url: 'https://keystone.api.dfw3.rackspacecloud.com/v3/',
-      cred_source_flex_username: 'dzng.8294',
+      cred_source_flex_username: '',
       cred_source_flex_password: '',
-      cred_source_flex_project_id: '49a2c18a567c402ef560bb0f11821b61',
+      cred_source_flex_project_id: '',
       cred_source_flex_domain: 'rackspace_cloud_domain',
       cred_source_flex_region: 'DFW3',
-      mig_ospc_cloud_user: 'dzng.8294',
+      mig_ospc_cloud_user: '',
       mig_ospc_cloud_key: '',
-      mig_ospc_cloud_account: '1342314',
+      mig_ospc_cloud_account: '',
       mig_credFlexAuthUrl: 'https://keystone.api.dfw3.rackspacecloud.com/v3/',
       mig_credFlexAuthType: 'password',
-      mig_credFlexUsername: 'dzng.8294',
+      mig_credFlexUsername: '',
       mig_credFlexPassword: '',
-      mig_credFlexProjectId: '49a2c18a567c402ef560bb0f11821b61',
+      mig_credFlexProjectId: '',
       mig_credFlexDomain: 'rackspace_cloud_domain',
       mig_credFlexRegion: 'DFW3',
     };
@@ -844,7 +844,7 @@
       <p class="hint">{% if is_flex2flex %}Authenticate with source FLEX Keystone credentials or import an OpenRC file, then scan the source project inventory.{% elif is_hyperflex %}Create or load {{ provider_label }} source inventory artifacts, then generate FLEX-ready overview and mapping files.{% else %}Authenticate with your Rackspace OSPC Credentials and click the Run Account Scanning button below.{% endif %}</p>
       <div class="grid" style="margin-bottom:12px;">
         <label>{% if is_flex2flex %}FLEX Username{% elif is_hyperflex %}{{ provider_label }} Account / Access ID{% else %}OSPC Username{% endif %}
-          <input id="ovUsername" type="text" value="{% if is_flex2flex or is_hyperflex %}{% else %}dzng.8294{% endif %}" />
+          <input id="ovUsername" type="text" value="{% if is_flex2flex or is_hyperflex %}{% else %}{% endif %}" />
         </label>
         <label>{% if is_flex2flex %}FLEX Password{% elif is_hyperflex %}{{ provider_label }} Secret / Key{% else %}OSPC API Key{% endif %}
           <input id="ovApiKey" type="text" />
