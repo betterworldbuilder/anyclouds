@@ -75,7 +75,7 @@
       "x": 838.5,
       "y": 461.5,
       "props": {
-        "admin_password": "j63I89kTd4FTKs",
+        "admin_password": "",
         "admin_user": "Administrator",
         "auth_mode": "windows_password",
         "flavor": "gp.5.2.4",
@@ -92,7 +92,7 @@
       "x": 838.5,
       "y": 350.5,
       "props": {
-        "admin_password": "fcFx2Z11DeggET",
+        "admin_password": "",
         "admin_user": "Administrator",
         "auth_mode": "windows_password",
         "flavor": "gp.5.2.4",
@@ -109,7 +109,7 @@
       "x": 838.5,
       "y": 461.5,
       "props": {
-        "admin_password": "UL8SdLBWz5WIHB",
+        "admin_password": "",
         "admin_user": "Administrator",
         "auth_mode": "windows_password",
         "flavor": "gp.5.2.4",

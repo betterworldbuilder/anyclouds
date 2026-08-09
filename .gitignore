@@ -195,3 +195,7 @@ output/export/manifests/secret.yaml
 oauth2-proxy.cfg
 **/oauth2-proxy.cfg
 !**/oauth2-proxy.cfg.example
+
+# The `*tokens*` rule above matches "tokenscan", which would silently exclude
+# the credential scanner from commits.
+!scripts/security/tokenscan.sh
