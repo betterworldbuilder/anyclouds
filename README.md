@@ -577,8 +577,12 @@ Run the dashboard from a Linux or WSL2 operator workstation. Run heavy image wor
 
 ## 🔐 Credentials & Secrets
 
-**No credentials are hardcoded in this repository.** Every script, tool and template
-reads its credentials from the environment at runtime.
+**No credentials are hardcoded in any script, tool or template** — they all read
+from the environment at runtime, and [`scripts/security/tokenscan.sh`](scripts/security/tokenscan.sh)
+enforces this on demand or in a pre-commit hook.
+
+One exception remains open: three plaintext Windows admin passwords in a committed
+topology **data** file — see [Audit status](#audit-status) below.
 
 ### How to supply credentials
 
@@ -602,19 +606,74 @@ In the dashboard, credentials are entered through the UI and kept in the browser
 `seedCloudCredentialDefaults()` skips empty values, so the credential panels simply
 start unfilled.
 
+### `tokenscan.sh` — run the audit yourself
+
+```bash
+scripts/security/tokenscan.sh              # whole tree, incl. .gitignore'd files
+scripts/security/tokenscan.sh --tracked    # only what a clone would publish (fast)
+scripts/security/tokenscan.sh --staged     # pre-commit use
+scripts/security/tokenscan.sh -H           # also sweep git history (slow)
+scripts/security/tokenscan.sh -v           # show what the allowlist suppressed
+scripts/security/tokenscan.sh --no-allow   # raw, unfiltered output
+```
+
+26 rules across two severities: **HIGH** is a distinctive secret shape (GitHub,
+Anthropic, AWS, Google, Slack, GitLab, Stripe, npm, DigitalOcean, HuggingFace,
+private keys, JWTs, URLs with inline credentials); **MEDIUM** is credential-shaped
+and wants a human glance. It also flags committed `.env` / `*.pem` / `id_rsa` /
+`clouds.yaml` / OpenRC files.
+
+Exit codes are CI-friendly: **0** clean, **1** findings, **2** usage error.
+Matched values are always **redacted** (`ghp_A1…r8 [40 chars]`) so the scanner
+never prints a secret into a build log. A ~1400-file scan takes about 10 seconds.
+
+False positives go in [`scripts/security/tokenscan-allow.txt`](scripts/security/tokenscan-allow.txt)
+as ERE patterns matched against `path:line:match:context`, or put the marker
+`tokenscan:allow` on the offending source line. Every entry in that file has a
+comment saying why it is not a secret.
+
+Self-test — 48 assertions over throwaway repos with synthetic secrets:
+
+```bash
+scripts/security/tokenscan-test.sh
+```
+
+Two deliberate limitations, both worth knowing:
+
+- `--history` applies only the **HIGH** rules. A MEDIUM-shaped secret (such as a
+  32-hex API key assigned to a variable — exactly the shape of the key purged in
+  `94b8750`) will **not** be found that way. Use `git log -S'<value>' --all`.
+- The allowlist suppresses by path. A real key committed to an allowlisted path
+  (e.g. under `tests/`) would be hidden, which is why those paths are listed
+  individually rather than as a blanket `^tests/`.
+
 ### Audit status
 
-Last audited **2026-08-09** at commit `95a40bf` across all 1348 tracked files:
+Last audited **2026-08-09** with `tokenscan.sh --all` (1415 files) and
+`--tracked` (1347 files):
 
 | Check | Result |
 |---|---|
 | Provider tokens (`ghp_`, `github_pat_`, `sk-ant-`, `xox*-`, `AKIA*`, `AIza*`, `glpat-`, …) | ✅ none |
-| API keys / passwords assigned to literals | ✅ none |
+| API keys assigned to literals | ✅ none |
 | 32-hex secret assignments | ✅ no credentials (see note 4) |
 | JWTs | ✅ none |
 | PEM private keys | ✅ no key material (see notes 1, 5) |
 | `OS_PASSWORD` / `OS_API_KEY` / `OS_APPLICATION_CREDENTIAL_SECRET` literals | ✅ none — all runtime-injected |
 | Tracked `.env`, `*.pem`, `*.key`, `clouds.yaml`, `credentials` files | ✅ none |
+| Plaintext passwords in committed data files | ❌ **6 findings — see below** |
+
+#### ❌ Open finding: Windows admin passwords in a saved topology
+
+`uploads/topologies/cust1.json` (and its `newwindowsfix.20260501_042410/` copy)
+contain three `"admin_password"` values for Windows VMs alongside
+`"admin_user": "Administrator"` and `"auth_mode": "windows_password"`. They are
+committed in plaintext and reachable by anyone with repo access.
+
+These are **not** allowlisted — `tokenscan.sh` reports them on every run by
+design. They need to be rotated and scrubbed; this section stays until they are.
+Earlier passes of this audit missed them because those passes searched for
+*token* shapes, not for `"admin_password": "<14 random chars>"`.
 
 Coverage includes vendored and generated assets that are easy to skip: the saved-webpage
 bundle under `The Rackspace Cloud_files/`, minified JS/CSS, `*.download`, `*.map` and
@@ -639,22 +698,23 @@ Known and accepted matches, reviewed and not secrets:
    not a Rackspace or cloud credential. It is still a hardcoded password granting
    `REPLICATION SLAVE ON *.*` to `'repl'@'%'`, and is worth parameterising.
 
-### Reproducing the audit
+### Wire it into a pre-commit hook
 
 ```bash
-# tracked-file scan for provider token shapes
-git grep -nIE '(ghp|gho|ghs)_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{30,}|sk-ant-[A-Za-z0-9_-]{20,}|AKIA[0-9A-Z]{16}|glpat-[A-Za-z0-9_-]{20}'
-
-# secret-shaped assignments (32-hex values, the shape of a Rackspace API key)
-git grep -nIiE "(api_?key|token|password|secret)[\"']?[[:space:]]*[:=][[:space:]]*[\"']?[0-9a-f]{32}"
-
-# include gitignored files too — plain `grep` skips nothing
-grep -rIlE 'ghp_[A-Za-z0-9]{30,}|-----BEGIN (RSA |OPENSSH )?PRIVATE KEY-----' . \
-  --exclude-dir=.git --exclude-dir=node_modules --exclude-dir=.venv
+cat > .git/hooks/pre-commit <<'HOOK'
+#!/bin/sh
+exec scripts/security/tokenscan.sh --staged --quiet
+HOOK
+chmod +x .git/hooks/pre-commit
 ```
 
-> ⚠️ Note that `git grep` and ripgrep honour `.gitignore`, which can hide *tracked*
-> backup files (e.g. `*.bak_*`). Always include a plain `grep` sweep as above.
+The commit is then blocked whenever a staged file carries a secret.
+
+> ⚠️ **Why the default scope walks the filesystem:** `git grep` and ripgrep both
+> honour `.gitignore`, which hides *tracked* files whose names happen to match an
+> ignore rule. Six tracked `*.bak_*` templates full of credentials were missed for
+> exactly this reason during the first pass of this audit. `tokenscan.sh` defaults
+> to `find`, so an ignore rule can never hide a tracked file from it.
 
 ### ⚠️ Git history is not clean
 
