@@ -3,7 +3,7 @@
 # Usage: OS_PASSWORD=yourpassword bash test_flex_vms.sh
 
 AUTH_URL="https://keystone.api.dfw3.rackspacecloud.com/v3"
-USERNAME="dzng.8294"
+USERNAME="${OS_USERNAME:?Set OS_USERNAME (source your OpenRC)}"
 PROJECT_ID="49a2c18a567c402ef560bb0f11821b61"
 DOMAIN="rackspace_cloud_domain"
 PASSWORD="${OS_PASSWORD:-}"

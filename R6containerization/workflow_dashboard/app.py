@@ -5255,8 +5255,9 @@ def _cutover_scan_ospc_live(creds: Dict[str, Any], region: str) -> Tuple[List[Di
     # This repo's cached credentials use FLEX project UUID separately. If an old
     # browser cache still passes that UUID as the OSPC account, try the known
     # numeric Rackspace tenant before giving up.
-    if username == "dzng.8294" and "1342314" not in candidates:
-        candidates.append("1342314")
+    _fallback_tenant = os.environ.get("OSPC_FALLBACK_TENANT_ID", "").strip()
+    if _fallback_tenant and _fallback_tenant not in candidates:
+        candidates.append(_fallback_tenant)
 
     errors: List[str] = []
     for tenant_id in candidates:
@@ -20149,7 +20150,7 @@ echo "=== TASK COMPLETE ==="
                         "OSPC Inventory": ospc_inv,
                         "Flex Inventory": flex_inv,
                         "Migrated Status": "Successfully Migrated",
-                        "User Account": "dzng.8294",
+                        "User Account": "n/a",
                         "Cloud Env": "FLEX Production",
                         "Cutover Test Results": "PASSED (No Loss)",
                         "Method of Migration": "Blue-Green Migration",
@@ -20165,7 +20166,7 @@ echo "=== TASK COMPLETE ==="
                         "OSPC Inventory": "web-prod-01",
                         "Flex Inventory": "web-prod-01-flex",
                         "Migrated Status": "Successfully Migrated",
-                        "User Account": "dzng.8294",
+                        "User Account": "n/a",
                         "Cloud Env": "FLEX Production",
                         "Cutover Test Results": "PASSED",
                         "Method of Migration": "Blue-Green UI",
