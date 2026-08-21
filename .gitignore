@@ -199,3 +199,10 @@ oauth2-proxy.cfg
 # The `*tokens*` rule above matches "tokenscan", which would silently exclude
 # the credential scanner from commits.
 !tokenscan.sh
+
+# SSH trust store written by the dashboard at runtime. Holds host public keys,
+# fingerprints and the IPs of live servers - operational data, not source.
+workflow_dashboard/data/ssh/known_hosts
+workflow_dashboard/data/ssh/known_hosts_audit.jsonl
+**/data/ssh/known_hosts
+**/data/ssh/known_hosts_audit.jsonl
