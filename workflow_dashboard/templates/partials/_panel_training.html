@@ -35,7 +35,9 @@
         --trn-sh2:    var(--ios-shadow-2, 0 2px 6px rgba(0,0,0,.05), 0 8px 24px rgba(0,0,0,.06));
         font-family: var(--ios-font, -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif);
       }
-      #panel-s_train .trn-wrap { max-width:1320px; margin:0 auto; padding:6px 0 48px; }
+      /* Match the OpenCenter stage: relocated lab bands should use the entire
+         training workspace instead of being squeezed into a 1320px wrapper. */
+      #panel-s_train .trn-wrap { width:100%; max-width:none; margin:0; padding:6px 0 48px; }
       #panel-s_train .trn-hero {
         position:relative; overflow:hidden; border-radius:var(--trn-rlg);
         border:1px solid var(--trn-sep); margin-bottom:20px; padding:34px 36px 30px;

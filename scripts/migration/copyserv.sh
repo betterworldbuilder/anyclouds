@@ -1,3 +1,4 @@
 eval "$(ssh-agent -s)"
 ssh-add ~/.ssh/id_rsa
-./run_origin_rsync_interactive.sh
+# Sibling script — resolve next to this file so the caller's cwd does not matter.
+"$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/run_origin_rsync_interactive.sh"
